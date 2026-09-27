@@ -1,0 +1,1 @@
+import{c as a}from"./index-CFbJpgaA.js";const e={name:"align-vertical-space-around",size:24,node:[["rect",{width:"10",height:"6",x:"7",y:"9",rx:"2",key:"b1zbii"}],["path",{d:"M22 20H2",key:"1p1f7z"}],["path",{d:"M22 4H2",key:"1b7qnq"}]]};e.node;const c=a(e);export{e as __iconData,c as default};

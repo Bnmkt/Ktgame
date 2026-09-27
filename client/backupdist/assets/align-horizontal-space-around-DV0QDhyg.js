@@ -1,0 +1,1 @@
+import{c as a}from"./index-j2sd2D1v.js";const e={name:"align-horizontal-space-around",size:24,node:[["rect",{width:"6",height:"10",x:"9",y:"7",rx:"2",key:"yn7j0q"}],["path",{d:"M4 22V2",key:"tsjzd3"}],["path",{d:"M20 22V2",key:"1bnhr8"}]]};e.node;const o=a(e);export{e as __iconData,o as default};

@@ -1,0 +1,1 @@
+import{c as t}from"./index-B54cPbUQ.js";const e={name:"arrow-right-left",size:24,node:[["path",{d:"m16 3 4 4-4 4",key:"1x1c3m"}],["path",{d:"M20 7H4",key:"zbl0bi"}],["path",{d:"m8 21-4-4 4-4",key:"h9nckh"}],["path",{d:"M4 17h16",key:"g4d7ey"}]]};e.node;const o=t(e);export{e as __iconData,o as default};

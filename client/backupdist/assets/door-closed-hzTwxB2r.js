@@ -1,0 +1,1 @@
+import{c as e}from"./index-CGSsC9XH.js";const o={name:"door-closed",size:24,node:[["path",{d:"M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16",key:"4uynto"}],["path",{d:"M2 21h20",key:"1nyx9w"}],["path",{d:"M9 12h.01",key:"157uk2"}]]};o.node;const t=e(o);export{o as __iconData,t as default};

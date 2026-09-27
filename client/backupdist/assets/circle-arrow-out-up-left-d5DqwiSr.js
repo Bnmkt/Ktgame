@@ -1,0 +1,1 @@
+import{c as r}from"./index-j2sd2D1v.js";const e={name:"circle-arrow-out-up-left",size:24,node:[["path",{d:"M2 8V2h6",key:"hiwtdz"}],["path",{d:"m2 2 10 10",key:"1oh8rs"}],["path",{d:"M12 2A10 10 0 1 1 2 12",key:"rrk4fa"}]],aliases:["arrow-up-left-from-circle"]};e.node;const a=r(e);export{e as __iconData,a as default};

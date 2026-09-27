@@ -1,0 +1,1 @@
+import{c as a}from"./index-j2sd2D1v.js";const e={name:"briefcase",size:24,node:[["path",{d:"M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16",key:"jecpp"}],["rect",{width:"20",height:"14",x:"2",y:"6",rx:"2",key:"i6l2r4"}]]};e.node;const t=a(e);export{e as __iconData,t as default};

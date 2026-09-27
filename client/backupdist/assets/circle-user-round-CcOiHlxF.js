@@ -1,0 +1,1 @@
+import{c}from"./index-j2sd2D1v.js";const e={name:"circle-user-round",size:24,node:[["path",{d:"M17.925 20.056a6 6 0 0 0-11.851.001",key:"z69sun"}],["circle",{cx:"12",cy:"11",r:"4",key:"1gt34v"}],["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}]],aliases:["user-circle-2"]};e.node;const a=c(e);export{e as __iconData,a as default};

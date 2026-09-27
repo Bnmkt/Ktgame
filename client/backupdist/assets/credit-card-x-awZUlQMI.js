@@ -1,0 +1,1 @@
+import{c as e}from"./index-CnLhKHnI.js";const a={name:"credit-card-x",size:24,node:[["path",{d:"M12.5 19H4a2 2 0 01-2-2V7a2 2 0 012-2h16a2 2 0 012 2v3.5",key:"187u2m"}],["path",{d:"m16.5 14.5 5 5",key:"ozpm51"}],["path",{d:"M2 10h20",key:"1ir3d8"}],["path",{d:"m21.5 14.5-5 5",key:"1bnlip"}]]};a.node;const t=e(a);export{a as __iconData,t as default};

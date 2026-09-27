@@ -1,0 +1,1 @@
+import{c}from"./index-BulVBlDR.js";const e={name:"circle-arrow-up",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"m16 12-4-4-4 4",key:"177agl"}],["path",{d:"M12 16V8",key:"1sbj14"}]],aliases:["arrow-up-circle"]};e.node;const r=c(e);export{e as __iconData,r as default};

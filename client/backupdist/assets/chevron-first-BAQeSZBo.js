@@ -1,0 +1,1 @@
+import{c as o}from"./index-BulVBlDR.js";const e={name:"chevron-first",size:24,node:[["path",{d:"m17 18-6-6 6-6",key:"1yerx2"}],["path",{d:"M7 6v12",key:"1p53r6"}]]};e.node;const r=o(e);export{e as __iconData,r as default};

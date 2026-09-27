@@ -1,0 +1,1 @@
+import{c as a}from"./index-B54cPbUQ.js";const e={name:"at-sign",size:24,node:[["circle",{cx:"12",cy:"12",r:"4",key:"4exip2"}],["path",{d:"M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8",key:"7n84p3"}]]};e.node;const n=a(e);export{e as __iconData,n as default};

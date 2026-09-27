@@ -1,0 +1,1 @@
+import{c as e}from"./index-j2sd2D1v.js";const a={name:"arrow-big-right",size:24,node:[["path",{d:"M13.207 19.793a.707.707 0 0 1-1.207-.5V16a1 1 0 0 0-1-1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h6a1 1 0 0 0 1-1V4.707a.707.707 0 0 1 1.207-.5l6.94 6.94a1.207 1.207 0 0 1 0 1.707z",key:"zee3eo"}]]};a.node;const t=e(a);export{a as __iconData,t as default};

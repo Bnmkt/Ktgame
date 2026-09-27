@@ -1,0 +1,1 @@
+import{c as e}from"./index-BulVBlDR.js";const c={name:"clock-5",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"M12 6v6l2 4",key:"1287s9"}]]};c.node;const a=e(c);export{c as __iconData,a as default};

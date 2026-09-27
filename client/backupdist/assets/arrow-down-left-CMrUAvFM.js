@@ -1,0 +1,1 @@
+import{c as e}from"./index-DPIYnb7u.js";const o={name:"arrow-down-left",size:24,node:[["path",{d:"M17 7 7 17",key:"15tmo1"}],["path",{d:"M17 17H7V7",key:"1org7z"}]]};o.node;const a=e(o);export{o as __iconData,a as default};

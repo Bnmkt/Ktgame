@@ -1,0 +1,1 @@
+import{c as e}from"./index-BulVBlDR.js";const a={name:"arrow-up",size:24,node:[["path",{d:"m5 12 7-7 7 7",key:"hav0vg"}],["path",{d:"M12 19V5",key:"x0mq9r"}]]};a.node;const r=e(a);export{a as __iconData,r as default};

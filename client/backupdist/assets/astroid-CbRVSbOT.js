@@ -1,0 +1,1 @@
+import{c as t}from"./index-DPIYnb7u.js";const o={name:"astroid",size:24,node:[["path",{d:"M12.983 21.186a1 1 0 0 1-1.966 0 10 10 0 0 0-8.203-8.203 1 1 0 0 1 0-1.966 10 10 0 0 0 8.203-8.203 1 1 0 0 1 1.966 0 10 10 0 0 0 8.203 8.203 1 1 0 0 1 0 1.966 10 10 0 0 0-8.203 8.203",key:"1tipus"}]]};o.node;const e=t(o);export{o as __iconData,e as default};

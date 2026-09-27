@@ -1,0 +1,1 @@
+import{c}from"./index-CnLhKHnI.js";const e={name:"eclipse",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"M12 2a7 7 0 1 0 10 10",key:"1yuj32"}]]};e.node;const o=c(e);export{e as __iconData,o as default};

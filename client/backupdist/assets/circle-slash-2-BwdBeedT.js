@@ -1,0 +1,1 @@
+import{c}from"./index-CFbJpgaA.js";const e={name:"circle-slash-2",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"M22 2 2 22",key:"y4kqgn"}]],aliases:["circle-slashed"]};e.node;const s=c(e);export{e as __iconData,s as default};

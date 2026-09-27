@@ -1,0 +1,250 @@
+.casino-header { background: #101514; border-bottom: 1px solid #35413b; }
+.room-route-active .casino-header *,
+.room-route-active .casino-header *::before,
+.room-route-active .casino-header *::after { animation: none !important; }
+.live-room-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 24px; }
+.live-room-list button { align-items: center; display: inline-flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+.health-subtabs { display: flex; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; }
+.health-subtabs button { flex: 1 0 auto; white-space: nowrap; }
+.activity-card { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.activity-card .chart-heading { min-width: 0; }
+.activity-card .chart-heading > div:first-child { display: grid; gap: 4px; }
+.activity-card .range-tabs { border-radius: 8px; flex: 0 1 auto; flex-wrap: wrap; max-width: 100%; min-width: 0; }
+.activity-card .range-tabs button { white-space: nowrap; }
+.activity-plot { height: auto; min-width: 0; overflow-x: auto; }
+.activity-plot svg { display: block; height: auto; min-width: 520px; width: 100%; }
+.activity-grid-line { stroke: #3d5146; stroke-width: 1; }
+.activity-axis-label { fill: #c8d6ca; font-size: 13px; }
+.activity-value-label { fill: #f0dc9e; font-size: 12px; font-weight: 700; }
+.activity-line { fill: none; stroke: #64b993; stroke-width: 2; stroke-linejoin: round; }
+.activity-point { fill: #84d7b1; }
+.activity-point.selected { fill: #edc76a; stroke: #101918; stroke-width: 1; }
+.activity-point-target { cursor: pointer; fill: transparent; }
+.activity-point-target:focus { outline: none; stroke: #edc76a; stroke-width: 1; }
+.casino-header-inner { align-items: center; display: flex; gap: 18px; margin: 0 auto; max-width: 1440px; padding: 14px 24px; }
+.casino-brand { align-items: center; color: #f1d88f; display: inline-flex; flex: 0 0 auto; font-size: 23px; font-weight: 900; gap: 8px; text-decoration: none; }
+.casino-brand .cosmetic-icon { display: inline-flex; flex: 0 0 auto; }
+.casino-navigation { align-items: center; display: flex; flex: 1; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.casino-navigation a, .casino-navigation button { align-items: center; background: transparent; border: 1px solid transparent; border-radius: 6px; box-shadow: none; color: #c8d1cb; display: inline-flex; font-size: 14px; font-weight: 700; gap: 7px; min-height: 40px; padding: 9px 12px; text-decoration: none; white-space: nowrap; }
+.casino-navigation .active { background: #243b31; border-color: #486654; color: #f5e6b9; }
+.casino-navigation a:hover, .casino-navigation button:hover { background: #25312b; color: #fff5d9; transform: none; }
+.casino-brand:focus-visible, .casino-navigation a:focus-visible { outline: 2px solid #f1d88f; outline-offset: 3px; }
+.casino-logout { flex: 0 0 auto; }
+.casino-accountbar { align-items: center; display: flex; flex: 0 0 auto; gap: 12px; justify-content: flex-end; margin-left: auto; min-width: 0; }
+.casino-wallet { align-items: center; color: #edd17f; display: inline-flex; font-variant-numeric: tabular-nums; font-weight: 800; gap: 8px; white-space: nowrap; }
+.casino-accountbar .identity-pill { background: transparent; border: 0; min-width: 0; padding: 0; }
+.casino-accountbar .identity-pill { justify-content: flex-end; text-align: right; }
+.casino-accountbar .identity-pill .display-name-text { max-width: 150px; overflow-wrap: anywhere; white-space: normal; }
+.casino-accountbar .daily-bonus-button { flex-shrink: 0; font-size: 13px; min-height: 42px; padding: 6px 12px; }
+.casino-accountbar .daily-bonus-button small { font-size: 10px; }
+.casino-bonus-feedback { align-items: center; display: flex; gap: 10px; margin: 16px auto 0; max-width: 1392px; width: calc(100% - 48px); }
+.casino-bonus-feedback > svg, .casino-bonus-feedback > button { flex-shrink: 0; }
+.casino-bonus-feedback > span { flex: 1; }
+.casino-accountbar .notification-center { position: relative; right: auto; top: auto; z-index: 6; }
+.casino-accountbar .notification-panel { right: -54px; width: min(420px, calc(100vw - 48px)); }
+.page-heading { align-items: center; display: flex; gap: 16px; justify-content: space-between; margin-bottom: 24px; min-width: 0; }
+.page-heading h1 { font-size: 30px; margin: 3px 0 0; overflow-wrap: anywhere; }
+.page-heading > div { min-width: 0; }
+.room-heading { margin-bottom: 16px; }
+.room-table-tools { align-items: center; border-bottom: 1px solid #343e37; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; padding-bottom: 16px; }
+.room-table-tools button { font-size: 13px; min-height: 38px; }
+.room-close-action { margin-left: auto; }
+.room-app-shell.table-fullscreen .page-heading { margin-bottom: 8px; }
+.room-app-shell.table-fullscreen .page-heading h1 { font-size: 24px; }
+.room-app-shell.table-fullscreen .room-table-tools { margin-bottom: 10px; padding-bottom: 8px; }
+.game-card h3 { align-items: center; display: flex; gap: 8px; }
+.game-favorite { color: #e9c565; flex: 0 0 auto; }
+.shop-page-panel, .shop-page-content, .shop-page-layout { min-width: 0; }
+.shop-page-panel { border: 1px solid #5b533b; border-radius: 8px; background: #101718; padding: 22px; }
+.shop-main, .admin-list { scroll-margin-top: 20px; }
+.list-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; border-top: 1px solid #514b38; padding-top: 16px; margin-top: 20px; }
+.list-pagination .pagination-count { color: #d7ceb9; font-size: 13px; font-variant-numeric: tabular-nums; }
+.list-pagination label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #d7ceb9; }
+.list-pagination select { color: #f4ead4; background: #1b2425; border: 1px solid #716442; border-radius: 6px; min-height: 38px; padding: 6px 8px; font: inherit; color-scheme: dark; }
+.pagination-controls { display: flex; align-items: center; gap: 6px; }
+.pagination-controls > span { min-width: 90px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pagination-controls .icon-toggle { flex: 0 0 36px; width: 36px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.pack-theme-tabs button { color: #f6e9c9; }
+.pack-theme-tabs button strong { font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+.pack-theme-tabs button small { color: #cec5b0; }
+.pack-theme-tabs button.active strong { color: #ffe091; }
+.pack-theme-tabs button:hover, .pack-theme-tabs button:focus-visible { color: #fff1cc; border-color: #bca366; }
+.pack-item.owned { opacity: 1; background: #192321; }
+.pack-item.owned strong { color: #d9dfd6; }
+.pack-actions { position: sticky; bottom: 12px; z-index: 5; background: #101718; }
+.pack-actions .pack-checkout { position: static; border-radius: 8px; }
+.pack-actions .list-pagination { margin: 0; padding: 12px 0; }
+.shop-main .shop-grid > .shop-item { content-visibility: visible; contain-intrinsic-size: none; }
+@media(max-width: 650px) {
+  .shop-page-panel { padding: 12px; }
+  .list-pagination { gap: 12px 8px; }
+  .pagination-controls { width: 100%; justify-content: center; }
+}
+.shop-shell .shop-preview { position: sticky; top: 20px; }
+.shop-shell .shop-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.shop-shell .shop-item { min-width: 0; }
+.casino-dialog-layer { z-index: 20; }
+.casino-dialog { outline: none; }
+.action-confirm-layer { z-index: 130; }
+.action-confirm-modal { max-width: 520px; }
+.action-confirm-message { align-items: flex-start; color: #d2dacd; display: flex; gap: 10px; line-height: 1.6; margin: 0 0 24px; overflow-wrap: anywhere; }
+.action-confirm-message > svg { color: #edbf75; flex-shrink: 0; margin-top: 3px; }
+.action-confirm-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.admin-ledger { position: relative; }
+.lobby-join-action { display: flex; justify-content: flex-end; margin: 0 0 22px; }
+.join-code-modal { max-width: 460px; }
+.join-code-modal form, .join-code-modal label { display: grid; gap: 10px; }
+.join-code-modal form { gap: 20px; }
+.join-code-modal label > span { align-items: center; display: flex; gap: 8px; }
+.join-code-modal .actions { justify-content: flex-end; }
+.friend-join.available { background: #153e2a; border-color: #65bd89; color: #9aefb7; }
+.friend-join.available:hover { background: #1b5035; }
+.player-network-actions .danger-button { color: #ffb9bd; }
+.event-action-buttons { justify-content: center; margin: 20px 0; }
+.event-ranking-tabs button { color: #d9dfda; font-size: 12px; }
+.event-ranking-tabs button:hover { background: #253b32; color: #fff; }
+.event-effect-rules { border-top: 1px solid #3c4d44; margin-top: 22px; padding-top: 18px; }
+.event-effect-rules h3 { color: #f3e5c6; font-size: 17px; margin: 0 0 14px; }
+.event-effect-rules dl { margin: 0; }
+.event-effect-rules dl > div { border-bottom: 1px solid #33453b; display: grid; gap: 12px; grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr); padding: 14px 0; }
+.event-effect-rules dt, .event-effect-rules dd { min-width: 0; overflow-wrap: anywhere; }
+.event-effect-rules dt small { color: #b9c4bc; display: block; line-height: 1.5; margin-top: 5px; }
+.event-effect-rules dd { color: #e0e8df; line-height: 1.6; margin: 0; }
+.event-effect-rules ul { margin: 0; padding-left: 18px; }
+.event-effect-rules li + li { margin-top: 6px; }
+.event-combinations .admin-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.event-combinations label { display: grid; gap: 6px; min-width: 0; }
+.event-combinations select { background: #fff9ed; border: 1px solid #abb6a8; border-radius: 6px; color: #151b17; font: inherit; min-height: 40px; min-width: 0; padding: 8px; width: 100%; }
+.event-combination summary { flex-wrap: wrap; gap: 8px; }
+.event-combination summary strong { overflow-wrap: anywhere; }
+.combination-values { display: grid; gap: 10px; margin: 16px 0; }
+.combination-dice { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); }
+.combination-cards { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.combination-value { align-items: center; border-bottom: 1px solid #39463d; display: flex; gap: 10px; min-width: 0; padding-bottom: 12px; }
+.combination-value > label, .combination-card-fields { flex: 1; min-width: 0; }
+.combination-card-fields { display: grid; gap: 8px; }
+.combination-value > button { flex: 0 0 32px; height: 32px; min-height: 32px; padding: 5px; width: 32px; }
+.combination-value-preview, .combination-value-preview .die { height: 40px; min-height: 40px; min-width: 40px; width: 40px; }
+.combination-value-preview { align-items: center; display: flex; flex-shrink: 0; justify-content: center; }
+.combination-value-preview .die { border-radius: 7px; padding: 5px; pointer-events: none; transform: none; }
+.combination-value-preview .pip { height: 6px; width: 6px; }
+.combination-card-preview { align-content: center; background: #fffbef; border: 1px solid #9ca69c; border-radius: 5px; color: #162019; display: grid; flex: 0 0 64px; gap: 6px; height: 88px; padding: 5px; text-align: center; }
+.combination-card-preview strong { font-size: 22px; }
+.combination-card-preview span { font-size: 10px; line-height: 1.3; }
+.combination-card-preview.red { color: #b51e37; }
+.combination-summary { color: #c7d5ca; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.combination-add-value { margin-bottom: 8px; }
+@media (max-width: 600px) {
+  .event-combinations .admin-field-grid, .combination-cards { grid-template-columns: minmax(0, 1fr); }
+}
+.community-event-result { background: none; border: 0; border-radius: 0; min-height: 0; padding: 0; }
+.event-card-table { background: #262525; border: 2px solid #9e8654; border-radius: 100px; padding: 16px; width: 100%; }
+.event-card-felt { align-items: center; background: repeating-linear-gradient(25deg, #ffffff03 0 1px, transparent 1px 4px), #12513f; border: 1px solid #70a588; border-radius: 84px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; min-height: 240px; padding: 30px 20px; }
+.event-table-empty { color: #e0e5d2; padding: 20px; text-align: center; }
+.event-draw-scores { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); margin: 18px 0; text-align: left; width: 100%; }
+.event-draw-scores > div { border-bottom: 1px solid #486155; display: grid; gap: 5px; padding: 8px 0; }
+.event-draw-scores span { color: #d1dccf; display: flex; font-size: 12px; justify-content: space-between; }
+.community-event-result .dice-throw-tray { width: 100%; }
+.casino-dialog .modal-title-row { flex-shrink: 0; margin-bottom: 18px; }
+.casino-dialog .modal-title-row h2 { font-size: 23px; margin: 0; }
+.connections-modal { max-width: 800px; }
+.connections-search { align-items: center; display: flex; gap: 10px; margin-bottom: 18px; }
+.connections-search > svg { color: #b5c1b9; flex-shrink: 0; }
+.connections-search input { min-width: 0; width: 100%; }
+.connections-tabs { display: flex; flex-wrap: wrap; margin-bottom: 20px; }
+.connections-tabs button { align-items: center; display: inline-flex; flex: 1; gap: 7px; justify-content: center; }
+.connections-tabs small { background: #121b16; border-radius: 4px; color: #e7d59e; padding: 2px 6px; }
+.connections-content, .connections-results { min-height: 200px; }
+.connections-content h3 { font-size: 16px; margin: 18px 0 10px; }
+.connections-modal .player-network-row { flex-wrap: wrap; gap: 12px; }
+.connections-modal .player-network-actions { margin-left: auto; }
+.connections-modal .player-network-row > div:first-child small { display: block; }
+.wardrobe-heading { align-items: center; display: flex; gap: 12px; justify-content: space-between; margin-bottom: 18px; }
+.wardrobe-heading h2 { margin: 0; }
+.wardrobe-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.wardrobe-slot { background: #151d19; border: 1px solid #38433b; border-radius: 8px; min-width: 0; padding: 14px; }
+.wardrobe-open { justify-content: space-between; min-height: 44px; text-align: left; width: 100%; }
+.wardrobe-open span { overflow-wrap: anywhere; }
+.wardrobe-open svg { flex-shrink: 0; }
+.wardrobe-current { align-items: center; display: flex; height: 128px; justify-content: center; min-width: 0; overflow: hidden; padding: 14px; width: 100%; }
+.wardrobe-current-label { display: grid; gap: 5px; text-align: center; }
+.wardrobe-current-label strong, .wardrobe-choice > strong { color: #e8ebdf; font-size: 14px; overflow-wrap: anywhere; }
+.wardrobe-current-label small, .wardrobe-choice > small { align-items: center; color: #aabbad; display: flex; font-size: 12px; gap: 5px; justify-content: center; }
+.wardrobe-current .cosmetic-icon { font-size: 28px; height: 42px; width: 42px; }
+.wardrobe-current .display-name { font-size: 20px; min-width: 0; }
+.wardrobe-current .display-name-text { overflow-wrap: anywhere; }
+.wardrobe-current .die { height: 58px; min-height: 58px; min-width: 58px; padding: 7px; width: 58px; }
+.wardrobe-card-pair { display: flex; gap: 8px; }
+.wardrobe-card-pair .playing-card { height: 90px; min-width: 62px; padding: 8px; width: 62px; }
+.wardrobe-current .vip-card.wardrobe-member { aspect-ratio: auto; gap: 10px; height: 94px; min-height: 0; padding: 12px 16px; width: min(100%, 200px); }
+.wardrobe-member .vip-label { font-size: 10px; }
+.wardrobe-member > strong { font-size: 16px; overflow-wrap: anywhere; }
+.wardrobe-profile-sample { align-items: center; display: flex; height: 94px; justify-content: center; min-height: 0; padding: 15px; width: min(100%, 210px); }
+.wardrobe-profile-sample > span { color: #f1eddc; font-size: 16px; font-weight: 800; position: relative; z-index: 3; }
+.wardrobe-modal { display: flex; flex-direction: column; max-height: 90dvh; max-width: 940px; overflow: hidden; }
+.wardrobe-modal .connections-search, .wardrobe-modal .shop-subselector { flex-shrink: 0; }
+.wardrobe-modal .shop-subselector { display: flex; gap: 6px; margin-bottom: 16px; max-width: none; overflow-x: auto; padding-bottom: 5px; scrollbar-width: thin; }
+.wardrobe-modal .shop-subselector button { flex: 0 0 auto; white-space: nowrap; }
+.wardrobe-choices { align-content: start; display: grid; gap: 12px; grid-auto-rows: max-content; grid-template-columns: repeat(3, minmax(0, 1fr)); min-height: 0; overflow: auto; padding: 3px; scrollbar-gutter: stable; }
+.wardrobe-choice { align-content: start; background: #141c19; border: 1px solid #3e4a42; border-radius: 8px; color: #f1ebd9; display: grid; gap: 7px; grid-template-rows: 120px auto auto; min-height: 180px; min-width: 0; padding: 10px; text-align: center; }
+.wardrobe-choice:hover { background: #1b2b23; border-color: #bfa663; transform: none; }
+.wardrobe-choice.active { background: #24372c; border-color: #e0bf66; }
+.wardrobe-choice .wardrobe-current { height: 120px; padding: 10px; pointer-events: none; }
+.wardrobe-footer { align-items: center; border-top: 1px solid #37413b; display: flex; flex-shrink: 0; gap: 12px; justify-content: space-between; margin-top: 16px; padding-top: 16px; }
+.wardrobe-footer small { color: #bac5ba; }
+.event-progress-reserve { border-left: 1px dashed #6d7b71; bottom: 0; position: absolute; right: 0; top: 0; width: 12%; }
+.join-table-panel { margin: 30px auto; max-width: 520px; }
+.join-table-panel form { display: grid; gap: 18px; }
+.join-table-panel label { display: grid; gap: 8px; }
+.casino-modal-loading { background: #19231d; border: 1px solid #c1a665; border-radius: 6px; left: 50%; padding: 18px; position: fixed; top: 40%; transform: translateX(-50%); z-index: 20; }
+
+@media (max-width: 1100px) {
+  .casino-header-inner { flex-wrap: wrap; gap: 14px; }
+  .casino-navigation { flex-basis: 100%; order: 3; }
+  .casino-navigation a, .casino-navigation button { font-size: 13px; padding: 8px; }
+  .shop-shell .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .event-effect-rules dl > div { grid-template-columns: 1fr; }
+  .event-card-table { border-radius: 36px; padding: 8px; }
+  .event-card-felt { border-radius: 28px; gap: 10px; min-height: 210px; padding: 22px 12px; }
+  .event-card-felt .playing-card { height: 105px; min-width: 64px; width: 64px; }
+  .casino-header-inner { gap: 12px; padding: 14px; }
+  .casino-brand { font-size: 22px; }
+  .casino-navigation { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .casino-navigation a, .casino-navigation button { flex-shrink: 0; }
+  .casino-accountbar { display: grid; flex-basis: 100%; gap: 8px; grid-template-columns: minmax(0, 1fr) 44px 42px; }
+  .casino-accountbar .identity-pill { grid-column: 1; grid-row: 1; overflow-wrap: anywhere; }
+  .casino-accountbar .notification-center { grid-column: 2; grid-row: 1; }
+  .casino-accountbar .notification-panel { right: -50px; }
+  .casino-accountbar .casino-logout { grid-column: 3; grid-row: 1; }
+  .casino-accountbar .casino-wallet { grid-column: 1; grid-row: 2; }
+  .casino-accountbar .daily-bonus-button { gap: 6px; grid-column: 2 / 4; grid-row: 2; min-width: 0; padding: 6px; }
+  .casino-bonus-feedback { width: calc(100% - 28px); }
+  .casino-accountbar .display-name { min-width: 0; }
+  .casino-wallet { font-size: 13px; }
+  .page-heading { align-items: flex-start; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+  .page-heading h1 { font-size: 25px; }
+  .lobby-heading { align-items: center; flex-direction: row; }
+  .lobby-heading h1 { font-size: 23px; }
+  .room-table-tools { gap: 6px; }
+  .room-table-tools button { flex: 1 1 auto; }
+  .room-close-action { margin-left: 0; }
+  .shop-shell .shop-layout { grid-template-columns: 1fr; }
+  .shop-shell .shop-preview { position: static; }
+  .wardrobe-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .casino-dialog { padding: 16px; }
+  .casino-dialog .modal-title-row h2 { font-size: 20px; }
+  .connections-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .connections-tabs button { flex: 1 0 auto; }
+}
+@media (max-width: 440px) {
+  .wardrobe-grid, .shop-shell .shop-grid { grid-template-columns: 1fr; }
+  .wardrobe-current .vip-card.wardrobe-member { padding: 10px; }
+  .wardrobe-choice .wardrobe-current { height: 100px; padding: 3px; }
+  .wardrobe-card-pair { gap: 4px; }
+  .wardrobe-card-pair .playing-card { height: 72px; min-width: 45px; width: 45px; }
+  .wardrobe-choice { grid-template-rows: 100px auto auto; min-height: 164px; padding: 8px; }
+  .wardrobe-footer { align-items: stretch; flex-direction: column; }
+  .casino-wallet { gap: 5px; }
+}

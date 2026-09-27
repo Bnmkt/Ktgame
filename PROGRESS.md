@@ -1,0 +1,221 @@
+# KTGA.ME Progress
+
+## Planned
+- Add richer per-game UI controls and scoreboards.
+- Add friend invitations and private invite acceptance flow.
+- Add stronger account security.
+- Add automated tests for game engines and API routes.
+- Deepen Liar's Dice, Shut the Box, Golf Solitaire and Accordion variants with optional advanced settings.
+
+## Todo
+- Validate long multiplayer sessions across multiple browsers.
+- Add daily token claim cooldown feedback in the UI.
+- Add room chat.
+- Improve bot strategy beyond basic legal moves.
+- Add achievement-based unlock conditions on top of token prices.
+
+## Finished
+- Added shared filter-aware pagination and page-size controls to the public shop, admin shop/player/game/achievement lists and the top-100 leaderboards. Absolute ranks and the current player's position are preserved across pages. Added page borders for the shop/leaderboard, improved pack title contrast and kept pack checkout controls clear of pagination. Unit and desktop/mobile browser checks cover navigation, filters, empty results and page-size changes.
+- Added trusted player/inventory context to achievement events, login/profile/equipment snapshots, consented page/browser/URL-marker/active-time events, guided creation templates and catalogue selectors. Deep Thought now uses a generic page-visit marker. JSON schema reference: `docs/achievement-events.json`.
+- Added public terms, legal notice, privacy/cookie information and parental guidance under `/ktga/`, with readable desktop/mobile layouts and persistent preference access. Optional tracking is off by default, expires after 180 days, can be rejected/withdrawn and excludes arbitrary URLs and sensitive player fields.
+- Added a manual parental approval workflow for under-13 registrations: administrative verification attestation and private case reference, hashed single-use 72-hour codes, revocation and server-side registration checks. Optional navigation tracking remains disabled for these accounts. Operational/legal caveats and verification procedures are documented in `docs/privacy-and-achievements.md`.
+- Fixed single-item and pack purchases losing inventory changes when transaction achievements replaced the cosmetics object. New API/browser regression checks run against isolated databases, never production data.
+- Added versioned SQLite v2 storage with an automatic consistent pre-migration backup, transactional conversion, foreign keys and rollback recovery for both disk state and the mutable application cache. Existing production data is not migrated until the backend is restarted.
+- Normalized achievement ownership, inventory and historical players into relational tables; synchronized shared item/achievement definitions while retaining unknown and retired IDs. Derived public member-card stats are no longer persisted in each account.
+- Removed full-history, transaction and event-journal startup caches and snapshot scans; append-only archives retain only pending inserts. Added indexed profile/achievement/bonus statistics, event quota counts, SQL leaderboard aggregates and a bounded statistics cache.
+- Removed duplicated account, achievement and full-inventory payloads from persisted room players, and limited administration/event reports to indexed date ranges and capped detail pages.
+- Added server-side profile journal pagination and filters, independent all-time statistics, and a read-only-source migration audit (`npm.cmd run check:storage`). Audit of the current database copy preserved 17 users, 90 rooms, 468 matches, 2231 transactions and all community-event records, with valid integrity and foreign keys.
+- Verified 116 server tests, 13 client tests, production client build, profile pagination/search, purchases, daily bonuses, room/event workflows, Belote/replay, spectators and the current database migration audit. The live database and running production server were not modified.
+- Added /ktga/classements and casino navigation with top-100 wins, cumulative paid gains, single-match payout records, game-specific score records and global token balances. Supports daily selection, calendar-quarter seasons with archives and all-time rankings; ties share ranks and the current player's position remains available beyond the top 100.
+- Derived leaderboards from SQLite history/transactions, excluded bots/guests/inactive accounts, reconstructed closed-period balances, reversed lower-is-better score ordering and recorded actual Belote team scores for new match records. Public ranking identities exclude login, birth date and authentication data.
+- Verified 106 server tests and 13 client tests, isolated leaderboard API/browser coverage on desktop/mobile, actual Belote score recording and existing Belote/profile/spectator regressions. Production build completed in client/dist. Existing running servers and production data were left unchanged; deployment requires the new client build and a backend restart.
+- Unified table entry: joining a running/full table via public list, code, direct link, friends or an invitation automatically opens the spectator view. Password/invitation checks remain enforced; spectators can take an available seat when the room returns to waiting.
+- Limited the lobby's live-table strip to friends' games, deduplicated and capped at five. Removed separate Observer actions from the joining UI.
+- Added public dice trays, retained last rolls, shared Farkle combinations, available Yahtzee categories and score sheets to spectator views. Liar's Dice private rolls remain hidden server-side.
+- Restored the profile activity line and points while retaining numeric daily values, integer axes, background grid and the five time ranges.
+- Verified 97 server and 13 client tests, all-game automatic spectator entry, public dice/combination rendering, friends-only five-table limit, friend/invitation entry, password protection and taking a seat after replay. Desktop/mobile browser checks, existing rooms/events regressions and production build passed. Background preview launch was blocked by the execution environment; existing servers and production data remain unchanged.
+- Rebuilt the Belote table as a responsive 2v2 felt with opposite partners, blue/red teams, positioned tricks, hidden opponent card fans and an accessible playable hand. Added waiting-room team selection, host rearrangement and stable seats across replays/departures.
+- Added read-only spectator routes under /ktga/observer/CODE for all 15 games, public live-table discovery and observation by code. Spectators receive live updates without joining a seat, wagering or submitting game actions; protected rooms enforce password grants on HTTP and sockets.
+- Added explicit per-game spectator schemas hiding hands, deck order, unrevealed announcements, secrets and private action-log details while retaining public played/revealed cards. Verified 96 server tests, 11 client tests, all-game spectator browser coverage, live Belote/replay updates and protected-access regressions using isolated data.
+- Rechecked desktop/mobile trick visibility and existing rooms/events browser regressions; rebuilt client/dist. Automatic preview backend restart was blocked by the execution environment. Existing servers and production data were left unchanged; deployment requires the new client/dist and a backend restart.
+- Added four-seat team Belote with Belgian competition conventions by default and an opt-in French variant, plus independent announcements and target-score settings. Documented the exact local conventions and upstream MIT card-comparison attribution in README.
+- Implemented two-round bidding, forced Belgian takes/French redeals, legal follow/cut/overtrump rules, announcements, belote-rebelote, capot, litige carryover, team scores, next deals and room replay. Departing players are replaced by AI without breaking teams; private hands/deck/announcements stay server-side.
+- Added a responsive Belote board using equipped card skins, server-supplied legal moves, team scoreboards and illustrated rules. Existing per-game win achievements include Belote automatically.
+- Fixed percentage health-chart scale to 0-100 and kept Server Health subtabs on one line. Unified profile activity charts with daily bars, integer axis ticks, exact hover/focus values and week/month/quarter/semester/year ranges; mobile plots scroll within their container.
+- Removed the duplicate member-card win-rate choice and normalized the legacy overallWinRate key without discarding saved selections.
+- Verified 76 server tests (including 100 complete Belote simulations), 11 client tests, isolated Belote/profile/admin desktop-mobile browser tests, existing rooms/events browser regressions and production build. Production database and live backend were not modified/restarted.
+- Added event draw conditions for contained dice values and contained/exact card combinations, preserving legacy exact dice conditions and duplicate counts without reusing a drawn item.
+- Replaced the custom-values scalar input with visual dice/card selection rows, French condition labels, optional card suits, add/remove controls and immediate impossible-pattern warnings.
+- Applied each matched combination once per action alongside existing face/card effects; included card combinations in public rules and simulation results.
+- Validated draw lengths including critical extras, die ranges, joker availability and card multiplicities; verified persistence and responsive editing with isolated browser/API tests. All 60 server and 9 client tests passed; studio regressions and production build passed. Live backend left running unchanged.
+- Merged administration Metrics into a Server Health subtab alongside overview and logs.
+- Added configured dice/card/critical effect rules to both event rules views, centered the action button above the playing surface, reused the dice tray and added a full-width poker felt for card draws.
+- Improved inactive ranking tab contrast and responsive result-score layouts.
+- Moved the player name right in the shared header and placed the coin icon after the balance without a redundant token label.
+- Replaced the lobby intro/join form with a right-aligned join-code button and a dialog that reveals a password input only for protected rooms.
+- Added live friend room presence, privacy-aware join buttons and confirmed red friend-removal controls.
+- Added confirmed in-game kicks, recipient-only persistent exclusion notifications, immediate exclusion dialogs and socket subscription revocation before room updates.
+- Verified 53 server tests, 8 client tests, casino/studio browser regressions and an isolated real-API multi-account browser test covering room passwords, friend presence/removal, kicking, Metrics and event surfaces on desktop/mobile. Production client build completed; the existing live server was not restarted.
+- Grouped player identity, wallet and daily bonus before logout in the casino header, with responsive layouts and bonus feedback on every page.
+- Added reusable confirmation dialogs for shop/event duplication and deletion, event effects/milestones/combinations/reward tiers, and cosmetic studio configuration removal/reset.
+- Prevented repeated confirmation submissions, blocked dismissal while pending, and kept failed actions open for retry with their error message.
+- Verified cancellation without mutations, confirmed actions, error recovery, bonus collection and desktop/mobile layouts with isolated Playwright fixtures in `client/test/studio.smoke.mjs`.
+- Added shared casino navigation with a standalone shop, a friends dialog and table-specific controls outside the global header.
+- Added absolute client routes under the configured base path, browser back/forward navigation, direct table invitations after login and Apache SPA fallback in the production build.
+- Kept the active table mounted when visiting other casino pages so navigation does not disconnect the player.
+- Replaced large profile customization lists with eight equipped-item previews and searchable, filterable selection dialogs.
+- Prioritized favorite games on the casino home page while retaining the existing filters.
+- Hid unreached event milestones above 100%, leaving a fixed empty reserve that does not reveal the next bonus threshold.
+- Verified desktop/mobile navigation, table presence, friend invitations, equipment changes and milestone discovery with Playwright fixtures, screenshots and five client regression tests.
+- Fixed daily bonus multipliers and 7/30-day boosts to follow consecutive casino calendar days, resetting after a missed day while preserving lifetime claim totals and past payouts.
+- Aligned the admin bonus forecast, lobby reward feedback and profile streak/transaction labels with consecutive recovery days.
+- Added regression coverage for interrupted series, daily boundaries, milestone resets, duplicate dates and calendar changes.
+- Verified the consecutive daily bonus fix: 51 server tests passed, production client build completed and restarted HTTPS server healthcheck passed.
+- Created separated `client/` and `server/` apps.
+- Fixed Vite dev-client crash by aligning Vite and React plugin versions.
+- Added favicon asset.
+- Split login, register and guest forms.
+- Added rules modal for every game card and room.
+- Expanded rules modal with detailed goals, turn flow, legal moves, scoring and combinations for each game.
+- Reworked UI with visual game cards, game boards, score tables and readable player names.
+- Added visual dice with keep selection and visual playing cards with suit names/symbols.
+- Added Yahtzee score sheet with one row per scoring category.
+- Added Blackjack hand totals in the score panel.
+- Added wager and possible payout display for staked rooms and Blackjack.
+- Added final leaderboard view that replaces the game board after a room ends.
+- Fixed winner display to show player pseudos instead of blank ids.
+- Fixed dice pip layout, kept dice contrast and dice hover behavior.
+- Renamed the app to KTGA.ME.
+- Reworked the visual identity toward a casino-style interface.
+- Refined the casino theme with a darker premium layout and a fixed 3-column game grid on desktop.
+- Reworked game cards to a more restrained premium style.
+- Added chip-style wager steppers for +1/+10/+100 and -1/-10/-100.
+- Reworked per-game room modal into clean create/join/open-table sections.
+- Kept the Blackjack board visible after game end while hiding action controls.
+- Hid the daily bonus button when the registered user already claimed it for the current day.
+- Improved wager chip contrast and general button readability.
+- Added useful game animations for dice rolls and card dealing/flipping.
+- Added profile page with account, match history and token transaction tabs.
+- Reworked the profile page into a more premium member-card layout with stats and refined tabs.
+- Added profile customization with equipped icon, pseudo effect and member card tier.
+- Added a token shop to unlock icons, pseudo effects and member cards.
+- Split the shop by cosmetic type with item selectors and purchase previews.
+- Rebalanced shop prices so every item costs at least 2000 tokens and member cards are long-term rewards.
+- Expanded the cosmetic shop with many more icons and animated pseudo effects.
+- Added Classic/Premium shop subcategories for pseudo effects and member cards, including 16 early-game classic colors for each.
+- Strengthened the Shadow and Pulse pseudo effects for better visibility.
+- Muted classic member cards so they stay visibly below premium tiers.
+- Added member card hover previews on player pseudos.
+- Fixed member card hover previews inside player lists and replaced bulky player pills with cleaner seats.
+- Added classic and premium dice skins with readable pips.
+- Added classic and premium card skins with readable faces and distinct card backs.
+- Added dice/card skin preview and equipment controls in the profile shop.
+- Expanded dice skins to 10 classic and 9 premium variants.
+- Expanded card skins to 10 classic and 9 premium variants, including premium face treatments.
+- Replaced JSON-file persistence with a SQLite database layer and automatic legacy `db.json` migration.
+- Added game metadata and lobby filters by type, category, audience and complexity.
+- Expanded Cul de Chouette scoring with Velute and Chouette Velute handling.
+- Expanded Farkle with selectable scoring dice, hot-dice continuation and stricter scoring selection.
+- Expanded President with singles, pairs, brelans, carrés, pass resolution and revolution handling.
+- Removed duplicated game-card metadata when the same information is already displayed elsewhere.
+- Added five additional games: Farkle, Liar's Dice, Shut the Box, Golf Solitaire and Accordion.
+- Added solo game support for Shut the Box, Golf Solitaire and Accordion.
+- Added newest-first sorting and 20-row pagination for profile history and token transactions.
+- Right-aligned financial token columns with tabular numerals.
+- Disabled nested member-card hover previews inside member cards.
+- Replaced the member card token balance with a win-rate display.
+- Applied financial number formatting to token amounts across lobby, rooms, shop and profile ledgers.
+- Moved the active player identity into a dedicated topbar pill instead of under the KTGA.ME title.
+- Added a creator-only close-room action.
+- Added automatic user token refresh after room actions, Blackjack bets and payouts.
+- Added a Blackjack replay flow for quick rematches from a finished room.
+- Hid Blackjack hit/stand actions until the player has placed a bet and renamed them to Piocher/Rester.
+- Hid the Blackjack dealer hole card and full dealer score until round resolution.
+- Renamed Blackjack stand back to Rester and gated player actions until all bets are placed and it is the player's turn.
+- Added per-room action logs for turn-based games, including player, bot and dealer actions.
+- Made room codes more visible and added a copyable room invitation link.
+- Reworked wager controls into a cleaner premium stepper with balanced add/remove buttons and readable token value.
+- Added production environment examples, configurable CORS/JWT/SQLite/client static serving, healthcheck and deployment notes.
+- Added basic production hardening with Helmet headers and configurable API/auth rate limits.
+- Updated production examples for the client domain `ktga.netdis.org`.
+- Adapted client and server base paths for deployment under `https://netdis.org/ktga`, including Vite assets, API calls and Socket.IO.
+- Updated deployment notes for a public backend exposed on `94.106.131.148:4000`.
+- Added a static-client production env example for deploying the frontend under `/ktga` while calling the backend by public IP.
+- Switched the HTTPS production client example to same-origin API calls and documented reverse proxy rules for the public backend.
+- Added optional direct HTTPS support for the Node server with certificate/key environment variables.
+- Switched production API configuration to `ktgapi.netdis.org:4000` with Let's Encrypt certificate paths.
+- Added a Linux setup script for issuing the `ktgapi.netdis.org` certificate and opening the HTTPS API port.
+- Removed the self-signed IP certificate path from production guidance and tightened the backend-domain HTTPS setup.
+- Added backend timeout diagnostics for checking DNS, port 4000 exposure, HTTPS mode and firewall status.
+- Added Windows-local HTTPS certificate generation and configured the local server env to start with PEM certificates.
+- Documented `CERT_AUTHORITY_INVALID` and the need for a public CA certificate for `ktgapi.netdis.org`.
+- Added a Windows production HTTPS setup script using win-acme/Let's Encrypt PEM export for `ktgapi.netdis.org`.
+- Added a TLS-ALPN-01 Windows certificate option for environments where ACME HTTP-01 on port 80 is blocked.
+- Added invite-link handling so unauthenticated users can login/register/guest then automatically join the linked room.
+- Reworked the room status block with table state, active player, seats and room master display.
+- Moved the finished winner display onto the game board and grouped quick rematch actions with a Quitter button.
+- Added custom room names and optional password-protected rooms.
+- Added owner-only player exclusion from waiting rooms.
+- Sanitized room API/socket payloads so password hashes are never sent to the client.
+- Added persistent player achievements with classic progression, game win milestones, result-based game achievements, rare random achievement and shop achievements.
+- Added a profile Achievements tab with grouped cards, progress bars and unlock dates.
+- Split achievements into Site, Jeux, Boutique and Milestones views.
+- Added achievement unlock notifications in the top-right UI.
+- Added configurable member-card stats, including unlocked milestone achievements as custom stats.
+- Reworked achievement selectors and added per-game achievement sub-tabs.
+- Added two configurable member-card stats and exposed them on pseudo hover mini-cards.
+- Added logout controls and an auth-screen server availability check before showing login/register/guest forms.
+- Merged shop achievements into the Site achievement view and made achievement completion stats reflect the selected view/subview.
+- Fixed member-card stat rendering to avoid cropped labels and applied stat fallbacks to every pseudo hover mini-card.
+- Made the shop preview sticky inside the profile scroll layout.
+- Improved President action availability, active-combination display and pass handling when a trick has been cleared.
+- Enforced a 10-token minimum room stake for creation/start/replay.
+- Changed room pot payouts to ranked 60/30/10 distribution for human players only, with no payouts to AI players.
+- Added fast replay support for every finished game room.
+- Adapted room pot payout rates to human player count: 100% for one human, 70/30 for two humans, 60/30/10 for three or more.
+- Fixed President turn cleanup so a player who has no cards cannot receive the next opening turn after winning a trick.
+- Changed replay so finished rooms return to the waiting lobby instead of immediately starting a new charged round.
+- Allowed the room master to kick players during an active match and cleaned the game state accordingly.
+- Blocked joining rooms while a match is already running so new players enter only from the lobby/replay state.
+- Enriched profile match history with styled player identities, member-card hover previews, winners, pot and the current player's gain.
+- Expanded the profile stat block with win rate, today's games, achievements, bonus claims, bonus streak, shop spending and balance.
+- Added classic icon shop items plus extra premium icons, pseudo effects, dice skins, card skins and shaped member cards.
+- Split cosmetic shop content into classic, premium, special-shape premium and special-animated premium tiers where available.
+- Added more classic cosmetic content so classic unlocks remain more numerous than premium rewards.
+- Added premium animated cosmetics for icons, pseudos, dice, cards and member cards.
+- Added premium animal icons, including a higher-priced animated fire fox icon.
+- Fixed classic icon colors so color-named icons render with matching visual colors instead of all appearing gold.
+- Reworked account settings into casino-style profile sections with login, public in-game pseudo, age, gender, bio and up to 5 favorite games.
+- Added a public profile view exposing only non-sensitive player information, public cosmetics and gameplay stats.
+- Added persistent friend lists with player search, friend requests, accept/decline and removal.
+- Added room invitations for friends, including invite acceptance into waiting rooms.
+- Added persistent notification inbox with deletion controls and popups for incoming friend requests and room invites.
+- Stabilized friend request refresh so received requests do not flicker out of the friends view.
+- Cleaned friend API responses to remove stale friend/request IDs and aligned friend counters with renderable rows.
+- Normalized crossed friend requests so two mutual pending requests become a friendship instead of an unstable received/sent state.
+- Scoped room achievement unlock responses per player so one account cannot receive another player's success toast.
+- Added persistent achievement notifications for the player who actually unlocked them.
+- Changed profile age entry to a birth date with computed public age.
+- Replaced free-form gender with a controlled selector.
+- Tightened public profile privacy so birth dates stay private and only computed age is exposed.
+- Reworked the public profile modal into a compact two-column layout with card/stats on the left and bio/favorite games on the right.
+- Aligned settings select, date and textarea fields with the existing casino input styling.
+- Made player pseudos clickable across rooms, scoreboards and profile history to open the public profile.
+- Added friend request actions directly from the public profile modal.
+- Added a 365-day point activity chart to public profiles.
+- Reworked large member-card stat layout to match mini member cards and avoid text overlap.
+- Removed login display from public profiles, hid empty public info blocks and added selectable activity periods.
+- Added profile editing for registered users.
+- Added token transaction tracking for signup, daily claim, room stakes, Blackjack bets and payouts.
+- Replaced the global room list with per-game room modals.
+- Added automatic cleanup for empty waiting rooms based on live room presence.
+- Updated Yahtzee to support kept dice and full 13-category completion across players.
+- Updated 421 to support up to three rolls, kept dice and explicit validation.
+- Updated Bataille to handle tie battles with a war pile.
+- Added local account login with pseudo + password.
+- Added guest login with default tokens.
+- Added daily token claim endpoint for registered accounts.
+- Added public/private rooms, room code join, stake configuration and winner pot distribution.
+- Added game cards for Yahtzee, 421, Cul de Chouette, Blackjack, Bataille and President.
+- Added initial playable server-side logic for all listed games.
+- Added basic bot turns for dice games and President.

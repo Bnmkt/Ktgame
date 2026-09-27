@@ -1,0 +1,1 @@
+import{c as t}from"./index-B54cPbUQ.js";const e={name:"barcode",size:24,node:[["path",{d:"M3 5v14",key:"1nt18q"}],["path",{d:"M8 5v14",key:"1ybrkv"}],["path",{d:"M12 5v14",key:"s699le"}],["path",{d:"M17 5v14",key:"ycjyhj"}],["path",{d:"M21 5v14",key:"nzette"}]]};e.node;const d=t(e);export{e as __iconData,d as default};

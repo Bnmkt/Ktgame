@@ -1,0 +1,1 @@
+import{c as a}from"./index-DPIYnb7u.js";const e={name:"diff",size:24,node:[["path",{d:"M12 3v14",key:"7cf3v8"}],["path",{d:"M5 10h14",key:"elsbfy"}],["path",{d:"M5 21h14",key:"11awu3"}]]};e.node;const o=a(e);export{e as __iconData,o as default};

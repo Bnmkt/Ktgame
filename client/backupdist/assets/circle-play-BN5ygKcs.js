@@ -1,0 +1,1 @@
+import{c}from"./index-j2sd2D1v.js";const a={name:"circle-play",size:24,node:[["path",{d:"M9 9.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997A1 1 0 0 1 9 14.996z",key:"kmsa83"}],["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}]],aliases:["play-circle"]};a.node;const l=c(a);export{a as __iconData,l as default};

@@ -1,0 +1,1 @@
+import{c}from"./index-j2sd2D1v.js";const e={name:"ellipsis-vertical",size:24,node:[["circle",{cx:"12",cy:"12",r:"1",key:"41hilf"}],["circle",{cx:"12",cy:"5",r:"1",key:"gxeob9"}],["circle",{cx:"12",cy:"19",r:"1",key:"lyex9k"}]],aliases:["more-vertical"]};e.node;const l=c(e);export{e as __iconData,l as default};

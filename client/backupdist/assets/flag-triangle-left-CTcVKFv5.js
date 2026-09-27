@@ -1,0 +1,1 @@
+import{c as e}from"./index-j2sd2D1v.js";const a={name:"flag-triangle-left",size:24,node:[["path",{d:"M18 22V2.8a.8.8 0 0 0-1.17-.71L5.45 7.78a.8.8 0 0 0 0 1.44L18 15.5",key:"rbbtmw"}]]};a.node;const n=e(a);export{a as __iconData,n as default};

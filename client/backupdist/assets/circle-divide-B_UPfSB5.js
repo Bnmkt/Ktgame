@@ -1,0 +1,1 @@
+import{c}from"./index-CFbJpgaA.js";const e={name:"circle-divide",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["line",{x1:"8",x2:"16",y1:"12",y2:"12",key:"1jonct"}],["line",{x1:"12",x2:"12",y1:"16",y2:"16",key:"aqc6ln"}],["line",{x1:"12",x2:"12",y1:"8",y2:"8",key:"1mkcni"}]],aliases:["divide-circle"]};e.node;const n=c(e);export{e as __iconData,n as default};

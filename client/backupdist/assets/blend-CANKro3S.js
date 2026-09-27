@@ -1,0 +1,1 @@
+import{c as e}from"./index-B54cPbUQ.js";const c={name:"blend",size:24,node:[["circle",{cx:"15",cy:"9",r:"7",key:"1i12rt"}],["circle",{cx:"9",cy:"15",r:"7",key:"19bs8k"}]]};c.node;const o=e(c);export{c as __iconData,o as default};

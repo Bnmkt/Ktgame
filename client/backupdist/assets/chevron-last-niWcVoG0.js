@@ -1,0 +1,1 @@
+import{c as o}from"./index-CFbJpgaA.js";const e={name:"chevron-last",size:24,node:[["path",{d:"m7 18 6-6-6-6",key:"lwmzdw"}],["path",{d:"M17 6v12",key:"1o0aio"}]]};e.node;const t=o(e);export{e as __iconData,t as default};

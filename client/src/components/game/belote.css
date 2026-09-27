@@ -1,0 +1,81 @@
+.team-0 { --team-color: #7dc5ff; --team-surface: #172f46; }
+.team-1 { --team-color: #ff9b9f; --team-surface: #452429; }
+.belote-board { display: grid; gap: 18px; min-width: 0; }
+.belote-summary { align-items: center; border-bottom: 1px solid #799888; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding-bottom: 12px; }
+.belote-summary strong { color: #ffe1a1; }
+.belote-score-strip { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.belote-score-strip > div { align-items: center; background: var(--team-surface); border-bottom: 3px solid var(--team-color); display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; padding: 10px 12px; }
+.belote-score-strip span { align-items: center; display: inline-flex; font-size: 13px; gap: 6px; }
+.belote-score-strip strong { font-size: 22px; }
+.belote-score-strip small { font-size: 13px; }
+.belote-score-strip i, .belote-seat-name > i, .belote-team-choice h3 > i, .belote-hand-zone h3 > i { background: var(--team-color); border-radius: 50%; display: inline-block; flex: 0 0 8px; height: 8px; width: 8px; }
+.belote-table { display: grid; gap: 8px; grid-template-columns: minmax(100px, 1fr) minmax(190px, 1.8fr) minmax(100px, 1fr); grid-template-rows: 156px 234px 156px; isolation: isolate; position: relative; }
+.belote-table-felt { background: radial-gradient(ellipse at center, #277552, #123f32); border: 8px solid #5b4030; border-radius: 42%; box-shadow: inset 0 0 0 2px #b39457, inset 0 8px 36px #061d1b80; inset: 35px 12px; position: absolute; z-index: -1; }
+.belote-seat { align-items: center; align-self: center; background: var(--team-surface); border: 1px solid var(--team-color); border-radius: 8px; display: flex; flex-direction: column; gap: 5px; justify-self: center; max-width: 190px; min-width: 0; padding: 8px 10px; width: 100%; z-index: 1; }
+.belote-seat.active { outline: 2px solid #ffe7a3; outline-offset: 3px; }
+.belote-seat-name { align-items: center; display: flex; gap: 6px; justify-content: center; max-width: 100%; min-width: 0; }
+.belote-seat-name .display-name { overflow-wrap: anywhere; }
+.belote-seat-name .display-name-text { min-width: 0; overflow-wrap: anywhere; }
+.belote-seat small, .belote-seat-count { color: #e4e9ec; font-size: 11px; }
+.seat-north { grid-column: 2; grid-row: 1; }
+.seat-south { grid-column: 2; grid-row: 3; }
+.seat-west { grid-column: 1; grid-row: 2; }
+.seat-east { grid-column: 3; grid-row: 2; }
+.belote-card-fan { display: flex; height: 46px; justify-content: center; padding-left: 20px; width: 78px; }
+.belote-board .belote-card-fan .playing-card { font-size: 12px; height: 44px; margin-left: -20px; min-width: 30px; padding: 2px; transform: rotate(-8deg); width: 30px; }
+.belote-card-fan .playing-card:nth-child(2) { transform: rotate(0); }
+.belote-card-fan .playing-card:nth-child(3) { transform: rotate(8deg); }
+.belote-board .belote-card-fan .playing-card > span { font-size: 18px; }
+.belote-table-center { align-items: center; display: flex; flex-direction: column; grid-column: 2; grid-row: 2; justify-content: center; min-width: 0; position: relative; }
+.belote-upcard { align-items: center; display: flex; flex-direction: column; font-size: 12px; gap: 8px; }
+.belote-trick-label, .belote-trick-winner { font-size: 12px; position: absolute; text-align: center; width: 100%; }
+.belote-trick-label { top: 0; }
+.empty-trick .belote-trick-label { position: static; }
+.empty-trick .belote-trick-grid { display: none; }
+.belote-trick-winner { bottom: 0; }
+.belote-trick-grid { height: 188px; max-width: 240px; position: relative; width: 100%; }
+.belote-trick-card { aspect-ratio: 5 / 7; position: absolute; width: 58px; }
+.played-north { left: 50%; top: 0; transform: translateX(-50%); }
+.played-south { bottom: 0; left: 50%; transform: translateX(-50%); }
+.played-west { left: 0; top: 50%; transform: translateY(-50%); }
+.played-east { right: 0; top: 50%; transform: translateY(-50%); }
+.belote-board .playing-card { aspect-ratio: 5 / 7; height: auto; max-width: 100%; min-width: 0; width: 70px; }
+.belote-board .playing-card strong { font-size: 22px; }
+.belote-board .playing-card > span { font-size: 28px; }
+.belote-board .belote-trick-card .playing-card { width: 58px; }
+.belote-bidding, .belote-bid-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.belote-hand-zone { border-top: 2px solid var(--team-color); padding-top: 8px; }
+.belote-hand-zone h3 { align-items: center; display: flex; gap: 8px; }
+.belote-hand { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+.belote-hand > button { background: transparent; border: 2px solid transparent; border-radius: 6px; box-shadow: none; padding: 3px; }
+.belote-hand > button:disabled { opacity: .7; }
+.belote-hand > button.belote-playable { border-color: #eaca81; }
+.belote-hand > button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.belote-round-score { align-items: center; border-left: 3px solid #eaca81; display: flex; flex-wrap: wrap; gap: 12px; padding: 12px; }
+.belote-round-score > span { flex: 1; min-width: 180px; }
+.belote-announcements { border-top: 1px solid #ffffff30; }
+.belote-announcements > div { display: flex; flex-wrap: wrap; gap: 12px; padding: 6px 0; }
+.belote-team-picker { border-bottom: 1px solid #6e6140; margin: 18px 0; padding: 0 0 20px; }
+.belote-team-picker > h2 { align-items: center; display: flex; gap: 8px; font-size: 20px; }
+.belote-team-columns { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.belote-team-choice { border-top: 3px solid var(--team-color); padding: 0 8px; }
+.belote-team-choice h3 { align-items: center; display: flex; gap: 8px; font-size: 16px; }
+.belote-team-choice h3 small { margin-left: auto; }
+.belote-lobby-seat { align-items: center; border-bottom: 1px solid #ffffff20; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; min-height: 62px; padding: 8px 0; }
+.belote-lobby-seat select { background: var(--team-surface); border: 1px solid var(--team-color); border-radius: 4px; color: #fff; font: inherit; max-width: 120px; padding: 8px; }
+@media (max-width: 600px) {
+  .belote-table { gap: 4px; grid-template-columns: minmax(62px, .7fr) minmax(128px, 1.5fr) minmax(62px, .7fr); grid-template-rows: 150px 210px 150px; }
+  .belote-seat { padding: 6px 3px; }
+  .belote-seat-name { flex-wrap: wrap; font-size: 12px; }
+  .belote-seat-name .icon-badge { display: none; }
+  .belote-table-felt { border-width: 5px; inset: 35px 0; }
+  .belote-trick-grid { height: 158px; }
+  .belote-trick-card { width: 43px; }
+  .belote-board .belote-trick-card .playing-card { padding: 4px; width: 43px; }
+  .belote-board .belote-trick-card .playing-card strong { font-size: 18px; }
+  .belote-board .belote-trick-card .playing-card > span { font-size: 22px; }
+  .belote-hand { gap: 4px; }
+  .belote-hand .playing-card { width: 52px; }
+  .belote-team-columns { grid-template-columns: minmax(0, 1fr); }
+  .belote-score-strip > div { padding: 8px; }
+}

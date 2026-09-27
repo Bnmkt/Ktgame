@@ -1,0 +1,1 @@
+import{c as a}from"./index-B54cPbUQ.js";const e={name:"chart-no-axes-column-decreasing",size:24,node:[["path",{d:"M5 21V3",key:"clc1r8"}],["path",{d:"M12 21V9",key:"uvy0l4"}],["path",{d:"M19 21v-6",key:"tkawy9"}]]};e.node;const o=a(e);export{e as __iconData,o as default};

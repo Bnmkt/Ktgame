@@ -1,0 +1,1106 @@
+{
+  "version": 2,
+  "events": [
+    {
+      "id": "game.action",
+      "label": "Action effectuée dans une partie",
+      "fields": [
+        {
+          "field": "gameId",
+          "label": "Jeu"
+        },
+        {
+          "field": "action",
+          "label": "Type d'action"
+        },
+        {
+          "field": "playerId",
+          "label": "Joueur"
+        },
+        {
+          "field": "roomId",
+          "label": "Table"
+        },
+        {
+          "field": "phase",
+          "label": "Phase"
+        },
+        {
+          "field": "dice",
+          "label": "Valeurs des dés"
+        },
+        {
+          "field": "diceCount",
+          "label": "Nombre de dés"
+        },
+        {
+          "field": "rollScore",
+          "label": "Score du lancer"
+        },
+        {
+          "field": "selectedDice",
+          "label": "Dés sélectionnés"
+        },
+        {
+          "field": "turnScore",
+          "label": "Score du tour"
+        },
+        {
+          "field": "totalScore",
+          "label": "Score total"
+        },
+        {
+          "field": "cards",
+          "label": "Cartes visibles"
+        },
+        {
+          "field": "handSize",
+          "label": "Nombre de cartes"
+        },
+        {
+          "field": "handTotal",
+          "label": "Valeur de la main"
+        },
+        {
+          "field": "category",
+          "label": "Catégorie"
+        },
+        {
+          "field": "categoryScore",
+          "label": "Score de la catégorie"
+        },
+        {
+          "field": "logTexts",
+          "label": "Nouveaux messages structurés"
+        },
+        {
+          "field": "flags",
+          "label": "Marqueurs du moteur"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "game.finished",
+      "label": "Partie terminée",
+      "fields": [
+        {
+          "field": "gameId",
+          "label": "Jeu"
+        },
+        {
+          "field": "playerId",
+          "label": "Joueur"
+        },
+        {
+          "field": "roomId",
+          "label": "Table"
+        },
+        {
+          "field": "won",
+          "label": "Victoire"
+        },
+        {
+          "field": "rank",
+          "label": "Classement"
+        },
+        {
+          "field": "score",
+          "label": "Score final"
+        },
+        {
+          "field": "gain",
+          "label": "Gain"
+        },
+        {
+          "field": "pot",
+          "label": "Pot"
+        },
+        {
+          "field": "playerCount",
+          "label": "Nombre de joueurs"
+        },
+        {
+          "field": "signals",
+          "label": "Résultats remarquables"
+        },
+        {
+          "field": "zeroScores",
+          "label": "Scores à zéro"
+        },
+        {
+          "field": "completedCategories",
+          "label": "Catégories complétées"
+        },
+        {
+          "field": "handSize",
+          "label": "Nombre de cartes"
+        },
+        {
+          "field": "handTotal",
+          "label": "Valeur de la main"
+        },
+        {
+          "field": "dealerTotal",
+          "label": "Valeur du croupier"
+        },
+        {
+          "field": "maxRollScore",
+          "label": "Meilleur lancer"
+        },
+        {
+          "field": "maxTurnScore",
+          "label": "Meilleur tour"
+        },
+        {
+          "field": "contractsAttempted",
+          "label": "Mandats tentés"
+        },
+        {
+          "field": "contractsCompleted",
+          "label": "Mandats réussis"
+        },
+        {
+          "field": "completedContractIds",
+          "label": "Mandats distincts réussis"
+        },
+        {
+          "field": "marketDiscards",
+          "label": "Dés écartés"
+        },
+        {
+          "field": "bluffsCaught",
+          "label": "Bluffs démasqués"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "transaction",
+      "label": "Transaction de jetons",
+      "fields": [
+        {
+          "field": "amount",
+          "label": "Montant"
+        },
+        {
+          "field": "balance",
+          "label": "Nouveau solde"
+        },
+        {
+          "field": "reason",
+          "label": "Motif"
+        },
+        {
+          "field": "gameId",
+          "label": "Jeu"
+        },
+        {
+          "field": "roomId",
+          "label": "Table"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "shop.purchase",
+      "label": "Achat en boutique",
+      "fields": [
+        {
+          "field": "itemId",
+          "label": "Objet"
+        },
+        {
+          "field": "itemType",
+          "label": "Type d'objet"
+        },
+        {
+          "field": "itemCategory",
+          "label": "Collection"
+        },
+        {
+          "field": "price",
+          "label": "Prix"
+        },
+        {
+          "field": "quantity",
+          "label": "Quantité"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "daily.claimed",
+      "label": "Bonus journalier récupéré",
+      "fields": [
+        {
+          "field": "amount",
+          "label": "Montant"
+        },
+        {
+          "field": "claims",
+          "label": "Nombre de bonus"
+        },
+        {
+          "field": "streak",
+          "label": "Série"
+        },
+        {
+          "field": "multiplier",
+          "label": "Multiplicateur"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "account.browser",
+      "label": "Navigateur détecté",
+      "fields": [
+        {
+          "field": "browser",
+          "label": "Navigateur",
+          "choices": [
+            {
+              "value": "firefox",
+              "label": "Firefox"
+            },
+            {
+              "value": "edge",
+              "label": "Edge"
+            },
+            {
+              "value": "chrome",
+              "label": "Chrome"
+            },
+            {
+              "value": "safari",
+              "label": "Safari"
+            },
+            {
+              "value": "other",
+              "label": "Autre"
+            }
+          ]
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "achievement.unlocked",
+      "label": "Succès débloqué",
+      "fields": [
+        {
+          "field": "achievementId",
+          "label": "Succès"
+        },
+        {
+          "field": "group",
+          "label": "Groupe"
+        },
+        {
+          "field": "unlockedCount",
+          "label": "Nombre débloqué"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "site.random",
+      "label": "Tirage aléatoire du site",
+      "fields": [
+        {
+          "field": "roll",
+          "label": "Valeur tirée"
+        },
+        {
+          "field": "maximum",
+          "label": "Maximum"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "site.visit",
+      "label": "Visite d'une page (facultatif)",
+      "fields": [
+        {
+          "field": "page",
+          "label": "Page visitee",
+          "choices": [
+            {
+              "value": "lobby",
+              "label": "Accueil"
+            },
+            {
+              "value": "profile",
+              "label": "Profil"
+            },
+            {
+              "value": "shop",
+              "label": "Boutique"
+            },
+            {
+              "value": "leaderboard",
+              "label": "Classements"
+            },
+            {
+              "value": "room",
+              "label": "Table"
+            },
+            {
+              "value": "spectator",
+              "label": "Spectateur"
+            },
+            {
+              "value": "event",
+              "label": "Evenement"
+            },
+            {
+              "value": "admin",
+              "label": "Administration"
+            }
+          ]
+        },
+        {
+          "field": "browser",
+          "label": "Famille du navigateur",
+          "choices": [
+            {
+              "value": "firefox",
+              "label": "Firefox"
+            },
+            {
+              "value": "edge",
+              "label": "Edge"
+            },
+            {
+              "value": "chrome",
+              "label": "Chrome"
+            },
+            {
+              "value": "safari",
+              "label": "Safari"
+            },
+            {
+              "value": "other",
+              "label": "Autre"
+            }
+          ]
+        },
+        {
+          "field": "markers",
+          "label": "Indices dans l'URL (secret:valeur ou challenge:valeur)"
+        },
+        {
+          "field": "seconds",
+          "label": "Secondes actives depuis le dernier signal"
+        },
+        {
+          "field": "activeSeconds",
+          "label": "Secondes actives cumulees"
+        },
+        {
+          "field": "visitDays",
+          "label": "Jours de visite (UTC)"
+        },
+        {
+          "field": "pageCount",
+          "label": "Types de pages visites"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "site.activity",
+      "label": "Temps actif sur le site (facultatif)",
+      "fields": [
+        {
+          "field": "page",
+          "label": "Page visitee",
+          "choices": [
+            {
+              "value": "lobby",
+              "label": "Accueil"
+            },
+            {
+              "value": "profile",
+              "label": "Profil"
+            },
+            {
+              "value": "shop",
+              "label": "Boutique"
+            },
+            {
+              "value": "leaderboard",
+              "label": "Classements"
+            },
+            {
+              "value": "room",
+              "label": "Table"
+            },
+            {
+              "value": "spectator",
+              "label": "Spectateur"
+            },
+            {
+              "value": "event",
+              "label": "Evenement"
+            },
+            {
+              "value": "admin",
+              "label": "Administration"
+            }
+          ]
+        },
+        {
+          "field": "browser",
+          "label": "Famille du navigateur",
+          "choices": [
+            {
+              "value": "firefox",
+              "label": "Firefox"
+            },
+            {
+              "value": "edge",
+              "label": "Edge"
+            },
+            {
+              "value": "chrome",
+              "label": "Chrome"
+            },
+            {
+              "value": "safari",
+              "label": "Safari"
+            },
+            {
+              "value": "other",
+              "label": "Autre"
+            }
+          ]
+        },
+        {
+          "field": "markers",
+          "label": "Indices dans l'URL (secret:valeur ou challenge:valeur)"
+        },
+        {
+          "field": "seconds",
+          "label": "Secondes actives depuis le dernier signal"
+        },
+        {
+          "field": "activeSeconds",
+          "label": "Secondes actives cumulees"
+        },
+        {
+          "field": "visitDays",
+          "label": "Jours de visite (UTC)"
+        },
+        {
+          "field": "pageCount",
+          "label": "Types de pages visites"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "account.login",
+      "label": "Connexion au compte",
+      "fields": [
+        {
+          "field": "method",
+          "label": "Methode"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "inventory.checked",
+      "label": "Inventaire verifie (connexion, achat ou equipement)",
+      "fields": [
+        {
+          "field": "reason",
+          "label": "Motif"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "player.updated",
+      "label": "Profil modifie",
+      "fields": [
+        {
+          "field": "changed",
+          "label": "Champs modifies"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    },
+    {
+      "id": "inventory.equipped",
+      "label": "Equipement modifie",
+      "fields": [
+        {
+          "field": "changed",
+          "label": "Emplacements modifies"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris"
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        }
+      ]
+    }
+  ],
+  "metrics": [
+    {
+      "id": "accountAgeDays",
+      "label": "Anciennete du compte (jours)"
+    },
+    {
+      "id": "tokens",
+      "label": "Solde de jetons"
+    },
+    {
+      "id": "friendCount",
+      "label": "Nombre d'amis"
+    },
+    {
+      "id": "gamesPlayed",
+      "label": "Parties terminées"
+    },
+    {
+      "id": "wins",
+      "label": "Victoires"
+    },
+    {
+      "id": "staked",
+      "label": "Jetons misés"
+    },
+    {
+      "id": "dailyClaims",
+      "label": "Bonus récupérés"
+    },
+    {
+      "id": "dailyStreak",
+      "label": "Meilleure série de bonus"
+    },
+    {
+      "id": "shopPurchases",
+      "label": "Achats en boutique"
+    },
+    {
+      "id": "shopSpent",
+      "label": "Jetons dépensés en boutique"
+    },
+    {
+      "id": "cosmeticCount",
+      "label": "Objets possédés"
+    },
+    {
+      "id": "cosmeticTypes",
+      "label": "Types cosmétiques possédés"
+    },
+    {
+      "id": "midnightContractsCompleted",
+      "label": "Mandats de Dés de Minuit distincts réussis"
+    },
+    {
+      "id": "achievementsUnlocked",
+      "label": "Succès débloqués"
+    },
+    {
+      "id": "visibleAchievementsUnlocked",
+      "label": "Succès non secrets débloqués"
+    },
+    {
+      "id": "gameWins.belote",
+      "label": "Victoires - Belote"
+    },
+    {
+      "id": "gameWins.yahtzee",
+      "label": "Victoires - Yahtzee"
+    },
+    {
+      "id": "gameWins.421",
+      "label": "Victoires - 421"
+    },
+    {
+      "id": "gameWins.cul-de-chouette",
+      "label": "Victoires - Cul de Chouette"
+    },
+    {
+      "id": "gameWins.blackjack",
+      "label": "Victoires - Blackjack"
+    },
+    {
+      "id": "gameWins.texas-holdem",
+      "label": "Victoires - Texas Hold'em"
+    },
+    {
+      "id": "gameWins.bataille",
+      "label": "Victoires - Bataille"
+    },
+    {
+      "id": "gameWins.president",
+      "label": "Victoires - Président"
+    },
+    {
+      "id": "gameWins.farkle",
+      "label": "Victoires - Farkle"
+    },
+    {
+      "id": "gameWins.liars-dice",
+      "label": "Victoires - Liar's Dice"
+    },
+    {
+      "id": "gameWins.shut-the-box",
+      "label": "Victoires - Shut the Box"
+    },
+    {
+      "id": "gameWins.golf-solitaire",
+      "label": "Victoires - Golf Solitaire"
+    },
+    {
+      "id": "gameWins.accordion",
+      "label": "Victoires - Accordion"
+    },
+    {
+      "id": "gameWins.midnight-dice",
+      "label": "Victoires - Dés de Minuit"
+    },
+    {
+      "id": "gameWins.velvet-ruse",
+      "label": "Victoires - Velours Noir"
+    }
+  ],
+  "operators": [
+    "eq",
+    "neq",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "in",
+    "notIn",
+    "contains",
+    "containsAny",
+    "containsAll",
+    "exists",
+    "startsWith",
+    "endsWith"
+  ],
+  "aggregates": [
+    "match",
+    "count",
+    "sum",
+    "max",
+    "distinct",
+    "streak"
+  ],
+  "scopes": [
+    "event",
+    "game",
+    "career"
+  ]
+}
