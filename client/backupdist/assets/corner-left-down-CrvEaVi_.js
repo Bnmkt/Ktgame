@@ -1,0 +1,1 @@
+import{c as o}from"./index-j2sd2D1v.js";const e={name:"corner-left-down",size:24,node:[["path",{d:"m14 15-5 5-5-5",key:"1eia93"}],["path",{d:"M20 4h-7a4 4 0 0 0-4 4v12",key:"nbpdq2"}]]};e.node;const a=o(e);export{e as __iconData,a as default};

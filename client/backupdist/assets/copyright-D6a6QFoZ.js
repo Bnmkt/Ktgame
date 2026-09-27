@@ -1,0 +1,1 @@
+import{c as e}from"./index-j2sd2D1v.js";const c={name:"copyright",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"M14.83 14.83a4 4 0 1 1 0-5.66",key:"1i56pz"}]]};c.node;const a=e(c);export{c as __iconData,a as default};

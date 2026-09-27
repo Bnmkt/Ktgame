@@ -1,0 +1,1 @@
+import{c as t}from"./index-BulVBlDR.js";const e={name:"dock",size:24,node:[["path",{d:"M2 8h20",key:"d11cs7"}],["rect",{width:"20",height:"16",x:"2",y:"4",rx:"2",key:"18n3k1"}],["path",{d:"M6 16h12",key:"u522kt"}]]};e.node;const o=t(e);export{e as __iconData,o as default};

@@ -1,0 +1,163 @@
+import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import https from "node:https";
+import { games } from "../../server/src/games/shared.js";
+import { defaultCommunityEvent } from "../../server/src/services/community-events.js";
+
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : "playwright");
+const output = path.join(tmpdir(), "ktga-casino-review");
+mkdirSync(output, { recursive: true });
+const catalog = await new Promise((resolve, reject) => {
+  https.get("https://localhost:4000/ktga/api/shop", { rejectUnauthorized: false }, (response) => {
+    let body = ""; response.on("data", (chunk) => { body += chunk; });
+    response.on("end", () => { try { resolve(JSON.parse(body)); } catch (error) { reject(error); } });
+  }).on("error", reject);
+});
+const defaults = { icons: "chip", nameEffects: "none", memberCards: "default", profileBanners: "default", profileFrames: "none", profileEffects: "none", diceSkins: "default", cardSkins: "default" };
+const cosmetics = Object.fromEntries(Object.entries(defaults).map(([type, value]) => [type, [...new Set([value, ...catalog.filter((item) => item.type === type).map((item) => item.value)])]]));
+cosmetics.equipped = { icon: "chip", nameEffect: "none", memberCard: "diamond", profileBanner: "default", profileFrame: "none", profileEffect: "none", diceSkin: "default", cardSkin: "default" };
+let user = { id: "review-player", pseudo: "Camille", login: "camille", tokens: 20300000, guest: false, cosmetics, achievements: {}, profile: { displayName: "Camille", favoriteGames: ["blackjack", "president"] }, profileStats: { memberCardStats: ["winRate", "achievementsUnlocked"], publicStats: [{ key: "winRate", label: "Winrate", value: "57%" }, { key: "achievements", label: "Succès", value: "38/133" }] }, dailyBonus: { claimedToday: false, streak: 4, nextReward: 375, nextMultiplier: 1.5 } };
+const friend = { ...user, id: "review-friend", pseudo: "Alex" };
+const room = { id: "review-room", code: "ABC123", name: "Table de Camille", gameId: "yahtzee", ownerId: user.id, players: [user], isPublic: true, stake: 10, finished: false, state: null, readyPlayerIds: [user.id] };
+const event = defaultCommunityEvent();
+Object.assign(event, { name: "Le grand défi", slug: "grand-defi", status: "active" });
+event.theme.title = "Le grand défi";
+event.objective.milestones = [50, 100, 150, 250].map((percent) => ({ id: String(percent), percent, label: `Palier ${percent}`, effects: [] }));
+let progress = 140;
+let anonymous = false;
+let joined = false;
+const errors = [];
+const mutations = [];
+const browser = await chromium.launch({ channel: "msedge", headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, ignoreHTTPSErrors: true });
+const page = await context.newPage();
+page.on("pageerror", (error) => errors.push(error.message));
+await context.route("**/*", async (route) => {
+  const request = route.request();
+  const url = new URL(request.url());
+  if (url.pathname.includes("socket.io")) return route.fulfill({ status: 503, body: "" });
+  const index = url.pathname.indexOf("/api/");
+  if (index < 0) return route.continue();
+  const endpoint = url.pathname.slice(index);
+  const method = request.method();
+  const body = request.postDataJSON();
+  const send = (data, status = 200) => route.fulfill({ status, json: data, headers: { "access-control-allow-origin": "*" } });
+  if (method === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,PATCH,DELETE", "access-control-allow-headers": "authorization,content-type" } });
+  if (method !== "GET") mutations.push({ endpoint, method, body });
+  if (endpoint === "/api/health") return send({ ok: true });
+  if (endpoint === "/api/me") return send(anonymous ? { error: "Connexion requise" } : user, anonymous ? 401 : 200);
+  if (endpoint === "/api/auth/login") { anonymous = false; return send({ token: "review-token", user }); }
+  if (endpoint === "/api/config") return send({ siteName: "KTGA.ME", minRoomStake: 10 });
+  if (endpoint === "/api/shop") return send(catalog);
+  if (endpoint === "/api/games") return send(games);
+  if (endpoint === "/api/rooms") return send([room]);
+  if (endpoint === "/api/me/cosmetics") { user = { ...user, cosmetics: { ...user.cosmetics, equipped: { ...user.cosmetics.equipped, ...body } } }; return send(user); }
+  if (endpoint === "/api/friends") return send({ friends: [friend], incoming: [friend], outgoing: [], roomInvites: [] });
+  if (endpoint === "/api/users/search") return send([friend]);
+  if (endpoint.startsWith("/api/friends/")) return send({ ok: true });
+  if (endpoint === "/api/community-events/carousel") return send({ events: [], focusIndex: 0 });
+  if (endpoint === "/api/community-events/grand-defi") {
+    event.runtime.reachedMilestones = event.objective.milestones.filter((item) => item.percent <= progress).map((item) => item.id);
+    return send({ event, progress, nextMilestone: event.objective.milestones.find((item) => item.percent > progress), participant: null, leaderboard: [], recentActions: [], personalActions: [] });
+  }
+  if (endpoint === "/api/rooms/ABC123") return send({ ...room, players: joined ? [user] : [] });
+  if (endpoint === "/api/rooms/ABC123/join") { joined = true; return send({ ...room, players: [user] }); }
+  if (endpoint === "/api/rooms/ABC123/invite") return send({ ok: true });
+  if (endpoint.startsWith("/api/secrets/")) return send({});
+  return send([]);
+});
+const base = "http://127.0.0.1:5173/ktga";
+const nav = () => page.getByRole("navigation", { name: "Navigation du casino" });
+async function clickLink(name) { await nav().getByRole("link", { name, exact: true }).click(); }
+async function screenshot(name) { await page.screenshot({ path: path.join(output, `${name}.png`), fullPage: false }); }
+async function fits() {
+  const widths = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: innerWidth }));
+  assert.ok(widths.page <= widths.viewport, JSON.stringify(widths));
+}
+try {
+  await page.goto(`${base}/`);
+  await page.locator(".game-card").first().waitFor();
+  assert.match(await page.locator(".game-card h3").nth(0).innerText(), /Blackjack/);
+  assert.match(await page.locator(".game-card h3").nth(1).innerText(), /Président/);
+  await fits(); await screenshot("lobby-desktop");
+  await clickLink("Profil");
+  await page.getByRole("button", { name: "Style", exact: true }).click();
+  assert.equal(await page.locator(".wardrobe-slot").count(), 8);
+  await page.getByRole("button", { name: "Choisir une icône", exact: true }).click();
+  await page.getByRole("dialog").waitFor();
+  assert.ok(await page.locator(".wardrobe-choice").count() > 20);
+  await screenshot("collection-desktop");
+  const icon = catalog.find((item) => item.type === "icons" && item.value !== "chip");
+  await page.getByPlaceholder("Rechercher dans ma collection").fill(icon.name);
+  await page.locator(".wardrobe-choice").first().click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  assert.equal(user.cosmetics.equipped.icon, icon.value);
+  await screenshot("style-desktop");
+  await clickLink("Boutique");
+  await page.locator(".shop-layout").waitFor();
+  assert.equal(new URL(page.url()).pathname, "/ktga/shop");
+  assert.equal(await page.locator(".profile-tabs").count(), 0);
+  await screenshot("shop-desktop");
+  await page.goBack(); await page.locator(".profile-tabs").waitFor();
+  assert.equal(new URL(page.url()).pathname, "/ktga/profil");
+  await page.goForward(); await page.locator(".shop-layout").waitFor();
+  await page.reload(); await page.locator(".shop-layout").waitFor();
+  await nav().getByRole("button", { name: "Amis", exact: true }).click();
+  await page.getByRole("dialog").waitFor();
+  await page.getByRole("button", { name: /Demandes/ }).click();
+  await page.getByRole("button", { name: "Accepter", exact: true }).waitFor();
+  await screenshot("friends-desktop");
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.goto(`${base}/table/ABC123`);
+  await page.locator(".room-table-tools").waitFor();
+  assert.ok(joined);
+  assert.equal(await page.locator(".casino-header").getByRole("button", { name: "Règles" }).count(), 0);
+  await page.locator(".room-app-shell").evaluate((element) => { element.dataset.review = "preserved"; });
+  await screenshot("table-desktop");
+  await clickLink("Boutique"); await page.locator(".shop-layout").waitFor();
+  await clickLink("Ma table");
+  assert.equal(await page.locator(".room-app-shell").getAttribute("data-review"), "preserved");
+  await nav().getByRole("button", { name: "Amis", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Inviter", exact: true }).click();
+  assert.equal(mutations.find((item) => item.endpoint.endsWith("/invite"))?.body.friendId, friend.id);
+  await page.keyboard.press("Escape");
+  await page.goto(`${base}/evenement/grand-defi`);
+  await page.locator(".event-progress").waitFor();
+  assert.deepEqual(await page.locator(".event-milestones small").allTextContents(), ["50%", "100%"]);
+  assert.equal(await page.locator(".event-next-milestone").count(), 0);
+  await screenshot("event-hidden-desktop");
+  progress = 150;
+  await page.reload(); await page.locator(".event-progress").waitFor();
+  assert.deepEqual(await page.locator(".event-milestones small").allTextContents(), ["50%", "100%", "150%"]);
+  await screenshot("event-reached-desktop");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await clickLink("Profil"); await page.getByRole("button", { name: "Style", exact: true }).click();
+  await fits(); await screenshot("style-mobile");
+  await page.getByRole("button", { name: "Choisir un skin de cartes", exact: true }).click();
+  await page.getByRole("dialog").waitFor();
+  await fits();
+  const choiceBounds = await page.locator(".wardrobe-choice").first().evaluate((element) => ({ height: element.getBoundingClientRect().height, scroll: element.scrollHeight, client: element.clientHeight }));
+  assert.ok(choiceBounds.height >= 160 && choiceBounds.scroll <= choiceBounds.client + 2, JSON.stringify(choiceBounds));
+  await screenshot("collection-mobile");
+  await page.keyboard.press("Escape");
+  await clickLink("Boutique"); await page.locator(".shop-layout").waitFor();
+  await fits(); await screenshot("shop-mobile");
+  await nav().getByRole("button", { name: "Amis", exact: true }).click();
+  await page.getByRole("dialog").waitFor(); await fits(); await screenshot("friends-mobile");
+  await page.keyboard.press("Escape");
+  anonymous = true; joined = false;
+  await page.goto(`${base}/table/ABC123`);
+  await page.getByText(/Invitation à la table ABC123/).waitFor();
+  await page.getByLabel("Pseudo", { exact: true }).fill("camille");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("test-only");
+  await page.getByRole("button", { name: "Se connecter", exact: true }).click();
+  await page.locator(".room-table-tools").waitFor();
+  assert.ok(joined); assert.equal(new URL(page.url()).pathname, "/ktga/table/ABC123");
+  await fits(); await screenshot("table-mobile");
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ ok: true, screenshots: output, checks: ["favorites", "routes", "browser-history", "direct-refresh", "table-presence", "login-invite", "wardrobe-equipment", "friends-invite", "hidden-milestones", "mobile-layout"], mutations: mutations.length }));
+} finally { await browser.close(); }

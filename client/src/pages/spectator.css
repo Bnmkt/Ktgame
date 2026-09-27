@@ -1,0 +1,27 @@
+.spectator-page { max-width: 1100px; }
+.spectator-page .eyebrow { align-items: center; display: inline-flex; gap: 8px; }
+.spectator-access { display: grid; gap: 12px; max-width: 420px; padding: 20px 0; }
+.spectator-access label { display: grid; gap: 8px; }
+.spectator-board { display: grid; gap: 18px; min-width: 0; }
+.spectator-players { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.spectator-players article { align-items: center; border-bottom: 2px solid #719183; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding: 12px; }
+.spectator-players article.active { border-color: #f8d77d; background: #ffffff15; }
+.spectator-players small { flex-basis: 100%; }
+.spectator-cards { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.spectator-columns { display: grid; gap: 10px; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow-x: auto; }
+.spectator-columns section { min-width: 52px; }
+.spectator-columns .spectator-cards { display: grid; gap: 6px; }
+.spectator-columns .playing-card { height: 76px; min-width: 48px; width: 100%; }
+.spectator-lanes { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.spectator-boxes section > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.spectator-boxes span { border: 1px solid #efd389; min-width: 32px; padding: 8px; text-align: center; }
+.spectator-page .dice-row { flex-wrap: wrap; }
+.live-room-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 24px; }
+.live-room-list button { align-items: center; display: inline-flex; gap: 8px; }
+@media (max-width: 600px) { .spectator-columns { grid-template-columns: repeat(7, 58px); } .spectator-lanes { grid-template-columns: minmax(0, 1fr); } }
+.public-dice-board { display: grid; gap: 16px; min-width: 0; }
+.public-dice-choices dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; }
+.public-dice-choices dl > div { border-bottom: 1px solid #ffffff40; padding: 8px 0; display: flex; gap: 8px; justify-content: space-between; }
+.public-dice-choices dt { overflow-wrap: anywhere; }
+.public-dice-choices dd { margin: 0; color: #ffe397; font-weight: 700; }
+.public-dice-scores { min-width: 0; overflow-x: auto; }

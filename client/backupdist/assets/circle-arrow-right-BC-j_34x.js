@@ -1,0 +1,1 @@
+import{c as e}from"./index-CGSsC9XH.js";const c={name:"circle-arrow-right",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"m12 16 4-4-4-4",key:"1i9zcv"}],["path",{d:"M8 12h8",key:"1wcyev"}]],aliases:["arrow-right-circle"]};c.node;const a=e(c);export{c as __iconData,a as default};

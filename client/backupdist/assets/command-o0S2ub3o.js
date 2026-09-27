@@ -1,0 +1,1 @@
+import{c as e}from"./index-CGSsC9XH.js";const a={name:"command",size:24,node:[["path",{d:"M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3",key:"11bfej"}]]};a.node;const n=e(a);export{a as __iconData,n as default};

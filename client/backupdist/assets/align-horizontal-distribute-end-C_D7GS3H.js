@@ -1,0 +1,1 @@
+import{c as e}from"./index-j2sd2D1v.js";const t={name:"align-horizontal-distribute-end",size:24,node:[["rect",{width:"6",height:"14",x:"4",y:"5",rx:"2",key:"1wwnby"}],["rect",{width:"6",height:"10",x:"14",y:"7",rx:"2",key:"1fe6j6"}],["path",{d:"M10 2v20",key:"uyc634"}],["path",{d:"M20 2v20",key:"1tx262"}]]};t.node;const n=e(t);export{t as __iconData,n as default};

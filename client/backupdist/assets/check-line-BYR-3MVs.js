@@ -1,0 +1,1 @@
+import{c as a}from"./index-DPIYnb7u.js";const e={name:"check-line",size:24,node:[["path",{d:"M20 4L9 15",key:"1qkx8z"}],["path",{d:"M21 19L3 19",key:"100sma"}],["path",{d:"M9 15L4 10",key:"9zxff7"}]]};e.node;const t=a(e);export{e as __iconData,t as default};

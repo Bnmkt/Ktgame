@@ -1,0 +1,12 @@
+{
+  "name": "ktga-me",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "test": "npm --prefix server test",
+    "build": "npm --prefix client run build",
+    "check": "npm run test && npm run build"
+  }
+}

@@ -1,0 +1,1 @@
+import{c as t}from"./index-j2sd2D1v.js";const e={name:"credit-card",size:24,node:[["rect",{width:"20",height:"14",x:"2",y:"5",rx:"2",key:"ynyp8z"}],["line",{x1:"2",x2:"22",y1:"10",y2:"10",key:"1b3vmo"}]]};e.node;const o=t(e);export{e as __iconData,o as default};

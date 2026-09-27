@@ -1,0 +1,1 @@
+import{c as e}from"./index-CFbJpgaA.js";const o={name:"arrow-down-from-line",size:24,node:[["path",{d:"M19 3H5",key:"1236rx"}],["path",{d:"M12 21V7",key:"gj6g52"}],["path",{d:"m6 15 6 6 6-6",key:"h15q88"}]]};o.node;const n=e(o);export{o as __iconData,n as default};

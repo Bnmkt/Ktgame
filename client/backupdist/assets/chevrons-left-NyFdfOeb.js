@@ -1,0 +1,1 @@
+import{c as t}from"./index-CGSsC9XH.js";const e={name:"chevrons-left",size:24,node:[["path",{d:"m11 17-5-5 5-5",key:"13zhaf"}],["path",{d:"m18 17-5-5 5-5",key:"h8a8et"}]]};e.node;const o=t(e);export{e as __iconData,o as default};

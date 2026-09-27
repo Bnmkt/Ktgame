@@ -1,0 +1,1 @@
+import{c as e}from"./index-DPIYnb7u.js";const a={name:"face-slightly-frowning",size:24,node:[["path",{d:"M15 10V9",key:"4dkmfx"}],["path",{d:"M9 10V9",key:"1lazqi"}],["path",{d:"M9 16a5 5 0 016 0",key:"34mdxb"}],["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}]],aliases:["frown"]};a.node;const n=e(a);export{a as __iconData,n as default};

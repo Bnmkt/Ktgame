@@ -1,0 +1,1 @@
+import{c}from"./index-BulVBlDR.js";const e={name:"circle-stop",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["rect",{x:"9",y:"9",width:"6",height:"6",rx:"1",key:"1ssd4o"}]],aliases:["stop-circle"]};e.node;const t=c(e);export{e as __iconData,t as default};

@@ -1,0 +1,1 @@
+import{c as e}from"./index-B54cPbUQ.js";const a={name:"credit-card-check",size:24,node:[["path",{d:"M12.5 19H4a2 2 0 01-2-2V7a2 2 0 012-2h16a2 2 0 012 2v4",key:"1pfaq2"}],["path",{d:"m16 17 2 2 4-4",key:"uh5qu3"}],["path",{d:"M2 10h20",key:"1ir3d8"}]]};a.node;const d=e(a);export{a as __iconData,d as default};

@@ -1,0 +1,1 @@
+import{c as t}from"./index-j2sd2D1v.js";const e={name:"arrow-right-to-line",size:24,node:[["path",{d:"M17 12H3",key:"8awo09"}],["path",{d:"m11 18 6-6-6-6",key:"8c2y43"}],["path",{d:"M21 5v14",key:"nzette"}]]};e.node;const a=t(e);export{e as __iconData,a as default};

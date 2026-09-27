@@ -1,0 +1,1 @@
+import{c as e}from"./index-CnLhKHnI.js";const a={name:"flask-round",size:24,node:[["path",{d:"M10 2v6.292a7 7 0 1 0 4 0V2",key:"1s42pc"}],["path",{d:"M5 15h14",key:"m0yey3"}],["path",{d:"M8.5 2h7",key:"csnxdl"}]]};a.node;const d=e(a);export{a as __iconData,d as default};

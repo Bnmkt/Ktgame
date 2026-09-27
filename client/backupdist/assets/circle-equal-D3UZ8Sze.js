@@ -1,0 +1,1 @@
+import{c}from"./index-CGSsC9XH.js";const e={name:"circle-equal",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"M7 10h10",key:"1101jm"}],["path",{d:"M7 14h10",key:"1mhdw3"}]]};e.node;const o=c(e);export{e as __iconData,o as default};

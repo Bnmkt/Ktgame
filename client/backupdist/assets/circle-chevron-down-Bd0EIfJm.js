@@ -1,0 +1,1 @@
+import{c}from"./index-j2sd2D1v.js";const e={name:"circle-chevron-down",size:24,node:[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["path",{d:"m16 10-4 4-4-4",key:"894hmk"}]],aliases:["chevron-down-circle"]};e.node;const n=c(e);export{e as __iconData,n as default};
