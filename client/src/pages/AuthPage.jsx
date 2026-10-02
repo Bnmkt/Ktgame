@@ -214,11 +214,11 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
       {(!settings.registrationsEnabled || !settings.guestAccessEnabled) && <div className="auth-availability-note"><AlertTriangle size={16} /><span>{!settings.registrationsEnabled && !settings.guestAccessEnabled ? "Les inscriptions et l’accès invité sont actuellement fermés." : !settings.registrationsEnabled ? "Les nouvelles inscriptions sont actuellement fermées." : "L’accès invité est actuellement fermé."}</span></div>}
       {error && <div className="error">{error}</div>}
     </>}
-    {restrictedAccess && <AccessRestrictionDialog value={restrictedAccess} busy={busy === "parental-reactivation"} onRequest={requestParentalReactivation} onClose={() => setRestrictedAccess(null)} />}
+    {restrictedAccess && <AccessRestrictionDialog value={restrictedAccess} supportEmail={settings.supportEmail} busy={busy === "parental-reactivation"} onRequest={requestParentalReactivation} onClose={() => setRestrictedAccess(null)} />}
   </div></main>;
 }
 
-function AccessRestrictionDialog({ value, busy, onRequest, onClose }) {
+function AccessRestrictionDialog({ value, supportEmail = "contact@netdis.org", busy, onRequest, onClose }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   const remaining = value.endsAt ? Math.max(0, Date.parse(value.endsAt) - now) : 0;
@@ -226,7 +226,13 @@ function AccessRestrictionDialog({ value, busy, onRequest, onClose }) {
   const hours = Math.floor(remaining % 86400000 / 3600000);
   const minutes = Math.floor(remaining % 3600000 / 60000);
   const seconds = Math.floor(remaining % 60000 / 1000);
-  return <Dialog title={value.code === "HARD_BAN" ? "Accès au compte suspendu" : "Accès suspendu par le responsable légal"} className="access-restriction-dialog" onClose={onClose}><div className="access-restriction-icon"><ShieldAlert size={30} /></div><p>{value.reason || "L’accès à ce compte est temporairement indisponible."}</p>{value.endsAt && <div className="access-restriction-countdown"><Clock3 size={20} /><span><small>Temps restant</small><strong>{days ? `${days} j ` : ""}{String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</strong></span></div>}<div className="actions">{value.code === "PARENTAL_ACCESS_REVOKED" && <button type="button" disabled={busy} onClick={onRequest}><MailCheck size={17} />{busy ? "Envoi…" : "Demander une réactivation"}</button>}<button type="button" className="secondary" onClick={onClose}>Fermer</button></div></Dialog>;
+  return <Dialog title={value.code === "HARD_BAN" ? "Accès au compte suspendu" : "Accès suspendu par le responsable légal"} className="access-restriction-dialog" onClose={onClose}>
+    <div className="access-restriction-icon"><ShieldAlert size={30} /></div>
+    <p>{value.reason || "L’accès à ce compte est temporairement indisponible."}</p>
+    {value.endsAt && <div className="access-restriction-countdown"><Clock3 size={20} /><span><small>Temps restant</small><strong>{days ? `${days} j ` : ""}{String(hours).padStart(2, "0")}:{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</strong></span></div>}
+    {value.code === "HARD_BAN" && <p>Un recours peut être adressé par écrit à <a href={`mailto:${supportEmail}`}>{supportEmail}</a>. Indique l’adresse du compte et les éléments permettant de réexaminer la décision.</p>}
+    <div className="actions">{value.code === "PARENTAL_ACCESS_REVOKED" && <button type="button" disabled={busy} onClick={onRequest}><MailCheck size={17} />{busy ? "Envoi…" : "Demander une réactivation"}</button>}<button type="button" className="secondary" onClick={onClose}>Fermer</button></div>
+  </Dialog>;
 }
 
 function VerificationNotice({ value, pending, onResend, canResend }) {

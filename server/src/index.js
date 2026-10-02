@@ -1186,7 +1186,22 @@ function ensureUserSocial(user) {
   };
   user.roomInvites = Array.isArray(user.roomInvites) ? user.roomInvites : [];
   user.notifications = Array.isArray(user.notifications) ? user.notifications : [];
+  user.blockedUsers = Array.isArray(user.blockedUsers) ? [...new Set(user.blockedUsers.map(String))] : [];
+  user.mutedUsers = Array.isArray(user.mutedUsers) ? [...new Set(user.mutedUsers.map(String))] : [];
   return user;
+}
+
+function connectionBlocked(left, right) {
+  if (!left || !right) return false;
+  ensureUserSocial(left);
+  ensureUserSocial(right);
+  return left.blockedUsers.includes(right.id) || right.blockedUsers.includes(left.id);
+}
+
+function messageHiddenFor(viewer, sender) {
+  if (!viewer || !sender || viewer.id === sender.id) return false;
+  ensureUserSocial(viewer);
+  return viewer.mutedUsers.includes(sender.id) || connectionBlocked(viewer, sender);
 }
 
 function pushNotification(user, notification) {
@@ -1254,6 +1269,8 @@ function normalizeFriendGraph(db) {
     user.friends = user.friends.filter((id) => existingUserIds.has(id) && id !== user.id);
     user.friendRequests.incoming = user.friendRequests.incoming.filter((id) => existingUserIds.has(id) && id !== user.id);
     user.friendRequests.outgoing = user.friendRequests.outgoing.filter((id) => existingUserIds.has(id) && id !== user.id);
+    user.blockedUsers = user.blockedUsers.filter((id) => existingUserIds.has(id) && id !== user.id);
+    user.mutedUsers = user.mutedUsers.filter((id) => existingUserIds.has(id) && id !== user.id);
   }
   for (const user of db.users) {
     for (const otherId of [...user.friendRequests.outgoing]) {
@@ -1344,7 +1361,9 @@ function publicUserPayload(user, db, viewerId = "") {
       self: viewerId === user.id,
       isFriend: viewer?.friends?.includes(user.id) ?? false,
       requested: viewer?.friendRequests?.outgoing?.includes(user.id) ?? false,
-      incoming: viewer?.friendRequests?.incoming?.includes(user.id) ?? false
+      incoming: viewer?.friendRequests?.incoming?.includes(user.id) ?? false,
+      blocked: viewer?.blockedUsers?.includes(user.id) ?? false,
+      muted: viewer?.mutedUsers?.includes(user.id) ?? false
     },
     stats: {
       gamesPlayed: statistics.gamesPlayed,
@@ -2104,7 +2123,7 @@ function resolveChatChannel(db, user, input = {}) {
   if (channelType === "direct") {
     const friend = db.users.find((entry) => entry.id === String(input.friendId ?? ""));
     ensureUserSocial(user);
-    if (!friend || !user.friends.includes(friend.id)) return null;
+    if (!friend || !user.friends.includes(friend.id) || connectionBlocked(user, friend)) return null;
     const channelId = directChannelId(user.id, friend.id);
     return { channelType, channelId, friend, socketRoom: `chat:direct:${channelId}` };
   }
@@ -2268,6 +2287,11 @@ function applyTribunalDecision(caseId, body, adminId, now = Date.now()) {
       user.moderation.hardBan = { active: true, reason, endsAt: permanent ? "" : new Date(now + days * 86400000).toISOString(), updatedAt: new Date(now).toISOString(), updatedBy: adminId, caseId: entry.id };
       user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
     }
+    if (["social-ban", "hard-ban-review", "permanent-ban-review"].includes(outcome)) pushNotification(user, {
+      type: "moderation-decision",
+      title: "Sanction confirmée",
+      message: `${reason} Pour demander un réexamen, adresse un recours écrit à ${process.env.CONTACT_EMAIL || "contact@netdis.org"} en indiquant le dossier ${entry.code}.`
+    });
     return true;
   });
   if (!applied) return { error: "user" };
@@ -2764,7 +2788,7 @@ updateDb((db) => {
 
 setCatalogSource((db) => ({ achievements: achievementCatalog(db, { includeDisabled: true }), items: configuredShop(db) }));
 
-app.get("/api/config", (_req, res) => res.json({ ...platformSettings(), emailVerificationAvailable: emailDeliveryConfigured() }));
+app.get("/api/config", (_req, res) => res.json({ ...platformSettings(), emailVerificationAvailable: emailDeliveryConfigured(), supportEmail: process.env.CONTACT_EMAIL || "contact@netdis.org" }));
 
 app.get("/api/games", (_req, res) => res.json(configuredGames().filter((game) => game.enabled !== false)));
 
@@ -3203,8 +3227,10 @@ app.get("/api/users/search", auth, (req, res) => {
   if (query.length < 2) return res.json([]);
   const db = readDb();
   const requester = db.users.find((u) => u.id === req.auth.id);
+  if (requester) ensureUserSocial(requester);
   const rows = db.users
     .filter((user) => user.id !== req.auth.id)
+    .filter((user) => !requester || !connectionBlocked(requester, user))
     .filter((user) => user.pseudo.toLowerCase().includes(query) || displayNameFor(ensureUserSocial(user)).toLowerCase().includes(query) || friendCodeFor(user).toLowerCase() === query.replace(/[^a-z0-9]/g, ""))
     .slice(0, 12)
     .map((user) => ({
@@ -3374,6 +3400,8 @@ app.get("/api/friends", auth, (req, res) => {
       friends: byIds(user.friends).map((friend) => ({ ...friend, ...friendRoomPresence(db.rooms, friend.id, user, (roomId, userId) => [...(roomPresence.get(roomId) ?? [])].some((socketId) => io.sockets.sockets.get(socketId)?.data.userId === userId)) })),
       incoming: byIds(user.friendRequests.incoming),
       outgoing: byIds(user.friendRequests.outgoing),
+      hiddenPlayers: byIds(user.blockedUsers),
+      mutedPlayers: byIds(user.mutedUsers.filter((id) => !user.blockedUsers.includes(id))),
       roomInvites: user.roomInvites.map((invite) => {
         const room = db.rooms.find((row) => row.code === invite.code);
         const from = db.users.find((row) => row.id === invite.fromId);
@@ -3391,7 +3419,9 @@ app.get("/api/chat/messages", auth, (req, res) => {
   const user = db.users.find((entry) => entry.id === req.auth.id);
   const channel = user ? resolveChatChannel(db, user, req.query) : null;
   if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
-  const messages = chat.list(channel.channelType, channel.channelId).map((message) => decorateChatMessage(message, db));
+  const messages = chat.list(channel.channelType, channel.channelId)
+    .filter((message) => !messageHiddenFor(user, db.users.find((entry) => entry.id === message.senderId)))
+    .map((message) => decorateChatMessage(message, db));
   chat.markRead(user.id, channel.channelType, channel.channelId);
   res.json({ channel: { type: channel.channelType, id: channel.channelId }, messages });
 });
@@ -3409,7 +3439,12 @@ app.post("/api/chat/messages", auth, (req, res) => {
   try {
     const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content }), db);
     chat.markRead(user.id, channel.channelType, channel.channelId);
-    io.to(channel.socketRoom).emit("chat-message", message);
+    for (const socket of io.sockets.sockets.values()) {
+      if (!socket.rooms.has(channel.socketRoom)) continue;
+      const viewer = db.users.find((entry) => entry.id === socket.data.chatUserId);
+      if (!viewer || messageHiddenFor(viewer, user)) continue;
+      socket.emit("chat-message", message);
+    }
     res.status(201).json(message);
   } catch (error) {
     res.status(400).json({ error: error.message === "INVALID_CHAT_MESSAGE" ? "Écris un message de 500 caractères maximum." : "Le message n’a pas pu être envoyé." });
@@ -3467,6 +3502,7 @@ app.post("/api/friends/request", auth, (req, res) => {
     if (!user || !target || user.id === target.id) return "missing";
     ensureUserSocial(user);
     ensureUserSocial(target);
+    if (connectionBlocked(user, target)) return "blocked";
     if (user.friends.includes(target.id)) return "friend";
     if (user.friendRequests.incoming.includes(target.id) || target.friendRequests.outgoing.includes(user.id)) {
       addFriendship(user, target);
@@ -3492,6 +3528,7 @@ app.post("/api/friends/request", auth, (req, res) => {
   });
   if (result === "missing") return res.status(404).json({ error: "Joueur introuvable." });
   if (result === "friend") return res.status(400).json({ error: "Ce joueur est déjà dans tes amis." });
+  if (result === "blocked") return res.status(403).json({ error: "Cette connexion n’est pas disponible." });
   res.json({ ok: true });
 });
 
@@ -3505,6 +3542,7 @@ app.post("/api/friends/:id/accept", auth, (req, res) => {
     if (!user || !friend) return null;
     ensureUserSocial(user);
     ensureUserSocial(friend);
+    if (connectionBlocked(user, friend)) return "blocked";
     if (!user.friendRequests.incoming.includes(friend.id)) return "missing";
     user.friendRequests.incoming = user.friendRequests.incoming.filter((id) => id !== friend.id);
     friend.friendRequests.outgoing = friend.friendRequests.outgoing.filter((id) => id !== user.id);
@@ -3514,6 +3552,7 @@ app.post("/api/friends/:id/accept", auth, (req, res) => {
   });
   if (!result) return res.status(404).json({ error: "Joueur introuvable." });
   if (result === "missing") return res.status(400).json({ error: "Demande introuvable." });
+  if (result === "blocked") return res.status(403).json({ error: "Cette connexion n’est pas disponible." });
   res.json({ ok: true });
 });
 
@@ -3543,6 +3582,63 @@ app.delete("/api/friends/:id", auth, (req, res) => {
     ensureUserSocial(friend);
     user.friends = user.friends.filter((id) => id !== friend.id);
     friend.friends = friend.friends.filter((id) => id !== user.id);
+  });
+  res.json({ ok: true });
+});
+
+app.post("/api/connections/hidden/:id", auth, (req, res) => {
+  if (req.auth.guest || req.params.id === req.auth.id) return res.status(400).json({ error: "Joueur invalide." });
+  const result = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id);
+    const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!user || !target) return null;
+    ensureUserSocial(user); ensureUserSocial(target);
+    user.blockedUsers = [...new Set([...user.blockedUsers, target.id])];
+    user.mutedUsers = user.mutedUsers.filter((id) => id !== target.id);
+    user.friends = user.friends.filter((id) => id !== target.id);
+    target.friends = target.friends.filter((id) => id !== user.id);
+    removeFriendRequestBetween(user, target.id);
+    removeFriendRequestBetween(target, user.id);
+    user.roomInvites = user.roomInvites.filter((invite) => invite.fromId !== target.id);
+    target.roomInvites = target.roomInvites.filter((invite) => invite.fromId !== user.id);
+    return true;
+  });
+  if (!result) return res.status(404).json({ error: "Joueur introuvable." });
+  res.json({ ok: true });
+});
+
+app.delete("/api/connections/hidden/:id", auth, (req, res) => {
+  updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id);
+    if (!user) return;
+    ensureUserSocial(user);
+    user.blockedUsers = user.blockedUsers.filter((id) => id !== req.params.id);
+  });
+  res.json({ ok: true });
+});
+
+app.post("/api/connections/muted/:id", auth, (req, res) => {
+  if (req.auth.guest || req.params.id === req.auth.id) return res.status(400).json({ error: "Joueur invalide." });
+  const result = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id);
+    const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!user || !target) return null;
+    ensureUserSocial(user);
+    if (user.blockedUsers.includes(target.id)) return "blocked";
+    user.mutedUsers = [...new Set([...user.mutedUsers, target.id])];
+    return true;
+  });
+  if (!result) return res.status(404).json({ error: "Joueur introuvable." });
+  if (result === "blocked") return res.status(409).json({ error: "Ce joueur est déjà masqué." });
+  res.json({ ok: true });
+});
+
+app.delete("/api/connections/muted/:id", auth, (req, res) => {
+  updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id);
+    if (!user) return;
+    ensureUserSocial(user);
+    user.mutedUsers = user.mutedUsers.filter((id) => id !== req.params.id);
   });
   res.json({ ok: true });
 });
@@ -5552,6 +5648,7 @@ app.post("/api/rooms/:code/invite", auth, (req, res) => {
     ensureUserSocial(user);
     ensureUserSocial(friend);
     if (!room.players.some((p) => p.id === user.id)) return "room";
+    if (connectionBlocked(user, friend)) return "blocked";
     if (!user.friends.includes(friend.id)) return "friend";
     friend.roomInvites = (friend.roomInvites ?? []).filter((invite) => !(invite.code === room.code && invite.fromId === user.id));
     friend.roomInvites.unshift({ id: randomUUID(), code: room.code, roomId: room.id, fromId: user.id, createdAt: new Date().toISOString() });
@@ -5568,6 +5665,7 @@ app.post("/api/rooms/:code/invite", auth, (req, res) => {
   if (result === "missing") return res.status(404).json({ error: "Table ou ami introuvable." });
   if (result === "room") return res.status(403).json({ error: "Tu dois être à la table pour inviter." });
   if (result === "friend") return res.status(403).json({ error: "Tu peux inviter uniquement tes amis." });
+  if (result === "blocked") return res.status(403).json({ error: "Cette invitation n’est pas disponible." });
   res.json({ ok: true });
 });
 
