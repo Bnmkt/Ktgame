@@ -29,12 +29,12 @@ async function api(endpoint, token, body, method = body ? "POST" : "GET") {
 }
 let browser, page, publicPage;
 try {
-  start([path.join(root, "server/src/index.js")], folder, { NODE_ENV: "test", PORT: String(apiPort), HOST: "127.0.0.1", SQLITE_PATH: database, REQUEST_LOG_PATH: path.join(folder, "logs.sqlite"), JWT_SECRET: "isolated-test-only-secret", APP_BASE_PATH: "/ktga", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "", CLIENT_DIST: "", CLIENT_ORIGIN: `http://127.0.0.1:${clientPort}`, API_RATE_LIMIT_MAX: "10000", AUTH_RATE_LIMIT_MAX: "100" });
+  start([path.join(root, "server/src/index.js")], folder, { NODE_ENV: "test", TEST_ADMIN_EMAIL: "bnmkt@tests.invalid", PORT: String(apiPort), HOST: "127.0.0.1", SQLITE_PATH: database, REQUEST_LOG_PATH: path.join(folder, "logs.sqlite"), JWT_SECRET: "isolated-test-only-secret", APP_BASE_PATH: "/ktga", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "", CLIENT_DIST: "", CLIENT_ORIGIN: `http://127.0.0.1:${clientPort}`, API_RATE_LIMIT_MAX: "10000", AUTH_RATE_LIMIT_MAX: "100" });
   await waitFor(`${apiRoot}/api/health`);
   start([path.join(root, "client/node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(clientPort), "--strictPort"], path.join(root, "client"), { VITE_BASE_PATH: "/ktga/", VITE_API_URL: apiRoot, VITE_SOCKET_URL: `http://127.0.0.1:${apiPort}`, VITE_SOCKET_PATH: "/ktga/socket.io" });
   await waitFor(`${base}/`);
-  const owner = await api("/auth/register", null, { pseudo: "bnmkt", password: "test-password", ageBand: "13plus", termsVersion: "2026-09-27" });
-  const guest = await api("/auth/register", null, { pseudo: "Camille", password: "test-password", ageBand: "13plus", termsVersion: "2026-09-27" });
+  const owner = await api("/auth/register", null, { email: "bnmkt@tests.invalid", pseudo: "bnmkt", password: "test-password", birthDate: "1990-01-01", termsVersion: "2026-09-27" });
+  const guest = await api("/auth/register", null, { email: "camille@tests.invalid", pseudo: "Camille", password: "test-password", birthDate: "1990-01-01", termsVersion: "2026-09-27" });
   const legacy = await api("/me", owner.token, { memberCardStats: ["overallWinRate", "achievementsUnlocked"] }, "PATCH");
   assert.deepEqual(legacy.profileStats.memberCardStats, ["winRate", "achievementsUnlocked"]);
   let room = await api("/rooms", owner.token, { gameId: "belote", stake: 10, name: "Belote belge", isPublic: true });

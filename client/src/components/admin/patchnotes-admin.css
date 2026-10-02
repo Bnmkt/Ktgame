@@ -1,0 +1,77 @@
+.patchnotes-admin { background: #0d1414; border: 1px solid #3b413b; border-radius: 8px; display: grid; gap: 18px; padding: 22px; }
+.patchnotes-admin-current { align-items: end; background: #151c1b; border: 1px solid #374039; border-left: 4px solid #d2aa3e; border-radius: 6px; display: grid; gap: 12px; grid-template-columns: auto minmax(180px, 260px) 1fr auto; padding: 13px 16px; }
+.patchnotes-admin-current > svg { color: #ecc959; }
+.patchnotes-admin-current label { display: grid; gap: 5px; }
+.patchnotes-admin-current input { min-height: 38px; }
+.patchnotes-admin-current span, .patchnotes-admin-current small { color: #989f96; font-size: 11px; }
+.patchnotes-admin-current small { align-self: center; justify-self: end; }
+.patchnotes-admin-list { border-bottom: 1px solid #343a36; }
+.patchnotes-admin-list > article { align-items: center; border-top: 1px solid #343a36; display: grid; gap: 14px; grid-template-columns: 110px minmax(220px, 1fr) auto auto; padding: 13px 4px; }
+.patchnotes-admin-list > article > div:nth-child(2), .patchnote-admin-version { display: grid; gap: 3px; }
+.patchnotes-admin-list small, .patchnote-admin-version span { color: #969d94; font-size: 11px; }
+.patchnote-admin-version strong { color: #efd06f; font-size: 17px; }
+.patchnote-admin-votes { align-items: center; display: flex; gap: 8px; }
+.patchnote-admin-votes span { align-items: center; color: #aab4ac; display: flex; font-size: 11px; gap: 3px; }
+.patchnote-admin-votes b { border-left: 1px solid #414741; color: #e8d9b7; font-size: 12px; padding-left: 8px; }
+.patchnotes-admin-pagination { align-items: center; display: flex; gap: 12px; justify-content: center; }
+.patchnotes-admin-pagination span { color: #aaa38e; font-size: 12px; }
+.patchnote-create-dialog { max-width: 720px; }
+.patchnote-create-form { display: grid; gap: 16px; }
+.patchnote-create-form > p { color: #c5bca7; line-height: 1.5; margin: 0; }
+.patchnote-create-form label, .patchnote-studio label, .patchnote-block-editor label { display: grid; gap: 6px; }
+.patchnote-create-form small, .patchnote-studio label small { color: #8e978e; font-size: 10px; }
+.patchnote-create-form .actions { justify-content: flex-end; }
+.patchnote-studio-layer { padding: 2vh 2vw; }
+.patchnote-studio-dialog { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 96vh; max-height: 96vh; max-width: 1680px; overflow: hidden; width: 96vw; }
+.patchnote-studio-dialog > .modal-title-row { flex: 0 0 auto; }
+.patchnote-studio { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; overflow: hidden; }
+.patchnote-studio-meta { border-bottom: 1px solid #3c423d; display: grid; gap: 12px; padding: 0 2px 16px; }
+.patchnote-block-fields { display: grid; gap: 12px; }
+.patchnote-block-fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.patchnote-block-fields.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.patchnote-studio-workspace { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.45fr) minmax(360px, .75fr); min-height: 0; overflow: hidden; padding-top: 16px; }
+.patchnote-builder { min-height: 0; overflow-y: auto; padding-right: 6px; }
+.patchnote-builder > header { align-items: flex-start; background: #0e1515; border-bottom: 1px solid #3b443e; display: flex; gap: 15px; justify-content: space-between; padding: 10px 4px 12px; position: sticky; top: 0; z-index: 4; }
+.patchnote-builder h3 { font-size: 21px; margin: 2px 0 0; }
+.patchnote-block-palette { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.patchnote-block-palette button { min-height: 34px; padding: 6px 9px; }
+.patchnote-editor-blocks { display: grid; gap: 12px; padding: 16px 0 22px; }
+.patchnote-block-editor { background: #111918; border: 1px solid #39423c; border-radius: 6px; display: grid; gap: 12px; padding: 14px; }
+.patchnote-block-editor.selected { border-color: #d6b64f; box-shadow: inset 3px 0 #d6b64f; }
+.patchnote-block-editor > header { align-items: center; display: flex; justify-content: space-between; }
+.patchnote-block-editor > header > span { align-items: center; color: #e2c86f; display: flex; font-size: 11px; font-weight: 900; gap: 7px; text-transform: uppercase; }
+.patchnote-block-editor > header > div { display: flex; gap: 5px; }
+.patchnote-block-editor textarea { min-height: 92px; resize: vertical; }
+.patchnote-image-fields { display: grid; gap: 12px; grid-template-columns: minmax(180px, .6fr) minmax(200px, 1fr) minmax(200px, 1fr); }
+.patchnote-upload { align-items: center; background: #1c2321; border: 1px dashed #776834; border-radius: 6px; color: #ead074; cursor: pointer; display: flex !important; flex-direction: row; gap: 8px !important; justify-content: center; min-height: 48px; overflow: hidden; padding: 8px; position: relative; }
+.patchnote-upload input { cursor: pointer; inset: 0; opacity: 0; position: absolute; }
+.patchnote-builder-empty { align-items: center; background: #101716; border: 1px dashed #4c564f; color: #ded5c0; display: flex; flex-direction: column; gap: 6px; justify-content: center; min-height: 210px; }
+.patchnote-builder-empty span { color: #939c94; font-size: 12px; }
+.patchnote-studio-preview { align-self: stretch; background: #0a1011; border: 1px solid #39403c; border-radius: 7px; min-height: 0; overflow-y: auto; padding: 20px; }
+.patchnote-studio-preview > h2 { font-size: 26px; margin: 4px 0 8px; }
+.patchnote-studio-preview > p { color: #aaa18e; line-height: 1.5; margin: 0 0 18px; }
+.patchnote-studio-preview .patchnote-blocks h2 { font-size: 21px; }
+.patchnote-studio-preview .patchnote-change { padding: 12px; }
+.patchnote-studio-actions { align-items: center; border-top: 1px solid #3c423d; display: flex; gap: 9px; justify-content: flex-end; padding-top: 14px; }
+.patchnote-studio-actions > span { align-items: center; color: #9ca59d; display: flex; flex: 1; font-size: 11px; gap: 6px; }
+.danger-icon { color: #ef8992 !important; }
+
+@media (max-width: 1050px) {
+  .patchnote-studio-workspace { grid-template-columns: 1fr; overflow-y: auto; }
+  .patchnote-builder { overflow: visible; }
+  .patchnote-studio-preview { max-height: 560px; }
+  .patchnote-image-fields { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .patchnotes-admin { padding: 15px; }
+  .patchnotes-admin-current { grid-template-columns: auto 1fr; }
+  .patchnotes-admin-current small, .patchnotes-admin-current button { grid-column: 1 / -1; justify-self: stretch; }
+  .patchnotes-admin-list > article { grid-template-columns: 80px 1fr; }
+  .patchnote-admin-votes, .patchnotes-admin-list .admin-row-actions { grid-column: 2; justify-content: flex-start; }
+  .patchnote-block-fields.two, .patchnote-block-fields.three { grid-template-columns: 1fr; }
+  .patchnote-studio-layer { padding: 0; }
+  .patchnote-studio-dialog { border-radius: 0; height: 100dvh; max-height: 100dvh; width: 100vw; }
+  .patchnote-builder > header { display: grid; }
+  .patchnote-block-palette { justify-content: flex-start; }
+  .patchnote-studio-actions > span { display: none; }
+}

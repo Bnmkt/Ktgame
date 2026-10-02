@@ -15,16 +15,14 @@ export function beloteLegalCards(state, playerId) {
   const lead = state.trick[0]?.card;
   if (!lead) return hand;
   const winning = strongestPlay(state.trick, state.trump);
+  const partnerWinning = beloteTeam(state, winning.playerId) === beloteTeam(state, playerId);
   const following = hand.filter((card) => card.suit === lead.suit);
   const trumps = hand.filter((card) => card.suit === state.trump);
   const rising = trumps.filter((card) => strongerCard(winning.card, card, state.trump));
-  if (following.length) return lead.suit === state.trump && rising.length ? rising : following;
+  if (following.length) return lead.suit === state.trump && !partnerWinning && rising.length ? rising : following;
   if (!trumps.length) return hand;
-  const partnerWinning = beloteTeam(state, winning.playerId) === beloteTeam(state, playerId);
   if (!partnerWinning) return rising.length ? rising : trumps;
-  // Belgian competition convention: undertrump a winning partner if unable to rise.
-  if (!state.modifiers.frenchRules && winning.card.suit === state.trump && !rising.length) return trumps;
-  return hand.filter((card) => card.suit !== state.trump || !rising.length || rising.includes(card));
+  return hand;
 }
 
 export function beloteAnnouncements(hand, trump) {

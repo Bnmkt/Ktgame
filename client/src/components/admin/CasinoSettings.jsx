@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Coins, Gift, Landmark, Plus, Save, ShieldCheck, Trash2, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, Bot, Clock3, Coins, Gift, Landmark, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { CompactNumber, formatCompactNumber } from "../../utils/presentation.jsx";
@@ -46,10 +46,11 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving }) {
   const addRule = () => update("dailyBonusRules", [...config.rules, { id: `bonus-rule-${Date.now()}`, label: "Nouveau palier", day: 7, operation: "add", value: 0.5, repeat: false }]);
 
   return <form className="admin-settings casino-settings" onSubmit={onSubmit}>
-    <header className="casino-settings-heading"><div><span className="eyebrow">Configuration générale</span><h2>Paramètres du casino</h2><p>Identité, accès et règles économiques appliquées par le serveur.</p></div><button type="submit" disabled={saving}><Save size={18} />{saving ? "Enregistrement…" : "Enregistrer"}</button></header>
+    <header className="casino-settings-heading"><div><span className="eyebrow">Configuration générale</span><h2>Paramètres du casino</h2><p>Identité, économie et rythme des parties appliqués par le serveur.</p></div><button type="submit" disabled={saving}><Save size={18} />{saving ? "Enregistrement…" : "Enregistrer"}</button></header>
     <nav className="segmented-tabs casino-settings-tabs" aria-label="Catégories des paramètres">
       <button type="button" className={section === "identity" ? "active" : ""} onClick={() => setSection("identity")}><Landmark size={17} />Identité et accès</button>
       <button type="button" className={section === "economy" ? "active" : ""} onClick={() => setSection("economy")}><Coins size={17} />Économie et bonus</button>
+      <button type="button" className={section === "pacing" ? "active" : ""} onClick={() => setSection("pacing")}><Clock3 size={17} />Rythme des parties</button>
     </nav>
 
     {section === "identity" && <div className="casino-settings-panel identity-access-panel">
@@ -65,6 +66,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving }) {
         <div className="settings-group-heading"><Users /><div><h3>Accès au casino</h3><p>Contrôle les modes de connexion proposés aux visiteurs.</p></div></div>
         <div className="settings-access-options">
           <label><span><ShieldCheck /><b>Inscriptions</b><small>Autoriser la création de nouveaux comptes persistants.</small></span><input type="checkbox" checked={draft.registrationsEnabled} onChange={(event) => update("registrationsEnabled", event.target.checked)} /></label>
+          <label title={!draft.emailVerificationAvailable ? "Configure le serveur SMTP pour activer cette option." : ""}><span><ShieldCheck /><b>Validation par email</b><small>{draft.emailVerificationAvailable ? "Exiger la validation de l’adresse avant l’accès au casino." : "Indisponible tant que le serveur SMTP n’est pas configuré."}</small></span><input type="checkbox" disabled={!draft.emailVerificationAvailable} checked={draft.emailVerificationRequired === true} onChange={(event) => update("emailVerificationRequired", event.target.checked)} /></label>
           <label><span><Users /><b>Comptes invités</b><small>Autoriser une session temporaire sans inscription.</small></span><input type="checkbox" checked={draft.guestAccessEnabled} onChange={(event) => update("guestAccessEnabled", event.target.checked)} /></label>
         </div>
       </section>
@@ -100,6 +102,18 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving }) {
       <BonusChart settings={draft} />
     </div>}
 
-    <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>Les changements s’appliquent aux prochaines inscriptions, récupérations de bonus et créations de table.</span></div><button type="submit" disabled={saving}><Save size={17} />{saving ? "Enregistrement…" : "Enregistrer les paramètres"}</button></footer>
+    {section === "pacing" && <div className="casino-settings-panel pacing-settings-panel">
+      <section className="settings-group pacing-settings-group">
+        <div className="settings-group-heading"><Clock3 /><div><h3>Temporisations de table</h3><p>Ces durées sont copiées dans une partie lorsqu’elle démarre et restent stables jusqu’à son terme.</p></div></div>
+        <div className="pacing-setting-list">
+          <label className="pacing-setting-card"><span className="pacing-setting-icon"><Bot /></span><span className="pacing-setting-copy"><b>Réflexion de l’IA</b><small>Délai avant que le bot effectue son action.</small></span><span className="pacing-setting-input"><input type="number" min="0" max="30" step="1" value={draft.botThinkingSeconds ?? 1} onChange={(event) => update("botThinkingSeconds", Number(event.target.value))} /><i>secondes</i></span></label>
+          <label className="pacing-setting-card"><span className="pacing-setting-icon"><Clock3 /></span><span className="pacing-setting-copy"><b>Lecture de fin de tour</b><small>Maintient le plateau visible avant le joueur suivant.</small></span><span className="pacing-setting-input"><input type="number" min="1" max="60" step="1" value={draft.turnEndDelaySeconds ?? 5} onChange={(event) => update("turnEndDelaySeconds", Number(event.target.value))} /><i>secondes</i></span></label>
+          <label className="pacing-setting-card"><span className="pacing-setting-icon"><Trophy /></span><span className="pacing-setting-copy"><b>Récapitulatif de manche</b><small>Durée du classement affiché entre deux manches. Une valeur de 0 le désactive.</small></span><span className="pacing-setting-input"><input type="number" min="0" max="120" step="1" value={draft.roundResultsSeconds ?? 30} onChange={(event) => update("roundResultsSeconds", Number(event.target.value))} /><i>secondes</i></span></label>
+        </div>
+        <div className="pacing-sequence" aria-label="Ordre des temporisations"><span><b>1</b>Action</span><span><b>2</b>Lecture de fin de tour</span><span><b>3</b>Réflexion de l’IA suivante</span><span><b>4</b>Récapitulatif si la manche se termine</span></div>
+      </section>
+    </div>}
+
+    <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>Les paramètres économiques s’appliquent aux nouvelles opérations. Les temporisations sont figées au lancement de chaque partie.</span></div><button type="submit" disabled={saving}><Save size={17} />{saving ? "Enregistrement…" : "Enregistrer les paramètres"}</button></footer>
   </form>;
 }

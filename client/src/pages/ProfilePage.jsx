@@ -3,20 +3,16 @@ import { Pagination } from "../components/feedback/Feedback.jsx";
 import { usePagination } from "../components/common/usePagination.js";
 import { DailyActivityChart } from "../components/profile/DailyActivityChart.jsx";
 export { DailyActivityChart } from "../components/profile/DailyActivityChart.jsx";
-import { Activity, BadgeCheck, Boxes, Check, Coins, Gem, Percent, ReceiptText, Search, Shield, ShoppingBag, Sparkles, Trophy, User, X } from "lucide-react";
-import { api } from "../api.js";
+import { Activity, BadgeCheck, Boxes, CalendarDays, Check, Coins, Eye, Flag, Gem, KeyRound, Mail, Percent, ReceiptText, Search, Shield, ShoppingBag, Sparkles, Trophy, User, UserRound, X } from "lucide-react";
+import { api, setToken } from "../api.js";
 import { Wardrobe } from "../components/profile/Wardrobe.jsx";
+import { ReportPlayerDialog } from "../components/profile/ReportPlayerDialog.jsx";
 import { Die, PlayingCard } from "../components/game/GamePieces.jsx";
 import { CosmeticPreview, DisplayName, FriendCode, ProfileCosmeticEffect, ProfileCosmeticFrame, ProfileCosmeticShell, profileCosmeticClassName, shopTypeLabel } from "../components/cosmetics/Cosmetics.jsx";
 import { memberCardOptions, publicProfileStatOptions } from "../config/site.js";
 import { gameTitle } from "../features/games/config.js";
 import { CompactNumber, achievementTypeLabel, ageFromBirthDate, formatDate, formatExactNumber, memberCardStats, memberStatOptions, shopCategoryLabel, transactionLabel } from "../utils/presentation.jsx";
-
-const shopPackDefinitions = {
-  "japanese-traditional": { name: "Japon traditionnel", description: "Encre sumi, papier washi, indigo et vermillon." },
-  "japanese-sakura": { name: "Sakura", description: "Une collection rose nacré animée par des pétales." },
-  neon: { name: "Néon", description: "Cyan lumineux, halos nocturnes et surfaces futuristes." }
-};
+import { shopPackDefinitions } from "../utils/shop-packs.js";
 
 function packDiscountPercent(count) {
   return Math.min(35, Math.max(0, count - 1) * 5);
@@ -66,6 +62,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const [games, setGames] = useState([]);
   const [favorites, setFavorites] = useState(user.profile?.favoriteGames ?? []);
   const [publicProfile, setPublicProfile] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
   const [achievementType, setAchievementType] = useState("games");
   const [shop, setShop] = useState([]);
   const [shopMode, setShopMode] = useState("items");
@@ -123,6 +120,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     setMessage("");
     try {
       const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ ...form, ...statForm }) });
+      if (updated.sessionToken) setToken(updated.sessionToken);
       setUser(updated);
       setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", password: "" });
       setFavorites(updated.profile?.favoriteGames ?? []);
@@ -133,11 +131,26 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     }
   }
 
+  async function saveEmail() {
+    setError("");
+    setMessage("");
+    try {
+      const result = await api("/api/me/email", { method: "POST", body: JSON.stringify({ email: form.login }) });
+      if (result.token) setToken(result.token);
+      if (result.user) {
+        setUser(result.user);
+        setForm((current) => ({ ...current, login: result.user.login ?? form.login }));
+      }
+      setMessage("Adresse enregistrée. Un email de vérification vient d’être envoyé.");
+    } catch (err) { setError(err.message); }
+  }
+
   async function savePublicInfo() {
     setError("");
     setMessage("");
     try {
       const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ ...form, favoriteGames: favorites, ...statForm }) });
+      if (updated.sessionToken) setToken(updated.sessionToken);
       setUser(updated);
       setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", password: "" });
       setFavorites(updated.profile?.favoriteGames ?? []);
@@ -278,7 +291,8 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const filteredShop = shop.filter((item) => item.type === shopType && item.category === effectiveShopCategory);
   const shopPages = usePagination(filteredShop, `${shopType}:${effectiveShopCategory}`, 12);
   const previewItem = shop.find((item) => item.id === previewItemId) ?? shopPages.rows[0];
-  const availablePackThemes = Object.keys(shopPackDefinitions).filter((theme) => shop.some((item) => item.packs?.includes(theme)));
+  const packDefinitions = shopPackDefinitions(shop);
+  const availablePackThemes = Object.keys(packDefinitions);
   const effectivePackTheme = availablePackThemes.includes(packTheme) ? packTheme : availablePackThemes[0];
   const packItems = shop.filter((item) => item.packs?.includes(effectivePackTheme)).sort((left, right) => shopTypes.indexOf(left.type) - shopTypes.indexOf(right.type));
   const packPages = usePagination(packItems, effectivePackTheme, 12);
@@ -350,48 +364,57 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
             <button className={tab === "transactions" ? "active" : ""} onClick={() => setTab("transactions")}><ReceiptText size={18} /> Transactions</button>
           </nav>}
           <div className={isShop ? "shop-page-content" : "profile-content"}>
-          {tab === "account" && <nav className="segmented-tabs account-subtabs" aria-label="Réglages du compte"><button className={accountSubtab === "details" ? "active" : ""} onClick={() => setAccountSubtab("details")}><User size={17} /> Informations du compte</button><button className={accountSubtab === "settings" ? "active" : ""} onClick={() => setAccountSubtab("settings")}><Shield size={17} /> Affichage du profil</button></nav>}
+          {tab === "account" && <nav className="segmented-tabs account-subtabs" aria-label="Réglages du compte"><button className={accountSubtab === "details" ? "active" : ""} onClick={() => setAccountSubtab("details")}><User size={17} /> Informations</button><button className={accountSubtab === "settings" ? "active" : ""} onClick={() => setAccountSubtab("settings")}><Eye size={17} /> Affichage public</button></nav>}
           {tab === "account" && accountSubtab === "details" && <>
-            <h2>Paramètres du compte</h2>
-            {user.guest ? <p>Les invités ne peuvent pas modifier un compte. Crée un compte pour conserver tes jetons et ton historique.</p> : <div className="settings-grid">
-              <section className="settings-card">
-                <div className="panel-heading"><span>Identité publique</span><small>Ces informations apparaissent sur ton profil public et ta member card.</small></div>
-                <div className="account-form identity-form">
-                  <label>Login<input value={form.login} onChange={(e) => setForm({ ...form, login: e.target.value })} placeholder="Identifiant de connexion" /></label>
-                  <label>Pseudo en jeu<input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Nom affiché en partie" /></label>
-                  <label>Date de naissance<input value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} type="date" /></label>
-                  <label>Genre<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">Non renseigné</option><option value="Homme">Homme</option><option value="Femme">Femme</option><option value="Non-binaire">Non-binaire</option><option value="Autre">Autre</option><option value="Préfère ne pas dire">Préfère ne pas dire</option></select></label>
-                  <div className="derived-field"><span>Âge affiché</span><strong>{ageFromBirthDate(form.birthDate) || "-"}</strong></div>
-                  <label className="wide-field">Bio<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} maxLength={180} placeholder="Quelques mots sur ton style de jeu" /></label>
+            <header className="account-page-heading"><div><span className="eyebrow">Compte joueur</span><h2>Informations du profil</h2><p>Gère séparément ce que les autres joueurs voient et les informations privées de connexion.</p></div><button className="secondary" onClick={() => openPublicProfile(user.id)}><Eye size={17} />Voir mon profil</button></header>
+            {user.guest ? <p>Les invités ne peuvent pas modifier un compte. Crée un compte pour conserver tes jetons et ton historique.</p> : <div className="settings-grid account-settings-grid">
+              <section className="settings-card account-identity-card">
+                <div className="account-section-heading"><span><UserRound size={20} /></span><div><h3>Identité publique</h3><p>Le pseudo et la bio sont visibles sur ton profil public.</p></div></div>
+                <div className="account-identity-layout">
+                  <div className="account-public-fields">
+                    <label>Pseudo en jeu<input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} maxLength={32} placeholder="Nom affiché en partie" /><small>Affiché sur ta member card et dans les parties.</small></label>
+                    <label>Bio<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} maxLength={180} placeholder="Quelques mots sur ton style de jeu" /><small>{form.bio.length}/180 caractères</small></label>
+                  </div>
+                  <div className="account-personal-fields">
+                    <div className="account-fields-caption"><CalendarDays size={17} /><span><strong>Informations personnelles</strong><small>La date complète reste privée.</small></span></div>
+                    <label>Date de naissance<input value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} type="date" disabled={Boolean(user.profile?.birthDate)} />{user.profile?.birthDate && <small>Pour corriger cette date, contacte l’administration.</small>}</label>
+                    <div className="account-age-gender-row"><label>Genre<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">Non renseigné</option><option value="Homme">Homme</option><option value="Femme">Femme</option><option value="Non-binaire">Non-binaire</option><option value="Autre">Autre</option><option value="Préfère ne pas dire">Préfère ne pas dire</option></select></label><div className="derived-field"><span>Âge calculé</span><strong>{ageFromBirthDate(form.birthDate) || "-"}</strong></div></div>
+                  </div>
                 </div>
               </section>
               <section className="settings-card">
                 <div className="panel-heading"><span>Jeux favoris</span><small>Choisis jusqu'à 5 jeux affichés sur ton profil public.</small></div>
                 <div className="favorite-game-grid">{games.map((game) => <button key={game.id} className={favorites.includes(game.id) ? "favorite-game active" : "favorite-game"} onClick={() => toggleFavorite(game.id)} disabled={!favorites.includes(game.id) && favorites.length >= 5}>{game.name}</button>)}</div>
               </section>
-              <section className="settings-card">
-                <div className="panel-heading"><span>Sécurité</span><small>Laisse vide pour conserver ton mot de passe actuel.</small></div>
-                <div className="account-form"><label>Nouveau mot de passe<input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} type="password" placeholder="4 caractères minimum" /></label></div>
+              <section className="settings-card account-security-card">
+                <div className="account-section-heading"><span><Shield size={20} /></span><div><h3>Connexion et sécurité</h3><p>Ces informations ne sont jamais affichées aux autres joueurs.</p></div></div>
+                <div className="account-security-layout">
+                  <div className="account-email-editor"><div className="account-email-summary"><Mail size={20} /><span><small>Adresse de connexion</small><strong>{user.emailVerified ? "Adresse vérifiée" : "Vérification requise"}</strong><em>Privée</em></span></div><label><span className="sr-only">Adresse email</span><input type="email" autoComplete="email" value={form.login} onChange={(event) => setForm({ ...form, login: event.target.value })} placeholder="nom@exemple.be" /></label><button type="button" className="secondary" onClick={saveEmail} disabled={!form.login || form.login === user.login && user.emailVerified}><Mail size={16} />{form.login === user.login ? "Renvoyer la vérification" : "Modifier l’adresse"}</button></div>
+                  <label><span className="field-label"><KeyRound size={15} />Nouveau mot de passe</span><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} type="password" autoComplete="new-password" placeholder="Laisser vide pour conserver l’actuel" /><small>4 caractères minimum uniquement si tu souhaites le modifier.</small></label>
+                </div>
               </section>
-              <div className="settings-actions"><button onClick={savePublicInfo}>Enregistrer</button><button className="secondary" onClick={() => openPublicProfile(user.id)}>Voir mon profil public</button></div>
+              <div className="settings-actions account-save-actions"><span>Les modifications du profil et des favoris seront enregistrées ensemble.</span><button onClick={savePublicInfo}>Enregistrer les modifications</button></div>
             </div>}
           </>}
           {tab === "account" && accountSubtab === "settings" && <>
-            <h2>Affichage du profil</h2>
-            {user.guest ? <p>Les invités ne peuvent pas modifier l’affichage d’un profil public.</p> : <section className="settings-card profile-display-settings">
-              <div className="panel-heading"><span>Statistiques publiques</span><small>Configure les deux emplacements de la member card. Choisis « Masquée » pour ne rien afficher à cet emplacement.</small></div>
-              <div className="stat-radio-columns">{[0, 1].map((index) => <fieldset className="stat-radio-group" key={index}>
-                <legend>Emplacement {index + 1}</legend>
-                <div className="stat-radio-grid" role="radiogroup" aria-label={`Statistique ${index + 1}`}>{memberStatOptions().map(([value, label]) => <button type="button" role="radio" aria-checked={(statForm.memberCardStats[index] === "overallWinRate" ? "winRate" : statForm.memberCardStats[index] ?? "hidden") === value} className={(statForm.memberCardStats[index] === "overallWinRate" ? "winRate" : statForm.memberCardStats[index] ?? "hidden") === value ? "stat-radio active" : "stat-radio"} key={value} onClick={() => { const memberCardStats = [...statForm.memberCardStats]; memberCardStats[index] = value; setStatForm({ ...statForm, memberCardStats }); }}><span className="radio-mark" />{label}</button>)}</div>
-                {statForm.memberCardStats[index] === "customAchievement" && <label>Succès affiché<select value={statForm.customAchievementIds[index] ?? ""} onChange={(e) => { const ids = [...statForm.customAchievementIds]; ids[index] = e.target.value; setStatForm({ ...statForm, customAchievementIds: ids }); }}><option value="">Choisir un milestone</option>{milestoneAchievements.map((achievement) => <option key={achievement.id} value={achievement.id}>{achievement.title}</option>)}</select></label>}
-              </fieldset>)}</div>
-              <div className="panel-heading profile-stat-heading"><span>Fiche du profil public</span><small>Choisis précisément les informations visibles par les autres joueurs.</small></div>
-              <div className="profile-stat-visibility">{publicProfileStatOptions.map(([key, label]) => {
-                const visible = statForm.visibleProfileStats.includes(key);
-                return <div className="profile-stat-toggle" key={key}><strong>{label}</strong><div className="binary-radio" role="radiogroup" aria-label={`${label} sur le profil public`}><button type="button" role="radio" aria-checked={visible} className={visible ? "active" : ""} onClick={() => setStatForm({ ...statForm, visibleProfileStats: [...new Set([...statForm.visibleProfileStats, key])] })}><span className="radio-mark" />Afficher</button><button type="button" role="radio" aria-checked={!visible} className={!visible ? "active" : ""} onClick={() => setStatForm({ ...statForm, visibleProfileStats: statForm.visibleProfileStats.filter((entry) => entry !== key) })}><span className="radio-mark" />Masquer</button></div></div>;
-              })}</div>
-              <div className="settings-actions"><button onClick={savePublicInfo}>Enregistrer</button><button className="secondary" onClick={() => openPublicProfile(user.id)}>Prévisualiser</button></div>
-            </section>}
+            <header className="account-page-heading"><div><span className="eyebrow">Confidentialité du profil</span><h2>Affichage public</h2><p>Choisis les statistiques résumées sur ta carte puis les détails visibles sur ton profil.</p></div><button className="secondary" onClick={() => openPublicProfile(user.id)}><Eye size={17} />Prévisualiser</button></header>
+            {user.guest ? <p>Les invités ne peuvent pas modifier l’affichage d’un profil public.</p> : <div className="profile-display-settings">
+              <section className="settings-card member-stat-settings">
+                <div className="account-section-heading"><span><Trophy size={20} /></span><div><h3>Member card</h3><p>Deux emplacements compacts apparaissent sur toutes les versions de ta carte.</p></div></div>
+                <div className="member-stat-slots">{[0, 1].map((index) => {
+                  const selected = statForm.memberCardStats[index] === "overallWinRate" ? "winRate" : statForm.memberCardStats[index] ?? "hidden";
+                  return <div className="member-stat-slot" key={index}><span className="member-stat-index">{index + 1}</span><div><label htmlFor={`member-stat-${index}`}>Statistique affichée</label><select id={`member-stat-${index}`} value={selected} onChange={(event) => { const memberCardStats = [...statForm.memberCardStats]; memberCardStats[index] = event.target.value; setStatForm({ ...statForm, memberCardStats }); }}>{memberStatOptions().map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{selected === "customAchievement" && <label className="member-custom-achievement">Succès personnalisé<select value={statForm.customAchievementIds[index] ?? ""} onChange={(event) => { const ids = [...statForm.customAchievementIds]; ids[index] = event.target.value; setStatForm({ ...statForm, customAchievementIds: ids }); }}><option value="">Choisir un milestone</option>{milestoneAchievements.map((achievement) => <option key={achievement.id} value={achievement.id}>{achievement.title}</option>)}</select></label>}</div></div>;
+                })}</div>
+              </section>
+              <section className="settings-card public-stat-settings">
+                <div className="account-section-heading"><span><Eye size={20} /></span><div><h3>Fiche du profil public</h3><p>Active uniquement les indicateurs que les autres joueurs peuvent consulter.</p></div></div>
+                <div className="profile-stat-visibility">{publicProfileStatOptions.map(([key, label]) => {
+                  const visible = statForm.visibleProfileStats.includes(key);
+                  return <label className={`profile-stat-toggle ${visible ? "active" : ""}`} key={key}><span><strong>{label}</strong><small>{visible ? "Visible sur le profil" : "Masqué aux autres joueurs"}</small></span><input type="checkbox" checked={visible} onChange={(event) => setStatForm({ ...statForm, visibleProfileStats: event.target.checked ? [...new Set([...statForm.visibleProfileStats, key])] : statForm.visibleProfileStats.filter((entry) => entry !== key) })} /><i aria-hidden="true" /></label>;
+                })}</div>
+              </section>
+              <div className="settings-actions account-save-actions"><span>Les changements prennent effet sur les prochaines ouvertures de ton profil.</span><button onClick={savePublicInfo}>Enregistrer l’affichage</button></div>
+            </div>}
           </>}
           {tab === "customize" && <Wardrobe user={user} setUser={setUser} catalog={shop} onOpenShop={onOpenShop} />}
           {tab === "shop" && <>
@@ -410,8 +433,8 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
                   })}</div>
                   <Pagination {...shopPages} pageSizes={[12, 24, 48]} label="Pages de la boutique" />
                 </> : <div className="pack-shop">
-                  <div className="pack-theme-tabs">{availablePackThemes.map((theme) => <button key={theme} className={effectivePackTheme === theme ? "active" : ""} onClick={() => selectPackTheme(theme)}><strong>{shopPackDefinitions[theme].name}</strong><small>{shopPackDefinitions[theme].description}</small></button>)}</div>
-                  <section className="pack-builder-head"><div><span>Pack personnalisable</span><h3>{shopPackDefinitions[effectivePackTheme]?.name}</h3><p>Coche les objets qui t’intéressent. Chaque objet supplémentaire ajoute 5% de remise, jusqu’à 35%.</p></div><div className="pack-discount-badge"><Percent size={20} /><strong>{packDiscount}%</strong><small>de réduction</small></div></section>
+                  <div className="pack-theme-tabs">{availablePackThemes.map((theme) => <button key={theme} className={effectivePackTheme === theme ? "active" : ""} onClick={() => selectPackTheme(theme)}><strong>{packDefinitions[theme].name}</strong><small>{packDefinitions[theme].description}</small></button>)}</div>
+                  <section className="pack-builder-head"><div><span>Pack personnalisable</span><h3>{packDefinitions[effectivePackTheme]?.name}</h3><p>Coche les objets qui t’intéressent. Chaque objet supplémentaire ajoute 5% de remise, jusqu’à 35%.</p></div><div className="pack-discount-badge"><Percent size={20} /><strong>{packDiscount}%</strong><small>de réduction</small></div></section>
                   <div className="pack-item-grid">{packPages.rows.map((item) => {
                     const owned = user.cosmetics?.[item.type]?.includes(item.value);
                     const selected = packSelection.includes(item.id) && !owned;
@@ -475,7 +498,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
       {purchaseConfirmation && <div className="modal-backdrop shop-confirmation-layer" onClick={() => { if (!purchasePending) setPurchaseConfirmation(null); }}><div className="modal shop-confirmation-modal" onClick={(event) => event.stopPropagation()}>
         <div className="shop-confirmation-icon"><ShoppingBag size={28} /></div>
         <span className="eyebrow">Confirmation d’achat</span>
-        <h2>{purchaseConfirmation.kind === "item" ? purchaseConfirmation.item.name : shopPackDefinitions[effectivePackTheme]?.name}</h2>
+        <h2>{purchaseConfirmation.kind === "item" ? purchaseConfirmation.item.name : packDefinitions[effectivePackTheme]?.name}</h2>
         <p>{purchaseConfirmation.kind === "item" ? <>Débloquer et équiper cet élément pour <strong><CompactNumber value={purchaseConfirmation.item.price} label="Prix exact" /> jetons</strong> ?</> : <>Acheter les <strong>{selectedPackItems.length} éléments</strong> sélectionnés pour <strong><CompactNumber value={packTotal} label="Prix exact" /> jetons</strong>{packDiscount ? ` avec ${packDiscount}% de réduction` : ""} ?</>}</p>
         <div className="shop-confirmation-balance"><span>Solde actuel<strong><CompactNumber value={user.tokens} label="Solde exact" /></strong></span><span>Après achat<strong><CompactNumber value={Math.max(0, Number(user.tokens) - (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) : packTotal))} label="Solde prévisionnel exact" /></strong></span></div>
         <div className="actions"><button type="button" disabled={purchasePending || (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) > Number(user.tokens) : packTotal > Number(user.tokens))} onClick={confirmPurchase}><Coins size={18} /> {purchasePending ? "Achat en cours…" : "Confirmer l’achat"}</button><button type="button" className="secondary" disabled={purchasePending} onClick={() => setPurchaseConfirmation(null)}>Annuler</button></div>
@@ -486,7 +509,8 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
         {smallRockMessage && <div className={smallRockUnlocked ? "success" : "error"}>{smallRockMessage}</div>}
         <button className="secret-rock-action" type="button" onClick={touchSmallRock} disabled={!smallRockStartedAt || smallRockUnlocked}><Gem size={18} /> {smallRockUnlocked ? "Secret découvert" : "Toucher la pierre"}</button>
       </div></div>}
-      {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromProfileModal} />}
+      {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromProfileModal} onReport={setReportTarget} />}
+      {reportTarget && <ReportPlayerDialog player={reportTarget} onClose={() => setReportTarget(null)} />}
     </main>
   );
 }
@@ -502,7 +526,7 @@ export function shortStatLabel(label) {
   return String(label ?? "Stat");
 }
 
-export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequest }) {
+export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequest, onReport }) {
   const favoriteGames = profile.profile?.favoriteGames ?? [];
   const hasBio = Boolean(profile.profile?.bio?.trim());
   const hasDetails = hasBio || favoriteGames.length > 0;
@@ -527,6 +551,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
           </div>
           <div className="modal-title-actions">
             {currentUser && !currentUser.guest && !profile.relationship?.self && <button className="secondary" disabled={profile.relationship?.isFriend || profile.relationship?.requested} onClick={() => onFriendRequest?.(profile.id)}>{profile.relationship?.isFriend ? "Ami" : profile.relationship?.requested ? "Demande envoyée" : "Ajouter en ami"}</button>}
+            {currentUser && !currentUser.guest && !profile.relationship?.self && <button className="secondary profile-report-button" onClick={() => onReport?.(profile)}><Flag size={16} /> Signaler</button>}
             <button className="secondary icon-toggle" onClick={onClose}><X size={18} /></button>
           </div>
         </div>

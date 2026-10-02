@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, EyeOff, Filter, HelpCircle, Play, Plus, Search, Sparkles, Star, Trophy, Users, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, EyeOff, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
 import { JoinRoomDialog } from "../components/navigation/JoinRoomDialog.jsx";
@@ -30,7 +30,7 @@ function formatEventDate(value) {
   return new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
-export function GameRoomsModal({ game, rooms, user, stake, setStake, isPublic, setIsPublic, roomName, setRoomName, roomPassword, setRoomPassword, joinCode, setJoinCode, joinPassword, setJoinPassword, onCreate, onJoin, onEnterRoom, onRules, onClose, settings = defaultPublicSettings }) {
+export function GameRoomsModal({ game, rooms, user, stake, setStake, isPublic, setIsPublic, roomName, setRoomName, roomPassword, setRoomPassword, joinCode, setJoinCode, joinPassword, setJoinPassword, onCreate, onJoin, onEnterRoom, onRules, onClose, canJoin = true, settings = defaultPublicSettings }) {
   if (!game) return null;
   const minimumStake = Math.max(game.id === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(game.entryPot) || 0);
   const filteredRooms = rooms.filter((room) => room.gameId === game.id);
@@ -45,7 +45,7 @@ export function GameRoomsModal({ game, rooms, user, stake, setStake, isPublic, s
           <button className="secondary icon-toggle" onClick={onClose}><X size={18} /></button>
         </div>
 
-        <div className="room-console room-browser-columns">
+        <div className={`room-console room-browser-columns ${canJoin ? "" : "single-panel"}`}>
           <section className="room-panel create-panel">
             <div className="panel-heading">
               <span>Créer une table</span>
@@ -63,7 +63,7 @@ export function GameRoomsModal({ game, rooms, user, stake, setStake, isPublic, s
             <button className="secondary room-rules-button" onClick={() => onRules(game.id)}><HelpCircle size={18} /> Consulter les règles</button>
           </section>
 
-          <section className="room-panel browse-panel">
+          {canJoin && <section className="room-panel browse-panel">
             <div className="panel-heading">
               <span>Tables existantes</span>
               <small>Rejoins une table publique ou utilise directement un code d'invitation.</small>
@@ -93,7 +93,7 @@ export function GameRoomsModal({ game, rooms, user, stake, setStake, isPublic, s
                 </button>
               ))}
             </div>
-          </section>
+          </section>}
         </div>
         </div>
       </div>
@@ -123,6 +123,10 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const [error, setError] = useState("");
   const [eventCarousel, setEventCarousel] = useState({ events: [], focusIndex: 0 });
   const [eventIndex, setEventIndex] = useState(0);
+  const accountRestrictions = user.minor?.restrictions ?? [];
+  const roomsRestricted = accountRestrictions.includes("rooms");
+  const joiningRestricted = roomsRestricted || user.moderation?.type === "soft";
+  const eventsRestricted = accountRestrictions.includes("community-events") || user.moderation?.type === "soft";
 
   useEffect(() => {
     api("/api/games").then(setGames);
@@ -175,6 +179,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const favorites = user.profile?.favoriteGames ?? [];
   const favoriteOrder = (game) => favorites.includes(game.id) ? favorites.indexOf(game.id) : favorites.length;
   const visibleGames = [...games].sort((left, right) => favoriteOrder(left) - favoriteOrder(right)).filter((game) => {
+    if (roomsRestricted || accountRestrictions.includes(`game:${game.id}`)) return false;
     const searchMatch = !normalizedGameSearch || `${game.name} ${game.description ?? ""}`.toLocaleLowerCase("fr").includes(normalizedGameSearch);
     const typeMatch = gameTypeFilter === "all" || game.type === gameTypeFilter;
     const categoryMatch = gameCategoryFilter === "all" || game.category === gameCategoryFilter;
@@ -182,7 +187,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
     const complexityMatch = gameComplexityFilter === "all" || game.complexity === gameComplexityFilter;
     return searchMatch && typeMatch && categoryMatch && audienceMatch && complexityMatch;
   });
-  const carouselEvents = eventCarousel.events ?? [];
+  const carouselEvents = eventsRestricted ? [] : eventCarousel.events ?? [];
   const activeCarouselEvent = carouselEvents[eventIndex] ?? null;
   const visibleEventCards = [-2, -1, 0, 1, 2].map((offset) => ({ offset, event: carouselEvents[eventIndex + offset], index: eventIndex + offset })).filter((entry) => entry.event);
 
@@ -198,6 +203,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
     <main className="app-shell">
       <div className="page-heading lobby-heading"><div><span className="eyebrow">Le casino</span><h1>À quelle table joues-tu ?</h1></div></div>
       {error && <div className="error">{error}</div>}
+      {(user.minor?.restricted || user.moderation?.type === "soft") && <div className="account-limitation-notice"><ShieldCheck size={18} /><span><strong>Accès adapté</strong>Certaines fonctions et certains jeux ne sont pas disponibles pour ce compte.</span></div>}
       {activeCarouselEvent && <section className="lobby-event-carousel" aria-label="Événements communautaires">
         <button className="secondary icon-toggle event-carousel-arrow" disabled={eventIndex === 0} onClick={() => setEventIndex((index) => Math.max(0, index - 1))} aria-label="Événement précédent"><ChevronLeft /></button>
         <div className="event-carousel-viewport"><div className="event-carousel-track">{visibleEventCards.map(({ event: carouselEvent, index, offset }) => {
@@ -215,8 +221,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
         <button className="secondary icon-toggle event-carousel-arrow" disabled={eventIndex >= carouselEvents.length - 1} onClick={() => setEventIndex((index) => Math.min(carouselEvents.length - 1, index + 1))} aria-label="Événement suivant"><ChevronRight /></button>
         <div className="event-carousel-position" aria-live="polite"><strong>{eventIndex + 1}</strong><span>/ {carouselEvents.length}</span></div>
       </section>}
-      <div className="lobby-join-action"><button type="button" className="secondary" onClick={() => setJoinOpen(true)}><DoorOpen size={18} /> Rejoindre avec un code</button></div>
-      {liveFriendTables.length > 0 && <section className="live-room-section"><h2>Parties en cours</h2><div className="live-room-list">{liveFriendTables.map((room) => <button className="secondary" key={room.code} onClick={() => onEnterRoom(room.code)}><Eye size={18} /><span>{room.name}</span></button>)}</div></section>}
+      {!joiningRestricted && <div className="lobby-join-action"><button type="button" className="secondary" onClick={() => setJoinOpen(true)}><DoorOpen size={18} /> Rejoindre avec un code</button></div>}
+      {!joiningRestricted && liveFriendTables.length > 0 && <section className="live-room-section"><h2>Parties en cours</h2><div className="live-room-list">{liveFriendTables.map((room) => <button className="secondary" key={room.code} onClick={() => onEnterRoom(room.code)}><Eye size={18} /><span>{room.name}</span></button>)}</div></section>}
       <div className="single-layout">
         <section>
           <div className="section-title"><h2>Jeux disponibles</h2><span>{visibleGames.length} jeu{visibleGames.length > 1 ? "x" : ""}</span></div>
@@ -251,7 +257,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       </div>
       {joinOpen && <JoinRoomDialog userId={user.id} onClose={() => setJoinOpen(false)} onJoined={onOpenRoom} />}
       <RulesModal gameId={rulesGame} onClose={() => setRulesGame(null)} />
-      <GameRoomsModal game={selectedGame} rooms={rooms} user={user} stake={stake} setStake={setStake} isPublic={isPublic} setIsPublic={setIsPublic} roomName={roomName} setRoomName={setRoomName} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joinPassword={joinPassword} setJoinPassword={setJoinPassword} onCreate={createRoom} onJoin={joinRoom} onEnterRoom={onEnterRoom} onRules={setRulesGame} onClose={() => setSelectedGame(null)} settings={settings} />
+      <GameRoomsModal game={selectedGame} rooms={rooms} user={user} stake={stake} setStake={setStake} isPublic={isPublic} setIsPublic={setIsPublic} roomName={roomName} setRoomName={setRoomName} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joinPassword={joinPassword} setJoinPassword={setJoinPassword} onCreate={createRoom} onJoin={joinRoom} onEnterRoom={onEnterRoom} onRules={setRulesGame} onClose={() => setSelectedGame(null)} canJoin={!joiningRestricted} settings={settings} />
     </main>
   );
 }

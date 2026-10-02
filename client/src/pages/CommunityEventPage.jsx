@@ -91,6 +91,32 @@ export function CommunityEventPage({ slug, user, setUser, onBack, onLogout }) {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [data?.event?.id, data?.event?.status, data?.event?.actions.allowPurchase, data?.participant?.purchasesTotal, data?.participant?.availability?.purchasedToday, purchaseCount]);
 
+  const rechargeDeadline = (() => {
+    const event = data?.event;
+    const participant = data?.participant;
+    const availability = participant?.availability;
+    if (event?.status !== "active" || event.actions?.mode !== "recharge" || !availability || availability.total > 0) return null;
+    if (Number(participant.actions) >= Number(event.limits?.maximumActionsPerUser)) return null;
+    if (!availability.nextRechargeAt) return null;
+    const timestamp = new Date(availability.nextRechargeAt).getTime();
+    return Number.isFinite(timestamp) ? timestamp : null;
+  })();
+
+  useEffect(() => {
+    if (!rechargeDeadline) return undefined;
+    let timer;
+    const refreshWhenReady = () => {
+      const remaining = rechargeDeadline - Date.now();
+      if (remaining <= 0) {
+        load(true);
+        return;
+      }
+      timer = window.setTimeout(refreshWhenReady, Math.min(remaining + 100, 2_000_000_000));
+    };
+    refreshWhenReady();
+    return () => window.clearTimeout(timer);
+  }, [rechargeDeadline, load]);
+
   async function mutate(path, body, mode) {
     setBusy(mode);
     setError("");
@@ -161,7 +187,11 @@ export function CommunityEventPage({ slug, user, setUser, onBack, onLogout }) {
           <div className="event-section-heading"><div><span className="eyebrow">Action personnelle</span><h2>{event.theme.actionName}</h2></div>{data.participant && <span className="event-action-stock">{data.participant.availability.total > 1000000 ? "∞" : data.participant.availability.total} disponible(s)</span>}</div>
           {!data.participant ? <div className="event-join-panel"><ShieldCheck /><div><strong>Prendre part à l’événement</strong><p>{event.texts.beforeJoin}</p><small>Entrée : <CompactNumber value={event.participation.entryCost} suffix=" jetons" label="Coût exact" /></small></div><button disabled={busy || event.status !== "active"} onClick={() => mutate(`/api/community-events/${event.id}/join`, { requestId: makeRequestId() }, "join")}>{busy === "join" ? "Inscription…" : "Participer"}</button></div> : <>
             <p className="event-after-join">{event.texts.afterJoin}</p>
-            <div className="event-action-buttons"><button className="event-primary-action" disabled={busy || event.status !== "active" || data.participant.availability.total < 1} onClick={() => mutate(`/api/community-events/${event.id}/actions`, { requestId: makeRequestId() }, "action")}><Swords />{busy === "action" ? "Résolution…" : event.theme.actionName}</button></div>
+            <div className="event-action-buttons">
+              <button className={`event-primary-action ${rechargeDeadline ? "recharge-waiting" : ""}`} disabled={busy || event.status !== "active" || data.participant.availability.total < 1} onClick={() => mutate(`/api/community-events/${event.id}/actions`, { requestId: makeRequestId() }, "action")}>
+                {busy === "action" ? <><Swords /> Résolution…</> : rechargeDeadline ? <><Clock3 /><span className="event-recharge-label"><small>Prochain ticket dans</small><strong>{formatCountdown(rechargeDeadline - now)}</strong></span></> : <><Swords />{event.theme.actionName}</>}
+              </button>
+            </div>
             <EventResult key={lastAction?.id ?? "empty"} action={lastAction} game={event.game} user={user} />
             {event.actions.allowPurchase && <div className="event-ticket-shop"><div className="event-ticket-shop-head"><span><Ticket /><strong>Actions supplémentaires</strong></span><div><b><CompactNumber value={data.participant.availability.purchasedToday} /> / <CompactNumber value={data.participant.availability.purchaseMaxDaily} /></b><small>achetées aujourd’hui au quota normal</small></div><div><b><CompactNumber value={data.participant.availability.purchasedTotal} /> / <CompactNumber value={data.participant.availability.purchaseMaxTotal} /></b><small>quota normal total</small></div></div><div className="event-ticket-purchase"><div className="event-quantity-control"><button type="button" className="secondary icon-toggle" disabled={purchaseCount <= 1} onClick={() => setPurchaseCount((value) => Math.max(1, value - 1))} aria-label="Retirer une action"><Minus /></button><label><span>Quantité</span><input type="number" min="1" max="100" value={purchaseCount} onChange={(event) => setPurchaseCount(Math.max(1, Math.min(100, Math.trunc(Number(event.target.value) || 1))))} /></label><button type="button" className="secondary icon-toggle" disabled={purchaseCount >= 100} onClick={() => setPurchaseCount((value) => Math.min(100, value + 1))} aria-label="Ajouter une action"><Plus /></button></div><div className="event-ticket-shortcuts">{[1, 5, 10].map((count) => <button type="button" className={purchaseCount === count ? "active" : "secondary"} key={count} onClick={() => setPurchaseCount(count)}>×{count}</button>)}</div><button disabled={busy || event.status !== "active" || !purchaseQuote || purchaseQuote.total > user.tokens} onClick={async () => { await mutate(`/api/community-events/${event.id}/actions/purchase`, { count: purchaseCount, requestId: makeRequestId() }, "purchase"); setPurchaseCount(1); }}><Coins /> {busy === "purchase" ? "Achat…" : <>Acheter · {purchaseQuote ? <CompactNumber value={purchaseQuote.total} label="Prix exact" /> : "…"}</>}</button></div>{purchaseQuote?.overflowCount > 0 && <div className="event-overflow-price"><Zap /><span><strong>{purchaseQuote.overflowCount} ticket(s) hors quota</strong><small>Tarif ×{event.actions.overflowPriceMultiplier}, puis progression exponentielle ×{event.actions.overflowExponentBase} par ticket hors quota déjà acheté.</small></span></div>}</div>}
           </>}

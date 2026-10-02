@@ -32,8 +32,8 @@ try {
   source.close(); source = null;
   const snapshot = new DatabaseSync(target, { readOnly: true });
   const version = snapshot.prepare("SELECT value FROM meta WHERE key = 'storage-version'").get()?.value;
-  if (version) throw new Error("This audit expects a pre-v2 database (use the migration backup after upgrading).");
   snapshot.close();
+  if (version) throw new Error("This audit expects a pre-v2 database (use the migration backup after upgrading).");
   process.env.SQLITE_PATH = target;
   storage = await import("../src/db.js");
   const backup = fs.readdirSync(folder).find((name) => name.includes("before-v2"));
@@ -71,5 +71,5 @@ try {
   source?.close(); baseline?.close(); migrated?.close(); storage?.closeDatabase();
   assert.equal(path.dirname(path.resolve(folder)), path.resolve(os.tmpdir()));
   assert.ok(path.basename(folder).startsWith("ktga-migration-check-"));
-  fs.rmSync(folder, { recursive: true, force: true });
+  fs.rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }

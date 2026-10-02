@@ -63,8 +63,10 @@ test("must follow suit without a non-trump obligation to rise", () => {
   assert.deepEqual(beloteLegalCards(state, "p0"), [card("7", "H"), card("A", "H")]);
 });
 
-test("must overtrump partner on a trump lead", () => {
+test("a player does not have to overtrump a winning partner", () => {
   const state = scenario([card("7"), card("J"), card("A", "H")], [play("p2", "9")]);
+  assert.deepEqual(beloteLegalCards(state, "p0"), [card("7"), card("J")]);
+  state.trick = [play("p1", "9")];
   assert.deepEqual(beloteLegalCards(state, "p0"), [card("J")]);
 });
 
@@ -77,16 +79,16 @@ test("must cut, overcut, or undercut an opponent", () => {
   assert.deepEqual(beloteLegalCards(state, "p0"), [card("7")]);
 });
 
-test("partner master permits discarding, with documented Belgian undertrump exception", () => {
+test("partner master permits discarding or undertrumping in both rule sets", () => {
   const hand = [card("7"), card("A", "D")];
   const state = scenario(hand, [play("p2", "A", "H")]);
   assert.deepEqual(beloteLegalCards(state, "p0"), hand);
   state.trick = [play("p1", "7", "H"), play("p2", "J")];
-  assert.deepEqual(beloteLegalCards(state, "p0"), [card("7")]);
+  assert.deepEqual(beloteLegalCards(state, "p0"), hand);
   state.modifiers.frenchRules = true;
   assert.deepEqual(beloteLegalCards(state, "p0"), hand);
   state.trick[1] = play("p2", "9"); state.hands.p0.push(card("J"));
-  assert.deepEqual(beloteLegalCards(state, "p0"), [card("A", "D"), card("J")]);
+  assert.deepEqual(beloteLegalCards(state, "p0"), [card("7"), card("A", "D"), card("J")]);
 });
 
 test("invalid actions neither consume a card nor alter the turn", () => {

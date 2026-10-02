@@ -160,7 +160,7 @@ function resolveRound(state) {
   state.lastResolution = resolution;
   if (resolution.events.length) {
     state.pendingTransfers = transfers;
-    state.resolutionEndsAt = Date.now() + (state.resolutionDurationMs ?? 10000);
+    state.resolutionEndsAt = Date.now() + (state.resolutionDurationMs ?? 5000);
     state.botThinking = {};
     return;
   }
@@ -225,7 +225,7 @@ export function createBattleState(players, options = {}) {
   const deck = shuffle(createDeck());
   const modifiers = normalizeBattleModifiers(options.battleModifiers);
   const laneIds = modifiers.pileMode === "single" ? ["center"] : ["left", "right"];
-  const state = { gameId: "bataille", players: tablePlayers, modifiers, piles: { [tablePlayers[0].id]: deck.slice(0, 26), [tablePlayers[1].id]: deck.slice(26) }, battleLanes: laneIds.map((id) => ({ id, cards: [], idleRounds: 0, tie: false })), drawnCards: {}, pendingChoices: {}, submittedPlayerIds: [], pendingTransfers: [], resolutionEndsAt: null, resolutionDurationMs: 10000, deckKnowledge: Object.fromEntries(tablePlayers.map((viewer) => [viewer.id, Object.fromEntries(tablePlayers.map((owner) => [owner.id, []]))])), botThinking: {}, round: 1, lastResolution: null, currentPlayerIndex: 0, logs: [], finished: false, winners: [] };
+  const state = { gameId: "bataille", players: tablePlayers, modifiers, piles: { [tablePlayers[0].id]: deck.slice(0, 26), [tablePlayers[1].id]: deck.slice(26) }, battleLanes: laneIds.map((id) => ({ id, cards: [], idleRounds: 0, tie: false })), drawnCards: {}, pendingChoices: {}, submittedPlayerIds: [], pendingTransfers: [], resolutionEndsAt: null, resolutionDurationMs: 5000, deckKnowledge: Object.fromEntries(tablePlayers.map((viewer) => [viewer.id, Object.fromEntries(tablePlayers.map((owner) => [owner.id, []]))])), botThinking: {}, round: 1, lastResolution: null, currentPlayerIndex: 0, logs: [], finished: false, winners: [] };
   refreshCardCounts(state);
   return state;
 }
@@ -250,7 +250,7 @@ export function applyBattleAction(state, actorId, action) {
   state.modifiers = normalizeBattleModifiers(state.modifiers);
   state.pendingTransfers ??= [];
   state.resolutionEndsAt ??= null;
-  state.resolutionDurationMs ??= 10000;
+  state.resolutionDurationMs ??= 5000;
   ensureKnowledge(state);
   if (state.resolutionEndsAt) throw new Error("La confrontation est en cours de résolution.");
   if (!state.players.some((player) => player.id === actorId)) throw new Error("Joueur absent de cette partie.");

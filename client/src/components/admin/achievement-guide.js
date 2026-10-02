@@ -5,7 +5,9 @@ export function achievementGoals(gameId = "") {
     { id: "wins", label: "Gagner des parties", example: "10 victoires", icon: "trophy", amount: 10, unit: "Victoires à obtenir" },
     { id: "plays", label: "Terminer des parties", example: "50 parties terminées", icon: "gamepad", amount: 50, unit: "Parties à terminer" },
     { id: "streak", label: "Gagner plusieurs fois de suite", example: "3 victoires consécutives", icon: "flame", amount: 3, unit: "Victoires consécutives" },
-    { id: "gain", label: "Remporter un gros gain", example: "5 000 jetons dans une partie", icon: "coins", amount: 5000, unit: "Gain minimum, en jetons", repeatable: true }
+    { id: "gain", label: "Remporter un gros gain", example: "5 000 jetons dans une partie", icon: "coins", amount: 5000, unit: "Gain minimum, en jetons", repeatable: true },
+    { id: "tableTime", label: "Passer du temps sur une table", example: "10 minutes actives sur une même table", icon: "calendar", amount: 10, unit: "Minutes actives sur une même table" },
+    { id: "roundTime", label: "Passer du temps dans une manche", example: "5 minutes actives dans une même manche", icon: "calendar", amount: 5, unit: "Minutes actives dans une même manche" }
   ];
   if (scoreGames.has(gameId)) goals.push({ id: "score", label: "Atteindre un score", example: gameId === "yahtzee" ? "300 points dans une partie" : "1 000 points dans une partie", icon: "target", amount: gameId === "yahtzee" ? 300 : 1000, unit: "Score minimum", repeatable: true });
   if (gameId === "farkle") goals.push({ id: "roll", label: "Réussir un lancer exceptionnel", example: "3 000 points en un lancer", icon: "dice", amount: 3000, unit: "Points minimum en un lancer", repeatable: true });
@@ -48,7 +50,13 @@ export function buildGuidedAchievement(config, games, achievements = []) {
   const n = new Intl.NumberFormat("fr").format(amount);
   let rule, target = amount, description;
   const finished = (condition, aggregate = "count", scope = "career") => ({ source: "event", event: "game.finished", scope, aggregate, ...(gameId ? { gameId } : {}), condition });
-  if (["siteVisit", "ownItem", "activeTime", "visitDays"].includes(objective)) {
+  if (["tableTime", "roundTime"].includes(objective)) {
+    const table = objective === "tableTime";
+    target = amount * 60;
+    if (target > 1000000000) throw new Error("La durée dépasse le maximum de 16 666 666 minutes.");
+    rule = { source: "event", event: table ? "table.activity" : "game.round.activity", aggregate: "max", scope: "career", valueField: table ? "tableSeconds" : "roundSeconds", ...(gameId ? { gameId } : {}), condition: { field: "seconds", operator: "gt", value: 0 } };
+    description = `Passer ${n} minute(s) actives ${table ? "sur une même table" : "dans une même manche"}${game ? ` à ${game.name}` : ""}, en tant que joueur.`;
+  } else if (["siteVisit", "ownItem", "activeTime", "visitDays"].includes(objective)) {
     const all = [];
     if (objective === "siteVisit") {
       all.push({ field: "page", operator: "eq", value: config.page || "lobby" });

@@ -35,3 +35,14 @@ test("guided active time uses minutes converted to server-counted seconds", () =
   assert.equal(normalizeAchievementRule(entry.rule).valueField, "activeSeconds");
   assert.equal(buildGuidedAchievement({ objective: "ownItem", ownedItem: "fox" }, []).rule.event, "inventory.checked");
 });
+test("guided table and round goals use independent per-session maxima and game filters", () => {
+  const games = [{ id: "421", name: "421" }];
+  const table = buildGuidedAchievement({ gameId: "421", objective: "tableTime", amount: 10 }, games);
+  const round = buildGuidedAchievement({ objective: "roundTime", amount: 5 }, []);
+  assert.equal(normalizeAchievementRule(table.rule).gameId, "421");
+  assert.equal(table.rule.valueField, "tableSeconds");
+  assert.equal(table.target, 600);
+  assert.equal(normalizeAchievementRule(round.rule).event, "game.round.activity");
+  assert.equal(round.rule.valueField, "roundSeconds");
+  assert.equal(round.target, 300);
+});

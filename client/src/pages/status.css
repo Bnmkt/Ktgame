@@ -1,0 +1,135 @@
+.status-page { display: grid; gap: 22px; margin: 0 auto; max-width: 1240px; padding: 28px 24px 64px; width: 100%; }
+.status-site-header { align-items: center; border-bottom: 1px solid #3e443b; display: grid; gap: 18px; grid-template-columns: 1fr auto 1fr; padding-bottom: 20px; }
+.status-site-header > div { display: grid; justify-items: center; }
+.status-site-header > div span { color: #efd070; font-size: 13px; font-weight: 950; text-transform: uppercase; }
+.status-site-header > div strong { color: #fff2d3; font-size: 23px; }
+.status-site-header > button:last-child { justify-self: end; }
+.status-summary { align-items: center; background: #111918; border: 1px solid #3f4a42; border-left: 5px solid #69d5aa; border-radius: 8px; display: flex; gap: 18px; min-height: 112px; padding: 22px 25px; }
+.status-summary > svg { color: #69d5aa; flex: 0 0 auto; }
+.status-summary h1 { color: #f8ecd2; font-size: 26px; letter-spacing: 0; margin: 0 0 5px; }
+.status-summary p { color: #adb9b1; margin: 0; }
+.status-summary.status-degraded, .status-summary.status-maintenance { border-left-color: #f0bd48; }
+.status-summary.status-degraded > svg, .status-summary.status-maintenance > svg { color: #f0bd48; }
+.status-summary.status-outage { border-left-color: #e36a78; }
+.status-summary.status-outage > svg { color: #ff8d99; }
+.status-summary.status-unknown { border-left-color: #84918a; }
+.status-summary.status-unknown > svg { color: #aab4ae; }
+.status-offline-help { align-items: center; border-bottom: 1px solid #3d413a; display: flex; justify-content: space-between; padding: 4px 0 20px; }
+.status-offline-help p { color: #d5cbb5; margin: 0; }
+.status-components, .status-incidents, .status-history, .status-latency-section { background: #0d1314; border: 1px solid #353c37; border-radius: 8px; padding: 22px; }
+.status-section-heading, .status-latency-section > header { align-items: end; display: flex; gap: 20px; justify-content: space-between; margin-bottom: 16px; }
+.status-section-heading h2, .status-latency-section h2 { font-size: 22px; letter-spacing: 0; margin: 3px 0 0; }
+.status-section-heading > p { color: #a99f88; font-size: 13px; margin: 0; text-align: right; }
+.status-range-actions { align-items: end; display: flex; flex-direction: column; gap: 8px; }
+.status-range-actions p { color: #a99f88; font-size: 13px; margin: 0; }
+.status-range-actions button { min-height: 34px; padding-block: 5px; }
+.status-timeline-matrix { border-bottom: 1px solid #303833; border-top: 1px solid #303833; display: grid; grid-template-columns: 230px minmax(0, 1fr); min-width: 0; }
+.status-timeline-labels { background: #0d1314; border-right: 1px solid #303833; position: relative; z-index: 2; }
+.status-timeline-label-heading { align-items: center; color: #8f998f; display: flex; font-size: 11px; font-weight: 900; height: 38px; padding: 0 12px; text-transform: uppercase; }
+.status-timeline-label { align-items: center; border-top: 1px solid #28302c; display: grid; gap: 10px; grid-template-columns: auto minmax(0, 1fr); height: 78px; padding: 9px 12px; }
+.status-timeline-label > span { align-items: center; background: #1a2522; border: 1px solid #405149; border-radius: 7px; color: #8ed8bb; display: flex; height: 36px; justify-content: center; width: 36px; }
+.status-timeline-label > div { align-items: center; display: grid; gap: 3px; grid-template-columns: 1fr auto; min-width: 0; }
+.status-timeline-label h3 { font-size: 13px; grid-column: 1 / -1; margin: 0; }
+.status-timeline-label .public-status-badge { font-size: 9px; overflow: hidden; padding: 3px 5px; text-overflow: ellipsis; }
+.status-timeline-label strong { color: #c9c0aa; font-size: 10px; white-space: nowrap; }
+.status-timeline-scroll { min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-color: #9b752d #171e1b; }
+.status-timeline-scroll:focus-visible { outline: 2px solid #e7c66d; outline-offset: 2px; }
+.status-timeline-track { min-width: 100%; }
+.status-timeline-axis { display: grid; height: 38px; }
+.status-timeline-axis span { align-items: center; border-left: 1px solid transparent; color: #8e978f; display: flex; font-size: 9px; overflow: visible; padding-left: 3px; white-space: nowrap; }
+.status-timeline-axis span:not(:empty) { border-left-color: #485149; }
+.status-timeline-row { align-items: stretch; border-top: 1px solid #28302c; display: grid; gap: 1px; height: 78px; padding-block: 15px; }
+.status-timeline-row .status-day { border-radius: 1px; height: 48px; min-width: 0; }
+.status-timeline-row button.status-day { border: 0; min-height: 0; padding: 0; }
+.status-timeline-row .status-day.has-justification { box-shadow: inset 0 0 0 1px rgba(255, 243, 194, .82); cursor: pointer; position: relative; }
+.status-timeline-row .status-day.has-justification:hover, .status-timeline-row .status-day.has-justification:focus-visible { box-shadow: inset 0 0 0 2px #fff0ad, 0 0 8px rgba(240, 189, 72, .5); outline: none; z-index: 1; }
+.status-component { align-items: center; border-top: 1px solid #303833; display: grid; gap: 16px; grid-template-columns: minmax(210px, .8fr) minmax(210px, .65fr) minmax(420px, 1.7fr); min-width: 0; padding: 18px 0; }
+.status-component-title { align-items: center; display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr); }
+.status-component-title > span { align-items: center; background: #1a2522; border: 1px solid #405149; border-radius: 7px; color: #8ed8bb; display: flex; height: 40px; justify-content: center; width: 40px; }
+.status-component h3 { font-size: 16px; margin: 0 0 3px; }
+.status-component p { color: #929d96; font-size: 12px; line-height: 1.4; margin: 0; }
+.status-component-current { align-items: start; display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.status-component-current strong { color: #f3e6c5; font-size: 13px; font-variant-numeric: tabular-nums; }
+.status-component-current small { color: #88938d; font-size: 11px; line-height: 1.35; }
+.public-status-badge { align-items: center; border: 1px solid; border-radius: 999px; display: inline-flex; font-size: 11px; font-weight: 900; gap: 5px; padding: 4px 8px; }
+.public-status-badge.status-operational { background: rgba(81, 190, 143, .1); border-color: rgba(105, 213, 170, .36); color: #88dfba; }
+.public-status-badge.status-degraded, .public-status-badge.status-maintenance { background: rgba(240, 189, 72, .1); border-color: rgba(240, 189, 72, .4); color: #f2cf78; }
+.public-status-badge.status-outage { background: rgba(227, 106, 120, .1); border-color: rgba(227, 106, 120, .45); color: #ff9ca7; }
+.public-status-badge.status-unknown { background: rgba(150, 160, 155, .08); border-color: #505b55; color: #b4bdb8; }
+.status-day-history { display: grid; gap: 2px; grid-template-columns: repeat(90, minmax(3px, 1fr)); height: 30px; min-width: 420px; }
+.status-day { background: #26302b; border-radius: 2px; min-width: 0; }
+.status-day.status-operational { background: #55ba8c; }
+.status-day.status-degraded { background: #dba83e; }
+.status-day.status-outage { background: #d65f6d; }
+.status-day.status-no_data { background: repeating-linear-gradient(135deg, #29302c 0 3px, #1b211e 3px 6px); }
+.status-history-legend { border-top: 1px solid #303833; display: flex; flex-wrap: wrap; gap: 16px; justify-content: flex-end; padding-top: 14px; }
+.status-history-legend span, .status-chart-legend span { align-items: center; color: #aeb8b1; display: inline-flex; font-size: 11px; gap: 6px; }
+.status-history-legend i, .status-chart-legend i { background: #4d5a53; border-radius: 2px; height: 8px; width: 8px; }
+.status-history-legend i.status-operational { background: #55ba8c; }
+.status-history-legend i.status-degraded { background: #dba83e; }
+.status-history-legend i.status-outage { background: #d65f6d; }
+.status-history-legend i.status-no_data { background: #3b4440; }
+.status-latency-section > header { align-items: center; }
+.status-chart-legend { display: flex; gap: 16px; }
+.status-latency-chart { min-height: 250px; overflow: hidden; }
+.status-latency-chart svg { height: 250px; overflow: visible; width: 100%; }
+.status-latency-chart line { stroke: rgba(209, 224, 214, .12); stroke-width: 1; }
+.status-latency-chart polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.4; vector-effect: non-scaling-stroke; }
+.status-latency-chart text { fill: #86918a; font-size: 10px; text-anchor: end; }
+.status-latency-chart .status-chart-date { fill: #a89f8c; font-size: 11px; text-anchor: start; }
+.status-latency-chart .status-chart-date:last-child { text-anchor: end; }
+.status-chart-empty, .status-empty { color: #a8b0aa; padding: 22px 0; text-align: center; }
+.status-incidents, .status-history { display: grid; gap: 12px; }
+.public-incident { border-left: 4px solid #f0bd48; border-top: 1px solid #353d38; padding: 16px 18px; }
+.public-incident.incident-outage { border-left-color: #e36a78; }
+.public-incident.incident-maintenance { border-left-color: #7dc7ff; }
+.public-incident > header { align-items: start; display: flex; gap: 15px; justify-content: space-between; }
+.public-incident > header span { color: #d3b969; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+.public-incident h3 { font-size: 17px; margin: 3px 0 0; }
+.public-incident p { color: #d0d8d1; line-height: 1.55; }
+.status-incident-markdown { margin: 10px 0 5px; }
+.status-incident-markdown > :first-child, .status-incident-update .patchnote-markdown > :first-child { margin-top: 0; }
+.status-incident-markdown > :last-child, .status-incident-update .patchnote-markdown > :last-child { margin-bottom: 0; }
+.public-incident small, .public-incident time { color: #89958e; font-size: 11px; }
+.public-incident ol { border-top: 1px solid #303833; display: grid; gap: 9px; list-style: none; margin: 14px 0 0; padding: 14px 0 0; }
+.public-incident li { display: grid; gap: 12px; grid-template-columns: 145px minmax(0, 1fr); }
+.status-incident-update { color: #bec8c1; display: grid; font-size: 12px; gap: 2px; }
+.public-incident li b { color: #f0d58d; }
+.status-justification-dialog { display: grid; gap: 14px; max-height: 90dvh; max-width: 720px; overflow-y: auto; }
+.status-justification-context { background: #111918; border: 1px solid #3d4a42; border-radius: 7px; display: grid; gap: 3px; padding: 13px 15px; }
+.status-justification-context strong { color: #f2dfae; }
+.status-justification-context span { color: #98a59d; font-size: 12px; }
+.status-justification-list { display: grid; gap: 12px; }
+.status-justification-list .public-incident { background: #0d1314; }
+
+@media (max-width: 980px) {
+  .status-component { grid-template-columns: minmax(190px, 1fr) minmax(200px, 1fr); }
+  .status-day-history { grid-column: 1 / -1; min-width: 0; }
+}
+@media (max-width: 640px) {
+  .status-page { padding: 18px 14px 40px; }
+  .status-site-header { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .status-site-header > button:first-child { font-size: 0; padding: 8px; }
+  .status-site-header > button:first-child svg { margin: 0; }
+  .status-site-header > div { justify-items: start; }
+  .status-site-header > div strong { font-size: 18px; }
+  .status-summary { align-items: flex-start; padding: 18px; }
+  .status-summary h1 { font-size: 21px; }
+  .status-components, .status-incidents, .status-history, .status-latency-section { padding: 16px; }
+  .status-section-heading, .status-latency-section > header { align-items: flex-start; flex-direction: column; }
+  .status-section-heading > p { text-align: left; }
+  .status-range-actions { align-items: flex-start; width: 100%; }
+  .status-range-actions button { width: 100%; }
+  .status-timeline-matrix { grid-template-columns: 166px minmax(0, 1fr); }
+  .status-timeline-label { padding-inline: 7px; }
+  .status-timeline-label > span { height: 30px; width: 30px; }
+  .status-timeline-label > div { display: grid; grid-template-columns: 1fr; }
+  .status-timeline-label strong { display: none; }
+  .status-timeline-label .public-status-badge { max-width: 112px; }
+  .status-component { grid-template-columns: 1fr; }
+  .status-day-history { grid-column: auto; grid-template-columns: repeat(90, 5px); max-width: 100%; min-width: 0; overflow-x: auto; }
+  .status-component-current { grid-template-columns: auto auto; }
+  .status-component-current small { grid-column: 1 / -1; }
+  .public-incident > header { flex-direction: column; gap: 5px; }
+  .public-incident li { grid-template-columns: 1fr; gap: 2px; }
+}

@@ -128,7 +128,12 @@ export function api(path, options = {}) {
         }
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Erreur serveur");
+      if (!res.ok) {
+        const error = new Error(data?.error ?? "Erreur serveur");
+        error.code = data?.code ?? "";
+        error.data = data;
+        throw error;
+      }
       if (cacheable) responseCache.set(path, { data, expiresAt: Date.now() + 30000 });
       finishButtonFeedback(true);
       return data;

@@ -37,7 +37,7 @@ export function PrivacyProvider({ children }) {
     {!choice && <section className="privacy-banner" aria-label="Choix de confidentialité"><div className="privacy-banner-inner"><h2><Cookie size={23} />Votre confidentialité</h2>{content}</div></section>}
     {error && <div className="privacy-sync-error" role="alert">{error}<button type="button" className="secondary" onClick={() => setOpen(true)}>Revoir mon choix</button></div>}
     {children}
-    <footer className="legal-footer"><nav aria-label="Informations legales">{Object.entries(legalLinks).map(([view, label]) => <a key={view} href={appPath(view)}>{label}</a>)}<button type="button" className="secondary" onClick={() => setOpen(true)}><Cookie size={15} />Mes préférences</button></nav><small>Jeux gratuits · Jetons virtuels sans valeur monétaire</small></footer>
+    <footer className="legal-footer"><nav aria-label="Informations legales"><a href={appPath("patchnotes")}>Patchnotes</a><a href={appPath("status")}>État des services</a>{Object.entries(legalLinks).map(([view, label]) => <a key={view} href={appPath(view)}>{label}</a>)}<button type="button" className="secondary" onClick={() => setOpen(true)}><Cookie size={15} />Mes préférences</button></nav><small>Jeux gratuits · Jetons virtuels sans valeur monétaire</small></footer>
     {open && <Dialog title="Mes préférences de confidentialité" className="privacy-dialog" onClose={() => setOpen(false)}>{choice && <p>Suivi facultatif : <strong>{choice.enabled ? "autorisé" : "refusé"}</strong></p>}{content}</Dialog>}
   </PrivacyContext.Provider>;
 }
@@ -66,7 +66,7 @@ export function useSiteActivity(user, route) {
           const page = current.current.view;
           if (stopped || busy || Date.now() - choice.chosenAt >= CONSENT_DURATION || document.visibilityState !== "visible" || !document.hasFocus() || Date.now() - lastInteraction > 60000 || !["lobby", "profile", "shop", "leaderboard", "room", "spectator", "event", "admin"].includes(page)) return;
           busy = true;
-          try { await api("/api/me/activity", { method: "POST", background: true, body: JSON.stringify({ page, markers: extractMarkers(location.search, config.markers ?? []) }) }); }
+          try { await api("/api/me/activity", { method: "POST", background: true, body: JSON.stringify({ page, ...(page === "room" ? { roomCode: current.current.id } : {}), markers: extractMarkers(location.search, config.markers ?? []) }) }); }
           catch (error) { if (!stopped) setError(`Le suivi facultatif est interrompu : ${error.message}`); stopped = true; }
           finally { busy = false; }
         };

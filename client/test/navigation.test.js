@@ -4,7 +4,7 @@ import { appPath, readRoute } from "../src/navigation/routes.js";
 import { eventProgressDisplay } from "../src/features/events/progress.js";
 
 test("routes absolues sous /ktga, y compris lors d'un acces direct", () => {
-  for (const [view, id, path] of [["lobby", "", "/ktga/"], ["profile", "", "/ktga/profil"], ["shop", "", "/ktga/shop"], ["admin", "", "/ktga/admin"], ["room", "ABC123", "/ktga/table/ABC123"], ["event", "ete-2026", "/ktga/evenement/ete-2026"]]) {
+  for (const [view, id, path] of [["lobby", "", "/ktga/"], ["profile", "", "/ktga/profil"], ["shop", "", "/ktga/shop"], ["tribunal", "", "/ktga/tribunal"], ["admin", "", "/ktga/admin"], ["patchnotes", "", "/ktga/patchnotes"], ["status", "", "/ktga/status"], ["room", "ABC123", "/ktga/table/ABC123"], ["event", "ete-2026", "/ktga/evenement/ete-2026"]]) {
     assert.equal(appPath(view, id, "/ktga/"), path);
     assert.deepEqual(readRoute({ pathname: path, search: "" }, "/ktga/"), { view, ...(id ? { id } : {}) });
   }

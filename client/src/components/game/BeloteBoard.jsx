@@ -29,7 +29,7 @@ export function BeloteBoard({ state, user, onAction, spectator = false }) {
   }
   return <div className="belote-board">
     <header className="belote-summary"><span>Donne {state.round} · {state.modifiers.frenchRules ? "Française" : "Belge"}</span><strong>{state.trump ? <>Atout {suits[state.trump].symbol} {suits[state.trump].name}</> : "Prise d'atout"}</strong><span>{bidding ? state.phase === "forced-bid" ? "Prise forcée" : `Tour ${state.bidRound} / 2` : `Pli ${state.trickNumber} / 8`}</span></header>
-    <div className="belote-score-strip">{[0, 1].map((team) => <div className={`team-${team}`} key={team}><span><i />{teamName(team)}</span><strong>{state.teamScores[team]} <small>/ {state.targetScore}</small></strong><span>{state.trickCounts[team]} plis</span></div>)}</div>
+    <div className="belote-score-strip">{[0, 1].map((team) => <div className={`team-${team}`} key={team}><span><i />{teamName(team)}</span><strong>{state.teamScores[team]} <small>/ {state.targetScore}</small></strong><span>{state.cardPoints[team]} pts sur la donne</span><span>{state.trickCounts[team]} plis</span></div>)}</div>
     <section className="belote-table" aria-label="Table de belote deux contre deux">
       <div className="belote-table-felt" aria-hidden="true" />
       {state.players.map((player, index) => {

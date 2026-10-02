@@ -2,19 +2,29 @@
 
 ## Deployment
 
-- Deploy the client build and restart the API together. Registration now requires `termsVersion: "2026-09-27"` and `ageBand: "13plus"` or `"under13"`.
-- Existing accounts remain usable. No production balances or achievements are reset.
+- Deploy the client build and restart the API together. Registration now requires a unique `email`, a `birthDate` in `YYYY-MM-DD` format and `termsVersion: "2026-09-27"`; the server derives the age band and requires a parental code below 13.
+- Existing accounts keep their data and can connect once with their old identifier, then must register a valid email. Email validation is optional and can only be enabled after configuring SMTP.
 - Public routes: `/ktga/conditions`, `/ktga/mentions-legales`, `/ktga/confidentialite`, `/ktga/cookies`, `/ktga/parents`. The static host must keep its existing SPA fallback for direct links.
 - Publisher: Sean "Bnmkt" Ferrara (individual), contact sean.ferrara@outlook.be. Client hosted by OVHcloud; game server self-hosted. No postal address was invented.
 - Regenerate the event reference: `node server/scripts/export-achievement-events.mjs docs/achievement-events.json`.
 
 ## Authoring achievements
 
-Admin > Achievements > Create offers page visits, a specific owned object, active minutes and distinct visit days. The visit template can require an equipped shop item, a browser family and an optional link marker. Inventory dropdowns use catalogue IDs, not CSS values.
+Admin > Achievements > Create offers page visits, a specific owned object, active minutes on the site/table/round and distinct visit days. The visit template can require an equipped shop item, a browser family and an optional link marker. Visual inventory selectors use catalogue IDs, not CSS values.
+
+For inventory, unlocked achievements (`player.achievementIds`) and favourite games, the advanced editor opens a searchable, paginated selection dialog with previews. `contains` selects one element; `containsAny` selects alternatives; `containsAll` requires every selected element. Cancellation preserves the original condition, including retired catalogue IDs. Changing an array operator to a scalar keeps only its first selection. Conditions are evaluated against server-owned account data, never client-submitted inventory/achievement lists.
+
+### Table and round time
+
+- Events: `table.activity` and `game.round.activity`; payload fields include `seconds` (increment), `tableSeconds`, `roundSeconds`, cumulative table/round seconds, `gameId`, `phase` and `roundNumber`.
+- Guided templates use the maximum time on one table or in one round, with thresholds entered in minutes. Advanced metrics `tableActiveSeconds`, `roundActiveSeconds`, `longestTableSeconds`, `longestRoundSeconds` use seconds.
+- Requires the same optional consent, foreground visibility and recent interaction as site time. Only seated human players count, not spectators. The table counter includes waiting and results while still seated; the round counter only includes active play. In games without numbered rounds it covers the game; poker uses the hand number.
+- The server resolves the room from its code, verifies the seat, and determines the round itself. Round transitions and replays reset the round cursor. Only one current table/round cursor plus four counters are stored; no per-room visit archive is created. Returning to the same table resumes its counter; visiting another table resets that cursor. Intervals crossing a room/round boundary are not credited to the new room/round, so short rounds under the heartbeat interval may record no time.
+- These are approximate active durations, not exact round wall-clock durations, and cannot be used as an anti-cheat mechanism.
 
 Example: choose Visit a page, Boutique, the desired equipped object, then an optional `secret` marker `answer-42`. The server emits `site.visit`; the rule combines `page = shop`, `player.equippedItemIds contains ITEM_ID`, and optionally `markers contains secret:answer-42`.
 
-Advanced rules retain AND / OR / NOT groups, comparison operators, counters, sums, maxima and distinct values. Every event now receives a trusted `player` snapshot with owned/equipped catalogue IDs, token balance, account age, favourite game IDs, inventory count and friend count. No birth date, gender, biography, password, email or parent dossier is included.
+Advanced rules retain AND / OR / NOT groups, comparison operators, counters, sums, maxima and distinct values. Every event now receives a trusted `player` snapshot with owned/equipped catalogue IDs, unlocked achievement IDs, token balance, account age, favourite game IDs, inventory count and friend count. No birth date, gender, biography, password, email or parent dossier is included.
 
 New events:
 

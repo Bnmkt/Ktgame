@@ -4,6 +4,7 @@ import { api } from "../../api.js";
 import { CompactNumber, formatExactNumber } from "../../utils/presentation.jsx";
 import { HealthLogs } from "./HealthLogs.jsx";
 import { AdminMetrics } from "./AdminMetrics.jsx";
+import { PublicStatusAdmin } from "./PublicStatusAdmin.jsx";
 
 const healthPalette = ["#f0bd48", "#69d5aa", "#7dc7ff", "#e36a78"];
 
@@ -56,7 +57,7 @@ function DetailList({ rows }) {
 
 export function ServerHealth({ reportError }) {
   const [tab, setTab] = useState("overview");
-  return <div className="server-health-tabs-page"><nav className="segmented-tabs health-subtabs" aria-label="Santé serveur"><button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Vue d’ensemble</button><button className={tab === "metrics" ? "active" : ""} onClick={() => setTab("metrics")}>Metrics</button><button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}>Journaux</button></nav>{tab === "logs" ? <HealthLogs /> : tab === "metrics" ? <AdminMetrics reportError={reportError} /> : <ServerHealthOverview reportError={reportError} />}</div>;
+  return <div className="server-health-tabs-page"><nav className="segmented-tabs health-subtabs" aria-label="Santé serveur"><button className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>Vue d’ensemble</button><button className={tab === "metrics" ? "active" : ""} onClick={() => setTab("metrics")}>Metrics</button><button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}>Journaux</button><button className={tab === "status" ? "active" : ""} onClick={() => setTab("status")}>Statut public</button></nav>{tab === "status" ? <PublicStatusAdmin reportError={reportError} /> : tab === "logs" ? <HealthLogs /> : tab === "metrics" ? <AdminMetrics reportError={reportError} /> : <ServerHealthOverview reportError={reportError} />}</div>;
 }
 
 function ServerHealthOverview({ reportError }) {
