@@ -90,6 +90,9 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
       if (requestError.code === "EMAIL_VERIFICATION_REQUIRED") {
         setPendingEmail(login.identifier);
         setVerification({ type: "pending", message: `Un lien de validation a été envoyé à ${requestError.data?.email ?? "ton adresse email"}.` });
+      } else if (requestError.code === "PASSWORD_UPGRADE_REQUIRED") {
+        setVerification({ type: "success", message: requestError.message });
+        setRecoveryEmail(login.identifier.includes("@") ? login.identifier : "");
       } else if (["HARD_BAN", "PARENTAL_ACCESS_REVOKED"].includes(requestError.code)) {
         setRestrictedAccess({ code: requestError.code, reason: requestError.data?.reason || requestError.message, endsAt: requestError.data?.endsAt || "", email: login.identifier });
       } else setError(requestError.message);

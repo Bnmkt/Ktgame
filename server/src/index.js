@@ -2919,7 +2919,7 @@ app.post("/api/auth/register", async (req, res) => {
     let authorization;
     try { authorization = registrationAuthorization(db, req.body); } catch (error) { return { error: error.message }; }
     const testAdminEmail = NODE_ENV === "test" ? normalizeEmail(process.env.TEST_ADMIN_EMAIL) : "";
-    const user = ensureUserSocial({ id: randomUUID(), pseudo, email, emailVerifiedAt: null, passwordHash, tokens: settings.signupTokens, guest: false, admin: Boolean(testAdminEmail && testAdminEmail === email), editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, profile: { displayName: pseudo, birthDate: authorization.birthDate }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
+    const user = ensureUserSocial({ id: randomUUID(), pseudo, email, emailVerifiedAt: null, passwordHash, passwordPolicyVersion: 1, tokens: settings.signupTokens, guest: false, admin: Boolean(testAdminEmail && testAdminEmail === email), editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, profile: { displayName: pseudo, birthDate: authorization.birthDate }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
     user.registrationAuthorization = authorization;
     db.users.push(user);
     db.transactions.push({ id: randomUUID(), userId: user.id, amount: settings.signupTokens, balance: user.tokens, gameId: null, roomId: null, reason: "signup-bonus", createdAt: new Date().toISOString() });
@@ -2970,6 +2970,19 @@ app.post("/api/auth/login", async (req, res) => {
       catch (error) { console.error("Email verification delivery failed:", error.message); return res.status(503).json({ error: "L'email de validation n'a pas pu être envoyé." }); }
     }
     return res.status(403).json({ code: "EMAIL_VERIFICATION_REQUIRED", email: maskedEmail(user.email), error: "Valide ton adresse email avant de te connecter." });
+  }
+  if (Number(user.passwordPolicyVersion) !== 1) {
+    if (!validEmail(user.email) || !emailDeliveryConfigured()) return res.status(503).json({ code: "PASSWORD_UPGRADE_UNAVAILABLE", error: "Ce compte doit renouveler son mot de passe, mais le service de récupération est indisponible. Contacte l’administration." });
+    let resetToken = "";
+    if (passwordResetCanBeResent(user)) {
+      resetToken = issuePasswordReset(user);
+      writeDb(db);
+    }
+    if (resetToken) {
+      try { await sendPasswordReset({ user, token: resetToken, siteName: settings.siteName }); }
+      catch (error) { console.error("Legacy password upgrade email failed:", error.message); return res.status(503).json({ error: "L’email de renouvellement n’a pas pu être envoyé." }); }
+    }
+    return res.status(403).json({ code: "PASSWORD_UPGRADE_REQUIRED", email: maskedEmail(user.email), error: "Ce compte utilise une ancienne politique de mot de passe. Un lien de renouvellement a été envoyé." });
   }
   const summary = mfaSummary(user);
   if (summary.enabled) {
@@ -3075,6 +3088,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
     const found = consumePasswordReset(db.users, token);
     if (!found) return null;
     found.passwordHash = passwordHash;
+    found.passwordPolicyVersion = 1;
     found.sessionVersion = (Number(found.sessionVersion) || 0) + 1;
     found.emailVerifiedAt ??= new Date().toISOString();
     return found;
@@ -4901,7 +4915,7 @@ app.post("/api/admin/parental-approvals/:id/approve", auth, requireAdmin, async 
   const created = updateDb((db) => {
     if (db.users.some((user) => normalizeEmail(user.email) === normalizeEmail(request.childEmail) || user.pseudo.toLowerCase() === request.childPseudo.toLowerCase())) return null;
     const settings = platformSettings(db);
-    const user = ensureUserSocial({ id: randomUUID(), pseudo: request.childPseudo, email: normalizeEmail(request.childEmail), emailVerifiedAt: null, passwordHash: request.passwordHash, tokens: settings.signupTokens, guest: false, admin: false, editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, registrationAuthorization: { ageBand: "under13", birthDate: request.childBirthDate, termsVersion: PRIVACY_VERSION, acceptedAt: request.parentConsentAt, parentalApproval: { requestId: request.id, code: request.code, reviewerId: req.auth.id, approvedAt: new Date().toISOString(), parentEmail: request.parentEmail } }, parentalAccess: { status: "active" }, profile: { displayName: request.childPseudo, birthDate: request.childBirthDate }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
+    const user = ensureUserSocial({ id: randomUUID(), pseudo: request.childPseudo, email: normalizeEmail(request.childEmail), emailVerifiedAt: null, passwordHash: request.passwordHash, passwordPolicyVersion: 1, tokens: settings.signupTokens, guest: false, admin: false, editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, registrationAuthorization: { ageBand: "under13", birthDate: request.childBirthDate, termsVersion: PRIVACY_VERSION, acceptedAt: request.parentConsentAt, parentalApproval: { requestId: request.id, code: request.code, reviewerId: req.auth.id, approvedAt: new Date().toISOString(), parentEmail: request.parentEmail } }, parentalAccess: { status: "active" }, profile: { displayName: request.childPseudo, birthDate: request.childBirthDate }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
     db.users.push(user);
     db.transactions.push({ id: randomUUID(), userId: user.id, amount: settings.signupTokens, balance: user.tokens, gameId: null, roomId: null, reason: "signup-bonus", createdAt: new Date().toISOString() });
     refreshPublicProfileStats(user, db);
@@ -5050,6 +5064,7 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
     else if (/^\d{4}-\d{2}-\d{2}$/.test(String(req.body.lastDailyClaim))) user.lastDailyClaim = String(req.body.lastDailyClaim);
     if (passwordHash) {
       user.passwordHash = passwordHash;
+      user.passwordPolicyVersion = 1;
       user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
     }
     if (req.body.admin !== undefined && user.id !== req.auth.id) user.admin = Boolean(req.body.admin);
@@ -5349,6 +5364,7 @@ app.patch("/api/me", auth, async (req, res) => {
     found.profile = normalizePublicProfile(found.profile, found.pseudo);
     if (passwordHash) {
       found.passwordHash = passwordHash;
+      found.passwordPolicyVersion = 1;
       found.sessionVersion = (Number(found.sessionVersion) || 0) + 1;
     }
     if (memberCardStats.length) found.profileStats.memberCardStats = memberCardStats.length === 1 ? [memberCardStats[0], "achievementsUnlocked"] : memberCardStats;
