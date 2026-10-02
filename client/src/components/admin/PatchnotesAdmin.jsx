@@ -146,7 +146,7 @@ export function PatchnotesAdmin({ reportError, notifySuccess }) {
     const blockId = editor.blocks[index].id;
     setUploading(blockId);
     try {
-      const response = await fetch(`${API_URL}/api/admin/patchnotes/${editor.id}/images`, { method: "POST", headers: { "Content-Type": file.type, "X-File-Name": encodeURIComponent(file.name), ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) }, body: file });
+      const response = await fetch(`${API_URL}/api/admin/patchnotes/${editor.id}/images`, { method: "POST", credentials: "include", headers: { "Content-Type": file.type, "X-File-Name": encodeURIComponent(file.name), ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) }, body: file });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Téléversement impossible.");
       setEditor((current) => ({ ...current, blocks: current.blocks.map((block) => block.id === blockId ? { ...block, metadata: { ...(block.metadata ?? {}), attachmentId: result.id } } : block) }));

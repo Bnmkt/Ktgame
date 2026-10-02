@@ -1,5 +1,31 @@
-export function normalizeCosmeticCss(value) {
-  return String(value ?? "").replace(/[{}@]/g, "").trim().slice(0, 2000);
+const cosmeticCssProperties = new Set([
+  "align-items", "animation", "background", "background-attachment", "background-clip", "background-color", "background-image", "background-origin", "background-position", "background-position-x", "background-position-y", "background-repeat", "background-size",
+  "border", "border-bottom-color", "border-bottom-left-radius", "border-bottom-right-radius", "border-bottom-style", "border-bottom-width", "border-color", "border-image-outset", "border-image-repeat", "border-image-slice", "border-image-source", "border-image-width", "border-left-color", "border-left-style", "border-left-width", "border-radius", "border-right-color", "border-right-style", "border-right-width", "border-style", "border-top-color", "border-top-left-radius", "border-top-right-radius", "border-top-style", "border-top-width", "border-width",
+  "bottom", "box-shadow", "color", "display", "filter", "flex-basis", "flex-grow", "flex-shrink", "font-family", "font-size", "font-style", "font-weight", "height", "justify-content", "left", "letter-spacing", "line-height", "margin", "margin-bottom", "margin-left", "margin-right", "margin-top", "max-height", "max-width", "min-height", "min-width", "opacity", "outline", "outline-offset", "overflow", "padding", "padding-bottom", "padding-left", "padding-right", "padding-top", "pointer-events", "position", "right", "text-align", "text-decoration", "text-shadow", "text-transform", "top", "transform", "transform-origin", "transition", "width", "z-index"
+]);
+
+function safeCssUrls(value, allowUrls) {
+  const matches = [...value.matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)/gi)];
+  if (!matches.length) return true;
+  if (!allowUrls) return false;
+  return matches.every((match) => /^(?:https:\/\/|data:image\/(?:png|jpeg|webp|gif);base64,)/i.test(match[2].trim()));
+}
+
+export function normalizeCosmeticCss(value, { allowUrls = false } = {}) {
+  const source = String(value ?? "").replace(/\/\*[\s\S]*?\*\//g, "").trim().slice(0, 4000);
+  if (!source || /[{}@<>\\]|expression\s*\(|javascript\s*:|vbscript\s*:|behavior\s*:|-moz-binding|@import/i.test(source)) return "";
+  const declarations = [];
+  for (const chunk of source.split(";")) {
+    const separator = chunk.indexOf(":");
+    if (separator < 1) continue;
+    const property = chunk.slice(0, separator).trim().toLowerCase();
+    const propertyValue = chunk.slice(separator + 1).trim();
+    if (!cosmeticCssProperties.has(property) || !propertyValue || propertyValue.length > 600) continue;
+    if (!safeCssUrls(propertyValue, allowUrls)) continue;
+    if (property === "position" && !/^(?:static|relative|absolute|sticky)$/i.test(propertyValue)) continue;
+    declarations.push(`${property}: ${propertyValue}`);
+  }
+  return declarations.length ? `${declarations.join("; ")};` : "";
 }
 
 export function normalizeCustomKeyframes(value) {

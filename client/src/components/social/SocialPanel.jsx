@@ -80,7 +80,7 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, requeste
     loadFriends();
     const friendTimer = window.setInterval(loadFriends, 10000);
     window.addEventListener("ktga-connections-updated", loadFriends);
-    const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { token: getToken() }, transports: ["websocket", "polling"] });
+    const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { token: getToken() }, transports: ["websocket", "polling"], withCredentials: true });
     socketRef.current = socket;
     socket.emit("chat-subscribe", { token: getToken(), roomCode });
     socket.on("chat-message", (message) => {

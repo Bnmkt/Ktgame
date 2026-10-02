@@ -9,6 +9,14 @@ const changeCategories = new Set(["feature", "game", "tool", "fix", "security", 
 const imageTypes = new Map([["image/png", "png"], ["image/jpeg", "jpg"], ["image/webp", "webp"], ["image/gif", "gif"]]);
 const clean = (value, max = 500) => String(value ?? "").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim().slice(0, max);
 
+function matchesImageSignature(body, mimeType) {
+  if (mimeType === "image/png") return body.length >= 8 && body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (mimeType === "image/jpeg") return body.length >= 3 && body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff;
+  if (mimeType === "image/gif") return body.length >= 6 && ["GIF87a", "GIF89a"].includes(body.subarray(0, 6).toString("ascii"));
+  if (mimeType === "image/webp") return body.length >= 12 && body.subarray(0, 4).toString("ascii") === "RIFF" && body.subarray(8, 12).toString("ascii") === "WEBP";
+  return false;
+}
+
 export function suggestedVersionGroup(version) {
   const value = clean(version, 40);
   const segments = value.match(/^v?(\d+)\.(\d+)/i);
@@ -229,7 +237,7 @@ export function createPatchnoteStore({ filename, uploadDirectory, currentVersion
   function addAttachment(id, { body, mimeType, originalName }) {
     if (!db.prepare("SELECT id FROM patchnotes WHERE id=?").get(id)) return null;
     const extension = imageTypes.get(mimeType);
-    if (!extension || !Buffer.isBuffer(body) || !body.length) throw new Error("Image PNG, JPEG, WebP ou GIF attendue.");
+    if (!extension || !Buffer.isBuffer(body) || !matchesImageSignature(body, mimeType)) throw new Error("Le contenu ne correspond pas à une image PNG, JPEG, WebP ou GIF valide.");
     if (body.length > 5 * 1024 * 1024) throw new Error("L’image ne peut pas dépasser 5 Mo.");
     const attachmentId = randomUUID();
     const filename = `${attachmentId}.${extension}`;

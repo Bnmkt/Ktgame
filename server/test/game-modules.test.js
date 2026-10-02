@@ -357,7 +357,10 @@ test("Velours Noir conserve son cycle pioche, déclaration et verdict", () => {
 });
 
 test("la personnalisation cosmétique filtre le CSS et les keyframes dangereux", () => {
-  assert.equal(normalizeCosmeticCss(" color: red; @import{} "), "color: red; import");
+  assert.equal(normalizeCosmeticCss(" color: red; @import{} "), "");
+  assert.equal(normalizeCosmeticCss("background-image:url(https://example.test/texture.png)", { allowUrls: true }), "background-image: url(https://example.test/texture.png);");
+  assert.equal(normalizeCosmeticCss("background-image:url(javascript:alert(1))", { allowUrls: true }), "");
+  assert.equal(normalizeCosmeticCss("position:fixed; inset:0; color:#fff"), "color: #fff;");
   assert.equal(normalizeCustomKeyframes("from { transform: translateX(0); } to { transform: translateX(12px); opacity: .8; }"), "from{transform:translateX(0);}to{transform:translateX(12px);opacity:.8;}");
   assert.equal(normalizeCustomKeyframes("from { background: url(javascript:alert(1)); } to { opacity: 1; }"), "");
   assert.equal(normalizeCosmeticMotion({ preset: "spin", duration: 100, intensity: -5 }).duration, 20);

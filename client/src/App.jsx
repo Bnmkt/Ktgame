@@ -230,6 +230,7 @@ export default function App() {
 
   async function logout() {
     if (roomCode) await api(`/api/rooms/${roomCode}/leave`, { method: "POST" }).catch(() => {});
+    await api("/api/auth/logout", { method: "POST", background: true }).catch(() => {});
     setBonusFeedback(null);
     setExclusion(null);
     setToken("");

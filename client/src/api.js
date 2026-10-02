@@ -22,6 +22,13 @@ const cacheableGetPattern = /^\/api\/(config|games|shop)$/;
 const sensitiveActionPattern = /acheter|enregistrer|créer|modifier|dupliquer|lancer|démarrer|appliquer|valider|supprimer|réinitialiser|charger|équiper|inviter|accepter|refuser|clôturer|planifier|rejouer|confirmer|piocher|rester|coucher/i;
 let lastActionButton = null;
 let lastActionButtonAt = 0;
+let sessionToken = (() => {
+  try {
+    const legacy = localStorage.getItem("ktgame-token") ?? "";
+    localStorage.removeItem("ktgame-token");
+    return legacy;
+  } catch { return ""; }
+})();
 
 function activeActionButton() {
   if (typeof document === "undefined") return null;
@@ -97,12 +104,12 @@ export function installButtonActionFeedback() {
 }
 
 export function getToken() {
-  return localStorage.getItem("ktgame-token");
+  return sessionToken;
 }
 
 export function setToken(token) {
-  if (token) localStorage.setItem("ktgame-token", token);
-  else localStorage.removeItem("ktgame-token");
+  sessionToken = String(token ?? "");
+  try { localStorage.removeItem("ktgame-token"); } catch { /* Le cookie HttpOnly reste la source de session. */ }
 }
 
 export function api(path, options = {}) {
@@ -121,6 +128,7 @@ export function api(path, options = {}) {
     try {
       const res = await fetch(`${API_URL}${path}`, {
         ...fetchOptions,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),

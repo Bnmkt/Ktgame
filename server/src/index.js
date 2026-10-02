@@ -527,7 +527,10 @@ function configuredGames(db = readDb()) {
 function configuredShop(db = readDb()) {
   const overrides = db.settings?.shopOverrides ?? {};
   const removed = new Set(db.settings?.removedShopItems ?? []);
-  return [...shopCatalog, ...(db.settings?.customShopItems ?? [])].filter((item) => !removed.has(item.id)).map((item) => ({ ...item, ...(overrides[item.id] ?? {}) }));
+  return [...shopCatalog, ...(db.settings?.customShopItems ?? [])].filter((item) => !removed.has(item.id)).map((item) => {
+    const merged = { ...item, ...(overrides[item.id] ?? {}) };
+    return { ...merged, css: normalizeCosmeticCss(merged.css, { allowUrls: true }) };
+  });
 }
 
 const shopTypes = ["icons", "nameEffects", "memberCards", "profileBanners", "profileFrames", "profileEffects", "diceSkins", "cardSkins"];
@@ -697,7 +700,23 @@ const corsOptions = {
 
 app.disable("x-powered-by");
 if (TRUST_PROXY) app.set("trust proxy", /^\d+$/.test(TRUST_PROXY) ? Number(TRUST_PROXY) : TRUST_PROXY);
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", ...allowedOrigins, ...allowedOrigins.map((origin) => origin.replace(/^http/i, "ws"))]
+    }
+  }
+}));
 app.use(requestLogMiddleware(requestLogs));
 app.use((req, res, next) => {
   if (!isAllowedOrigin(req.headers.origin)) res.locals.logCorsDenied = true;
@@ -1078,6 +1097,35 @@ function makeToken(user) {
   return jwt.sign({ id: user.id, guest: user.guest, sessionVersion: Math.max(0, Number(user.sessionVersion) || 0) }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
+const SESSION_COOKIE = "ktga_session";
+
+function requestCookie(req, name) {
+  const source = String(req.headers.cookie ?? "");
+  for (const part of source.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
+    try { return decodeURIComponent(part.slice(separator + 1).trim()); } catch { return ""; }
+  }
+  return "";
+}
+
+function sessionTokenFromRequest(req) {
+  const header = String(req.headers.authorization ?? "");
+  return header.startsWith("Bearer ") ? header.slice(7) : requestCookie(req, SESSION_COOKIE);
+}
+
+function setSessionCookie(res, token) {
+  const attributes = [`${SESSION_COOKIE}=${encodeURIComponent(token)}`, `Path=${APP_BASE_PATH || "/"}`, "HttpOnly", "SameSite=Lax"];
+  if (NODE_ENV === "production" || HTTPS_KEY_PATH || HTTPS_PFX_PATH) attributes.push("Secure");
+  res.append("Set-Cookie", attributes.join("; "));
+}
+
+function clearSessionCookie(res) {
+  const attributes = [`${SESSION_COOKIE}=`, `Path=${APP_BASE_PATH || "/"}`, "HttpOnly", "SameSite=Lax", "Max-Age=0"];
+  if (NODE_ENV === "production" || HTTPS_KEY_PATH || HTTPS_PFX_PATH) attributes.push("Secure");
+  res.append("Set-Cookie", attributes.join("; "));
+}
+
 function authFingerprint(req) {
   return `${req.ip ?? ""}|${String(req.headers["user-agent"] ?? "").slice(0, 300)}`;
 }
@@ -1091,14 +1139,16 @@ function sendAuthLocked(res, lock) {
   return res.status(429).json({ code: "AUTH_LOCKED", error: "Trop de tentatives ont échoué. Réessaie après la fin du blocage.", retryAfterSeconds: lock.retryAfterSeconds, lockedUntil: lock.lockedUntil ?? "" });
 }
 
-function completeAccountLogin(db, user, method, failureKey = "") {
+function completeAccountLogin(db, user, method, failureKey = "", res = null) {
   resetAuthFailures(user, failureKey);
   processAchievementEvent(db, user.id, { type: "account.login", payload: { method } });
   user.lastLoginAt = new Date().toISOString();
   if (isUnder13(user)) parentalControls.recordActivity(user.id, { day: casinoDateKey(), category: "session", label: "Connexion", count: 1 });
   refreshPublicProfileStats(user, db);
   writeDb(db);
-  return { token: makeToken(user), user: sanitizeUser(user) };
+  const token = makeToken(user);
+  if (res) setSessionCookie(res, token);
+  return { token, user: sanitizeUser(user) };
 }
 
 function normalizePublicProfile(profile = {}, fallbackName = "") {
@@ -1982,10 +2032,11 @@ function grantAchievementCosmetics(user) {
 }
 
 function auth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header) return res.status(401).json({ error: "Non authentifié." });
+  const token = sessionTokenFromRequest(req);
+  if (!token) return res.status(401).json({ error: "Non authentifié." });
   try {
-    req.auth = jwt.verify(header.replace("Bearer ", ""), JWT_SECRET);
+    req.auth = jwt.verify(token, JWT_SECRET);
+    if (req.headers.authorization) setSessionCookie(res, token);
     const persistentUser = !req.auth.guest ? readDb().users.find((user) => user.id === req.auth.id) : null;
     if (!req.auth.guest && !persistentUser) return res.status(401).json({ error: "Session invalide." });
     if (persistentUser && (Number(req.auth.sessionVersion) || 0) !== (Number(persistentUser.sessionVersion) || 0)) {
@@ -2859,7 +2910,9 @@ app.post("/api/auth/register", async (req, res) => {
     catch (error) { console.error("Email verification delivery failed:", error.message); return res.status(503).json({ code: "EMAIL_DELIVERY_FAILED", error: "Le compte a été créé, mais l'email de validation n'a pas pu être envoyé. Réessaie depuis la connexion." }); }
     if (settings.emailVerificationRequired) return res.status(202).json({ verificationRequired: true, email: maskedEmail(result.user.email), user: sanitizeUser(result.user) });
   }
-  res.status(201).json({ token: makeToken(result.user), user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
+  const token = makeToken(result.user);
+  setSessionCookie(res, token);
+  res.status(201).json({ token, user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -2913,7 +2966,7 @@ app.post("/api/auth/login", async (req, res) => {
     }
     return res.status(202).json({ mfaRequired: true, challengeId: challenge.id, methods: challenge.methods, email: emailAvailable ? maskedEmail(user.email) : "", emailCodeSent, expiresAt: challenge.expiresAt });
   }
-  res.json(completeAccountLogin(db, user, "password", failureKey));
+  res.json(completeAccountLogin(db, user, "password", failureKey, res));
 });
 
 app.post("/api/auth/mfa/email", async (req, res) => {
@@ -2946,7 +2999,7 @@ app.post("/api/auth/mfa/verify", (req, res) => {
     if (lock.locked) return sendAuthLocked(res, lock);
     return res.status(401).json({ error: "Code invalide ou tentative expirée.", remainingBeforeLock: Math.max(0, 3 - lock.failures) });
   }
-  res.json(completeAccountLogin(db, user, `password+${method}`, failureKey));
+  res.json(completeAccountLogin(db, user, `password+${method}`, failureKey, res));
 });
 
 app.post("/api/auth/verify-email", (req, res) => {
@@ -3031,7 +3084,9 @@ app.post("/api/me/email", auth, async (req, res) => {
     catch (error) { console.error("Email verification delivery failed:", error.message); return res.status(503).json({ error: "L'email de validation n'a pas pu être envoyé." }); }
     if (settings.emailVerificationRequired) return res.status(202).json({ verificationRequired: true, email: maskedEmail(result.user.email), user: sanitizeUser(result.user) });
   }
-  res.json({ token: makeToken(result.user), user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
+  const token = makeToken(result.user);
+  setSessionCookie(res, token);
+  res.json({ token, user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
 });
 
 app.get("/api/me/security", auth, (req, res) => {
@@ -3115,7 +3170,14 @@ app.post("/api/auth/guest", (req, res) => {
   const pseudo = String(req.body.pseudo ?? "").trim() || `Invité-${randomBytes(2).toString("hex")}`;
   const user = ensureUserSocial({ id: randomUUID(), pseudo, tokens: settings.signupTokens, guest: true, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
   sessions.set(user.id, user);
-  res.json({ token: makeToken(user), user: sanitizeUser(user) });
+  const token = makeToken(user);
+  setSessionCookie(res, token);
+  res.json({ token, user: sanitizeUser(user) });
+});
+
+app.post("/api/auth/logout", (_req, res) => {
+  clearSessionCookie(res);
+  res.json({ ok: true });
 });
 
 app.get("/api/me", auth, (req, res) => {
@@ -5087,7 +5149,7 @@ app.post("/api/admin/shop", auth, requireBackOffice, (req, res) => {
   }
   let pack;
   try { pack = normalizeShopPack(req.body.packName); } catch (error) { return res.status(400).json({ error: error.message }); }
-  const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css), ...pack, createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
+  const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack, createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
   updateDb((currentDb) => { currentDb.settings ??= {}; currentDb.settings.customShopItems ??= []; currentDb.settings.customShopItems.push(item); });
   res.json(item);
 });
@@ -5109,7 +5171,7 @@ app.patch("/api/admin/shop/:id", auth, requireBackOffice, (req, res) => {
     try { pack = req.body.packName === undefined ? { packs: current.packs ?? [], packName: current.packName ?? "" } : normalizeShopPack(req.body.packName); } catch (error) { return { error: error.message }; }
     const design = req.body.design === undefined ? current?.design ?? null : normalizeCosmeticDesign(req.body.design, type);
     const motion = req.body.motion === undefined ? current?.motion ?? null : normalizeCosmeticMotion(req.body.motion);
-    db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css), ...pack };
+    db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack };
     return "updated";
   });
   if (result === "missing") return res.status(404).json({ error: "Objet introuvable." });
@@ -5222,7 +5284,10 @@ app.patch("/api/me", auth, async (req, res) => {
   if (user === "achievement") return res.status(400).json({ error: "Succès milestone indisponible." });
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
   const payload = sanitizeUser(user);
-  if (passwordHash) payload.sessionToken = makeToken(user);
+  if (passwordHash) {
+    payload.sessionToken = makeToken(user);
+    setSessionCookie(res, payload.sessionToken);
+  }
   res.json(payload);
 });
 
@@ -5973,7 +6038,7 @@ setInterval(() => {
 io.on("connection", (socket) => {
   socket.emit("rooms", sanitizeRooms(readDb().rooms.filter((room) => room.isPublic && !room.finished)));
   const subscribeToChat = (payload = {}) => {
-    const token = payload.token || socket.handshake.auth?.token;
+    const token = payload.token || socket.handshake.auth?.token || requestCookie(socket.handshake, SESSION_COOKIE);
     if (!token) return;
     let viewer;
     try { viewer = jwt.verify(token, JWT_SECRET); } catch { return; }
@@ -5993,10 +6058,12 @@ io.on("connection", (socket) => {
   socket.on("chat-subscribe", subscribeToChat);
   socket.on("watch-room", (payload) => {
     const roomId = typeof payload === "string" ? payload : payload?.roomId;
-    if (!roomId || typeof payload !== "object" || !payload?.token) return;
+    if (!roomId || typeof payload !== "object") return;
+    const token = payload.token || socket.handshake.auth?.token || requestCookie(socket.handshake, SESSION_COOKIE);
+    if (!token) return;
     let viewer;
     try {
-      viewer = jwt.verify(payload.token, JWT_SECRET);
+      viewer = jwt.verify(token, JWT_SECRET);
     } catch {
       socket.emit("room-error", { error: "Session invalide." });
       return;

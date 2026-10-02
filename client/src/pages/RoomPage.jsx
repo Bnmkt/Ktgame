@@ -170,7 +170,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   }, [user.guest]);
   useEffect(() => {
     if (!room?.id) return undefined;
-    const socket = io(SOCKET_URL, { path: SOCKET_PATH });
+    const socket = io(SOCKET_URL, { path: SOCKET_PATH, withCredentials: true });
     socket.emit("watch-room", { roomId: room.id, token: getToken() });
     socket.on("room", (nextRoom) => {
       if (nextRoom.code !== code) return;

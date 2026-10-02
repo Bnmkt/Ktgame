@@ -27,7 +27,7 @@ export function SpectatorPage({ code, user, onBack, onJoin }) {
   }, [code, accept]);
   useEffect(() => {
     if (!room?.id) return undefined;
-    const socket = io(SOCKET_URL, { path: SOCKET_PATH });
+    const socket = io(SOCKET_URL, { path: SOCKET_PATH, withCredentials: true });
     socket.on("connect", () => { socket.emit("watch-room", { roomId: room.id, token: getToken(), spectator: true }); setConnected(true); });
     socket.on("disconnect", () => setConnected(false));
     socket.on("room", accept);
