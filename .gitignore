@@ -8,8 +8,8 @@ dist/
 *.pid
 server/certs/
 server/tools/
+artifacts/
+/data/
 
-server/data/*.sqlite
-server/data/*.sqlite-shm
-server/data/*.sqlite-wal
-*.sqlite.before-v2-*.bak
+server/data/*
+!server/data/.gitkeep
