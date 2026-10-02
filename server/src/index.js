@@ -13,7 +13,7 @@ import jwt from "jsonwebtoken";
 import fs from "node:fs";
 import { createServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { monitorEventLoopDelay, performance } from "node:perf_hooks";
@@ -80,10 +80,27 @@ import {
   passwordResetCanBeResent,
   reservedPublicEmail,
   sendEmailVerification,
+  sendMfaCode,
   sendPasswordReset,
   validEmail,
   verifyEmailDelivery
 } from "./services/email-verification.js";
+import {
+  authLockStatus,
+  beginTotpSetup,
+  cleanupSecurityState,
+  confirmTotpSetup,
+  consumeMfaChallenge,
+  createMfaChallenge,
+  disableTotp,
+  issueMfaEmailCode,
+  mfaSummary,
+  passwordPolicyError,
+  regenerateRecoveryCodes,
+  recordAuthFailure,
+  resetAuthFailures,
+  verifyUserMfa
+} from "./services/account-security.js";
 import { createStatusMonitor } from "./services/status-monitor.js";
 import { createPatchnoteStore } from "./services/patchnotes.js";
 import { createTribunalStore, tribunalCategories } from "./services/tribunal.js";
@@ -1061,6 +1078,29 @@ function makeToken(user) {
   return jwt.sign({ id: user.id, guest: user.guest, sessionVersion: Math.max(0, Number(user.sessionVersion) || 0) }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
+function authFingerprint(req) {
+  return `${req.ip ?? ""}|${String(req.headers["user-agent"] ?? "").slice(0, 300)}`;
+}
+
+function authFailureKey(identifier, req) {
+  return createHash("sha256").update(`${normalizeEmail(identifier)}|${req.ip ?? ""}`).digest("hex");
+}
+
+function sendAuthLocked(res, lock) {
+  if (lock.retryAfterSeconds) res.setHeader("Retry-After", String(lock.retryAfterSeconds));
+  return res.status(429).json({ code: "AUTH_LOCKED", error: "Trop de tentatives ont échoué. Réessaie après la fin du blocage.", retryAfterSeconds: lock.retryAfterSeconds, lockedUntil: lock.lockedUntil ?? "" });
+}
+
+function completeAccountLogin(db, user, method, failureKey = "") {
+  resetAuthFailures(user, failureKey);
+  processAchievementEvent(db, user.id, { type: "account.login", payload: { method } });
+  user.lastLoginAt = new Date().toISOString();
+  if (isUnder13(user)) parentalControls.recordActivity(user.id, { day: casinoDateKey(), category: "session", label: "Connexion", count: 1 });
+  refreshPublicProfileStats(user, db);
+  writeDb(db);
+  return { token: makeToken(user), user: sanitizeUser(user) };
+}
+
 function normalizePublicProfile(profile = {}, fallbackName = "") {
   const birthDate = String(profile.birthDate ?? "").slice(0, 10);
   return {
@@ -1206,7 +1246,7 @@ function sanitizeUser(user, db = readDb()) {
   const settings = platformSettings(db);
   const moderation = activeModeration(user);
   const parentalRevocation = activeParentalRevocation(user);
-  return { id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
+  return { id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, mfa: mfaSummary(user), minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
 }
 
 function roomPlayerFor(user) {
@@ -2775,7 +2815,9 @@ app.post("/api/auth/register", async (req, res) => {
   const password = String(req.body.password ?? "");
   if (!validEmail(email)) return res.status(400).json({ error: "Saisis une adresse email valide." });
   if (reservedPublicEmail(email)) return res.status(400).json({ error: "Cette adresse utilise un domaine réservé au service." });
-  if (pseudo.length < 3 || pseudo.length > 32 || password.length < 4) return res.status(400).json({ error: "Pseudo ou mot de passe invalide." });
+  const passwordError = passwordPolicyError(password);
+  if (pseudo.length < 3 || pseudo.length > 32) return res.status(400).json({ error: "Le pseudo doit contenir entre 3 et 32 caractères." });
+  if (passwordError) return res.status(400).json({ error: passwordError });
   const age = exactAge(req.body.birthDate);
   if (age === null || req.body.termsVersion !== PRIVACY_VERSION) return res.status(400).json({ error: "Saisis une date de naissance valide et accepte les conditions d’utilisation." });
   const marker = registrationMarker({ deviceId: req.headers["x-registration-device"], ip: req.ip, userAgent: req.headers["user-agent"] }, JWT_SECRET);
@@ -2821,12 +2863,21 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
+  cleanupSecurityState();
   const identifier = String(req.body.login ?? req.body.pseudo ?? "").trim();
   const password = String(req.body.password ?? "");
   const db = readDb();
   const normalizedIdentifier = normalizeEmail(identifier);
   const user = db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizedIdentifier : entry.pseudo.toLowerCase() === identifier.toLowerCase());
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) return res.status(401).json({ error: "Identifiants invalides." });
+  const failureKey = authFailureKey(identifier, req);
+  const currentLock = authLockStatus(user, failureKey);
+  if (currentLock.locked) return sendAuthLocked(res, currentLock);
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    const lock = recordAuthFailure(user, failureKey);
+    if (user) writeDb(db);
+    if (lock.locked) return sendAuthLocked(res, lock);
+    return res.status(401).json({ error: "Identifiants invalides.", remainingBeforeLock: Math.max(0, 3 - lock.failures) });
+  }
   if (user.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
   const moderation = activeModeration(user);
   if (moderation?.type === "hard") return res.status(403).json({ code: "HARD_BAN", error: "Ce compte est temporairement inaccessible.", reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" });
@@ -2843,12 +2894,59 @@ app.post("/api/auth/login", async (req, res) => {
     }
     return res.status(403).json({ code: "EMAIL_VERIFICATION_REQUIRED", email: maskedEmail(user.email), error: "Valide ton adresse email avant de te connecter." });
   }
-  processAchievementEvent(db, user.id, { type: "account.login", payload: { method: "password" } });
-  user.lastLoginAt = new Date().toISOString();
-  if (isUnder13(user)) parentalControls.recordActivity(user.id, { day: casinoDateKey(), category: "session", label: "Connexion", count: 1 });
-  refreshPublicProfileStats(user, db);
-  writeDb(db);
-  res.json({ token: makeToken(user), user: sanitizeUser(user) });
+  const summary = mfaSummary(user);
+  if (summary.enabled) {
+    const emailAvailable = validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured() && (user.admin || summary.emailEnabled);
+    let challenge;
+    try { challenge = createMfaChallenge(user, authFingerprint(req), emailAvailable); }
+    catch { return res.status(503).json({ code: "MFA_METHOD_UNAVAILABLE", error: "Aucune méthode de double authentification n’est utilisable. Contacte l’administration." }); }
+    let emailCodeSent = false;
+    if (!summary.totpEnabled && challenge.methods.includes("email")) {
+      const issued = issueMfaEmailCode(challenge.id, authFingerprint(req), JWT_SECRET);
+      try {
+        await sendMfaCode({ user, code: issued.code, siteName: settings.siteName });
+        emailCodeSent = true;
+      } catch (error) {
+        console.error("MFA email delivery failed:", error.message);
+        return res.status(503).json({ error: "Le code de connexion n’a pas pu être envoyé." });
+      }
+    }
+    return res.status(202).json({ mfaRequired: true, challengeId: challenge.id, methods: challenge.methods, email: emailAvailable ? maskedEmail(user.email) : "", emailCodeSent, expiresAt: challenge.expiresAt });
+  }
+  res.json(completeAccountLogin(db, user, "password", failureKey));
+});
+
+app.post("/api/auth/mfa/email", async (req, res) => {
+  const issued = issueMfaEmailCode(String(req.body.challengeId ?? ""), authFingerprint(req), JWT_SECRET);
+  if (!issued) return res.status(400).json({ error: "Cette tentative de connexion a expiré." });
+  if (issued.cooldown) return res.status(429).json({ error: "Un code a déjà été envoyé récemment.", retryAfterSeconds: 60 });
+  const user = readDb().users.find((entry) => entry.id === issued.userId);
+  if (!user) return res.status(400).json({ error: "Cette tentative de connexion a expiré." });
+  try { await sendMfaCode({ user, code: issued.code, siteName: platformSettings().siteName }); }
+  catch (error) { console.error("MFA email delivery failed:", error.message); return res.status(503).json({ error: "Le code de connexion n’a pas pu être envoyé." }); }
+  res.json({ ok: true, email: maskedEmail(user.email) });
+});
+
+app.post("/api/auth/mfa/verify", (req, res) => {
+  const db = readDb();
+  const challengeId = String(req.body.challengeId ?? "");
+  const method = String(req.body.method ?? "");
+  const userId = String(req.body.userId ?? "");
+  const challengeUser = db.users.find((entry) => entry.id === userId);
+  // The challenge does not expose its account id. Try only the authenticated identifier supplied by the login screen.
+  const identifier = String(req.body.login ?? "").trim();
+  const user = challengeUser ?? db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizeEmail(identifier) : entry.pseudo.toLowerCase() === identifier.toLowerCase());
+  if (!user) return res.status(400).json({ error: "Code invalide ou tentative expirée." });
+  const failureKey = authFailureKey(identifier || user.email || user.pseudo, req);
+  const currentLock = authLockStatus(user, failureKey);
+  if (currentLock.locked) return sendAuthLocked(res, currentLock);
+  if (!consumeMfaChallenge(challengeId, authFingerprint(req), method, req.body.code, user, JWT_SECRET)) {
+    const lock = recordAuthFailure(user, failureKey);
+    writeDb(db);
+    if (lock.locked) return sendAuthLocked(res, lock);
+    return res.status(401).json({ error: "Code invalide ou tentative expirée.", remainingBeforeLock: Math.max(0, 3 - lock.failures) });
+  }
+  res.json(completeAccountLogin(db, user, `password+${method}`, failureKey));
 });
 
 app.post("/api/auth/verify-email", (req, res) => {
@@ -2892,7 +2990,9 @@ app.post("/api/auth/request-password-reset", async (req, res) => {
 app.post("/api/auth/reset-password", async (req, res) => {
   const token = String(req.body.token ?? "");
   const password = String(req.body.password ?? "");
-  if (!token || password.length < 4 || password.length > 128) return res.status(400).json({ error: "Lien invalide ou nouveau mot de passe incorrect." });
+  const passwordError = passwordPolicyError(password);
+  if (!token) return res.status(400).json({ error: "Lien de récupération invalide." });
+  if (passwordError) return res.status(400).json({ error: passwordError });
   const passwordHash = await bcrypt.hash(password, 10);
   const user = updateDb((db) => {
     const found = consumePasswordReset(db.users, token);
@@ -2932,6 +3032,81 @@ app.post("/api/me/email", auth, async (req, res) => {
     if (settings.emailVerificationRequired) return res.status(202).json({ verificationRequired: true, email: maskedEmail(result.user.email), user: sanitizeUser(result.user) });
   }
   res.json({ token: makeToken(result.user), user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
+});
+
+app.get("/api/me/security", auth, (req, res) => {
+  if (req.auth.guest) return res.status(400).json({ error: "Les invités ne disposent pas de réglages de sécurité." });
+  const user = readDb().users.find((entry) => entry.id === req.auth.id);
+  if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+  res.json({ ...mfaSummary(user), emailVerified: Boolean(user.emailVerifiedAt), email: maskedEmail(user.email), emailAvailable: validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured() });
+});
+
+app.post("/api/me/security/totp/setup", auth, (req, res) => {
+  if (req.auth.guest) return res.status(400).json({ error: "Les invités ne disposent pas de réglages de sécurité." });
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+  res.json(beginTotpSetup(user, platformSettings(db).siteName, user.email || displayNameFor(user)));
+});
+
+app.post("/api/me/security/totp/confirm", auth, (req, res) => {
+  const result = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id && !entry.guest);
+    if (!user) return null;
+    const recoveryCodes = confirmTotpSetup(user, req.body.code, JWT_SECRET);
+    return recoveryCodes ? { recoveryCodes, user } : "invalid";
+  });
+  if (!result) return res.status(404).json({ error: "Utilisateur introuvable." });
+  if (result === "invalid") return res.status(400).json({ error: "Le code TOTP est invalide ou la configuration a expiré." });
+  res.json({ recoveryCodes: result.recoveryCodes, security: mfaSummary(result.user), user: sanitizeUser(result.user) });
+});
+
+app.patch("/api/me/security/email", auth, (req, res) => {
+  const enabled = req.body.enabled === true;
+  const result = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id && !entry.guest);
+    if (!user) return null;
+    if (enabled && (!validEmail(user.email) || !user.emailVerifiedAt || !emailDeliveryConfigured())) return "unavailable";
+    if (!enabled && user.admin && !user.mfa?.totpSecret) return "admin-required";
+    user.mfa ??= {};
+    user.mfa.emailEnabled = enabled;
+    if (!enabled && !user.mfa.totpSecret) delete user.mfa;
+    return user;
+  });
+  if (!result) return res.status(404).json({ error: "Utilisateur introuvable." });
+  if (result === "unavailable") return res.status(409).json({ error: "Valide une adresse email et vérifie la configuration du service email avant d’activer cette méthode." });
+  if (result === "admin-required") return res.status(409).json({ error: "Un administrateur doit conserver au moins une méthode de double authentification." });
+  res.json({ security: mfaSummary(result), user: sanitizeUser(result) });
+});
+
+app.delete("/api/me/security/totp", auth, (req, res) => {
+  const result = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id && !entry.guest);
+    if (!user) return null;
+    if (!user.mfa?.totpSecret) return "disabled";
+    if (!verifyUserMfa(user, String(req.body.method ?? "totp"), req.body.code, JWT_SECRET, Date.now(), false)) return "invalid";
+    const emailAvailable = validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured();
+    if (user.admin && !(emailAvailable && user.mfa.emailEnabled)) return "admin-required";
+    disableTotp(user);
+    return user;
+  });
+  if (!result) return res.status(404).json({ error: "Utilisateur introuvable." });
+  if (result === "disabled") return res.status(409).json({ error: "L’application d’authentification n’est pas activée." });
+  if (result === "invalid") return res.status(401).json({ error: "Code de vérification invalide." });
+  if (result === "admin-required") return res.status(409).json({ error: "Active d’abord la vérification par email : un administrateur doit conserver une seconde étape." });
+  res.json({ security: mfaSummary(result), user: sanitizeUser(result) });
+});
+
+app.post("/api/me/security/recovery", auth, (req, res) => {
+  const result = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.auth.id && !entry.guest);
+    if (!user) return null;
+    if (!verifyUserMfa(user, "totp", req.body.code, JWT_SECRET, Date.now(), false)) return "invalid";
+    return { recoveryCodes: regenerateRecoveryCodes(user, JWT_SECRET), user };
+  });
+  if (!result) return res.status(404).json({ error: "Utilisateur introuvable." });
+  if (result === "invalid" || !result.recoveryCodes) return res.status(401).json({ error: "Code TOTP invalide." });
+  res.json({ recoveryCodes: result.recoveryCodes, security: mfaSummary(result.user) });
 });
 
 app.post("/api/auth/guest", (req, res) => {
@@ -4680,7 +4855,8 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
 
 app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
   const newPassword = String(req.body.password ?? "");
-  if (newPassword && newPassword.length < 4) return res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 4 caractères." });
+  const passwordError = newPassword ? passwordPolicyError(newPassword) : "";
+  if (passwordError) return res.status(400).json({ error: passwordError });
   const currentTarget = readDb().users.find((entry) => entry.id === req.params.id && !entry.guest);
   const requestedEmail = normalizeEmail(req.body.login ?? currentTarget?.email);
   if (currentTarget && validEmail(requestedEmail) && requestedEmail !== normalizeEmail(currentTarget.email) && !emailDeliveryConfigured()) return res.status(503).json({ error: "Le service email est indisponible : l’adresse n’a pas été modifiée." });
@@ -4991,7 +5167,8 @@ app.patch("/api/me", auth, async (req, res) => {
     if (currentAccount?.profile?.birthDate && birthDate !== currentAccount.profile.birthDate) return res.status(400).json({ error: "La date de naissance enregistrée ne peut être modifiée que par l’administration." });
   }
   if (!allowedGenders.includes(gender)) return res.status(400).json({ error: "Genre invalide." });
-  if (password && password.length < 4) return res.status(400).json({ error: "Mot de passe trop court." });
+  const passwordError = password ? passwordPolicyError(password) : "";
+  if (passwordError) return res.status(400).json({ error: passwordError });
   if (memberCardStats.some((stat) => !statOptions.includes(stat))) return res.status(400).json({ error: "Statistique de member card invalide." });
   if (visibleProfileStats?.some((stat) => !publicStatOptions.includes(stat))) return res.status(400).json({ error: "Statistique de profil invalide." });
   const passwordHash = password ? await bcrypt.hash(password, 10) : null;
