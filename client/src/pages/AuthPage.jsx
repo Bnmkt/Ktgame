@@ -35,6 +35,8 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [restrictedAccess, setRestrictedAccess] = useState(null);
+  const [mfa, setMfa] = useState(null);
+  const [mfaCode, setMfaCode] = useState("");
 
   useEffect(() => { api("/api/health").then(() => setServerStatus("ok")).catch(() => setServerStatus("down")); }, []);
   useEffect(() => {
@@ -75,6 +77,13 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
         setMode("login");
         return;
       }
+      if (data.mfaRequired) {
+        const preferredMethod = data.methods.includes("totp") ? "totp" : data.methods[0];
+        setMfa({ ...data, method: preferredMethod, login: login.identifier });
+        setMfaCode("");
+        setMode("mfa");
+        return;
+      }
       setToken(data.token);
       onAuth(data.user);
     } catch (requestError) {
@@ -85,6 +94,30 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
         setRestrictedAccess({ code: requestError.code, reason: requestError.data?.reason || requestError.message, endsAt: requestError.data?.endsAt || "", email: login.identifier });
       } else setError(requestError.message);
     } finally { setBusy(""); }
+  }
+
+  async function verifyMfa(event) {
+    event.preventDefault();
+    setBusy("mfa");
+    setError("");
+    try {
+      const result = await api("/api/auth/mfa/verify", { method: "POST", body: JSON.stringify({ challengeId: mfa.challengeId, method: mfa.method, code: mfaCode, login: mfa.login }) });
+      setToken(result.token);
+      setMfa(null);
+      setMfaCode("");
+      onAuth(result.user);
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusy(""); }
+  }
+
+  async function sendMfaEmail() {
+    setBusy("mfa-email");
+    setError("");
+    try {
+      await api("/api/auth/mfa/email", { method: "POST", body: JSON.stringify({ challengeId: mfa.challengeId }) });
+      setVerification({ type: "success", message: `Un nouveau code a été envoyé à ${mfa.email || "ton adresse email"}.` });
+    } catch (requestError) { setError(requestError.message); }
+    finally { setBusy(""); }
   }
 
   async function updateLegacyLogin(event) {
@@ -170,12 +203,13 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
     </>}
     {serverStatus === "ok" && !accountSetup && <>
       {pendingRoomCode && <div className="invite-banner"><Link size={18} /> Invitation à la table {pendingRoomCode} : connecte-toi ou utilise le mode invité pour la rejoindre.</div>}
-      {!passwordResetToken && !["forgot-password"].includes(mode) && <div className="tabs segmented-tabs"><button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}><LogIn size={18} /> Connexion</button>{settings.registrationsEnabled && <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}><UserPlus size={18} /> Inscription</button>}{settings.guestAccessEnabled && <button className={mode === "guest" ? "active" : ""} onClick={() => setMode("guest")}><DoorOpen size={18} /> Invité</button>}</div>}
+      {!passwordResetToken && !["forgot-password", "mfa"].includes(mode) && <div className="tabs segmented-tabs"><button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}><LogIn size={18} /> Connexion</button>{settings.registrationsEnabled && <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}><UserPlus size={18} /> Inscription</button>}{settings.guestAccessEnabled && <button className={mode === "guest" ? "active" : ""} onClick={() => setMode("guest")}><DoorOpen size={18} /> Invité</button>}</div>}
       {verification && <VerificationNotice value={verification} pending={busy === "resend"} onResend={resendVerification} canResend={verification.type === "pending" && Boolean(pendingEmail)} />}
       {mode === "login" && <form className="form-stack" onSubmit={(event) => { event.preventDefault(); submit("login"); }}><label>Adresse email<input required autoComplete="username" value={login.identifier} onChange={(event) => setLogin({ ...login, identifier: event.target.value })} placeholder="nom@exemple.be" /></label><small className="legacy-login-hint">Ancien compte sans email ? Utilise une dernière fois ton ancien identifiant.</small><label>Mot de passe<input required autoComplete="current-password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} placeholder="Votre mot de passe" type="password" /></label><button type="submit" disabled={busy === "login"}>{busy === "login" ? "Connexion…" : "Se connecter"}</button><button type="button" className="secondary" onClick={() => { setError(""); setVerification(null); setRecoveryEmail(login.identifier.includes("@") ? login.identifier : ""); setMode("forgot-password"); }}><KeyRound size={17} /> Mot de passe oublié ?</button></form>}
+      {mode === "mfa" && mfa && <form className="form-stack auth-mfa" onSubmit={verifyMfa}><div className="account-setup-heading"><ShieldAlert size={25} /><div><span className="eyebrow">Connexion sécurisée</span><h2>Deuxième étape</h2></div></div><p className="account-setup-copy">Confirme cette connexion avec une méthode associée à ton compte.</p>{mfa.methods.length > 1 && <div className="segmented-tabs mfa-methods">{mfa.methods.map((method) => <button key={method} type="button" className={mfa.method === method ? "active" : ""} onClick={() => { setMfa({ ...mfa, method }); setMfaCode(""); }}>{method === "totp" ? "Application" : method === "email" ? "Email" : "Code de secours"}</button>)}</div>}<label>{mfa.method === "recovery" ? "Code de secours" : "Code à 6 chiffres"}<input required autoFocus inputMode={mfa.method === "recovery" ? "text" : "numeric"} autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} placeholder={mfa.method === "recovery" ? "XXXXXX-XXXXXX" : "000000"} /></label>{mfa.method === "email" && <><small>Le code est envoyé à {mfa.email || "l’adresse vérifiée du compte"} et expire avec cette tentative.</small><button type="button" className="secondary" disabled={busy === "mfa-email"} onClick={sendMfaEmail}><RefreshCw size={17} />{busy === "mfa-email" ? "Envoi…" : mfa.emailCodeSent ? "Renvoyer le code" : "Envoyer le code"}</button></>}<button type="submit" disabled={busy === "mfa" || !mfaCode.trim()}>{busy === "mfa" ? "Vérification…" : "Confirmer la connexion"}</button><button type="button" className="secondary" onClick={() => { setMfa(null); setMfaCode(""); setError(""); setMode("login"); }}>Annuler</button></form>}
       {mode === "forgot-password" && <form className="form-stack" onSubmit={requestPasswordReset}><div className="account-setup-heading"><KeyRound size={25} /><div><span className="eyebrow">Récupération du compte</span><h2>Mot de passe oublié</h2></div></div><p className="account-setup-copy">Saisis l’adresse email du compte. Un lien valable 30 minutes te permettra de choisir un nouveau mot de passe.</p><label>Adresse email<input required type="email" autoComplete="email" value={recoveryEmail} onChange={(event) => setRecoveryEmail(event.target.value)} placeholder="nom@exemple.be" /></label><button type="submit" disabled={busy === "password-reset-request"}><MailCheck size={17} />{busy === "password-reset-request" ? "Envoi…" : "Envoyer le lien"}</button><button type="button" className="secondary" onClick={() => { setError(""); setMode("login"); }}>Retour à la connexion</button></form>}
-      {mode === "reset-password" && <form className="form-stack" onSubmit={completePasswordReset}><div className="account-setup-heading"><KeyRound size={25} /><div><span className="eyebrow">Récupération du compte</span><h2>Nouveau mot de passe</h2></div></div><label>Nouveau mot de passe<input required minLength="4" maxLength="128" autoComplete="new-password" type="password" value={resetPassword.password} onChange={(event) => setResetPassword({ ...resetPassword, password: event.target.value })} placeholder="4 caractères minimum" /></label><label>Confirmer le mot de passe<input required minLength="4" maxLength="128" autoComplete="new-password" type="password" value={resetPassword.confirm} onChange={(event) => setResetPassword({ ...resetPassword, confirm: event.target.value })} placeholder="Saisissez à nouveau le mot de passe" /></label><button type="submit" disabled={busy === "password-reset"}>{busy === "password-reset" ? "Modification…" : "Modifier le mot de passe"}</button></form>}
-      {mode === "register" && <form className="form-stack" onSubmit={(event) => { event.preventDefault(); submit("register"); }}><label>Adresse email<input required type="email" autoComplete="email" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} placeholder="nom@exemple.be" /></label><label>Pseudo en jeu<input required autoComplete="nickname" minLength="3" maxLength="32" value={register.pseudo} onChange={(event) => setRegister({ ...register, pseudo: event.target.value })} placeholder="Nom affiché sur ta member card" /></label><EnrollmentFields value={register} onChange={setRegister} /><label>Mot de passe<input required autoComplete="new-password" minLength="4" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} placeholder="4 caractères minimum" type="password" /></label><label>Confirmer le mot de passe<input required autoComplete="new-password" value={register.passwordConfirm} onChange={(event) => setRegister({ ...register, passwordConfirm: event.target.value })} placeholder="Saisissez à nouveau le mot de passe" type="password" /></label><button type="submit" disabled={busy === "register"}>{busy === "register" ? "Création…" : "Créer le compte"}</button></form>}
+      {mode === "reset-password" && <form className="form-stack" onSubmit={completePasswordReset}><div className="account-setup-heading"><KeyRound size={25} /><div><span className="eyebrow">Récupération du compte</span><h2>Nouveau mot de passe</h2></div></div><label>Nouveau mot de passe<input required minLength="10" maxLength="128" autoComplete="new-password" type="password" value={resetPassword.password} onChange={(event) => setResetPassword({ ...resetPassword, password: event.target.value })} placeholder="10 caractères et 3 types de caractères" /></label><label>Confirmer le mot de passe<input required minLength="10" maxLength="128" autoComplete="new-password" type="password" value={resetPassword.confirm} onChange={(event) => setResetPassword({ ...resetPassword, confirm: event.target.value })} placeholder="Saisissez à nouveau le mot de passe" /></label><button type="submit" disabled={busy === "password-reset"}>{busy === "password-reset" ? "Modification…" : "Modifier le mot de passe"}</button></form>}
+      {mode === "register" && <form className="form-stack" onSubmit={(event) => { event.preventDefault(); submit("register"); }}><label>Adresse email<input required type="email" autoComplete="email" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} placeholder="nom@exemple.be" /></label><label>Pseudo en jeu<input required autoComplete="nickname" minLength="3" maxLength="32" value={register.pseudo} onChange={(event) => setRegister({ ...register, pseudo: event.target.value })} placeholder="Nom affiché sur ta member card" /></label><EnrollmentFields value={register} onChange={setRegister} /><label>Mot de passe<input required autoComplete="new-password" minLength="10" maxLength="128" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} placeholder="10 caractères et 3 types de caractères" type="password" /></label><label>Confirmer le mot de passe<input required autoComplete="new-password" minLength="10" maxLength="128" value={register.passwordConfirm} onChange={(event) => setRegister({ ...register, passwordConfirm: event.target.value })} placeholder="Saisissez à nouveau le mot de passe" type="password" /></label><button type="submit" disabled={busy === "register"}>{busy === "register" ? "Création…" : "Créer le compte"}</button></form>}
       {mode === "guest" && <form className="form-stack" onSubmit={(event) => { event.preventDefault(); submit("guest"); }}><label>Pseudo temporaire<input value={guest} onChange={(event) => setGuest(event.target.value)} placeholder="Nom affiché aux tables" /></label><button type="submit" disabled={busy === "guest"}>Entrer en invité</button></form>}
       {(!settings.registrationsEnabled || !settings.guestAccessEnabled) && <div className="auth-availability-note"><AlertTriangle size={16} /><span>{!settings.registrationsEnabled && !settings.guestAccessEnabled ? "Les inscriptions et l’accès invité sont actuellement fermés." : !settings.registrationsEnabled ? "Les nouvelles inscriptions sont actuellement fermées." : "L’accès invité est actuellement fermé."}</span></div>}
       {error && <div className="error">{error}</div>}

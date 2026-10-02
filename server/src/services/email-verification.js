@@ -245,3 +245,18 @@ export async function sendPasswordReset({ user, token, siteName }, environment =
   });
 }
 
+export async function sendMfaCode({ user, code, siteName }, environment = process.env) {
+  const displayName = user.profile?.displayName || user.pseudo || "joueur";
+  const casinoName = siteName || "KTGA.ME";
+  const name = escapeHtml(displayName);
+  const casino = escapeHtml(casinoName);
+  const safeCode = escapeHtml(String(code));
+  await mailTransport(environment).sendMail({
+    from: environment.EMAIL_FROM,
+    to: user.email,
+    subject: `Code de connexion ${casinoName} : ${code}`,
+    text: `Bonjour ${displayName},\n\nTon code de connexion ${casinoName} est ${code}.\n\nIl expire dans 10 minutes. Ne le communique à personne. Si tu n'es pas à l'origine de cette connexion, change immédiatement ton mot de passe.`,
+    html: `<div style="margin:0;padding:32px 16px;background:#080d0c;color:#f7ecd2;font-family:Arial,sans-serif"><div style="max-width:560px;margin:auto;background:#121918;border:1px solid #3d3928;border-radius:8px;overflow:hidden"><div style="height:5px;background:#d7a92f"></div><div style="padding:36px"><div style="color:#d8b75d;font-size:11px;font-weight:800;text-transform:uppercase">Double authentification</div><h1 style="margin:10px 0 14px;color:#fff6df;font-size:27px">Confirme ta connexion</h1><p style="color:#cfc5ad;line-height:1.6">Bonjour ${name}, utilise ce code personnel pour terminer ta connexion à <strong>${casino}</strong>.</p><div style="margin:28px 0;padding:18px;text-align:center;background:#0b1110;border:1px solid #66552d;border-radius:6px;color:#f4d675;font:800 34px/1.2 monospace;letter-spacing:8px">${safeCode}</div><p style="color:#938b79;font-size:13px;line-height:1.55">Le code expire dans 10 minutes. Ne le communique à personne. Si tu n’es pas à l’origine de cette connexion, change immédiatement ton mot de passe.</p></div></div></div>`
+  });
+}
+

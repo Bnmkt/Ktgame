@@ -6,6 +6,7 @@ export { DailyActivityChart } from "../components/profile/DailyActivityChart.jsx
 import { Activity, BadgeCheck, Boxes, CalendarDays, Check, Coins, Eye, Flag, Gem, KeyRound, Mail, Percent, ReceiptText, Search, Shield, ShoppingBag, Sparkles, Trophy, User, UserRound, X } from "lucide-react";
 import { api, setToken } from "../api.js";
 import { Wardrobe } from "../components/profile/Wardrobe.jsx";
+import { AccountSecurity } from "../components/profile/AccountSecurity.jsx";
 import { ReportPlayerDialog } from "../components/profile/ReportPlayerDialog.jsx";
 import { Die, PlayingCard } from "../components/game/GamePieces.jsx";
 import { CosmeticPreview, DisplayName, FriendCode, ProfileCosmeticEffect, ProfileCosmeticFrame, ProfileCosmeticShell, profileCosmeticClassName, shopTypeLabel } from "../components/cosmetics/Cosmetics.jsx";
@@ -390,8 +391,9 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
                 <div className="account-section-heading"><span><Shield size={20} /></span><div><h3>Connexion et sécurité</h3><p>Ces informations ne sont jamais affichées aux autres joueurs.</p></div></div>
                 <div className="account-security-layout">
                   <div className="account-email-editor"><div className="account-email-summary"><Mail size={20} /><span><small>Adresse de connexion</small><strong>{user.emailVerified ? "Adresse vérifiée" : "Vérification requise"}</strong><em>Privée</em></span></div><label><span className="sr-only">Adresse email</span><input type="email" autoComplete="email" value={form.login} onChange={(event) => setForm({ ...form, login: event.target.value })} placeholder="nom@exemple.be" /></label><button type="button" className="secondary" onClick={saveEmail} disabled={!form.login || form.login === user.login && user.emailVerified}><Mail size={16} />{form.login === user.login ? "Renvoyer la vérification" : "Modifier l’adresse"}</button></div>
-                  <label><span className="field-label"><KeyRound size={15} />Nouveau mot de passe</span><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} type="password" autoComplete="new-password" placeholder="Laisser vide pour conserver l’actuel" /><small>4 caractères minimum uniquement si tu souhaites le modifier.</small></label>
+                  <label><span className="field-label"><KeyRound size={15} />Nouveau mot de passe</span><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={10} maxLength={128} type="password" autoComplete="new-password" placeholder="Laisser vide pour conserver l’actuel" /><small>10 caractères minimum et au moins trois types de caractères.</small></label>
                 </div>
+                <AccountSecurity user={user} onUser={setUser} onError={setError} onMessage={setMessage} />
               </section>
               <div className="settings-actions account-save-actions"><span>Les modifications du profil et des favoris seront enregistrées ensemble.</span><button onClick={savePublicInfo}>Enregistrer les modifications</button></div>
             </div>}
