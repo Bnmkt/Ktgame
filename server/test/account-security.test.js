@@ -56,8 +56,11 @@ test("la configuration TOTP crée des codes de secours à usage unique", () => {
   assert.equal(verifyUserMfa(user, "recovery", codes[0], "pepper", 1_000_000), false);
 });
 
-test("la politique de mot de passe impose longueur et diversité", () => {
+test("la politique de mot de passe impose chaque condition affichée à l'inscription", () => {
   assert.match(passwordPolicyError("Court1!"), /10 caractères/);
-  assert.match(passwordPolicyError("seulementdesminuscules"), /trois types/);
+  assert.match(passwordPolicyError("seulementdesminuscules"), /lettre et un chiffre/);
+  assert.match(passwordPolicyError("seulement1minuscules"), /majuscule/);
+  assert.match(passwordPolicyError("Seulement1minuscules"), /caractère spécial/);
   assert.equal(passwordPolicyError("Casino-2026-Sur"), "");
+  assert.equal(passwordPolicyError("Éléphant-2026"), "");
 });
