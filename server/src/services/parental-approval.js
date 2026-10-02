@@ -17,12 +17,20 @@ export function createParentalApproval(db, input, reviewerId, now = Date.now()) 
 
 export function registrationAuthorization(db, input, now = Date.now()) {
   if (input.termsVersion !== PRIVACY_VERSION) throw new Error("Veuillez accepter les conditions d'utilisation actuelles.");
-  if (!["13plus", "under13"].includes(input.ageBand)) throw new Error("Choisissez votre tranche d'age.");
-  if (input.ageBand === "13plus") return { ageBand: "13plus", termsVersion: PRIVACY_VERSION, acceptedAt: new Date(now).toISOString() };
+  const birthDate = String(input.birthDate ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) throw new Error("Saisissez une date de naissance valide.");
+  const born = new Date(`${birthDate}T00:00:00.000Z`);
+  const today = new Date(now);
+  if (Number.isNaN(born.getTime()) || born.toISOString().slice(0, 10) !== birthDate || born > today) throw new Error("Saisissez une date de naissance valide.");
+  let age = today.getUTCFullYear() - born.getUTCFullYear();
+  if (today.getUTCMonth() < born.getUTCMonth() || (today.getUTCMonth() === born.getUTCMonth() && today.getUTCDate() < born.getUTCDate())) age -= 1;
+  if (age < 0 || age > 120) throw new Error("Saisissez une date de naissance valide.");
+  const ageBand = age < 13 ? "under13" : "13plus";
+  if (ageBand === "13plus") return { ageBand, birthDate, termsVersion: PRIVACY_VERSION, acceptedAt: new Date(now).toISOString() };
   const hash = digest(String(input.parentalCode ?? "").trim());
   const row = (db.settings?.parentalApprovals ?? []).find((entry) => entry.hash === hash && Date.parse(entry.expiresAt) > now && entry.version === PRIVACY_VERSION);
   if (!row) throw new Error("Une autorisation parentale valide est necessaire avant l'inscription.");
   db.settings.parentalApprovals = db.settings.parentalApprovals.filter((entry) => entry.id !== row.id);
   const { hash: _hash, expiresAt: _expiry, ...approval } = row;
-  return { ageBand: "under13", termsVersion: PRIVACY_VERSION, acceptedAt: new Date(now).toISOString(), parentalApproval: approval };
+  return { ageBand, birthDate, termsVersion: PRIVACY_VERSION, acceptedAt: new Date(now).toISOString(), parentalApproval: approval };
 }

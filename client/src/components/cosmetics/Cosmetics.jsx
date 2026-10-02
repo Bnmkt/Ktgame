@@ -599,6 +599,7 @@ export function MotionDesigner({ motion, onChange }) {
 }
 
 export function VisualDesigner({ type, design, onChange, onActivate, onDisable }) {
+  const [panel, setPanel] = useState("surface");
   if (!visualDesignerTypes.has(type)) return null;
   const activeDesign = design?.type === type ? { ...defaultVisualDesign(type), ...design } : null;
   if (!activeDesign) return <section className="visual-designer visual-designer-inactive">
@@ -614,8 +615,11 @@ export function VisualDesigner({ type, design, onChange, onActivate, onDisable }
   return <section className="visual-designer">
     <div className="visual-designer-heading"><div><small>Studio visuel</small><h3>Conception assistée</h3></div><span className="designer-active-status">Actif</span></div>
     <div className="designer-presets"><span>Préréglages</span>{presets.map((preset) => <button type="button" className="secondary" key={preset} onClick={() => onChange(visualPreset(type, preset))}>{preset}</button>)}</div>
+    <nav className="designer-subtabs" aria-label="Réglages du studio visuel">
+      {[['surface', 'Couleurs et matière'], ['shape', 'Forme et bordure'], ['effects', 'Ombre et effets']].map(([value, label]) => <button type="button" key={value} className={panel === value ? "active" : ""} onClick={() => setPanel(value)}>{label}</button>)}
+    </nav>
 
-    {type === "diceSkins" && <>
+    {panel === "surface" && <>{type === "diceSkins" && <>
       <div className="designer-section"><h4>Corps du dé</h4><div className="designer-control-grid">
         <DesignerSelect label="Fond" value={activeDesign.backgroundMode} onChange={(value) => set("backgroundMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]} />
         <DesignerColor label="Couleur principale" value={activeDesign.primaryColor} onChange={(value) => set("primaryColor", value)} />
@@ -663,24 +667,24 @@ export function VisualDesigner({ type, design, onChange, onActivate, onDisable }
         <DesignerColor label="Texte secondaire" value={activeDesign.secondaryTextColor} onChange={(value) => set("secondaryTextColor", value)} />
         <DesignerSelect label="Typographie" value={activeDesign.fontStyle} onChange={(value) => set("fontStyle", value)} options={[["casino", "Casino du site"], ["serif", "Élégante avec empattements"], ["modern", "Moderne"], ["mono", "Monospace"]]} />
       </div></div>
-    </>}
+    </>}</>}
 
-    <div className="designer-section"><h4>Forme et finition</h4><div className="designer-control-grid">
+    {panel === "shape" && <div className="designer-section"><h4>Forme et finition</h4><div className="designer-control-grid">
       <DesignerSelect label="Silhouette" value={activeDesign.shape} onChange={(value) => set("shape", value)} options={commonShapeOptions} />
       <DesignerRange label="Arrondi" value={activeDesign.radius} min={0} max={30} suffix=" px" onChange={(value) => set("radius", value)} />
       <DesignerColor label="Bordure" value={activeDesign.borderColor} onChange={(value) => set("borderColor", value)} />
       <DesignerRange label="Épaisseur" value={activeDesign.borderWidth} min={0} max={8} suffix=" px" onChange={(value) => set("borderWidth", value)} />
       <DesignerSelect label="Style de bordure" value={activeDesign.borderStyle} onChange={(value) => set("borderStyle", value)} options={[["solid", "Continue"], ["double", "Double"], ["dashed", "Tirets"]]} />
-    </div></div>
+    </div></div>}
 
-    <div className="designer-section"><h4>Ombre et animation</h4><div className="designer-control-grid">
+    {panel === "effects" && <div className="designer-section"><h4>Ombre et animation</h4><div className="designer-control-grid">
       <DesignerColor label="Couleur de l’ombre" value={activeDesign.shadowColor} onChange={(value) => set("shadowColor", value)} />
       <DesignerRange label="Flou" value={activeDesign.shadowBlur} min={0} max={60} suffix=" px" onChange={(value) => set("shadowBlur", value)} />
       <DesignerRange label="Opacité" value={activeDesign.shadowOpacity} min={0} max={100} suffix=" %" onChange={(value) => set("shadowOpacity", value)} />
       <DesignerRange label="Halo" value={activeDesign.glow} min={0} max={50} suffix=" px" onChange={(value) => set("glow", value)} />
       <DesignerSelect label="Animation" value={activeDesign.animation} onChange={(value) => set("animation", value)} options={[["none", "Aucune"], ["flow", "Dégradé mouvant"], ["pulse", "Pulsation"], ["shimmer", "Reflet traversant"]]} />
       <DesignerRange label="Durée" value={activeDesign.animationSpeed} min={0.6} max={10} step={0.2} suffix=" s" onChange={(value) => set("animationSpeed", value)} />
-    </div></div>
+    </div></div>}
     <div className="designer-footer"><ConfirmActionButton className="secondary" dialogTitle="Réinitialiser le style ?" message="Les réglages visuels actuels seront remplacés par les réglages par défaut." confirmLabel="Réinitialiser" danger onConfirm={() => onChange(defaultVisualDesign(type))}>Réinitialiser</ConfirmActionButton><ConfirmActionButton className="danger-button" dialogTitle="Désactiver le studio visuel ?" message="La configuration visuelle assistée sera retirée de cet objet." confirmLabel="Désactiver" danger onConfirm={onDisable}>Désactiver le studio</ConfirmActionButton></div>
   </section>;
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { appPath } from "../navigation/routes.js";
-import { AlertTriangle, BadgeCheck, CheckCircle2, Coins, Copy, DoorOpen, Eye, HelpCircle, LogOut, Maximize2, Minimize2, Play, Save, Settings, ShieldCheck, Swords, Trophy, X } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Bot, CheckCircle2, Clock3, Coins, Copy, DoorOpen, Eye, FastForward, HelpCircle, LogOut, Maximize2, Minimize2, Play, Save, Settings, ShieldCheck, Swords, Trophy, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api, getToken } from "../api.js";
 import { DiceSelectionMode, DiceThrowTray, Die, PlayingCard } from "../components/game/GamePieces.jsx";
 import { DisplayName } from "../components/cosmetics/Cosmetics.jsx";
@@ -57,6 +57,24 @@ function PokerAutoAction({ enabled, isMyTurn, turnStartedAt, enabledAt, onToggle
   return <button className={`secondary poker-auto-action ${enabled ? "active" : ""}`} title="Après 10 secondes : Parole si aucune mise n’est à suivre, sinon Se coucher." onClick={onToggle}><ShieldCheck size={17} /><span><strong>Parole / se coucher auto · {enabled ? "ON" : "OFF"}</strong><small>{enabled ? seconds !== null ? `Action dans ${seconds} s : Parole si possible, sinon Se coucher` : "Armé pour ton prochain tour" : "Attend 10 secondes avant l’action automatique"}</small></span></button>;
 }
 
+function PacingCountdown({ endsAt }) {
+  const now = useClock(Boolean(endsAt), 250);
+  return Math.max(0, Math.ceil((Number(endsAt) - now) / 1000));
+}
+
+function TurnPacingBanner({ pacing, players, canSkip, onSkip }) {
+  if (!["bot-thinking", "turn-end"].includes(pacing?.kind)) return null;
+  const actor = players.find((player) => player.id === pacing.actorId);
+  const thinking = pacing.kind === "bot-thinking";
+  const botTurn = Boolean(pacing.actorIsBot);
+  return <section className={`room-pacing-banner ${thinking ? "thinking" : "turn-ended"}`} aria-live="polite"><div className="room-pacing-icon">{botTurn ? <Bot size={20} /> : <Clock3 size={20} />}</div><div><small>{thinking ? "Réflexion de l’IA" : botTurn ? "Tour de l’IA terminé" : "Tour terminé"}</small><strong>{actor ? <DisplayName user={actor} /> : pacing.actorName ?? (botTurn ? "L’IA" : "Le joueur")} {thinking ? "prépare son coup" : "laisse la table visible"}</strong></div><span className="room-pacing-countdown"><Clock3 size={16} /><PacingCountdown endsAt={pacing.endsAt} /> s</span>{canSkip && <button type="button" className="secondary" onClick={onSkip}><FastForward size={17} /> Passer l’attente</button>}</section>;
+}
+
+function RoundResultsOverlay({ pacing, players, canSkip, isOwner, onSkip, onDismiss }) {
+  if (pacing?.kind !== "round-results") return null;
+  return <div className="modal-backdrop round-results-layer" role="presentation"><section className="modal round-results-modal" role="dialog" aria-modal="true" aria-labelledby="round-results-title"><header><div className="round-results-emblem"><Trophy size={25} /></div><div><span className="eyebrow">{pacing.final ? "Partie terminée" : `Manche ${pacing.round}`}</span><h2 id="round-results-title">{pacing.final ? "Résultats finaux" : "Résultats de la manche"}</h2></div><button type="button" className="secondary icon-toggle" aria-label={canSkip ? "Fermer les résultats et continuer" : "Masquer les résultats"} title={canSkip ? "Continuer la partie" : "Masquer pour moi"} onClick={canSkip ? onSkip : onDismiss}><X size={18} /></button></header><div className="round-results-timer"><span>{pacing.final ? "Fin de l’affichage" : "Reprise automatique"}</span><strong><PacingCountdown endsAt={pacing.endsAt} /> secondes</strong><i><b style={{ animationDuration: `${Math.max(1, pacing.endsAt - pacing.startedAt)}ms`, animationDelay: `${Math.min(0, pacing.startedAt - Date.now())}ms` }} /></i></div><ol className="round-results-list">{(pacing.results ?? []).map((result) => { const player = players.find((entry) => entry.id === result.id) ?? result; return <li className={result.winner ? "winner" : ""} key={result.id}><span>{result.rank}</span><DisplayName user={player} /><strong>{result.scoreLabel ?? <CompactNumber value={result.score} label={`Score exact de ${result.pseudo}`} />}</strong>{result.winner && <Trophy size={17} />}</li>; })}</ol><footer><small>Le plateau reste figé pour laisser le temps de lire les résultats.</small>{canSkip && <button type="button" onClick={onSkip}><FastForward size={18} /> {pacing.final ? "Fermer les résultats" : isOwner ? "Continuer maintenant" : "Passer les résultats"}</button>}</footer></section></div>;
+}
+
 function BetLimitsEditor({ minimum, maximum, maxAllowed = 100000000, disabled, onChange, poker = false }) {
   const detectedPreset = betPresets.find(([, , min, max]) => min === minimum && max === maximum)?.[0] ?? "custom";
   const [selectedPreset, setSelectedPreset] = useState(detectedPreset);
@@ -102,6 +120,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
   const [blackjackRevealDone, setBlackjackRevealDone] = useState(false);
+  const [dismissedPacingId, setDismissedPacingId] = useState("");
   const [diceRollLocked, setDiceRollLocked] = useState(false);
   const diceRollRequestPending = useRef(false);
   const roomShellRef = useRef(null);
@@ -213,6 +232,18 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
     }
   }
 
+  async function skipPacing() {
+    if (!room?.pacing) return;
+    setError("");
+    try {
+      const result = await api(`/api/rooms/${code}/pacing/skip`, { method: "POST", body: JSON.stringify({ pacingId: room.pacing.id }) });
+      commitRoom(result);
+      syncUserFromRoom(result);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function closeRoom() {
     setError("");
     try {
@@ -252,6 +283,9 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   }
 
   const state = room?.state;
+  const pacing = room?.pacing;
+  const pacingActive = Boolean(pacing);
+  const isSeatedPlayer = room?.players?.some((player) => player.id === user.id && !player.isBot) && !room?.spectator;
   const current = state?.players?.[state.currentPlayerIndex];
   const myHand = state?.hands?.[user.id] ?? [];
   const hasBlackjackBet = Boolean(state?.bets?.[user.id]);
@@ -266,7 +300,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const pokerMinimumRaise = room?.gameId === "texas-holdem" && state ? state.currentBet + state.minRaise : 0;
   const pokerMaximumRaise = room?.gameId === "texas-holdem" && state ? Math.min(state.maximumBet ?? Number.MAX_SAFE_INTEGER, (state.streetBets?.[user.id] ?? 0) + (state.stacks?.[user.id] ?? 0)) : 0;
   const allBlackjackBetsPlaced = room?.gameId === "blackjack" && state ? Object.keys(state.bets ?? {}).length >= state.players.filter((p) => !p.isBot).length : false;
-  const isMyTurn = current?.id === user.id;
+  const isMyTurn = current?.id === user.id && !pacingActive;
   const pokerAutoEnabled = Boolean(state?.autoCheckFoldPlayerIds?.includes(user.id));
   const isPlayerActionExpected = Boolean(state && !state.finished && !state.nextHandAt && (
     room?.gameId === "blackjack"
@@ -306,6 +340,9 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   useEffect(() => {
     if (room?.gameId === "blackjack" && !state?.finished) setBlackjackRevealDone(false);
   }, [room?.gameId, state?.finished]);
+  useEffect(() => {
+    if (pacing?.id !== dismissedPacingId) setDismissedPacingId("");
+  }, [pacing?.id, dismissedPacingId]);
   useEffect(() => {
     if (room?.pokerBlinds) setPokerBlinds({ bigBlind: room.pokerBlinds.bigBlind, maximumBet: room.pokerBlinds.maximumBet ?? room.stake });
   }, [room?.pokerBlinds?.bigBlind, room?.pokerBlinds?.maximumBet, room?.stake]);
@@ -406,8 +443,9 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
           <RoomStatusPanel room={room} state={state} current={current} userId={user.id} isOwner={isOwner} onAddBot={() => roomPost("bot")} onStart={() => roomPost("start")} onReady={() => roomPost("ready")} onKick={kickPlayer} onSettings={openRoomSettings} />
           {!state && room.gameId === "belote" && <BeloteTeams room={room} userId={user.id} onChange={changeBeloteTeam} />}
           {showFinishedResult && <FinishedLeaderboard room={room} state={state} />}
+          <TurnPacingBanner pacing={pacing} players={room.players} canSkip={isSeatedPlayer} onSkip={skipPacing} />
 
-          {state && <section className={`board board-${room.gameId} ${state.finished ? "finished-board" : ""} ${isPlayerActionExpected ? "your-active-turn" : ""}`}>
+          {state && <section className={`board board-${room.gameId} ${state.finished ? "finished-board" : ""} ${isPlayerActionExpected ? "your-active-turn" : ""} ${pacingActive ? "pacing-locked" : ""}`}>
             <div className="board-felt">
               <div className="board-heading"><h2>{gameTitle(room.gameId)}</h2>{room.gameId === "yahtzee" && <div className="round-counter"><span>Manche</span><strong>{yahtzeeRound} / 13</strong><small>{Math.max(0, 13 - yahtzeeRound)} restante{13 - yahtzeeRound > 1 ? "s" : ""}</small></div>}{["421", "cul-de-chouette"].includes(room.gameId) && <div className="round-counter"><span>Manche</span><strong>{state.round} / {state.maxRounds}</strong><small>{Math.max(0, state.maxRounds - state.round)} restante{state.maxRounds - state.round > 1 ? "s" : ""}</small></div>}</div>
               <div className={`turn-line ${room.gameId === "yahtzee" && !state.finished ? `yahtzee-turn-focus ${isMyTurn ? "your-turn" : "opponent-turn"}` : ""} ${room.gameId === "bataille" && !state.finished ? "battle-simultaneous-turn" : ""}`}>{state.finished ? (showFinishedResult ? "Partie terminée" : "Le dealer termine sa main…") : room.gameId === "blackjack" && allBlackjackBetsPlaced ? `${(state.players.filter((player) => !player.isBot).length - (state.completedPlayerIds?.length ?? 0))} main(s) encore en jeu avant le dealer` : room.gameId === "bataille" ? <><span className="turn-status-icon"><Swords size={22} /></span><span className="turn-copy"><small>{state.resolutionEndsAt ? "Confrontation" : "Actions simultanées"} · manche {state.round}</small><strong>{state.resolutionEndsAt ? <>Résultat affiché encore <BattleCountdown endsAt={state.resolutionEndsAt} /> seconde(s)</> : state.submittedPlayerIds?.includes(user.id) ? "Placement enregistré — l’adversaire joue" : state.drawnCards?.[user.id] ? `Ta carte est prête — choisis ${state.battleLanes?.length === 1 ? "la pile centrale" : "la pile A ou B"}` : "À toi de piocher ta carte"}</strong></span></> : room.gameId === "yahtzee" ? <><span className="turn-status-icon"><Play size={22} /></span><span className="turn-copy"><small>{isMyTurn ? "Ton tour" : "Tour en cours"}</small><strong>{isMyTurn ? "À toi de jouer" : <><DisplayName user={current} /> joue maintenant</>}</strong></span></> : <>À <DisplayName user={current} /> de jouer</>}</div>
@@ -525,6 +563,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
         <GameModifiersPanel gameId={room.gameId} value={gameModifiers} isOwner={isOwner} onChange={setGameModifiers} showFooter={false} />
       </div><div className="room-settings-modal-footer"><span><Swords size={16} /> Ces paramètres seront verrouillés au lancement.</span><div className="actions">{isOwner && <button onClick={applyRoomSettings}><Save size={17} /> Appliquer les paramètres</button>}<button className="secondary" onClick={cancelRoomSettings}>{isOwner ? "Annuler" : "Fermer"}</button></div></div></div></div>}
       {rulesOpen && <RulesModal gameId={room.gameId} onClose={() => setRulesOpen(false)} />}
+      {pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && <RoundResultsOverlay pacing={pacing} players={room.players} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
     </main>
   );
 }

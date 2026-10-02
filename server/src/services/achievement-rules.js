@@ -1,4 +1,4 @@
-import { playerContextFields, sitePages, browserFamilies } from "./site-achievements.js";
+import { playerContextFields, sitePages, browserFamilies, tableTimeMetrics } from "./site-achievements.js";
 const operators = new Set(["eq", "neq", "gt", "gte", "lt", "lte", "in", "notIn", "contains", "containsAny", "containsAll", "exists", "startsWith", "endsWith"]);
 const aggregates = new Set(["match", "count", "sum", "max", "distinct", "streak"]);
 const scopes = new Set(["event", "game", "career"]);
@@ -34,7 +34,10 @@ export const achievementEventSchema = {
 };
 
 const activityFields = { page: "Page visitee", browser: "Famille du navigateur", markers: "Indices dans l'URL (secret:valeur ou challenge:valeur)", seconds: "Secondes actives depuis le dernier signal", activeSeconds: "Secondes actives cumulees", visitDays: "Jours de visite (UTC)", pageCount: "Types de pages visites" };
+const tableFields = { gameId: "Jeu", roomId: "Table", phase: "Etat de la table (waiting, playing, finished)", roundNumber: "Numero de manche / main", seconds: "Secondes actives depuis le dernier signal", tableSeconds: "Temps actif sur cette table (secondes)", roundSeconds: "Temps actif dans cette manche (secondes)", tableActiveSeconds: "Temps actif cumule aux tables (secondes)", roundActiveSeconds: "Temps actif cumule en manches (secondes)" };
 Object.assign(achievementEventSchema, {
+  "table.activity": { label: "Temps actif sur une table (facultatif)", fields: tableFields },
+  "game.round.activity": { label: "Temps actif dans une manche (facultatif)", fields: tableFields },
   "site.visit": { label: "Visite d'une page (facultatif)", fields: activityFields },
   "site.activity": { label: "Temps actif sur le site (facultatif)", fields: activityFields },
   "account.login": { label: "Connexion au compte", fields: { method: "Methode" } },
@@ -45,6 +48,7 @@ Object.assign(achievementEventSchema, {
 for (const schema of Object.values(achievementEventSchema)) schema.fields = { ...schema.fields, ...playerContextFields };
 
 export const achievementMetricSchema = {
+  ...tableTimeMetrics,
   accountAgeDays: "Anciennete du compte (jours)",
   tokens: "Solde de jetons", friendCount: "Nombre d'amis",
   gamesPlayed: "Parties terminées",
@@ -188,9 +192,14 @@ export function consumeAchievementEvent(rule, event, previous = {}) {
   return { matched, progress: { value, ...(values.length ? { values } : {}), updatedAt: new Date().toISOString() } };
 }
 
-export function achievementRuleSchemas(games = [], shop = []) {
+export function achievementRuleSchemas(games = [], shop = [], achievements = []) {
   const choices = { page: Object.entries(sitePages).map(([value, label]) => ({ value, label })), browser: Object.entries(browserFamilies).map(([value, label]) => ({ value, label })) };
   for (const field of ["player.ownedItemIds", "player.equippedItemIds"]) choices[field] = shop.map((item) => ({ value: item.id, label: item.name }));
+  choices["player.favoriteGameIds"] = games.map((game) => ({ value: game.id, label: game.name }));
+  choices["player.achievementIds"] = achievements.map((entry) => ({ value: entry.id, label: entry.title }));
+  choices.achievementId = choices["player.achievementIds"];
+  choices.itemId = choices["player.ownedItemIds"];
+  choices.gameId = choices["player.favoriteGameIds"];
   return {
     events: Object.entries(achievementEventSchema).map(([id, value]) => ({ id, ...value, fields: Object.entries(value.fields).map(([field, label]) => ({ field, label, ...(choices[field] ? { choices: choices[field] } : {}) })) })),
     metrics: [...Object.entries(achievementMetricSchema).map(([id, label]) => ({ id, label })), ...games.map((game) => ({ id: `gameWins.${game.id}`, label: `Victoires - ${game.name}` }))],

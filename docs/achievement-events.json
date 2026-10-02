@@ -7,7 +7,69 @@
       "fields": [
         {
           "field": "gameId",
-          "label": "Jeu"
+          "label": "Jeu",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "action",
@@ -101,11 +163,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -115,7 +244,69 @@
       "fields": [
         {
           "field": "gameId",
-          "label": "Jeu"
+          "label": "Jeu",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "playerId",
@@ -225,11 +416,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -251,7 +509,69 @@
         },
         {
           "field": "gameId",
-          "label": "Jeu"
+          "label": "Jeu",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "roomId",
@@ -281,11 +601,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -295,7 +682,8 @@
       "fields": [
         {
           "field": "itemId",
-          "label": "Objet"
+          "label": "Objet",
+          "choices": []
         },
         {
           "field": "itemType",
@@ -337,11 +725,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -389,11 +844,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -451,11 +973,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -465,7 +1054,8 @@
       "fields": [
         {
           "field": "achievementId",
-          "label": "Succès"
+          "label": "Succès",
+          "choices": []
         },
         {
           "field": "group",
@@ -499,11 +1089,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -543,11 +1200,480 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "id": "table.activity",
+      "label": "Temps actif sur une table (facultatif)",
+      "fields": [
+        {
+          "field": "gameId",
+          "label": "Jeu",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "roomId",
+          "label": "Table"
+        },
+        {
+          "field": "phase",
+          "label": "Etat de la table (waiting, playing, finished)"
+        },
+        {
+          "field": "roundNumber",
+          "label": "Numero de manche / main"
+        },
+        {
+          "field": "seconds",
+          "label": "Secondes actives depuis le dernier signal"
+        },
+        {
+          "field": "tableSeconds",
+          "label": "Temps actif sur cette table (secondes)"
+        },
+        {
+          "field": "roundSeconds",
+          "label": "Temps actif dans cette manche (secondes)"
+        },
+        {
+          "field": "tableActiveSeconds",
+          "label": "Temps actif cumule aux tables (secondes)"
+        },
+        {
+          "field": "roundActiveSeconds",
+          "label": "Temps actif cumule en manches (secondes)"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "id": "game.round.activity",
+      "label": "Temps actif dans une manche (facultatif)",
+      "fields": [
+        {
+          "field": "gameId",
+          "label": "Jeu",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "roomId",
+          "label": "Table"
+        },
+        {
+          "field": "phase",
+          "label": "Etat de la table (waiting, playing, finished)"
+        },
+        {
+          "field": "roundNumber",
+          "label": "Numero de manche / main"
+        },
+        {
+          "field": "seconds",
+          "label": "Secondes actives depuis le dernier signal"
+        },
+        {
+          "field": "tableSeconds",
+          "label": "Temps actif sur cette table (secondes)"
+        },
+        {
+          "field": "roundSeconds",
+          "label": "Temps actif dans cette manche (secondes)"
+        },
+        {
+          "field": "tableActiveSeconds",
+          "label": "Temps actif cumule aux tables (secondes)"
+        },
+        {
+          "field": "roundActiveSeconds",
+          "label": "Temps actif cumule en manches (secondes)"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -663,11 +1789,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -783,11 +1976,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -823,11 +2083,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -863,11 +2190,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -903,11 +2297,78 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     },
@@ -943,16 +2404,99 @@
         },
         {
           "field": "player.favoriteGameIds",
-          "label": "Joueur : jeux favoris"
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
         },
         {
           "field": "player.friendCount",
           "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
         }
       ]
     }
   ],
   "metrics": [
+    {
+      "id": "tableActiveSeconds",
+      "label": "Temps actif cumule aux tables (secondes)"
+    },
+    {
+      "id": "roundActiveSeconds",
+      "label": "Temps actif cumule en manches (secondes)"
+    },
+    {
+      "id": "longestTableSeconds",
+      "label": "Plus long temps actif sur une table (secondes)"
+    },
+    {
+      "id": "longestRoundSeconds",
+      "label": "Plus long temps actif dans une manche (secondes)"
+    },
     {
       "id": "accountAgeDays",
       "label": "Anciennete du compte (jours)"

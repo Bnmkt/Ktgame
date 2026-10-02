@@ -1,6 +1,8 @@
 import "dotenv/config";
-import { createParentalApproval, registrationAuthorization } from "./services/parental-approval.js";
-import { allowedUrlMarkers, createSiteActivityTracker, playerAchievementContext, setActivityConsent, validActivityConsent } from "./services/site-achievements.js";
+import { registrationAuthorization } from "./services/parental-approval.js";
+import { activeModeration, activeParentalRevocation, createParentalControlStore, defaultMinorRestrictions, exactAge, featureAccess, isUnder13, minorRestrictionOptions, normalizeMinorRestrictions, registrationMarker, turnsThirteenAt } from "./services/parental-controls.js";
+import { sendParentBirthdayReminder, sendParentDailySummary, sendParentalActionNotice, sendParentalAdminNotice, sendParentalDecision, sendParentVerification } from "./services/parental-email.js";
+import { PRIVACY_VERSION, allowedUrlMarkers, createSiteActivityTracker, playerAchievementContext, setActivityConsent, validActivityConsent, tableActivityContext, tableTimeMetrics } from "./services/site-achievements.js";
 import bcrypt from "bcryptjs";
 import compression from "compression";
 import cors from "cors";
@@ -67,8 +69,28 @@ import {
 import { casinoDateKey, casinoTimeParts, shiftDateKey } from "./services/time.js";
 import { calculateDailyBonusStatus, defaultDailyBonusRules, normalizeDailyBonusConfig } from "./services/daily-bonus.js";
 import { createRequestLogStore, requestLogMiddleware } from "./services/request-logs.js";
+import {
+  consumeEmailVerification,
+  consumePasswordReset,
+  emailDeliveryConfigured,
+  emailVerificationCanBeResent,
+  issueEmailVerification,
+  issuePasswordReset,
+  normalizeEmail,
+  passwordResetCanBeResent,
+  reservedPublicEmail,
+  sendEmailVerification,
+  sendPasswordReset,
+  validEmail,
+  verifyEmailDelivery
+} from "./services/email-verification.js";
+import { createStatusMonitor } from "./services/status-monitor.js";
+import { createPatchnoteStore } from "./services/patchnotes.js";
+import { createTribunalStore, tribunalCategories } from "./services/tribunal.js";
+import { createChatStore, directChannelId } from "./services/chat.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const APP_VERSION = process.env.APP_VERSION || JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || "0.1.0";
 const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
@@ -85,6 +107,10 @@ const HTTPS_PFX_PASSPHRASE = process.env.HTTPS_PFX_PASSPHRASE || "";
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60000);
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 300);
 const AUTH_RATE_LIMIT_MAX = Number(process.env.AUTH_RATE_LIMIT_MAX || 20);
+const TRUST_PROXY = String(process.env.TRUST_PROXY ?? "").trim();
+const PARENTAL_DB_PATH = process.env.PARENTAL_DB_PATH ? path.resolve(process.cwd(), process.env.PARENTAL_DB_PATH) : path.join(__dirname, "..", "data", "parental.sqlite");
+const TRIBUNAL_DB_PATH = process.env.TRIBUNAL_DB_PATH ? path.resolve(process.cwd(), process.env.TRIBUNAL_DB_PATH) : path.join(__dirname, "..", "data", "tribunal.sqlite");
+const CHAT_DB_PATH = process.env.CHAT_DB_PATH ? path.resolve(process.cwd(), process.env.CHAT_DB_PATH) : path.join(__dirname, "..", "data", "chat.sqlite");
 const DEFAULT_TOKENS = 1000;
 const DAILY_TOKENS = 250;
 const MIN_ROOM_STAKE = 10;
@@ -95,17 +121,25 @@ const defaultPlatformSettings = Object.freeze({
   siteSubtitle: "Casino privé multijoueur, jetons, dés et cartes.",
   registrationsEnabled: true,
   guestAccessEnabled: true,
+  emailVerificationRequired: false,
+  minorRestrictions: defaultMinorRestrictions,
   signupTokens: DEFAULT_TOKENS,
   dailyTokens: DAILY_TOKENS,
   dailyBonusDefaultMultiplier: 1,
   dailyBonusMaxMultiplier: 100,
   dailyBonusRules: defaultDailyBonusRules,
   minRoomStake: MIN_ROOM_STAKE,
+  botThinkingSeconds: 1,
+  turnEndDelaySeconds: 5,
+  roundResultsSeconds: 30,
   minPokerBuyIn: MIN_POKER_BUY_IN,
   pokerDefaultBigBlind: 20,
   pokerTurnSeconds: 300
 });
 const ROOM_PAYOUT_RATES = [0.6, 0.3, 0.1];
+const DEFAULT_BOT_THINKING_MS = 1000;
+const DEFAULT_TURN_END_DELAY_MS = 5000;
+const DEFAULT_ROUND_RESULTS_MS = 30000;
 const achievementThresholds = {
   gamesPlayed: [1, 5, 50, 200, 1000, 5000, 10000],
   wins: [1, 10, 100, 500, 1000, 5000, 10000],
@@ -125,6 +159,12 @@ const defaultCosmetics = {
   cardSkins: ["default"],
   equipped: { icon: "chip", nameEffect: "none", memberCard: "default", profileBanner: "default", profileFrame: "none", profileEffect: "none", diceSkin: "default", cardSkin: "default" }
 };
+
+const parentalControls = createParentalControlStore({ filename: PARENTAL_DB_PATH, secret: JWT_SECRET });
+const tribunal = createTribunalStore({ filename: TRIBUNAL_DB_PATH });
+process.on("exit", () => tribunal.close());
+const chat = createChatStore({ filename: CHAT_DB_PATH });
+process.on("exit", () => chat.close());
 
 const defaultGameDescriptions = {
   yahtzee: "Marquer le plus de points après 13 catégories.",
@@ -407,12 +447,17 @@ function normalizePlatformSettings(value = {}) {
     siteSubtitle: String(value.siteSubtitle ?? defaultPlatformSettings.siteSubtitle).trim().slice(0, 120) || defaultPlatformSettings.siteSubtitle,
     registrationsEnabled: value.registrationsEnabled !== false,
     guestAccessEnabled: value.guestAccessEnabled !== false,
+    emailVerificationRequired: value.emailVerificationRequired === true,
+    minorRestrictions: normalizeMinorRestrictions(value.minorRestrictions),
     signupTokens: integer("signupTokens", defaultPlatformSettings.signupTokens, 0, 10000000),
     dailyTokens: integer("dailyTokens", defaultPlatformSettings.dailyTokens, 0, 1000000),
     dailyBonusDefaultMultiplier: dailyBonus.defaultMultiplier,
     dailyBonusMaxMultiplier: dailyBonus.maxMultiplier,
     dailyBonusRules: dailyBonus.rules,
     minRoomStake: integer("minRoomStake", defaultPlatformSettings.minRoomStake, 1, 1000000),
+    botThinkingSeconds: integer("botThinkingSeconds", defaultPlatformSettings.botThinkingSeconds, 0, 30),
+    turnEndDelaySeconds: integer("turnEndDelaySeconds", defaultPlatformSettings.turnEndDelaySeconds, 1, 60),
+    roundResultsSeconds: integer("roundResultsSeconds", defaultPlatformSettings.roundResultsSeconds, 0, 120),
     minPokerBuyIn,
     pokerDefaultBigBlind,
     pokerTurnSeconds: integer("pokerTurnSeconds", defaultPlatformSettings.pokerTurnSeconds, 30, 600)
@@ -459,7 +504,7 @@ function battleDeckOverview(state, viewerId) {
 
 function configuredGames(db = readDb()) {
   const overrides = db.settings?.games ?? {};
-  return games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999));
+  return games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999));
 }
 
 function configuredShop(db = readDb()) {
@@ -471,6 +516,17 @@ function configuredShop(db = readDb()) {
 const shopTypes = ["icons", "nameEffects", "memberCards", "profileBanners", "profileFrames", "profileEffects", "diceSkins", "cardSkins"];
 const shopCategories = ["classic", "premium", "premiumShape", "premiumAnimated"];
 const cosmeticEquippedKeys = { icons: "icon", nameEffects: "nameEffect", memberCards: "memberCard", profileBanners: "profileBanner", profileFrames: "profileFrame", profileEffects: "profileEffect", diceSkins: "diceSkin", cardSkins: "cardSkin" };
+const builtInPackNames = { "japanese-traditional": "Japon traditionnel", "japanese-sakura": "Sakura", neon: "Néon" };
+
+function normalizeShopPack(packName) {
+  const name = normalizePlainText(packName, 80);
+  if (!name) return { packs: [], packName: "" };
+  const comparable = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr");
+  const builtIn = Object.entries(builtInPackNames).find(([id, label]) => comparable === id || comparable === label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr"));
+  const id = builtIn?.[0] ?? comparable.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
+  if (!id) throw new Error("Le nom du pack doit contenir au moins une lettre ou un chiffre.");
+  return { packs: [id], packName: builtIn?.[1] ?? name };
+}
 
 function shopPackDiscountPercent(itemCount) {
   return Math.min(35, Math.max(0, Math.floor(Number(itemCount) || 0) - 1) * 5);
@@ -582,6 +638,14 @@ const achievementCompletionId = "achievement-visible-complete";
 const app = express();
 const requestLogs = createRequestLogStore({ filename: process.env.REQUEST_LOG_PATH || path.join(__dirname, "..", "data", "request-logs.sqlite") });
 process.on("exit", () => requestLogs.close());
+const statusMonitor = createStatusMonitor({ filename: process.env.STATUS_DB_PATH || path.join(__dirname, "..", "data", "status.sqlite") });
+process.on("exit", () => statusMonitor.close());
+const patchnotes = createPatchnoteStore({
+  filename: process.env.PATCHNOTES_DB_PATH ? path.resolve(process.cwd(), process.env.PATCHNOTES_DB_PATH) : path.join(__dirname, "..", "data", "patchnotes.sqlite"),
+  uploadDirectory: process.env.PATCHNOTES_UPLOAD_DIR ? path.resolve(process.cwd(), process.env.PATCHNOTES_UPLOAD_DIR) : path.join(__dirname, "..", "data", "patchnote-images"),
+  currentVersion: APP_VERSION
+});
+process.on("exit", () => patchnotes.close());
 const serverStartedAt = Date.now();
 const requestTelemetry = {
   active: 0,
@@ -615,6 +679,7 @@ const corsOptions = {
 };
 
 app.disable("x-powered-by");
+if (TRUST_PROXY) app.set("trust proxy", /^\d+$/.test(TRUST_PROXY) ? Number(TRUST_PROXY) : TRUST_PROXY);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(requestLogMiddleware(requestLogs));
 app.use((req, res, next) => {
@@ -651,7 +716,7 @@ app.use((req, res, next) => {
       .replace(/\/\d+(?=\/|$)/g, "/:id");
     const key = `${req.method} ${routePath}`;
     // Le rafraîchissement de la page de santé ne doit pas masquer l'activité utile.
-    if (key === "GET /api/admin/health") return;
+    if (["GET /api/admin/health", "GET /api/status"].includes(key)) return;
     const failed = res.statusCode >= 400;
     requestTelemetry.total += 1;
     requestTelemetry.periodCount += 1;
@@ -715,7 +780,9 @@ const io = new Server(server, {
   }
 });
 const sessions = new Map();
+let socketConnectionErrors = 0;
 io.engine.on("connection_error", (error) => {
+  socketConnectionErrors += 1;
   requestLogs.append({ category: "socket", level: "warning", method: "WS", route: `${APP_BASE_PATH}/socket.io`, status: 400, origin: error.req?.headers?.origin, message: `Connexion temps réel refusée (code ${Number(error.code) || 0}).` });
 });
 const roomPresence = new Map();
@@ -892,8 +959,106 @@ function serverHealthPayload(requestedPoints = 360) {
 collectServerHealthSample();
 setInterval(collectServerHealthSample, 5000).unref();
 
+const STATUS_PROBE_INTERVAL_MS = Math.max(30000, Number(process.env.STATUS_PROBE_INTERVAL_MS) || 60000);
+let statusProbeRunning = false;
+let lastEmailProbeAt = 0;
+let cachedEmailProbe = { configured: emailDeliveryConfigured(), ok: false };
+let lastStatusPruneAt = 0;
+
+function publicWebsiteUrl() {
+  const configured = String(process.env.PUBLIC_APP_URL ?? "").trim();
+  if (configured) return configured;
+  const origin = String(CLIENT_ORIGIN).split(",")[0].trim();
+  return `${origin.replace(/\/$/, "")}${APP_BASE_PATH || "/"}`;
+}
+
+async function websiteStatusProbe() {
+  const startedAt = performance.now();
+  try {
+    const response = await fetch(publicWebsiteUrl(), { method: "GET", redirect: "follow", signal: AbortSignal.timeout(5000) });
+    await response.body?.cancel().catch(() => {});
+    const latencyMs = performance.now() - startedAt;
+    if (!response.ok) return { id: "website", status: response.status >= 500 ? "outage" : "degraded", latencyMs, message: "Le site public répond avec une erreur." };
+    return { id: "website", status: latencyMs > 2000 ? "degraded" : "operational", latencyMs, message: latencyMs > 2000 ? "Le chargement du site public est ralenti." : "Le site public répond normalement." };
+  } catch {
+    return { id: "website", status: "outage", latencyMs: performance.now() - startedAt, message: "Le site public ne répond pas à la sonde." };
+  }
+}
+
+function apiStatusProbe() {
+  const rows = serverHealthHistory.slice(-12).filter((row) => Date.parse(row.at) - serverStartedAt >= 30000);
+  const latest = rows.at(-1) ?? latestServerHealth ?? {};
+  const p95 = Math.max(0, ...rows.map((row) => Number(row.eventLoopP95) || 0));
+  const latency = rows.length ? rows.reduce((sum, row) => sum + (Number(row.requestLatencyAverage) || 0), 0) / rows.length : 0;
+  const errors = rows.reduce((sum, row) => sum + (Number(row.requestErrors) || 0), 0);
+  const warmingUp = !rows.length;
+  const outage = !server.listening;
+  const degraded = errors >= 5 || (!warmingUp && (p95 > 150 || latency > 750 || Number(latest.cpuProcess) > 90 || Number(latest.eventLoopUtilization) > 99));
+  return { id: "api", status: outage ? "outage" : degraded ? "degraded" : "operational", latencyMs: latency, message: outage ? "L’API ne traite plus les requêtes dans des délais acceptables." : degraded ? "L’API connaît des ralentissements ou des erreurs." : "L’API répond normalement." };
+}
+
+function realtimeStatusProbe() {
+  const errors = socketConnectionErrors;
+  socketConnectionErrors = 0;
+  if (!server.listening || !io.engine) return { id: "realtime", status: "outage", message: "Le service temps réel est indisponible." };
+  return { id: "realtime", status: errors >= 10 ? "degraded" : "operational", message: errors >= 10 ? "Un nombre inhabituel de connexions temps réel a échoué." : "Le service temps réel est opérationnel." };
+}
+
+function gamesStatusProbe() {
+  const startedAt = performance.now();
+  try {
+    const players = [{ id: "status-player-1", pseudo: "Sonde 1" }, { id: "status-player-2", pseudo: "Sonde 2" }];
+    const state = createGameState("421", players);
+    if (state.gameId !== "421" || state.players?.length !== 2) throw new Error("Invalid canary state");
+    const latencyMs = performance.now() - startedAt;
+    return { id: "games", status: latencyMs > 250 ? "degraded" : "operational", latencyMs, message: latencyMs > 250 ? "L’initialisation des parties est ralentie." : "Le moteur de jeu répond normalement." };
+  } catch {
+    return { id: "games", status: "outage", latencyMs: performance.now() - startedAt, message: "Le moteur de jeu ne parvient pas à initialiser une partie." };
+  }
+}
+
+function databaseStatusProbe() {
+  const startedAt = performance.now();
+  try {
+    const health = currentDatabaseHealth(true);
+    const latencyMs = performance.now() - startedAt;
+    const oversizedWal = health.walBytes > Math.max(64 * 1024 * 1024, health.fileBytes * 2);
+    const degraded = latencyMs > 500 || health.fragmentationRatio > .35 || oversizedWal;
+    return { id: "database", status: degraded ? "degraded" : "operational", latencyMs, message: degraded ? "Le stockage nécessite une surveillance." : "Le stockage répond normalement." };
+  } catch {
+    return { id: "database", status: "outage", latencyMs: performance.now() - startedAt, message: "Le stockage ne répond pas à la sonde." };
+  }
+}
+
+async function emailStatusProbe(timestamp = Date.now()) {
+  if (timestamp - lastEmailProbeAt >= 15 * 60 * 1000 || !lastEmailProbeAt) {
+    cachedEmailProbe = await verifyEmailDelivery();
+    lastEmailProbeAt = timestamp;
+  }
+  if (!cachedEmailProbe.configured) return { id: "email", status: "unknown", message: "Le service email n’est pas activé." };
+  return { id: "email", status: cachedEmailProbe.ok ? "operational" : "outage", message: cachedEmailProbe.ok ? "Le serveur email accepte les connexions." : "Le serveur email ne répond pas à la sonde." };
+}
+
+async function collectPublicStatus() {
+  if (statusProbeRunning) return;
+  statusProbeRunning = true;
+  const timestamp = Date.now();
+  try {
+    const [website, email] = await Promise.all([websiteStatusProbe(), emailStatusProbe(timestamp)]);
+    statusMonitor.recordSnapshot([website, apiStatusProbe(), realtimeStatusProbe(), gamesStatusProbe(), databaseStatusProbe(), email], timestamp);
+    if (timestamp - lastStatusPruneAt > 24 * 60 * 60 * 1000) {
+      statusMonitor.prune(timestamp);
+      lastStatusPruneAt = timestamp;
+    }
+  } catch (error) {
+    requestLogs.append({ category: "status", level: "error", method: "SYSTEM", route: "status/probe", message: `Échec de la collecte de statut: ${error instanceof Error ? error.message : String(error)}` });
+  } finally {
+    statusProbeRunning = false;
+  }
+}
+
 function makeToken(user) {
-  return jwt.sign({ id: user.id, guest: user.guest }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign({ id: user.id, guest: user.guest, sessionVersion: Math.max(0, Number(user.sessionVersion) || 0) }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
 function normalizePublicProfile(profile = {}, fallbackName = "") {
@@ -1023,6 +1188,12 @@ function friendCodeFor(user) {
   return String(user?.id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
+function maskedEmail(value) {
+  const [local = "", domain = ""] = normalizeEmail(value).split("@");
+  if (!domain) return "";
+  return `${local.slice(0, 2)}${"*".repeat(Math.max(1, Math.min(6, local.length - 2)))}@${domain}`;
+}
+
 function publicProfileFor(user) {
   const profile = normalizePublicProfile(user.profile, user.pseudo);
   const { birthDate: _birthDate, ...publicProfile } = profile;
@@ -1031,7 +1202,11 @@ function publicProfileFor(user) {
 
 function sanitizeUser(user, db = readDb()) {
   ensureUserSocial(user);
-  return { id: user.id, login: user.pseudo, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length };
+  const verificationRequired = platformSettings(db).emailVerificationRequired;
+  const settings = platformSettings(db);
+  const moderation = activeModeration(user);
+  const parentalRevocation = activeParentalRevocation(user);
+  return { id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
 }
 
 function roomPlayerFor(user) {
@@ -1048,7 +1223,7 @@ function roomPlayerFor(user) {
 function sanitizeFriendUser(user, db) {
   ensureUserSocial(user);
   refreshPublicProfileStats(user, db);
-  return { id: user.id, login: user.pseudo, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), age: ageFromBirthDate(user.profile.birthDate), cosmetics: normalizeCosmetics(user.cosmetics), profileStats: normalizeProfileStats(user.profileStats), profile: publicProfileFor(user) };
+  return { id: user.id, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), age: ageFromBirthDate(user.profile.birthDate), cosmetics: normalizeCosmetics(user.cosmetics), profileStats: normalizeProfileStats(user.profileStats), profile: publicProfileFor(user) };
 }
 
 function publicUserPayload(user, db, viewerId = "") {
@@ -1068,7 +1243,6 @@ function publicUserPayload(user, db, viewerId = "") {
   }
   return {
     id: user.id,
-    login: user.pseudo,
     pseudo: displayNameFor(user),
     friendCode: friendCodeFor(user),
     cosmetics: normalizeCosmetics(user.cosmetics),
@@ -1155,7 +1329,7 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
   if (spectating && room.state) safeState = spectatorState({ ...room.state, players: (room.state.players ?? []).map(sanitizeRoomPlayer) });
   if (!room.state) safeState = null;
   return {
-    ...(spectating ? { id: room.id, code: room.code, name: room.name, gameId: room.gameId, ownerId: room.ownerId, isPublic: room.isPublic, finished: room.finished, stake: room.stake } : safeRoom),
+    ...(spectating ? { id: room.id, code: room.code, name: room.name, gameId: room.gameId, ownerId: room.ownerId, isPublic: room.isPublic, finished: room.finished, stake: room.stake, pacing: room.pacing ?? null } : safeRoom),
     players: safeRoom.players.map(sanitizeRoomPlayer),
     state: safeState,
     spectator: spectating,
@@ -1401,6 +1575,7 @@ function userAchievementProgress(user, db) {
   for (const id of resultIds) progress[id] = 1;
   progress["midnight-all-contracts"] = completedMidnightContractCount(resultIds);
   const metricValues = {
+    ...Object.fromEntries(Object.keys(tableTimeMetrics).map((key) => [key, Number(user.siteActivity?.[key]) || 0])),
     ...playerAchievementContext(user, []),
     gamesPlayed: statistics.gamesPlayed,
     wins: statistics.wins,
@@ -1771,16 +1946,91 @@ function auth(req, res, next) {
   if (!header) return res.status(401).json({ error: "Non authentifié." });
   try {
     req.auth = jwt.verify(header.replace("Bearer ", ""), JWT_SECRET);
-    if (!req.auth.guest && readDb().users.find((user) => user.id === req.auth.id)?.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
+    const persistentUser = !req.auth.guest ? readDb().users.find((user) => user.id === req.auth.id) : null;
+    if (!req.auth.guest && !persistentUser) return res.status(401).json({ error: "Session invalide." });
+    if (persistentUser && (Number(req.auth.sessionVersion) || 0) !== (Number(persistentUser.sessionVersion) || 0)) {
+      return res.status(401).json({ error: "Cette session a expiré. Reconnecte-toi." });
+    }
+    if (persistentUser?.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
+    const moderation = activeModeration(persistentUser);
+    if (moderation?.type === "hard") return res.status(403).json({ code: "HARD_BAN", error: "Ce compte est temporairement inaccessible.", reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" });
+    const parentalRevocation = activeParentalRevocation(persistentUser);
+    if (parentalRevocation) return res.status(403).json({ code: "PARENTAL_ACCESS_REVOKED", error: "L’accès à ce compte a été suspendu par le responsable légal.", reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil });
+    const accountSetupRoute = req.path === "/api/me" || req.path === "/api/me/email";
+    if (persistentUser && !validEmail(persistentUser.email) && !accountSetupRoute) return res.status(403).json({ code: "EMAIL_UPGRADE_REQUIRED", error: "Ajoute une adresse email valide pour continuer." });
+    if (persistentUser && platformSettings().emailVerificationRequired && validEmail(persistentUser.email) && !persistentUser.emailVerifiedAt && !accountSetupRoute) return res.status(403).json({ code: "EMAIL_VERIFICATION_REQUIRED", error: "Valide ton adresse email pour continuer." });
+    if (persistentUser && isUnder13(persistentUser) && req.method !== "GET" && !req.path.endsWith("/guardian-activity")) {
+      res.once("finish", () => {
+        if (res.statusCode >= 400) return;
+        const route = req.path;
+        const category = route.includes("/rooms/") ? "game" : route.includes("community-events") ? "event" : route.includes("friends") || route.includes("room-invites") || route.includes("/chat") ? "social" : route.includes("shop") ? "shop" : "account";
+        const label = category === "game" ? "Action dans une table" : category === "event" ? "Action dans un événement" : category === "social" ? "Interaction sociale" : category === "shop" ? "Action boutique" : "Modification du compte";
+        parentalControls.recordActivity(persistentUser.id, { day: casinoDateKey(), category, label });
+      });
+    }
     next();
   } catch {
     res.status(401).json({ error: "Session invalide." });
   }
 }
 
+function userFeatureAccess(user, feature, db = readDb()) {
+  return featureAccess(user, feature, platformSettings(db).minorRestrictions);
+}
+
+function tableFeatureAccess(user, room, db = readDb()) {
+  const roomAccess = userFeatureAccess(user, room?.ownerId === user?.id ? "rooms:create" : "rooms:join", db);
+  return roomAccess.allowed ? userFeatureAccess(user, `game:${room?.gameId}`, db) : roomAccess;
+}
+
+function rejectFeature(res, access) {
+  return res.status(403).json({ code: access.code, error: access.reason || "Cette action n’est pas disponible pour ce compte.", reason: access.reason ?? "", endsAt: access.until ?? "" });
+}
+
 function getUser(id) {
   if (sessions.has(id)) return sessions.get(id);
   return readDb().users.find((u) => u.id === id);
+}
+
+const chatRateWindows = new Map();
+function chatRateAllowed(userId, now = Date.now()) {
+  const recent = (chatRateWindows.get(userId) ?? []).filter((at) => now - at < 60000);
+  if (recent.length >= 20 || now - (recent.at(-1) ?? 0) < 750) return false;
+  recent.push(now);
+  chatRateWindows.set(userId, recent);
+  return true;
+}
+
+function chatRoomAccess(db, userId, roomCodeValue) {
+  const room = db.rooms.find((entry) => entry.code === String(roomCodeValue ?? "").trim().toUpperCase());
+  if (!room || (!room.players.some((player) => player.id === userId) && !maySpectate(room, userId))) return null;
+  return room;
+}
+
+function resolveChatChannel(db, user, input = {}) {
+  const channelType = String(input.channelType ?? input.channel ?? "");
+  if (channelType === "global") return { channelType, channelId: "global", socketRoom: "chat:global" };
+  if (channelType === "direct") {
+    const friend = db.users.find((entry) => entry.id === String(input.friendId ?? ""));
+    ensureUserSocial(user);
+    if (!friend || !user.friends.includes(friend.id)) return null;
+    const channelId = directChannelId(user.id, friend.id);
+    return { channelType, channelId, friend, socketRoom: `chat:direct:${channelId}` };
+  }
+  if (channelType === "room") {
+    const room = chatRoomAccess(db, user.id, input.roomCode);
+    if (!room) return null;
+    return { channelType, channelId: room.id, room, socketRoom: `chat:room:${room.id}` };
+  }
+  return null;
+}
+
+function decorateChatMessage(message, db = readDb()) {
+  const sender = db.users.find((entry) => entry.id === message.senderId);
+  return {
+    ...message,
+    sender: sender ? sanitizeFriendUser(sender, db) : { id: message.senderId, pseudo: "Compte supprimé", cosmetics: structuredClone(defaultCosmetics) }
+  };
 }
 
 function roomCode() {
@@ -1810,6 +2060,129 @@ function addTokens(db, userId, amount, meta = {}) {
     return session.tokens;
   }
   return null;
+}
+
+function tribunalEligibility(user, db = readDb()) {
+  const settings = tribunal.settings();
+  if (!settings.enabled) return { eligible: false, reason: "Le tribunal est temporairement fermé." };
+  if (!user || user.guest) return { eligible: false, reason: "Un compte joueur est requis pour participer." };
+  if (isUnder13(user)) return { eligible: false, reason: "Le tribunal est réservé aux joueurs de 13 ans et plus." };
+  if (activeModeration(user)) return { eligible: false, reason: "Un compte sous sanction ne peut pas siéger au tribunal." };
+  const gamesPlayed = playerStatistics(db, user.id).gamesPlayed;
+  if (gamesPlayed < settings.minimumGames) return { eligible: false, reason: `${settings.minimumGames} parties terminées sont requises.`, gamesPlayed };
+  const behavior = tribunal.behavior(user.id);
+  if (behavior.score < settings.minimumBehaviorScore) return { eligible: false, reason: "Le score comportemental du compte est insuffisant.", gamesPlayed, behavior };
+  return { eligible: true, gamesPlayed, behavior };
+}
+
+function anonymizeTribunalText(value, db) {
+  let text = normalizePlainText(value, 2000);
+  const identities = db.users.flatMap((user) => [user.pseudo, user.profile?.displayName, user.email]).filter((entry) => String(entry ?? "").trim().length >= 2).sort((a, b) => String(b).length - String(a).length);
+  for (const identity of identities) text = text.replace(new RegExp(String(identity).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "Joueur anonymisé");
+  return text;
+}
+
+function publicTribunalCase(entry, userId, settings = tribunal.settings(), db = readDb()) {
+  return {
+    id: entry.id,
+    code: entry.code,
+    title: entry.title,
+    summary: anonymizeTribunalText(entry.summary, db),
+    evidence: Array.isArray(entry.evidence) ? entry.evidence.map((item) => ({
+      type: normalizePlainText(item?.type, 30) || "context",
+      label: anonymizeTribunalText(item?.label, db).slice(0, 80) || "Élément de contexte",
+      value: anonymizeTribunalText(item?.value, db).slice(0, 500),
+      occurredAt: Number.isFinite(Date.parse(item?.occurredAt)) ? new Date(item.occurredAt).toISOString() : ""
+    })) : [],
+    status: entry.status,
+    reportCount: entry.reportCount,
+    startsAt: entry.startsAt,
+    endsAt: entry.endsAt,
+    finalScore: entry.finalScore,
+    outcome: entry.outcome,
+    vote: entry.vote,
+    accused: settings.revealAccusedIdentity && entry.accusedId !== userId ? entry.accusedId : ""
+  };
+}
+
+function tribunalOutcomeMessage(entry) {
+  if (entry.outcome === "social-ban") return `Le tribunal a prononcé une restriction sociale de ${entry.socialBanDays} jour(s). Score final : ${entry.finalScore}/5.`;
+  if (entry.outcome === "hard-ban-review") return `Le tribunal a prononcé un bannissement de ${entry.hardBanDays} jour(s). Score final : ${entry.finalScore}/5.`;
+  if (entry.outcome === "permanent-ban-review") return `Le tribunal a prononcé un bannissement définitif. Score final : ${entry.finalScore}/5.`;
+  if (entry.outcome === "warning") return `Le dossier se conclut par un avertissement. Score final : ${entry.finalScore}/5.`;
+  return `Le tribunal a conclu à l’absence de culpabilité. Un rappel des règles reste adressé au compte. Score final : ${entry.finalScore}/5.`;
+}
+
+function settleTribunalCases(now = Date.now()) {
+  tribunal.resolveDue(now);
+  for (const entry of tribunal.casesAwaitingSettlement()) {
+    const paidJurors = [];
+    updateDb((db) => {
+      const accused = db.users.find((user) => user.id === entry.accusedId);
+      if (accused) {
+        ensureUserSocial(accused);
+        pushNotification(accused, { type: "tribunal-verdict", title: "Décision du tribunal", message: tribunalOutcomeMessage(entry) });
+      }
+      for (const vote of entry.votes) {
+        if (vote.rewardPaid || !vote.reward) continue;
+        const requestId = `tribunal:${entry.id}:${vote.jurorId}`;
+        const alreadyPaid = db.transactions.some((transaction) => transaction.requestId === requestId)
+          || archiveRows(db.transactions, { userId: vote.jurorId, requestId }, { limit: 1 }).length > 0;
+        const juror = db.users.find((user) => user.id === vote.jurorId);
+        if (!alreadyPaid && juror) {
+          addTokens(db, juror.id, vote.reward, { reason: "tribunal-juror-reward", requestId, note: `Vote ${entry.code}` });
+          pushNotification(juror, { type: "tribunal-reward", title: "Vote du tribunal évalué", message: `Ton vote rapporte ${vote.reward.toLocaleString("fr-BE")} jetons. Score final : ${entry.finalScore}/5.` });
+        }
+        paidJurors.push(vote.jurorId);
+      }
+    });
+    for (const jurorId of paidJurors) tribunal.markRewardPaid(entry.id, jurorId);
+    tribunal.markSettlement(entry.id);
+  }
+}
+
+function tribunalAdminPayload(db = readDb()) {
+  const snapshot = tribunal.adminSnapshot();
+  const users = new Map(db.users.map((user) => [user.id, user]));
+  const identity = (id) => {
+    const user = users.get(id);
+    return user ? { id, pseudo: displayNameFor(ensureUserSocial(user)), email: user.email ?? "" } : { id, pseudo: "Compte supprimé", email: "" };
+  };
+  return {
+    ...snapshot,
+    categories: tribunalCategories,
+    reports: snapshot.reports.map((entry) => ({ ...entry, reporter: identity(entry.reporterId), accused: identity(entry.accusedId) })),
+    cases: snapshot.cases.map((entry) => ({ ...entry, accused: identity(entry.accusedId), accusedBehavior: tribunal.behavior(entry.accusedId), accusedReports: tribunal.reportStats(entry.accusedId), reportIds: tribunal.reportIdsForCase(entry.id), votes: tribunal.votes(entry.id) }))
+  };
+}
+
+function applyTribunalDecision(caseId, body, adminId, now = Date.now()) {
+  const entry = tribunal.adminSnapshot().cases.find((candidate) => candidate.id === caseId && candidate.status === "awaiting-enforcement");
+  if (!entry) return { error: "missing" };
+  const allowed = new Set(["permanent-ban-review", "hard-ban-review", "social-ban", "warning", "not-guilty"]);
+  const outcome = allowed.has(body?.outcome) ? body.outcome : entry.outcome;
+  const permanent = outcome === "permanent-ban-review";
+  const maximumDays = outcome === "social-ban" ? 30 : 3650;
+  const fallbackDays = outcome === "social-ban" ? entry.socialBanDays : entry.hardBanDays;
+  const days = permanent || ["warning", "not-guilty"].includes(outcome) ? 0 : Math.max(1, Math.min(maximumDays, Math.round(Number(body?.days) || fallbackDays)));
+  const reason = normalizePlainText(body?.reason, 240) || `Décision du tribunal ${entry.code}`;
+  const applied = updateDb((db) => {
+    const user = db.users.find((candidate) => candidate.id === entry.accusedId);
+    if (!user) return false;
+    ensureUserSocial(user);
+    user.moderation ??= {};
+    if (outcome === "social-ban") {
+      user.moderation.softBan = { active: true, reason, endsAt: new Date(now + days * 86400000).toISOString(), updatedAt: new Date(now).toISOString(), updatedBy: adminId, caseId: entry.id };
+    } else if (["hard-ban-review", "permanent-ban-review"].includes(outcome)) {
+      user.moderation.hardBan = { active: true, reason, endsAt: permanent ? "" : new Date(now + days * 86400000).toISOString(), updatedAt: new Date(now).toISOString(), updatedBy: adminId, caseId: entry.id };
+      user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+    }
+    return true;
+  });
+  if (!applied) return { error: "user" };
+  const decided = tribunal.confirmDecision(entry.id, adminId, { outcome, days }, now);
+  settleTribunalCases(now);
+  return { entry: decided };
 }
 
 function getTokenBalance(db, userId) {
@@ -1971,7 +2344,137 @@ function botActionFor(state, bot) {
   return null;
 }
 
-function runBotTurns(room, db) {
+function roundProgressSnapshot(state) {
+  if (!state) return { finished: false, round: 0, resultKey: "", yahtzeeRound: 0 };
+  const lastRound = state.lastRound?.round;
+  const lastResolution = state.gameId === "bataille" ? undefined : state.lastResolution?.round;
+  const latest421Round = state.roundHistory?.at(-1)?.round;
+  const resultKey = lastRound !== undefined
+    ? `last-round:${lastRound}`
+    : lastResolution !== undefined
+      ? `last-resolution:${lastResolution}`
+      : latest421Round !== undefined
+        ? `round-history:${latest421Round}`
+        : state.gameId === "texas-holdem" && state.nextHandAt
+          ? `poker-hand:${state.handNumber ?? 1}`
+          : "";
+  const yahtzeeCompletedTurns = state.gameId === "yahtzee"
+    ? Object.values(state.scores ?? {}).reduce((total, score) => total + Object.keys(score ?? {}).length, 0)
+    : 0;
+  return {
+    finished: Boolean(state.finished),
+    round: Number(state.round) || Number(state.handNumber) || 0,
+    resultKey,
+    yahtzeeRound: state.gameId === "yahtzee" ? Math.floor(yahtzeeCompletedTurns / Math.max(1, state.players?.length ?? 1)) : 0
+  };
+}
+
+function completedRoundNumber(state, before) {
+  if (state.lastRound?.round !== undefined) return state.lastRound.round;
+  if (state.lastResolution?.round !== undefined) return state.lastResolution.round;
+  if (state.roundHistory?.length) return state.roundHistory.at(-1).round;
+  if (state.gameId === "texas-holdem") return state.handNumber ?? before.round ?? 1;
+  if (state.gameId === "yahtzee") return Math.max(1, roundProgressSnapshot(state).yahtzeeRound);
+  return before.round || state.round || 1;
+}
+
+function didRoundFinish(before, state) {
+  const after = roundProgressSnapshot(state);
+  if (!before.finished && after.finished) return true;
+  if (after.resultKey && after.resultKey !== before.resultKey) return true;
+  if (state.gameId === "yahtzee" && after.yahtzeeRound > before.yahtzeeRound) return true;
+  if (!["texas-holdem", "belote", "midnight-dice", "421"].includes(state.gameId) && after.round > before.round) return true;
+  return false;
+}
+
+function roomPacingActive(room, now = Date.now()) {
+  return Boolean(room.pacing?.endsAt && room.pacing.endsAt > now);
+}
+
+function roomTiming(room) {
+  return {
+    botThinkingMs: Math.max(0, Number(room.timing?.botThinkingMs ?? DEFAULT_BOT_THINKING_MS)),
+    turnEndDelayMs: Math.max(1000, Number(room.timing?.turnEndDelayMs ?? DEFAULT_TURN_END_DELAY_MS)),
+    roundResultsMs: Math.max(0, Number(room.timing?.roundResultsMs ?? DEFAULT_ROUND_RESULTS_MS))
+  };
+}
+
+function startRoomPacing(room, kind, durationMs, details = {}) {
+  const now = Date.now();
+  room.pacing = {
+    id: randomUUID(),
+    kind,
+    startedAt: now,
+    endsAt: now + durationMs,
+    ...details
+  };
+  if (room.state?.gameId === "texas-holdem" && kind === "round-results" && room.state.nextHandAt) {
+    room.state.resolutionStartedAt = now;
+    room.state.nextHandAt = room.pacing.endsAt;
+  }
+}
+
+function roundResultsPacingDetails(room, before) {
+  const round = completedRoundNumber(room.state, before);
+  return {
+    round,
+    final: Boolean(room.state.finished),
+    results: roomRanking(room).map((player, index) => {
+      const state = room.state;
+      let scoreLabel = "";
+      if (["shut-the-box", "golf-solitaire", "accordion"].includes(state.gameId)) scoreLabel = String(Math.abs(player.score));
+      if (state.gameId === "president") {
+        const finishIndex = state.finishedOrder?.indexOf(player.id) ?? -1;
+        scoreLabel = finishIndex >= 0 ? `${finishIndex + 1}e place` : `${state.hands?.[player.id]?.length ?? 0} carte(s)`;
+      }
+      return { ...player, rank: index + 1, ...(scoreLabel ? { scoreLabel } : {}) };
+    })
+  };
+}
+
+function startRoundResultsIfNeeded(room, before, afterActor = null) {
+  if (!room.state || !didRoundFinish(before, room.state)) return false;
+  const details = roundResultsPacingDetails(room, before);
+  const timing = roomTiming(room);
+  if (afterActor) {
+    startRoomPacing(room, "turn-end", timing.turnEndDelayMs, {
+      actorId: afterActor.id,
+      actorName: afterActor.pseudo,
+      actorIsBot: Boolean(afterActor.isBot),
+      ...(timing.roundResultsMs > 0 ? { nextPacing: { kind: "round-results", durationMs: timing.roundResultsMs, details } } : {})
+    });
+  } else if (timing.roundResultsMs > 0) {
+    startRoomPacing(room, "round-results", timing.roundResultsMs, details);
+  } else {
+    return false;
+  }
+  return true;
+}
+
+function advanceRoomPacing(room, db, now = Date.now()) {
+  if (!room.pacing || room.pacing.endsAt > now) return false;
+  const completedPacing = room.pacing;
+  room.pacing = null;
+  if (completedPacing.kind === "turn-end" && room.state?.turnDeadline) {
+    const pausedFor = Math.max(0, now - completedPacing.startedAt);
+    room.state.turnStartedAt = room.state.turnStartedAt ? room.state.turnStartedAt + pausedFor : room.state.turnStartedAt;
+    room.state.turnDeadline += pausedFor;
+  }
+  if (completedPacing.kind === "round-results" && room.state?.gameId === "texas-holdem" && room.state.nextHandAt) {
+    room.state.nextHandAt = now;
+    tickPokerState(room.state, now);
+  }
+  if (completedPacing.nextPacing) {
+    startRoomPacing(room, completedPacing.nextPacing.kind, completedPacing.nextPacing.durationMs, completedPacing.nextPacing.details);
+    return true;
+  }
+  if (!room.state?.finished) runBotTurns(room, db, { skipThinking: completedPacing.kind === "bot-thinking" });
+  finishRoomIfNeeded(room, db);
+  return true;
+}
+
+function runBotTurns(room, db, { skipThinking = false } = {}) {
+  if (roomPacingActive(room)) return;
   if (room.state?.gameId === "bataille") {
     if (room.state.resolutionEndsAt) return;
     room.state.botThinking ??= {};
@@ -1980,7 +2483,8 @@ function runBotTurns(room, db) {
       const scheduledRound = room.state.round;
       const timerKey = `${room.id}:${scheduledRound}:${bot.id}:${phase}`;
       if (battleBotTimers.has(timerKey)) continue;
-      const delay = phase === "draw" ? 700 + Math.floor(Math.random() * 700) : 1200 + Math.floor(Math.random() * 1400);
+      const configuredDelay = roomTiming(room).botThinkingMs;
+      const delay = configuredDelay > 0 ? configuredDelay : 50;
       room.state.botThinking[bot.id] = { phase, until: Date.now() + delay };
       const timer = setTimeout(() => {
         battleBotTimers.delete(timerKey);
@@ -1992,8 +2496,9 @@ function runBotTurns(room, db) {
         const action = botActionFor(currentRoom.state, currentBot);
         if (!action) return;
         try {
+          const roundBeforeAction = roundProgressSnapshot(currentRoom.state);
           currentRoom.state = applyAction(currentRoom.state, currentBot.id, action);
-          runBotTurns(currentRoom, currentDb);
+          if (!startRoundResultsIfNeeded(currentRoom, roundBeforeAction, currentBot)) runBotTurns(currentRoom, currentDb);
           finishRoomIfNeeded(currentRoom, currentDb);
           writeDb(currentDb);
           emitRoomUpdate(currentRoom, currentDb);
@@ -2007,13 +2512,29 @@ function runBotTurns(room, db) {
     return;
   }
   let guard = 0;
+  let actionCount = 0;
+  const firstBot = room.state?.players?.[room.state.currentPlayerIndex];
+  if (!firstBot?.isBot) {
+    finishRoomIfNeeded(room, db);
+    return;
+  }
+  const timing = roomTiming(room);
+  if (!skipThinking && timing.botThinkingMs > 0) {
+    startRoomPacing(room, "bot-thinking", timing.botThinkingMs, { actorId: firstBot.id, actorName: firstBot.pseudo, actorIsBot: true });
+    return;
+  }
+  const before = roundProgressSnapshot(room.state);
   while (room.state && !room.state.finished && guard < 30) {
     guard += 1;
     const bot = room.state.players?.[room.state.currentPlayerIndex];
-    if (!bot?.isBot) break;
+    if (!bot?.isBot || bot.id !== firstBot.id) break;
     const action = botActionFor(room.state, bot);
     if (!action) break;
     room.state = applyAction(room.state, bot.id, action);
+    actionCount += 1;
+  }
+  if (!startRoundResultsIfNeeded(room, before, firstBot) && actionCount > 0 && !room.state.finished) {
+    startRoomPacing(room, "turn-end", timing.turnEndDelayMs, { actorId: firstBot.id, actorName: firstBot.pseudo, actorIsBot: true });
   }
   finishRoomIfNeeded(room, db);
 }
@@ -2035,6 +2556,12 @@ function startRoomRound(room, db) {
   }
   syncRoomPlayerTokens(room, db);
   room.finished = false;
+  room.pacing = null;
+  room.timing = {
+    botThinkingMs: settings.botThinkingSeconds * 1000,
+    turnEndDelayMs: settings.turnEndDelaySeconds * 1000,
+    roundResultsMs: settings.roundResultsSeconds * 1000
+  };
   if (room.gameId === "texas-holdem") {
     room.pokerBlinds = {
       ...pokerBlindsFromBigBlind(room.pokerBlinds?.bigBlind, settings.pokerDefaultBigBlind),
@@ -2044,13 +2571,54 @@ function startRoomRound(room, db) {
   room.gameModifiers = normalizeGameModifiers(room.gameId, room.gameModifiers);
   if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
   const seatedPlayers = room.gameId === "belote" ? room.beloteSeats.map((id) => room.players.find((player) => player.id === id)) : room.players;
-  room.state = createGameState(room.gameId, seatedPlayers, { buyIn: room.stake, bigBlind: room.pokerBlinds?.bigBlind, maximumBet: room.pokerBlinds?.maximumBet, turnDurationMs: settings.pokerTurnSeconds * 1000, battleModifiers: room.battleModifiers, gameModifiers: room.gameModifiers });
+  room.state = createGameState(room.gameId, seatedPlayers, { buyIn: room.stake, bigBlind: room.pokerBlinds?.bigBlind, maximumBet: room.pokerBlinds?.maximumBet, turnDurationMs: (room.pokerTurnSeconds ?? settings.pokerTurnSeconds) * 1000, battleModifiers: room.battleModifiers, gameModifiers: room.gameModifiers });
+  if (room.state.gameId === "bataille") room.state.resolutionDurationMs = room.timing.turnEndDelayMs;
+  room.activityMatchId = randomUUID();
   runBotTurns(room, db);
   return null;
 }
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "ktga-me-server", environment: NODE_ENV, timeZone: process.env.CASINO_TIME_ZONE || "Europe/Brussels", serverTime: new Date().toISOString(), casinoDate: casinoDateKey() });
+});
+
+app.get("/api/status", (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=30");
+  res.json(statusMonitor.payload(req.query.days));
+});
+
+app.get("/api/patchnotes/images/:id", (req, res) => {
+  const image = patchnotes.attachment(req.params.id);
+  if (!image || !fs.existsSync(image.path)) return res.status(404).json({ error: "Image introuvable." });
+  res.setHeader("Content-Type", image.mimeType);
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  res.sendFile(image.path);
+});
+
+app.get("/api/patchnotes", (_req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+  res.json({ currentVersion: patchnotes.currentVersion, notes: patchnotes.list() });
+});
+
+app.get("/api/patchnotes/:version", (req, res) => {
+  const note = patchnotes.get(req.params.version);
+  if (!note) return res.status(404).json({ error: "Patchnote introuvable." });
+  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+  res.json(note);
+});
+
+app.get("/api/patchnotes/:id/reaction", auth, (req, res) => {
+  res.json(patchnotes.reaction(req.params.id, req.auth.id));
+});
+
+app.post("/api/patchnotes/:id/reaction", auth, (req, res) => {
+  try {
+    const result = patchnotes.react(req.params.id, req.auth.id, req.body?.value);
+    if (!result) return res.status(404).json({ error: "Patchnote introuvable." });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Réaction invalide." });
+  }
 });
 
 updateDb((db) => {
@@ -2065,7 +2633,6 @@ updateDb((db) => {
   for (const user of db.users) {
     if (user.active === undefined) user.active = true;
     if (user.editor === undefined) user.editor = false;
-    if (user.pseudo?.toLowerCase() === "bnmkt") user.admin = true;
   }
   for (const room of db.rooms.filter((entry) => entry.gameId === "texas-holdem")) {
     const blinds = pokerBlindsFromBigBlind(room.pokerBlinds?.bigBlind, db.settings.platform.pokerDefaultBigBlind);
@@ -2106,45 +2673,265 @@ updateDb((db) => {
 
 setCatalogSource((db) => ({ achievements: achievementCatalog(db, { includeDisabled: true }), items: configuredShop(db) }));
 
-app.get("/api/config", (_req, res) => res.json(platformSettings()));
+app.get("/api/config", (_req, res) => res.json({ ...platformSettings(), emailVerificationAvailable: emailDeliveryConfigured() }));
 
 app.get("/api/games", (_req, res) => res.json(configuredGames().filter((game) => game.enabled !== false)));
+
+function minorRestrictionCatalog(db = readDb()) {
+  const options = [...minorRestrictionOptions, ...configuredGames(db).map((game) => ({ id: `game:${game.id}`, label: game.name, description: `Créer, rejoindre ou observer une table de ${game.name}.` }))];
+  return [...new Map(options.map((entry) => [entry.id, entry])).values()];
+}
+
+app.get("/api/parental/request", (req, res) => {
+  const request = parentalControls.requestForVerification(req.query.token);
+  if (!request) return res.status(404).json({ error: "Cette demande parentale est invalide ou a expiré." });
+  res.json({ code: request.code, childPseudo: request.childPseudo, childBirthDate: request.childBirthDate, parentEmail: maskedEmail(request.parentEmail), status: request.status, restrictions: platformSettings().minorRestrictions, restrictionOptions: minorRestrictionCatalog() });
+});
+
+app.post("/api/parental/consent", (req, res) => {
+  if (req.body.consent !== true) return res.status(400).json({ error: "L’accord explicite du responsable légal est requis." });
+  const request = parentalControls.consent(req.body.token);
+  if (!request) return res.status(404).json({ error: "Cette demande parentale est invalide ou a expiré." });
+  res.json({ ok: true, code: request.code, status: request.status, message: "Votre adresse est validée et votre accord enregistré. La demande attend maintenant la revue de l’équipe." });
+});
+
+function parentalPortalSummary(request, selectedDay = casinoDateKey()) {
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === request.userId && !entry.guest);
+  if (!user) return null;
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(selectedDay)) ? String(selectedDay) : casinoDateKey();
+  const activity = parentalControls.activity(user.id, day);
+  const history = archiveRows(db.history, { memberId: user.id }, { descending: true, limit: 250 }).filter((entry) => casinoDateKey(entry.finishedAt) === day).map((entry) => ({ id: entry.id, gameId: entry.gameId, name: entry.name || entry.code || "Table", finishedAt: entry.finishedAt, won: entry.winners?.includes(user.id) ?? false, players: entry.players?.length ?? 0 }));
+  const transactions = archiveRows(db.transactions, { userId: user.id }, { descending: true, limit: 500 }).filter((entry) => casinoDateKey(entry.createdAt) === day).map((entry) => ({ id: entry.id, reason: entry.reason, amount: Number(entry.amount) || 0, balance: Number(entry.balance) || 0, gameId: entry.gameId ?? "", createdAt: entry.createdAt }));
+  const seconds = activity.reduce((sum, entry) => sum + Number(entry.durationSeconds || 0), 0);
+  const sessions = Math.max(activity.length ? 1 : 0, activity.filter((entry) => entry.category === "session").reduce((sum, entry) => sum + Number(entry.count || 0), 0));
+  const revocation = activeParentalRevocation(user);
+  const access = revocation ? { ...user.parentalAccess, managed: true, revoked: true, revokedUntil: revocation.revokedUntil } : { status: "active", managed: isUnder13(user), revoked: false, reactivationRequestedAt: null };
+  return { request: { code: request.code, parentEmail: maskedEmail(request.parentEmail) }, child: { pseudo: displayNameFor(user), birthDate: user.profile?.birthDate, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) }, day, access, restrictions: platformSettings(db).minorRestrictions, activity, history, transactions, metrics: { seconds, sessions, games: history.length, wins: history.filter((entry) => entry.won).length, actions: activity.reduce((sum, entry) => sum + Number(entry.count || 0), 0), credits: transactions.filter((entry) => entry.amount > 0).reduce((sum, entry) => sum + entry.amount, 0), debits: Math.abs(transactions.filter((entry) => entry.amount < 0).reduce((sum, entry) => sum + entry.amount, 0)) } };
+}
+
+app.get("/api/parental/portal", (req, res) => {
+  const request = parentalControls.portalRequest(req.query.token);
+  if (!request) return res.status(403).json({ error: "Le lien de l’espace parent est invalide." });
+  const payload = parentalPortalSummary(request, req.query.date);
+  if (!payload) return res.status(404).json({ error: "Le compte associé n’existe plus." });
+  res.json(payload);
+});
+
+app.post("/api/parental/portal/revoke", async (req, res) => {
+  const request = parentalControls.portalRequest(req.body.token);
+  if (!request) return res.status(403).json({ error: "Le lien de l’espace parent est invalide." });
+  const result = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === request.userId && isUnder13(entry));
+    if (!user) return null;
+    const thirteenth = Date.parse(turnsThirteenAt(user.profile.birthDate));
+    const requestedDays = Math.max(1, Math.min(3650, Math.floor(Number(req.body.days) || 0)));
+    const requestedEnd = req.body.untilThirteen === true ? thirteenth : Date.now() + requestedDays * 86400000;
+    const revokedUntil = new Date(Math.min(thirteenth, requestedEnd)).toISOString();
+    user.parentalAccess = { status: "revoked", reason: normalizePlainText(req.body.reason || "Décision du responsable légal", 240), revokedAt: new Date().toISOString(), revokedUntil, reactivationRequestedAt: null };
+    user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+    return { user, revokedUntil };
+  });
+  if (!result) return res.status(404).json({ error: "Ce compte ne relève plus du parcours des moins de 13 ans." });
+  await sendParentalActionNotice({ request, portalToken: req.body.token, title: "Accès suspendu", message: `Votre décision a été enregistrée. L’accès de ${request.childPseudo} est suspendu jusqu’au ${new Intl.DateTimeFormat("fr-BE", { dateStyle: "long" }).format(new Date(result.revokedUntil))}.` }).catch((error) => console.error("Parental decision email failed:", error.message));
+  res.json(parentalPortalSummary(request, req.body.date));
+});
+
+app.post("/api/parental/portal/reactivate", async (req, res) => {
+  const request = parentalControls.portalRequest(req.body.token);
+  if (!request) return res.status(403).json({ error: "Le lien de l’espace parent est invalide." });
+  const updated = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === request.userId && isUnder13(entry));
+    if (!user?.parentalAccess?.reactivationRequestedAt) return null;
+    user.parentalAccess = { status: "active", reactivatedAt: new Date().toISOString(), reactivationRequestedAt: null };
+    user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+    return user;
+  });
+  if (!updated) return res.status(409).json({ error: "Aucune demande de réactivation n’est en attente." });
+  await sendParentalActionNotice({ request, portalToken: req.body.token, title: "Accès réactivé", message: `L’accès de ${request.childPseudo} est de nouveau autorisé.` }).catch((error) => console.error("Parental reactivation email failed:", error.message));
+  res.json(parentalPortalSummary(request, req.body.date));
+});
+
+app.post("/api/auth/request-parental-reactivation", async (req, res) => {
+  const email = normalizeEmail(req.body.email);
+  const db = readDb();
+  const user = db.users.find((entry) => normalizeEmail(entry.email) === email && activeParentalRevocation(entry));
+  if (!user) return res.json({ ok: true, message: "Si ce compte peut demander une réactivation, son responsable légal recevra un email." });
+  const request = parentalControls.approvedGuardians().find((entry) => entry.userId === user.id);
+  if (!request) return res.json({ ok: true, message: "Si ce compte peut demander une réactivation, son responsable légal recevra un email." });
+  const previousRequestAt = Date.parse(user.parentalAccess?.reactivationRequestedAt ?? "");
+  if (Number.isFinite(previousRequestAt) && Date.now() - previousRequestAt < 3600000) return res.json({ ok: true, message: "Une demande de réactivation a déjà été envoyée récemment." });
+  user.parentalAccess.reactivationRequestedAt = new Date().toISOString();
+  writeDb(db);
+  await sendParentalActionNotice({ request, portalToken: request.portalToken, title: "Demande de réactivation", message: `${displayNameFor(user)} demande la réactivation de son accès. Connectez-vous à l’espace parent pour confirmer ou laisser la suspension en place.` }).catch((error) => console.error("Parental reactivation request email failed:", error.message));
+  res.json({ ok: true, message: "La demande a été envoyée au responsable légal." });
+});
 
 app.post("/api/auth/register", async (req, res) => {
   const settings = platformSettings();
   if (!settings.registrationsEnabled) return res.status(403).json({ error: "Les inscriptions sont temporairement fermées." });
   const pseudo = String(req.body.pseudo ?? "").trim();
+  const email = normalizeEmail(req.body.email);
   const password = String(req.body.password ?? "");
-  if (pseudo.length < 3 || password.length < 4) return res.status(400).json({ error: "Pseudo ou mot de passe trop court." });
+  if (!validEmail(email)) return res.status(400).json({ error: "Saisis une adresse email valide." });
+  if (reservedPublicEmail(email)) return res.status(400).json({ error: "Cette adresse utilise un domaine réservé au service." });
+  if (pseudo.length < 3 || pseudo.length > 32 || password.length < 4) return res.status(400).json({ error: "Pseudo ou mot de passe invalide." });
+  const age = exactAge(req.body.birthDate);
+  if (age === null || req.body.termsVersion !== PRIVACY_VERSION) return res.status(400).json({ error: "Saisis une date de naissance valide et accepte les conditions d’utilisation." });
+  const marker = registrationMarker({ deviceId: req.headers["x-registration-device"], ip: req.ip, userAgent: req.headers["user-agent"] }, JWT_SECRET);
+  if (age >= 13 && parentalControls.hasRecentMinorRisk({ markers: marker, email, pseudo })) return res.status(429).json({ code: "REGISTRATION_REVIEW_REQUIRED", error: "Une demande pour un compte de moins de 13 ans a récemment été commencée avec des informations ou un appareil similaires. L’inscription est temporairement suspendue afin d’éviter un contournement du parcours parental." });
+  if (!emailDeliveryConfigured()) return res.status(503).json({ error: "La validation par email est temporairement indisponible." });
   const passwordHash = await bcrypt.hash(password, 10);
+  if (age < 13) {
+    const parentEmail = normalizeEmail(req.body.parentEmail);
+    if (!validEmail(parentEmail) || parentEmail === email) return res.status(400).json({ error: "Saisis l’adresse email distincte d’un responsable légal." });
+    if (!emailDeliveryConfigured()) return res.status(503).json({ error: "Le parcours parental est temporairement indisponible car le service email ne répond pas." });
+    const db = readDb();
+    if (db.users.some((user) => user.pseudo.toLowerCase() === pseudo.toLowerCase())) return res.status(409).json({ error: "Pseudo déjà utilisé." });
+    if (db.users.some((user) => normalizeEmail(user.email) === email)) return res.status(409).json({ error: "Cette adresse email est déjà utilisée." });
+    let request;
+    try { request = parentalControls.createRequest({ childEmail: email, childPseudo: pseudo, childBirthDate: req.body.birthDate, passwordHash, parentEmail }, marker); }
+    catch (error) { return res.status(409).json({ error: String(error.message).includes("UNIQUE") ? "Une demande existe déjà pour cette adresse email." : "La demande parentale n’a pas pu être créée." }); }
+    try { await Promise.all([sendParentVerification(request), sendParentalAdminNotice(request)]); }
+    catch (error) { console.error("Parental request email delivery failed:", error.message); return res.status(503).json({ code: "EMAIL_DELIVERY_FAILED", error: `Le dossier ${request.code} a été créé, mais un email n’a pas pu être envoyé. Contacte le support avec ce code.` }); }
+    return res.status(202).json({ parentalApprovalRequired: true, code: request.code, parentEmail: maskedEmail(parentEmail), message: "La demande a été envoyée au responsable légal. Le compte sera créé après son accord et la validation de l’équipe." });
+  }
   const result = updateDb((db) => {
     if (db.users.some((u) => u.pseudo.toLowerCase() === pseudo.toLowerCase())) return null;
+    if (db.users.some((u) => normalizeEmail(u.email) === email)) return "email";
     let authorization;
     try { authorization = registrationAuthorization(db, req.body); } catch (error) { return { error: error.message }; }
-    const user = ensureUserSocial({ id: randomUUID(), pseudo, passwordHash, tokens: settings.signupTokens, guest: false, admin: pseudo.toLowerCase() === "bnmkt", editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
+    const testAdminEmail = NODE_ENV === "test" ? normalizeEmail(process.env.TEST_ADMIN_EMAIL) : "";
+    const user = ensureUserSocial({ id: randomUUID(), pseudo, email, emailVerifiedAt: null, passwordHash, tokens: settings.signupTokens, guest: false, admin: Boolean(testAdminEmail && testAdminEmail === email), editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, profile: { displayName: pseudo, birthDate: authorization.birthDate }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
     user.registrationAuthorization = authorization;
     db.users.push(user);
     db.transactions.push({ id: randomUUID(), userId: user.id, amount: settings.signupTokens, balance: user.tokens, gameId: null, roomId: null, reason: "signup-bonus", createdAt: new Date().toISOString() });
     refreshPublicProfileStats(user, db);
-    return user;
+    return { user, verificationToken: emailDeliveryConfigured() ? issueEmailVerification(user) : "" };
   });
   if (!result) return res.status(409).json({ error: "Pseudo déjà utilisé." });
+  if (result === "email") return res.status(409).json({ error: "Cette adresse email est déjà utilisée." });
   if (result.error) return res.status(400).json(result);
-  res.json({ token: makeToken(result), user: sanitizeUser(result) });
+  if (result.verificationToken) {
+    try { await sendEmailVerification({ user: result.user, token: result.verificationToken, siteName: settings.siteName }); }
+    catch (error) { console.error("Email verification delivery failed:", error.message); return res.status(503).json({ code: "EMAIL_DELIVERY_FAILED", error: "Le compte a été créé, mais l'email de validation n'a pas pu être envoyé. Réessaie depuis la connexion." }); }
+    if (settings.emailVerificationRequired) return res.status(202).json({ verificationRequired: true, email: maskedEmail(result.user.email), user: sanitizeUser(result.user) });
+  }
+  res.status(201).json({ token: makeToken(result.user), user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  const pseudo = String(req.body.pseudo ?? "").trim();
+  const identifier = String(req.body.login ?? req.body.pseudo ?? "").trim();
   const password = String(req.body.password ?? "");
   const db = readDb();
-  const user = db.users.find((u) => u.pseudo.toLowerCase() === pseudo.toLowerCase());
+  const normalizedIdentifier = normalizeEmail(identifier);
+  const user = db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizedIdentifier : entry.pseudo.toLowerCase() === identifier.toLowerCase());
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) return res.status(401).json({ error: "Identifiants invalides." });
   if (user.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
-  if (user.pseudo.toLowerCase() === "bnmkt" && !user.admin) user.admin = true;
+  const moderation = activeModeration(user);
+  if (moderation?.type === "hard") return res.status(403).json({ code: "HARD_BAN", error: "Ce compte est temporairement inaccessible.", reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" });
+  const parentalRevocation = activeParentalRevocation(user);
+  if (parentalRevocation) return res.status(403).json({ code: "PARENTAL_ACCESS_REVOKED", error: "L’accès à ce compte a été suspendu par le responsable légal.", reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil });
+  const settings = platformSettings(db);
+  if (settings.emailVerificationRequired && validEmail(user.email) && !user.emailVerifiedAt) {
+    if (!emailDeliveryConfigured()) return res.status(503).json({ error: "La validation par email est temporairement indisponible." });
+    if (emailVerificationCanBeResent(user)) {
+      const token = issueEmailVerification(user);
+      writeDb(db);
+      try { await sendEmailVerification({ user, token, siteName: settings.siteName }); }
+      catch (error) { console.error("Email verification delivery failed:", error.message); return res.status(503).json({ error: "L'email de validation n'a pas pu être envoyé." }); }
+    }
+    return res.status(403).json({ code: "EMAIL_VERIFICATION_REQUIRED", email: maskedEmail(user.email), error: "Valide ton adresse email avant de te connecter." });
+  }
   processAchievementEvent(db, user.id, { type: "account.login", payload: { method: "password" } });
+  user.lastLoginAt = new Date().toISOString();
+  if (isUnder13(user)) parentalControls.recordActivity(user.id, { day: casinoDateKey(), category: "session", label: "Connexion", count: 1 });
   refreshPublicProfileStats(user, db);
   writeDb(db);
   res.json({ token: makeToken(user), user: sanitizeUser(user) });
+});
+
+app.post("/api/auth/verify-email", (req, res) => {
+  const user = updateDb((db) => consumeEmailVerification(db.users, req.body.token));
+  if (!user) return res.status(400).json({ error: "Ce lien de validation est invalide ou a expiré." });
+  res.json({ ok: true, email: maskedEmail(user.email) });
+});
+
+app.post("/api/auth/resend-verification", async (req, res) => {
+  const email = normalizeEmail(req.body.email);
+  const settings = platformSettings();
+  if (!emailDeliveryConfigured()) return res.json({ ok: true });
+  const pending = updateDb((db) => {
+    const user = db.users.find((entry) => normalizeEmail(entry.email) === email && !entry.emailVerifiedAt);
+    if (!user || !emailVerificationCanBeResent(user)) return null;
+    return { user, token: issueEmailVerification(user) };
+  });
+  if (pending) {
+    try { await sendEmailVerification({ user: pending.user, token: pending.token, siteName: settings.siteName }); }
+    catch (error) { console.error("Email verification delivery failed:", error.message); }
+  }
+  res.json({ ok: true });
+});
+
+app.post("/api/auth/request-password-reset", async (req, res) => {
+  if (!emailDeliveryConfigured()) return res.status(503).json({ error: "La récupération de compte est temporairement indisponible." });
+  const email = normalizeEmail(req.body.email);
+  const pending = updateDb((db) => {
+    if (!validEmail(email)) return null;
+    const user = db.users.find((entry) => !entry.guest && entry.active !== false && normalizeEmail(entry.email) === email);
+    if (!user || !user.passwordHash || !passwordResetCanBeResent(user)) return null;
+    return { user, token: issuePasswordReset(user) };
+  });
+  if (pending) {
+    try { await sendPasswordReset({ user: pending.user, token: pending.token, siteName: platformSettings().siteName }); }
+    catch (error) { console.error("Password reset delivery failed:", error.message); }
+  }
+  res.json({ ok: true, message: "Si cette adresse correspond à un compte, un lien de récupération vient d’être envoyé." });
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  const token = String(req.body.token ?? "");
+  const password = String(req.body.password ?? "");
+  if (!token || password.length < 4 || password.length > 128) return res.status(400).json({ error: "Lien invalide ou nouveau mot de passe incorrect." });
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = updateDb((db) => {
+    const found = consumePasswordReset(db.users, token);
+    if (!found) return null;
+    found.passwordHash = passwordHash;
+    found.sessionVersion = (Number(found.sessionVersion) || 0) + 1;
+    found.emailVerifiedAt ??= new Date().toISOString();
+    return found;
+  });
+  if (!user) return res.status(400).json({ error: "Ce lien de récupération est invalide ou a expiré." });
+  res.json({ ok: true });
+});
+
+app.post("/api/me/email", auth, async (req, res) => {
+  if (req.auth.guest) return res.status(400).json({ error: "Les invités ne peuvent pas modifier un compte." });
+  const email = normalizeEmail(req.body.email);
+  if (!validEmail(email)) return res.status(400).json({ error: "Saisis une adresse email valide." });
+  if (reservedPublicEmail(email)) return res.status(400).json({ error: "Cette adresse utilise un domaine réservé au service." });
+  const settings = platformSettings();
+  if (!emailDeliveryConfigured()) return res.status(503).json({ error: "La validation par email est temporairement indisponible." });
+  const result = updateDb((db) => {
+    if (db.users.some((entry) => entry.id !== req.auth.id && normalizeEmail(entry.email) === email)) return "duplicate";
+    const user = db.users.find((entry) => entry.id === req.auth.id);
+    if (!user) return null;
+    if (normalizeEmail(user.email) !== email) {
+      user.email = email;
+      user.emailVerifiedAt = null;
+      delete user.emailVerification;
+    }
+    return { user, verificationToken: emailDeliveryConfigured() ? issueEmailVerification(user) : "" };
+  });
+  if (!result) return res.status(404).json({ error: "Utilisateur introuvable." });
+  if (result === "duplicate") return res.status(409).json({ error: "Cette adresse email est déjà utilisée." });
+  if (result.verificationToken) {
+    try { await sendEmailVerification({ user: result.user, token: result.verificationToken, siteName: settings.siteName }); }
+    catch (error) { console.error("Email verification delivery failed:", error.message); return res.status(503).json({ error: "L'email de validation n'a pas pu être envoyé." }); }
+    if (settings.emailVerificationRequired) return res.status(202).json({ verificationRequired: true, email: maskedEmail(result.user.email), user: sanitizeUser(result.user) });
+  }
+  res.json({ token: makeToken(result.user), user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
 });
 
 app.post("/api/auth/guest", (req, res) => {
@@ -2199,6 +2986,129 @@ app.get("/api/users/:id/public", auth, (req, res) => {
   res.json(publicUserPayload(user, db, req.auth.id));
 });
 
+app.post("/api/tribunal/reports", auth, (req, res) => {
+  if (req.auth.guest) return res.status(403).json({ error: "Un compte joueur est requis pour effectuer un signalement." });
+  const db = readDb();
+  const reporter = db.users.find((user) => user.id === req.auth.id);
+  const accused = db.users.find((user) => user.id === String(req.body.accusedId ?? "") && !user.guest);
+  if (!reporter || !accused) return res.status(404).json({ error: "Joueur introuvable." });
+  const evidence = [];
+  const roomCode = String(req.body.roomCode ?? "").trim().toUpperCase();
+  if (roomCode) {
+    const room = db.rooms.find((entry) => entry.code === roomCode);
+    const participants = room?.players?.map((player) => player.id) ?? [];
+    if (!room || !participants.includes(reporter.id) || !participants.includes(accused.id)) return res.status(400).json({ error: "Cette table ne peut pas servir de contexte à ce signalement." });
+    const aliases = new Map(participants.map((id, index) => [id, id === accused.id ? "Joueur mis en cause" : `Participant ${index + 1}`]));
+    const roomIdentities = room.players.flatMap((player) => {
+      const registered = db.users.find((entry) => entry.id === player.id);
+      return [player.pseudo, registered?.pseudo, registered?.profile?.displayName].filter(Boolean).map((name) => [String(name), aliases.get(player.id) ?? "Participant"]);
+    }).sort((left, right) => right[0].length - left[0].length);
+    const redactRoomText = (value) => {
+      let text = normalizePlainText(value, 500);
+      for (const [name, alias] of roomIdentities) text = text.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), alias);
+      return text;
+    };
+    for (const message of chat.list("room", room.id, 30)) {
+      evidence.push({ type: "table-chat", label: `Chat de table · ${aliases.get(message.senderId) ?? "Participant"}`, value: redactRoomText(message.content), occurredAt: message.createdAt });
+    }
+    evidence.push({ type: "table", label: "Contexte de partie vérifié", value: games.find((game) => game.id === room.gameId)?.name || "Partie", occurredAt: new Date().toISOString() });
+    const publicLogs = spectatorState(room.state)?.logs ?? [];
+    for (const log of publicLogs.filter((entry) => entry.actorId === accused.id).slice(-8)) {
+      evidence.push({ type: "journal", label: "Journal · joueur mis en cause", value: redactRoomText(log.text), occurredAt: log.at });
+    }
+  }
+  try {
+    const report = tribunal.createReport({
+      reporterId: reporter.id,
+      accusedId: accused.id,
+      category: String(req.body.category ?? ""),
+      description: normalizePlainText(req.body.description, 1200),
+      evidence,
+      context: roomCode ? { type: "room", roomCode } : { type: "profile" }
+    });
+    const settings = tribunal.settings();
+    let openedAutomatically = false;
+    if (settings.automaticReviewEnabled && tribunal.pendingReporterCount(accused.id) >= settings.automaticReportThreshold) {
+      const reportIds = tribunal.pendingReportIds(accused.id);
+      tribunal.openCaseFromReports({ reportIds, adminId: "automatic-rule", source: "automatic", title: "Signalements concordants", summary: "Plusieurs joueurs distincts ont signalé des comportements qui doivent être examinés par le tribunal." });
+      openedAutomatically = true;
+    }
+    res.status(201).json({ ok: true, reportId: report.id, openedAutomatically });
+  } catch (error) {
+    const messages = {
+      INVALID_REPORT_TARGET: "Tu ne peux pas te signaler toi-même.",
+      INVALID_REPORT_CATEGORY: "Choisis un motif de signalement valide.",
+      REPORT_DESCRIPTION_TOO_SHORT: "Décris les faits en au moins 20 caractères.",
+      DUPLICATE_REPORT: "Un signalement similaire a déjà été envoyé au cours des dernières 24 heures."
+    };
+    res.status(error.message === "DUPLICATE_REPORT" ? 409 : 400).json({ error: messages[error.message] ?? "Le signalement n’a pas pu être enregistré." });
+  }
+});
+
+app.get("/api/tribunal", auth, (req, res) => {
+  settleTribunalCases();
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  const eligibility = tribunalEligibility(user, db);
+  const settings = tribunal.settings();
+  if (eligibility.eligible) {
+    const eligibleCaseIds = tribunal.openCases()
+      .filter((entry) => entry.accusedId !== user.id)
+      .filter((entry) => !tribunal.reporterIdsForCase(entry.id).includes(user.id))
+      .filter((entry) => !user.friends?.includes(entry.accusedId))
+      .map((entry) => entry.id);
+    tribunal.assign(user.id, eligibleCaseIds);
+  }
+  const cases = eligibility.eligible ? tribunal.jurorCases(user.id)
+    .filter((entry) => entry.accusedId !== user.id)
+    .filter((entry) => !tribunal.reporterIdsForCase(entry.id).includes(user.id))
+    .filter((entry) => !user.friends?.includes(entry.accusedId))
+    .map((entry) => {
+    const payload = publicTribunalCase(entry, user.id, settings, db);
+    if (settings.revealAccusedIdentity) {
+      const accused = db.users.find((candidate) => candidate.id === entry.accusedId);
+      payload.accused = accused ? displayNameFor(ensureUserSocial(accused)) : "Compte supprimé";
+    }
+    return payload;
+  }) : [];
+  res.json({
+    eligibility,
+    cases,
+    categories: tribunalCategories,
+    settings: { votingDurationHours: settings.votingDurationHours, minimumVotes: settings.minimumVotes, maximumReward: settings.maximumReward },
+    stats: { pending: cases.filter((entry) => entry.status === "voting" && !entry.vote).length, voted: cases.filter((entry) => entry.vote).length, behaviorScore: eligibility.behavior?.score ?? tribunal.behavior(user?.id ?? "").score }
+  });
+});
+
+app.get("/api/tribunal/availability", auth, (req, res) => {
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  const eligibility = tribunalEligibility(user, db);
+  if (!eligibility.eligible) return res.json({ available: false, count: 0 });
+  const count = tribunal.openCases()
+    .filter((entry) => entry.accusedId !== user.id)
+    .filter((entry) => !tribunal.reporterIdsForCase(entry.id).includes(user.id))
+    .filter((entry) => !user.friends?.includes(entry.accusedId)).length;
+  res.json({ available: count > 0, count });
+});
+
+app.post("/api/tribunal/cases/:id/vote", auth, (req, res) => {
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  const eligibility = tribunalEligibility(user, db);
+  if (!eligibility.eligible) return res.status(403).json({ error: eligibility.reason });
+  const entry = tribunal.openCases().find((candidate) => candidate.id === req.params.id);
+  if (!entry || entry.accusedId === user.id || tribunal.reporterIdsForCase(entry.id).includes(user.id) || user.friends?.includes(entry.accusedId)) return res.status(403).json({ error: "Ce dossier est lié à ton compte et ne peut pas t’être soumis." });
+  try {
+    const vote = tribunal.vote(req.params.id, user.id, req.body.score, req.body.rationale);
+    settleTribunalCases();
+    res.json({ ok: true, vote });
+  } catch (error) {
+    const messages = { INVALID_VOTE: "Le vote doit être compris entre 1 et 5.", CASE_NOT_ASSIGNED: "Ce dossier ne t’est pas affecté.", VOTING_CLOSED: "Le vote de ce dossier est terminé." };
+    res.status(error.message === "CASE_NOT_ASSIGNED" ? 403 : 409).json({ error: messages[error.message] ?? "Le vote n’a pas pu être enregistré." });
+  }
+});
+
 app.get("/api/leaderboards", auth, (req, res) => {
   const db = readDb();
   try {
@@ -2238,6 +3148,56 @@ app.get("/api/friends", auth, (req, res) => {
   res.json(result);
 });
 
+app.get("/api/chat/messages", auth, (req, res) => {
+  if (req.auth.guest) return res.status(403).json({ error: "Le chat est réservé aux comptes enregistrés." });
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  const channel = user ? resolveChatChannel(db, user, req.query) : null;
+  if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
+  const messages = chat.list(channel.channelType, channel.channelId).map((message) => decorateChatMessage(message, db));
+  chat.markRead(user.id, channel.channelType, channel.channelId);
+  res.json({ channel: { type: channel.channelType, id: channel.channelId }, messages });
+});
+
+app.post("/api/chat/messages", auth, (req, res) => {
+  if (req.auth.guest) return res.status(403).json({ error: "Le chat est réservé aux comptes enregistrés." });
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+  const access = userFeatureAccess(user, "chat", db);
+  if (!access.allowed) return rejectFeature(res, access);
+  const channel = resolveChatChannel(db, user, req.body);
+  if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
+  if (!chatRateAllowed(user.id)) return res.status(429).json({ error: "Tu envoies des messages trop rapidement." });
+  try {
+    const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content }), db);
+    chat.markRead(user.id, channel.channelType, channel.channelId);
+    io.to(channel.socketRoom).emit("chat-message", message);
+    res.status(201).json(message);
+  } catch (error) {
+    res.status(400).json({ error: error.message === "INVALID_CHAT_MESSAGE" ? "Écris un message de 500 caractères maximum." : "Le message n’a pas pu être envoyé." });
+  }
+});
+
+app.post("/api/chat/read", auth, (req, res) => {
+  if (req.auth.guest) return res.json({ ok: true });
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  const channel = user ? resolveChatChannel(db, user, req.body) : null;
+  if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
+  chat.markRead(user.id, channel.channelType, channel.channelId);
+  res.json({ ok: true });
+});
+
+app.get("/api/chat/journal", auth, (req, res) => {
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id) ?? sessions.get(req.auth.id);
+  const room = user ? chatRoomAccess(db, user.id, req.query.roomCode) : null;
+  if (!room) return res.status(404).json({ error: "Table introuvable ou inaccessible." });
+  const state = spectatorState(room.state);
+  res.json({ room: { code: room.code, name: room.name, gameId: room.gameId }, logs: (state?.logs ?? []).slice(-100) });
+});
+
 app.get("/api/notifications", auth, (req, res) => {
   if (req.auth.guest) return res.json([]);
   const db = readDb();
@@ -2261,6 +3221,8 @@ app.delete("/api/notifications/:id", auth, (req, res) => {
 
 app.post("/api/friends/request", auth, (req, res) => {
   if (req.auth.guest) return res.status(400).json({ error: "Les amis sont réservés aux comptes enregistrés." });
+  const access = userFeatureAccess(getUser(req.auth.id), "friends");
+  if (!access.allowed) return rejectFeature(res, access);
   const targetId = String(req.body.userId ?? "");
   const result = updateDb((db) => {
     const user = db.users.find((u) => u.id === req.auth.id);
@@ -2297,6 +3259,8 @@ app.post("/api/friends/request", auth, (req, res) => {
 });
 
 app.post("/api/friends/:id/accept", auth, (req, res) => {
+  const access = userFeatureAccess(getUser(req.auth.id), "friends");
+  if (!access.allowed) return rejectFeature(res, access);
   const friendId = req.params.id;
   const result = updateDb((db) => {
     const user = db.users.find((u) => u.id === req.auth.id);
@@ -2396,6 +3360,19 @@ app.post("/api/secrets/small-rock/claim", auth, (req, res) => {
 });
 
 const siteActivityTracker = createSiteActivityTracker();
+const guardianActivityCursors = new Map();
+app.post("/api/me/guardian-activity", auth, (req, res) => {
+  const user = readDb().users.find((entry) => entry.id === req.auth.id);
+  if (!user || !isUnder13(user)) return res.json({ tracked: false });
+  const pageLabels = { lobby: "Accueil", profile: "Profil", leaderboard: "Classements", room: "Table de jeu", spectator: "Partie observée", event: "Événement", admin: "Administration" };
+  const page = Object.hasOwn(pageLabels, req.body.page) ? req.body.page : "lobby";
+  const now = Date.now();
+  const previous = guardianActivityCursors.get(user.id);
+  const seconds = previous && now - previous.at >= 5000 && now - previous.at <= 90000 ? Math.floor((now - previous.at) / 1000) : 0;
+  guardianActivityCursors.set(user.id, { at: now, page });
+  parentalControls.recordActivity(user.id, { day: casinoDateKey(now), category: "navigation", label: pageLabels[page], count: previous?.page === page ? 0 : 1, durationSeconds: seconds }, now);
+  res.json({ tracked: true });
+});
 app.get("/api/me/activity-config", auth, (req, res) => {
   const db = readDb();
   res.json({ markers: allowedUrlMarkers(achievementCatalog(db)) });
@@ -2410,7 +3387,7 @@ app.post("/api/me/privacy", auth, (req, res) => {
       const consent = setActivityConsent(user, req.body);
       if (!consent.enabled) {
         siteActivityTracker.forget(user.id);
-        for (const entry of achievementCatalog(db)) if (["site.visit", "site.activity", "account.browser"].includes(entry.rule?.event)) delete user.achievementProgress?.[entry.id];
+        for (const entry of achievementCatalog(db)) if (["site.visit", "site.activity", "account.browser", "table.activity", "game.round.activity"].includes(entry.rule?.event) || Object.hasOwn(tableTimeMetrics, entry.rule?.metric ?? "")) delete user.achievementProgress?.[entry.id];
       }
       return consent;
     });
@@ -2425,8 +3402,9 @@ app.post("/api/me/activity", auth, (req, res) => {
   try {
     const unlocked = updateDb((db) => {
       const found = db.users.find((entry) => entry.id === user.id);
-      const events = siteActivityTracker.record(found, req.body, req.headers["user-agent"], allowedUrlMarkers(achievementCatalog(db)));
-      const ids = events.flatMap((event) => processAchievementEvent(db, found.id, event));
+      const room = req.body.page === "room" ? db.rooms.find((entry) => entry.code === String(req.body.roomCode ?? "").slice(0, 20).toUpperCase()) : null;
+      const events = siteActivityTracker.record(found, req.body, req.headers["user-agent"], allowedUrlMarkers(achievementCatalog(db)), Date.now(), tableActivityContext(room, found.id));
+      const ids = events.flatMap((event) => processAchievementEvent(db, found.id, event, ["table.activity", "game.round.activity"].includes(event.type) ? room : null));
       if (events.some((event) => event.type === "site.visit")) ids.push(...processAchievementEvent(db, found.id, { type: "account.browser", payload: { browser: events[0].payload.browser } }));
       return [...new Set(ids)];
     });
@@ -2454,23 +3432,62 @@ function adminOverview(db) {
   const activeRooms = db.rooms.filter((room) => !room.finished);
   const today = casinoDateKey();
   const todayHistory = archiveDays(db.history, today, today);
+  const todayTransactions = archiveDays(db.transactions, today, today);
+  const weekStart = shiftDateKey(today, -6);
+  const activePlayersToday = new Set(todayHistory.flatMap((game) => (game.players ?? []).filter((player) => !player.isBot).map((player) => player.id)).filter(Boolean));
   const customShopIds = new Set((db.settings?.customShopItems ?? []).map((item) => item.id));
+  const gamesCatalog = configuredGames(db);
+  const shopCatalog = configuredShop(db);
+  const achievementsCatalog = achievementCatalog(db, { includeDisabled: true });
+  const events = db.communityEvents ?? [];
+  const transactionTotal = (positive) => todayTransactions.reduce((total, entry) => {
+    const amount = Number(entry.amount) || 0;
+    return total + (positive ? Math.max(0, amount) : Math.max(0, -amount));
+  }, 0);
   return {
     users: {
       total: users.length,
       active: users.filter((user) => user.active !== false).length,
       inactive: users.filter((user) => user.active === false).length,
-      admins: users.filter((user) => user.admin).length
+      admins: users.filter((user) => user.admin).length,
+      pendingVerification: users.filter((user) => validEmail(user.email) && !user.emailVerifiedAt).length,
+      legacyLogins: users.filter((user) => !validEmail(user.email)).length,
+      newToday: users.filter((user) => casinoDateKey(user.createdAt) === today).length,
+      new7d: users.filter((user) => {
+        const created = casinoDateKey(user.createdAt);
+        return created && created >= weekStart && created <= today;
+      }).length
     },
     rooms: {
       active: activeRooms.length,
       playing: activeRooms.filter((room) => room.state).length,
-      waiting: activeRooms.filter((room) => !room.state).length
+      waiting: activeRooms.filter((room) => !room.state).length,
+      seatedHumans: activeRooms.reduce((total, room) => total + room.players.filter((player) => !player.isBot).length, 0),
+      seatedBots: activeRooms.reduce((total, room) => total + room.players.filter((player) => player.isBot).length, 0)
     },
-    activity: { gamesToday: todayHistory.length, gamesTotal: db.history.length },
-    economy: { circulatingTokens: users.reduce((total, user) => total + Math.max(0, Number(user.tokens) || 0), 0) },
-    catalog: { games: configuredGames(db).length, enabledGames: configuredGames(db).filter((game) => game.enabled !== false).length, shopItems: configuredShop(db).length, customShopItems: customShopIds.size },
-    activeRooms: activeRooms.slice(0, 6).map((room) => ({ id: room.id, code: room.code, name: room.name, gameId: room.gameId, players: room.players.length, playing: Boolean(room.state), createdAt: room.createdAt }))
+    activity: { gamesToday: todayHistory.length, gamesTotal: db.history.length, activePlayersToday: activePlayersToday.size },
+    economy: {
+      circulatingTokens: users.reduce((total, user) => total + Math.max(0, Number(user.tokens) || 0), 0),
+      creditsToday: transactionTotal(true),
+      debitsToday: transactionTotal(false),
+      transactionsToday: todayTransactions.length
+    },
+    catalog: {
+      games: gamesCatalog.length,
+      enabledGames: gamesCatalog.filter((game) => game.enabled !== false).length,
+      disabledGames: gamesCatalog.filter((game) => game.enabled === false).length,
+      shopItems: shopCatalog.length,
+      customShopItems: customShopIds.size,
+      achievements: achievementsCatalog.length,
+      disabledAchievements: achievementsCatalog.filter((achievement) => achievement.enabled === false).length
+    },
+    events: {
+      active: events.filter((event) => event.status === "active").length,
+      scheduled: events.filter((event) => event.status === "scheduled").length,
+      draft: events.filter((event) => event.status === "draft").length
+    },
+    activeRooms: activeRooms.slice(0, 6).map((room) => ({ id: room.id, code: room.code, name: room.name, gameId: room.gameId, players: room.players.length, playing: Boolean(room.state), createdAt: room.createdAt })),
+    recentUsers: users.filter((user) => user.createdAt).sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt)).slice(0, 5).map((user) => ({ id: user.id, displayName: displayNameFor(user), emailVerified: Boolean(user.emailVerifiedAt), legacyLogin: !validEmail(user.email), active: user.active !== false, createdAt: user.createdAt }))
   };
 }
 
@@ -2769,10 +3786,19 @@ function adminUserDetail(db, user) {
     const source = achievementCatalog().find((candidate) => candidate.id === entry.id);
     return { ...entry, description: source?.description ?? entry.description };
   });
+  const statistics = playerStatistics(db, user.id);
+  const relation = (id) => {
+    const related = db.users.find((entry) => entry.id === id && !entry.guest);
+    return related ? { id: related.id, displayName: displayNameFor(ensureUserSocial(related)), active: related.active !== false } : null;
+  };
+  const activeRooms = db.rooms.filter((room) => !room.finished && room.players?.some((player) => player.id === user.id)).map((room) => ({ id: room.id, code: room.code, name: room.name, gameId: room.gameId, playing: Boolean(room.state), owner: room.ownerId === user.id }));
+  const moderationEntryActive = (entry) => entry?.active === true && (!entry.endsAt || Date.parse(entry.endsAt) > Date.now());
   return {
     user: {
       id: user.id,
-      login: user.pseudo,
+      login: user.email ?? user.pseudo,
+      legacyLogin: !validEmail(user.email),
+      emailVerified: Boolean(user.emailVerifiedAt),
       displayName: profile.displayName,
       birthDate: profile.birthDate,
       gender: profile.gender,
@@ -2783,15 +3809,52 @@ function adminUserDetail(db, user) {
       admin: Boolean(user.admin),
       editor: Boolean(user.editor),
       createdAt: user.createdAt ?? transactions.find((entry) => entry.reason === "signup-bonus")?.createdAt ?? null,
+      lastLoginAt: user.lastLoginAt ?? null,
       lastDailyClaim: user.lastDailyClaim ?? null,
       friendCode: friendCodeFor(user),
       hasPassword: Boolean(user.passwordHash),
-      profileStats: normalizeProfileStats(user.profileStats)
+      profileStats: normalizeProfileStats(user.profileStats),
+      minor: isUnder13(user),
+      moderation: {
+        softBan: { active: moderationEntryActive(user.moderation?.softBan), reason: user.moderation?.softBan?.reason ?? "", endsAt: user.moderation?.softBan?.endsAt ?? "" },
+        hardBan: { active: moderationEntryActive(user.moderation?.hardBan), reason: user.moderation?.hardBan?.reason ?? "", endsAt: user.moderation?.hardBan?.endsAt ?? "" }
+      }
     },
     inventory: { cosmetics: normalizeCosmetics(user.cosmetics), catalog },
     achievements,
     history,
     transactions,
+    statistics: {
+      gamesPlayed: statistics.gamesPlayed,
+      wins: statistics.wins,
+      winRate: statistics.gamesPlayed ? Math.round((statistics.wins / statistics.gamesPlayed) * 100) : 0,
+      transactions: statistics.transactions,
+      credits: statistics.credits,
+      debits: statistics.debits,
+      staked: statistics.staked,
+      shopSpent: statistics.shopSpent,
+      shopPurchases: statistics.shopPurchases,
+      dailyClaims: statistics.dailyClaims
+    },
+    relationships: {
+      friends: user.friends.map(relation).filter(Boolean),
+      incoming: user.friendRequests.incoming.map(relation).filter(Boolean),
+      outgoing: user.friendRequests.outgoing.map(relation).filter(Boolean)
+    },
+    security: {
+      sessionVersion: Math.max(0, Number(user.sessionVersion) || 0),
+      emailVerificationPending: Boolean(user.emailVerification),
+      emailVerificationSentAt: user.emailVerification?.sentAt ?? null,
+      emailVerificationExpiresAt: user.emailVerification?.expiresAt ?? null,
+      passwordResetPending: Boolean(user.passwordReset),
+      passwordResetSentAt: user.passwordReset?.sentAt ?? null,
+      passwordResetExpiresAt: user.passwordReset?.expiresAt ?? null
+    },
+    tribunal: {
+      behavior: tribunal.behavior(user.id),
+      reports: tribunal.reportStats(user.id)
+    },
+    activeRooms,
     bonus: {
       status: dailyBonusStatus(user, db),
       recentClaims: transactions.filter((entry) => entry.reason === "daily-claim").slice(0, 30)
@@ -3027,6 +4090,8 @@ app.get("/api/community-events/:id/leaderboards", auth, (req, res) => {
 
 app.post("/api/community-events/:id/join", auth, communityEventActionLimiter, (req, res) => {
   if (req.auth.guest) return res.status(403).json({ error: "Crée un compte pour participer aux événements communautaires." });
+  const access = userFeatureAccess(getUser(req.auth.id), "community-events");
+  if (!access.allowed) return rejectFeature(res, access);
   try {
     const result = updateDb((db) => {
       const event = getCommunityEvent(db, req.params.id);
@@ -3045,6 +4110,8 @@ app.post("/api/community-events/:id/join", auth, communityEventActionLimiter, (r
 
 app.post("/api/community-events/:id/actions/purchase", auth, communityEventActionLimiter, (req, res) => {
   if (req.auth.guest) return res.status(403).json({ error: "Crée un compte pour acheter des actions." });
+  const access = userFeatureAccess(getUser(req.auth.id), "community-events");
+  if (!access.allowed) return rejectFeature(res, access);
   const requestId = normalizePlainText(req.body.requestId, 100);
   if (!requestId) return res.status(400).json({ error: "Identifiant d’achat manquant." });
   try {
@@ -3080,6 +4147,8 @@ app.post("/api/community-events/:id/actions/quote", auth, communityEventActionLi
 
 app.post("/api/community-events/:id/actions", auth, communityEventActionLimiter, (req, res) => {
   if (req.auth.guest) return res.status(403).json({ error: "Crée un compte pour agir pendant l’événement." });
+  const access = userFeatureAccess(getUser(req.auth.id), "community-events");
+  if (!access.allowed) return rejectFeature(res, access);
   const requestId = normalizePlainText(req.body.requestId, 100);
   if (!requestId) return res.status(400).json({ error: "Identifiant d’action manquant." });
   try {
@@ -3237,7 +4306,7 @@ app.get("/api/admin", auth, requireBackOffice, (req, res) => {
   const registeredUsers = db.users.filter((user) => !user.guest).map((user) => {
     const statistics = playerStatistics(db, user.id);
     const signupTransaction = user.createdAt ? null : archiveRows(db.transactions, { userId: user.id, reason: "signup-bonus" }, { limit: 1 })[0];
-    return { id: user.id, login: user.pseudo, displayName: displayNameFor(user), bio: user.profile?.bio ?? "", tokens: user.tokens, active: user.active !== false, admin: Boolean(user.admin), editor: Boolean(user.editor), gamesPlayed: statistics.gamesPlayed, wins: statistics.wins, lastDailyClaim: user.lastDailyClaim ?? null, createdAt: user.createdAt ?? signupTransaction?.createdAt ?? null };
+    return { id: user.id, login: user.email ?? user.pseudo, legacyLogin: !validEmail(user.email), emailVerified: Boolean(user.emailVerifiedAt), displayName: displayNameFor(user), bio: user.profile?.bio ?? "", tokens: user.tokens, active: user.active !== false, admin: Boolean(user.admin), editor: Boolean(user.editor), gamesPlayed: statistics.gamesPlayed, wins: statistics.wins, lastDailyClaim: user.lastDailyClaim ?? null, createdAt: user.createdAt ?? signupTransaction?.createdAt ?? null, lastLoginAt: user.lastLoginAt ?? null };
   });
   const permissions = {
     role: isAdministrator ? "admin" : "editor",
@@ -3261,12 +4330,79 @@ app.get("/api/admin", auth, requireBackOffice, (req, res) => {
     } : game) : [],
     shop: configuredShop(db),
     achievements: isAdministrator ? achievementCatalog(db, { includeDisabled: true }) : [],
-    achievementRuleSchemas: isAdministrator ? achievementRuleSchemas(configuredGames(db), configuredShop(db)) : null,
+    achievementRuleSchemas: isAdministrator ? achievementRuleSchemas(configuredGames(db), configuredShop(db), achievementCatalog(db, { includeDisabled: true })) : null,
     pricing: shopPricingMatrix(db),
     permissions,
-    settings,
+    settings: { ...settings, emailVerificationAvailable: emailDeliveryConfigured() },
     overview: isAdministrator ? adminOverview(db) : { catalog: { shopItems: configuredShop(db).length, customShopItems: db.settings?.customShopItems?.length ?? 0 } }
   });
+});
+
+app.get("/api/admin/tribunal", auth, requireAdmin, (_req, res) => {
+  settleTribunalCases();
+  res.json(tribunalAdminPayload());
+});
+
+app.patch("/api/admin/tribunal/settings", auth, requireAdmin, (req, res) => {
+  res.json(tribunal.updateSettings(req.body ?? {}));
+});
+
+app.post("/api/admin/tribunal/reports/:id/dismiss", auth, requireAdmin, (req, res) => {
+  const dismissed = tribunal.dismissReport(req.params.id, req.auth.id, req.body.note);
+  if (!dismissed) return res.status(404).json({ error: "Signalement introuvable ou déjà traité." });
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/tribunal/cases", auth, requireAdmin, (req, res) => {
+  try {
+    const created = tribunal.openCaseFromReports({
+      reportIds: req.body.reportIds,
+      adminId: req.auth.id,
+      title: req.body.title,
+      summary: req.body.summary,
+      votingDurationHours: req.body.votingDurationHours,
+      minimumVotes: req.body.minimumVotes,
+      hardBanDays: req.body.hardBanDays,
+      socialBanDays: req.body.socialBanDays
+    });
+    res.status(201).json(created);
+  } catch (error) {
+    const messages = { REPORT_REQUIRED: "Sélectionne au moins un signalement.", REPORT_NOT_AVAILABLE: "Un signalement sélectionné a déjà été traité.", REPORT_TARGET_MISMATCH: "Tous les signalements d’un dossier doivent viser le même joueur." };
+    res.status(400).json({ error: messages[error.message] ?? "Le dossier n’a pas pu être ouvert." });
+  }
+});
+
+app.post("/api/admin/tribunal/cases/:id/resolve", auth, requireAdmin, (req, res) => {
+  const resolved = tribunal.resolveDue(Date.now(), req.params.id);
+  if (!resolved.length) return res.status(409).json({ error: "Ce dossier ne contient encore aucun vote ou n’est plus ouvert." });
+  settleTribunalCases();
+  res.json({ ok: true, case: resolved[0] });
+});
+
+app.post("/api/admin/tribunal/cases/:id/dismiss", auth, requireAdmin, (req, res) => {
+  const dismissed = tribunal.dismissCase(req.params.id, req.auth.id, req.body.note);
+  if (!dismissed) return res.status(404).json({ error: "Dossier introuvable ou déjà clôturé." });
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/tribunal/cases/:id/enforce", auth, requireAdmin, (req, res) => {
+  const result = applyTribunalDecision(req.params.id, req.body, req.auth.id);
+  if (result.error === "missing") return res.status(404).json({ error: "Aucune décision n’attend de confirmation pour ce dossier." });
+  if (result.error === "user") return res.status(404).json({ error: "Le compte concerné n’existe plus." });
+  res.json({ ok: true, case: result.entry });
+});
+
+app.post("/api/admin/tribunal/cases/enforce-batch", auth, requireAdmin, (req, res) => {
+  const ids = [...new Set((Array.isArray(req.body.caseIds) ? req.body.caseIds : []).map(String))].slice(0, 100);
+  if (!ids.length) return res.status(400).json({ error: "Sélectionne au moins un dossier." });
+  const applied = [];
+  const skipped = [];
+  for (const caseId of ids) {
+    const result = applyTribunalDecision(caseId, req.body, req.auth.id);
+    if (result.entry) applied.push(result.entry.id);
+    else skipped.push(caseId);
+  }
+  res.json({ ok: true, applied, skipped });
 });
 
 app.get("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
@@ -3274,6 +4410,55 @@ app.get("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
   const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
   if (!target) return res.status(404).json({ error: "Joueur introuvable." });
   res.json(adminUserDetail(db, target));
+});
+
+app.post("/api/admin/users/:id/send-verification", auth, requireAdmin, async (req, res) => {
+  if (!emailDeliveryConfigured()) return res.status(503).json({ error: "Le service email n’est pas configuré." });
+  const pending = updateDb((db) => {
+    const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!target) return "missing";
+    if (!validEmail(target.email)) return "email";
+    return { user: target, token: issueEmailVerification(target), siteName: platformSettings(db).siteName };
+  });
+  if (pending === "missing") return res.status(404).json({ error: "Joueur introuvable." });
+  if (pending === "email") return res.status(400).json({ error: "Ce compte ne possède pas encore d’adresse email valide." });
+  try {
+    await sendEmailVerification({ user: pending.user, token: pending.token, siteName: pending.siteName });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Admin email verification delivery failed:", error.message);
+    res.status(503).json({ error: "L’email de validation n’a pas pu être envoyé." });
+  }
+});
+
+app.post("/api/admin/users/:id/email-validation", auth, requireAdmin, (req, res) => {
+  const result = updateDb((db) => {
+    const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!target) return "missing";
+    if (!validEmail(target.email)) return "email";
+    if (req.body.verified === false) target.emailVerifiedAt = null;
+    else {
+      target.emailVerifiedAt = new Date().toISOString();
+      delete target.emailVerification;
+    }
+    return true;
+  });
+  if (result === "missing") return res.status(404).json({ error: "Joueur introuvable." });
+  if (result === "email") return res.status(400).json({ error: "Ce compte ne possède pas encore d’adresse email valide." });
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/users/:id/revoke-sessions", auth, requireAdmin, (req, res) => {
+  if (req.params.id === req.auth.id) return res.status(400).json({ error: "Utilise la déconnexion pour fermer ta propre session." });
+  const found = updateDb((db) => {
+    const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!target) return false;
+    target.sessionVersion = (Number(target.sessionVersion) || 0) + 1;
+    delete target.passwordReset;
+    return true;
+  });
+  if (!found) return res.status(404).json({ error: "Joueur introuvable." });
+  res.json({ ok: true });
 });
 
 app.get("/api/admin/metrics", auth, requireAdmin, (req, res) => {
@@ -3290,16 +4475,124 @@ app.get("/api/admin/health/logs", auth, requireAdmin, (req, res) => {
   res.json(requestLogs.query(req.query));
 });
 
-app.get("/api/admin/parental-approvals", auth, requireAdmin, (req, res) => {
-  res.json((readDb().settings?.parentalApprovals ?? []).filter((row) => Date.parse(row.expiresAt) > Date.now()).map(({ hash: _hash, ...row }) => row));
+app.get("/api/admin/status", auth, requireAdmin, (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json(statusMonitor.payload(7, { includeFutureUpdates: true }));
 });
-app.post("/api/admin/parental-approvals", auth, requireAdmin, (req, res) => {
-  try { res.json(updateDb((db) => createParentalApproval(db, req.body, req.auth.id))); }
-  catch (error) { res.status(400).json({ error: error.message }); }
+
+app.put("/api/admin/status/settings", auth, requireAdmin, (req, res) => {
+  try {
+    const settings = statusMonitor.updateStatusSettings(req.body ?? {});
+    res.json({ settings, status: statusMonitor.payload(7, { includeFutureUpdates: true }) });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Paramètres invalides." });
+  }
 });
-app.delete("/api/admin/parental-approvals/:id", auth, requireAdmin, (req, res) => {
-  updateDb((db) => { db.settings.parentalApprovals = (db.settings.parentalApprovals ?? []).filter((row) => row.id !== req.params.id); });
+
+app.post("/api/admin/status/incidents", auth, requireAdmin, (req, res) => {
+  try {
+    const incident = statusMonitor.createIncident(req.body ?? {}, req.auth.id);
+    res.status(201).json({ incident, status: statusMonitor.payload(7, { includeFutureUpdates: true }) });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Incident invalide." });
+  }
+});
+
+app.patch("/api/admin/status/incidents/:id", auth, requireAdmin, (req, res) => {
+  try {
+    const incident = statusMonitor.updateIncident(req.params.id, req.body ?? {});
+    if (!incident) return res.status(404).json({ error: "Incident introuvable." });
+    res.json({ incident, status: statusMonitor.payload(7, { includeFutureUpdates: true }) });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Incident invalide." });
+  }
+});
+
+app.get("/api/admin/patchnotes", auth, requireBackOffice, (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ currentVersion: patchnotes.currentVersion, notes: patchnotes.list({ includeDrafts: true, includeReactions: true }) });
+});
+
+app.put("/api/admin/patchnotes/settings", auth, requireBackOffice, (req, res) => {
+  try { res.json({ currentVersion: patchnotes.setCurrentVersion(req.body?.currentVersion) }); }
+  catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Version invalide." }); }
+});
+
+app.get("/api/admin/patchnotes/:id", auth, requireBackOffice, (req, res) => {
+  const note = patchnotes.get(req.params.id, { includeDrafts: true, includeReactions: true });
+  if (!note) return res.status(404).json({ error: "Patchnote introuvable." });
+  res.json(note);
+});
+
+app.post("/api/admin/patchnotes", auth, requireBackOffice, (req, res) => {
+  try { res.status(201).json(patchnotes.create(req.body ?? {}, req.auth.id)); }
+  catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Patchnote invalide." }); }
+});
+
+app.patch("/api/admin/patchnotes/:id", auth, requireBackOffice, (req, res) => {
+  try {
+    const note = patchnotes.update(req.params.id, req.body ?? {});
+    if (!note) return res.status(404).json({ error: "Patchnote introuvable." });
+    res.json(note);
+  } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Patchnote invalide." }); }
+});
+
+app.post("/api/admin/patchnotes/:id/duplicate", auth, requireBackOffice, (req, res) => {
+  try {
+    const note = patchnotes.duplicate(req.params.id, req.auth.id, req.body?.version);
+    if (!note) return res.status(404).json({ error: "Patchnote introuvable." });
+    res.status(201).json(note);
+  } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Duplication impossible." }); }
+});
+
+app.post("/api/admin/patchnotes/:id/images", auth, requireBackOffice, express.raw({ type: ["image/png", "image/jpeg", "image/webp", "image/gif"], limit: "5mb" }), (req, res) => {
+  try {
+    const originalName = decodeURIComponent(String(req.headers["x-file-name"] ?? "image"));
+    const image = patchnotes.addAttachment(req.params.id, { body: req.body, mimeType: req.headers["content-type"], originalName });
+    if (!image) return res.status(404).json({ error: "Patchnote introuvable." });
+    res.status(201).json(image);
+  } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Image invalide." }); }
+});
+
+app.delete("/api/admin/patchnotes/:id", auth, requireBackOffice, (req, res) => {
+  if (!patchnotes.remove(req.params.id)) return res.status(404).json({ error: "Patchnote introuvable." });
   res.json({ ok: true });
+});
+
+app.get("/api/admin/parental-approvals", auth, requireAdmin, (req, res) => {
+  res.json({ requests: parentalControls.listRequests(), restrictions: platformSettings().minorRestrictions, restrictionOptions: minorRestrictionCatalog() });
+});
+app.post("/api/admin/parental-approvals/:id/approve", auth, requireAdmin, async (req, res) => {
+  const request = parentalControls.getInternal(req.params.id);
+  if (!request || request.status !== "admin_pending") return res.status(409).json({ error: "Ce dossier n’attend pas de validation administrative." });
+  const created = updateDb((db) => {
+    if (db.users.some((user) => normalizeEmail(user.email) === normalizeEmail(request.childEmail) || user.pseudo.toLowerCase() === request.childPseudo.toLowerCase())) return null;
+    const settings = platformSettings(db);
+    const user = ensureUserSocial({ id: randomUUID(), pseudo: request.childPseudo, email: normalizeEmail(request.childEmail), emailVerifiedAt: null, passwordHash: request.passwordHash, tokens: settings.signupTokens, guest: false, admin: false, editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, registrationAuthorization: { ageBand: "under13", birthDate: request.childBirthDate, termsVersion: PRIVACY_VERSION, acceptedAt: request.parentConsentAt, parentalApproval: { requestId: request.id, code: request.code, reviewerId: req.auth.id, approvedAt: new Date().toISOString(), parentEmail: request.parentEmail } }, parentalAccess: { status: "active" }, profile: { displayName: request.childPseudo, birthDate: request.childBirthDate }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
+    db.users.push(user);
+    db.transactions.push({ id: randomUUID(), userId: user.id, amount: settings.signupTokens, balance: user.tokens, gameId: null, roomId: null, reason: "signup-bonus", createdAt: new Date().toISOString() });
+    refreshPublicProfileStats(user, db);
+    return user;
+  });
+  if (!created) return res.status(409).json({ error: "L’adresse email ou le pseudo est désormais utilisé par un autre compte." });
+  const approved = parentalControls.approve(request.id, req.auth.id, created.id);
+  const childVerification = emailDeliveryConfigured() ? updateDb((db) => {
+    const child = db.users.find((entry) => entry.id === created.id);
+    return child ? { user: child, token: issueEmailVerification(child), siteName: platformSettings(db).siteName } : null;
+  }) : null;
+  try { await Promise.all([
+    sendParentalDecision(approved, { approved: true, portalToken: approved.portalToken }),
+    childVerification ? sendEmailVerification(childVerification) : Promise.resolve()
+  ]); }
+  catch (error) { console.error("Parental approval email failed:", error.message); }
+  res.status(201).json({ request: approved, user: sanitizeUser(created) });
+});
+app.post("/api/admin/parental-approvals/:id/reject", auth, requireAdmin, async (req, res) => {
+  const request = parentalControls.reject(req.params.id, req.auth.id, req.body.reason);
+  if (!request) return res.status(409).json({ error: "Ce dossier ne peut plus être refusé." });
+  try { await sendParentalDecision(request, { approved: false, reason: request.rejectionReason }); }
+  catch (error) { console.error("Parental rejection email failed:", error.message); }
+  res.json(request);
 });
 
 app.post("/api/admin/achievements", auth, requireAdmin, (req, res) => {
@@ -3376,26 +4669,38 @@ app.delete("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
+  if (req.body.emailVerificationRequired === true && !emailDeliveryConfigured()) return res.status(400).json({ error: "Configure SMTP_HOST et EMAIL_FROM avant d'activer la validation des emails." });
   const settings = updateDb((db) => {
     db.settings ??= {};
     db.settings.platform = normalizePlatformSettings({ ...platformSettings(db), ...req.body });
     return db.settings.platform;
   });
-  res.json(settings);
+  res.json({ ...settings, emailVerificationAvailable: emailDeliveryConfigured() });
 });
 
 app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
   const newPassword = String(req.body.password ?? "");
   if (newPassword && newPassword.length < 4) return res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 4 caractères." });
+  const currentTarget = readDb().users.find((entry) => entry.id === req.params.id && !entry.guest);
+  const requestedEmail = normalizeEmail(req.body.login ?? currentTarget?.email);
+  if (currentTarget && validEmail(requestedEmail) && requestedEmail !== normalizeEmail(currentTarget.email) && !emailDeliveryConfigured()) return res.status(503).json({ error: "Le service email est indisponible : l’adresse n’a pas été modifiée." });
   const passwordHash = newPassword ? await bcrypt.hash(newPassword, 10) : null;
   const result = updateDb((db) => {
     const user = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
     if (!user) return null;
-    const login = String(req.body.login ?? user.pseudo).trim().slice(0, 32);
-    if (login.length < 3 || db.users.some((entry) => entry.id !== user.id && entry.pseudo.toLowerCase() === login.toLowerCase())) return "duplicate";
+    const email = normalizeEmail(req.body.login ?? user.email);
+    if (!validEmail(email) || db.users.some((entry) => entry.id !== user.id && normalizeEmail(entry.email) === email)) return "duplicate";
     ensureUserSocial(user);
-    user.pseudo = login;
-    user.profile.displayName = String(req.body.displayName ?? displayNameFor(user)).trim().slice(0, 32) || login;
+    const emailChanged = normalizeEmail(user.email) !== email;
+    if (emailChanged) {
+      user.email = email;
+      user.emailVerifiedAt = null;
+      delete user.emailVerification;
+      user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+    }
+    if (!emailChanged && req.body.emailVerified === true) user.emailVerifiedAt ??= new Date().toISOString();
+    if (!emailChanged && req.body.emailVerified === false) user.emailVerifiedAt = null;
+    user.profile.displayName = String(req.body.displayName ?? displayNameFor(user)).trim().slice(0, 32) || user.pseudo;
     user.profile.bio = normalizePlainText(req.body.bio ?? user.profile.bio, 180);
     user.profile.birthDate = normalizePublicProfile({ birthDate: req.body.birthDate ?? user.profile.birthDate }).birthDate;
     user.profile.gender = String(req.body.gender ?? user.profile.gender ?? "").trim().slice(0, 32);
@@ -3404,18 +4709,38 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
     const requestedBalance = Math.max(0, Math.floor(Number(req.body.tokens) || 0));
     const balanceDelta = requestedBalance - (Number(user.tokens) || 0);
     if (balanceDelta) addTokens(db, user.id, balanceDelta, { reason: "admin-adjustment", note: "Solde modifié depuis la fiche joueur" });
-    user.active = req.body.active !== false;
+    const nextActive = req.body.active !== false;
+    if (user.active !== false && !nextActive) user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+    user.active = nextActive;
     if (req.body.lastDailyClaim === null || req.body.lastDailyClaim === "") user.lastDailyClaim = null;
     else if (/^\d{4}-\d{2}-\d{2}$/.test(String(req.body.lastDailyClaim))) user.lastDailyClaim = String(req.body.lastDailyClaim);
-    if (passwordHash) user.passwordHash = passwordHash;
+    if (passwordHash) {
+      user.passwordHash = passwordHash;
+      user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+    }
     if (req.body.admin !== undefined && user.id !== req.auth.id) user.admin = Boolean(req.body.admin);
     if (req.body.editor !== undefined && user.id !== req.auth.id) user.editor = Boolean(req.body.editor);
+    if (req.body.moderation && user.id !== req.auth.id) {
+      user.moderation ??= {};
+      for (const type of ["softBan", "hardBan"]) {
+        const input = req.body.moderation[type];
+        if (!input || typeof input !== "object") continue;
+        const wasActive = activeModeration(user)?.type === (type === "hardBan" ? "hard" : "soft");
+        const endsAt = input.endsAt && Number.isFinite(Date.parse(input.endsAt)) ? new Date(input.endsAt).toISOString() : "";
+        user.moderation[type] = { active: input.active === true, reason: normalizePlainText(input.reason, 240), endsAt, updatedAt: new Date().toISOString(), updatedBy: req.auth.id };
+        if (type === "hardBan" && !wasActive && input.active === true) user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+      }
+    }
     refreshPublicProfileStats(user, db);
-    return user;
+    return { user, verificationToken: emailChanged && emailDeliveryConfigured() ? issueEmailVerification(user) : "", siteName: platformSettings(db).siteName };
   });
   if (!result) return res.status(404).json({ error: "Joueur introuvable." });
-  if (result === "duplicate") return res.status(409).json({ error: "Pseudo déjà utilisé." });
-  res.json({ ok: true });
+  if (result === "duplicate") return res.status(409).json({ error: "Adresse email invalide ou déjà utilisée." });
+  if (result.verificationToken) {
+    try { await sendEmailVerification({ user: result.user, token: result.verificationToken, siteName: result.siteName }); }
+    catch (error) { console.error("Admin email verification delivery failed:", error.message); return res.status(503).json({ error: "Le compte a été modifié, mais l’email de validation n’a pas pu être envoyé." }); }
+  }
+  res.json({ ok: true, verificationSent: Boolean(result.verificationToken) });
 });
 
 app.put("/api/admin/users/:id/inventory", auth, requireAdmin, (req, res) => {
@@ -3489,12 +4814,60 @@ app.post("/api/admin/users/:id/reset-achievements", auth, requireAdmin, (req, re
 });
 
 app.post("/api/admin/users/:id/reset-account", auth, requireAdmin, (req, res) => {
-  const found = updateDb((db) => { const user = db.users.find((entry) => entry.id === req.params.id); if (!user) return false; user.tokens = platformSettings(db).signupTokens; user.profile = normalizePublicProfile({}, user.pseudo); user.profileStats = normalizeProfileStats(); user.cosmetics = structuredClone(defaultCosmetics); user.achievements = normalizeAchievements(); user.achievementProgress = {}; user.active = true; return true; });
+  const found = updateDb((db) => {
+    const user = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!user) return false;
+    const birthDate = user.profile?.birthDate ?? "";
+    const targetBalance = platformSettings(db).signupTokens;
+    const balanceDelta = targetBalance - (Number(user.tokens) || 0);
+    if (balanceDelta) addTokens(db, user.id, balanceDelta, { reason: "admin-adjustment", note: "Réinitialisation administrative du compte" });
+    user.profile = normalizePublicProfile({}, user.pseudo);
+    user.profile.birthDate = birthDate;
+    user.profileStats = normalizeProfileStats();
+    user.cosmetics = structuredClone(defaultCosmetics);
+    user.achievements = normalizeAchievements();
+    user.achievementProgress = {};
+    user.active = true;
+    user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+    delete user.passwordReset;
+    return true;
+  });
   if (!found) return res.status(404).json({ error: "Joueur introuvable." });
   res.json({ ok: true });
 });
 
+app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
+  if (req.params.id === req.auth.id) return res.status(400).json({ error: "Tu ne peux pas supprimer ton propre compte administrateur." });
+  const result = updateDb((db) => {
+    const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!target) return "missing";
+    if (target.admin && db.users.filter((entry) => !entry.guest && entry.admin).length <= 1) return "last-admin";
+    if (db.rooms.some((room) => !room.finished && room.players?.some((player) => player.id === target.id))) return "active-room";
+    for (const user of db.users) {
+      if (user.id === target.id) continue;
+      ensureUserSocial(user);
+      user.friends = user.friends.filter((id) => id !== target.id);
+      user.friendRequests.incoming = user.friendRequests.incoming.filter((id) => id !== target.id);
+      user.friendRequests.outgoing = user.friendRequests.outgoing.filter((id) => id !== target.id);
+      user.roomInvites = user.roomInvites.filter((invite) => invite.fromId !== target.id);
+      user.notifications = user.notifications.filter((notification) => notification.actorId !== target.id);
+    }
+    db.users = db.users.filter((entry) => entry.id !== target.id);
+    return "deleted";
+  });
+  if (result === "missing") return res.status(404).json({ error: "Joueur introuvable." });
+  if (result === "last-admin") return res.status(409).json({ error: "Le dernier administrateur du casino ne peut pas être supprimé." });
+  if (result === "active-room") return res.status(409).json({ error: "Ce joueur est encore présent dans une table active. Exclue-le ou ferme la table avant de supprimer son compte." });
+  if (result === "deleted") {
+    parentalControls.deleteForUser(req.params.id);
+    tribunal.deleteForUser(req.params.id);
+    chat.deleteForUser(req.params.id);
+  }
+  res.json({ ok: true });
+});
+
 app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
+  if (Object.hasOwn(req.body, "defaultModifiers") && (!req.body.defaultModifiers || typeof req.body.defaultModifiers !== "object" || Array.isArray(req.body.defaultModifiers))) return res.status(400).json({ error: "Parametres par defaut invalides." });
   if (req.params.id === "texas-holdem" && Number(req.body.pokerDefaultBigBlind) % 2) return res.status(400).json({ error: "La grosse blinde par défaut doit être paire." });
   const updated = updateDb((db) => {
     if (!games.some((game) => game.id === req.params.id)) return false;
@@ -3502,6 +4875,7 @@ app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
     db.settings.games ??= {};
     db.settings.games[req.params.id] = {
       ...(db.settings.games[req.params.id] ?? {}),
+      ...(Object.hasOwn(req.body, "defaultModifiers") ? { defaultModifiers: req.params.id === "bataille" ? normalizeBattleModifiers(req.body.defaultModifiers) : normalizeGameModifiers(req.params.id, req.body.defaultModifiers) } : {}),
       name: String(req.body.name ?? "").trim().slice(0, 60),
       description: String(req.body.description ?? "").trim().slice(0, 240),
       category: String(req.body.category ?? "").trim().slice(0, 40),
@@ -3535,7 +4909,9 @@ app.post("/api/admin/shop", auth, requireBackOffice, (req, res) => {
   if (!req.backOfficeUser.admin && (price < guidance.allowedMin || price > guidance.allowedMax)) {
     return res.status(400).json({ error: `Le prix doit être compris entre ${guidance.allowedMin} et ${guidance.allowedMax} jetons pour cette catégorie.`, pricing: guidance });
   }
-  const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css), createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
+  let pack;
+  try { pack = normalizeShopPack(req.body.packName); } catch (error) { return res.status(400).json({ error: error.message }); }
+  const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css), ...pack, createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
   updateDb((currentDb) => { currentDb.settings ??= {}; currentDb.settings.customShopItems ??= []; currentDb.settings.customShopItems.push(item); });
   res.json(item);
 });
@@ -3553,13 +4929,16 @@ app.patch("/api/admin/shop/:id", auth, requireBackOffice, (req, res) => {
     const price = Math.max(0, Math.floor(Number(req.body.price) || 0));
     const guidance = shopPriceGuidance(db, type, category, req.params.id);
     if (!req.backOfficeUser.admin && (price < guidance.allowedMin || price > guidance.allowedMax)) return { pricing: guidance };
+    let pack;
+    try { pack = req.body.packName === undefined ? { packs: current.packs ?? [], packName: current.packName ?? "" } : normalizeShopPack(req.body.packName); } catch (error) { return { error: error.message }; }
     const design = req.body.design === undefined ? current?.design ?? null : normalizeCosmeticDesign(req.body.design, type);
     const motion = req.body.motion === undefined ? current?.motion ?? null : normalizeCosmeticMotion(req.body.motion);
-    db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css) };
+    db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css), ...pack };
     return "updated";
   });
   if (result === "missing") return res.status(404).json({ error: "Objet introuvable." });
   if (result === "forbidden") return res.status(403).json({ error: "Un éditeur ne peut modifier que les objets personnalisés." });
+  if (result?.error) return res.status(400).json({ error: result.error });
   if (typeof result === "object") return res.status(400).json({ error: `Le prix doit être compris entre ${result.pricing.allowedMin} et ${result.pricing.allowedMax} jetons pour cette catégorie.`, pricing: result.pricing });
   res.json({ ok: true });
 });
@@ -3584,7 +4963,7 @@ app.delete("/api/admin/shop/:id", auth, requireBackOffice, (req, res) => {
 
 app.patch("/api/me", auth, async (req, res) => {
   if (req.auth.guest) return res.status(400).json({ error: "Les invités ne peuvent pas modifier un compte." });
-  const login = String(req.body.login ?? "").trim();
+  const login = req.body.login === undefined ? "" : normalizeEmail(req.body.login);
   const displayName = String(req.body.displayName ?? req.body.pseudo ?? "").trim();
   const birthDate = String(req.body.birthDate ?? "").trim();
   const gender = String(req.body.gender ?? "").trim();
@@ -3599,14 +4978,17 @@ app.patch("/api/me", auth, async (req, res) => {
     : [customAchievementId, ""];
   const statOptions = ["hidden", "todayGames", "overallWinRate", "winRate", "achievementsUnlocked", "customAchievement"];
   const publicStatOptions = ["age", "gender", "friends", "gamesPlayed", "wins", "winRate", "achievements"];
-  if (login && login.length < 3) return res.status(400).json({ error: "Identifiant trop court." });
+  if (login && !validEmail(login)) return res.status(400).json({ error: "Adresse email invalide." });
+  const currentAccount = readDb().users.find((entry) => entry.id === req.auth.id);
+  if (login && normalizeEmail(currentAccount?.email) !== login) return res.status(400).json({ error: "Modifie l'adresse email depuis l'écran de sécurité du compte." });
   if (displayName && displayName.length < 3) return res.status(400).json({ error: "Pseudo en jeu trop court." });
   const allowedGenders = ["", "Homme", "Femme", "Non-binaire", "Autre", "Préfère ne pas dire"];
   if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return res.status(400).json({ error: "Date de naissance invalide." });
   if (birthDate) {
     const age = ageFromBirthDate(birthDate);
-    const authorization = readDb().users.find((entry) => entry.id === req.auth.id)?.registrationAuthorization;
+    const authorization = currentAccount?.registrationAuthorization;
     if (age === "" || (age < 13 && !authorization?.parentalApproval)) return res.status(400).json({ error: "Une autorisation parentale est nécessaire avant 13 ans." });
+    if (currentAccount?.profile?.birthDate && birthDate !== currentAccount.profile.birthDate) return res.status(400).json({ error: "La date de naissance enregistrée ne peut être modifiée que par l’administration." });
   }
   if (!allowedGenders.includes(gender)) return res.status(400).json({ error: "Genre invalide." });
   if (password && password.length < 4) return res.status(400).json({ error: "Mot de passe trop court." });
@@ -3620,19 +5002,20 @@ app.patch("/api/me", auth, async (req, res) => {
     ensureUserCosmetics(found);
     ensureUserAchievements(found);
     found.profileStats = normalizeProfileStats(found.profileStats);
-    if (login && db.users.some((u) => u.id !== found.id && u.pseudo.toLowerCase() === login.toLowerCase())) return "duplicate";
     for (const id of customAchievementIds.filter(Boolean)) {
       const achievement = achievementStatus(found, db).find((entry) => entry.id === id);
       if (!achievement?.milestone || !achievement.unlocked) return "achievement";
     }
-    if (login) found.pseudo = login;
     if (displayName) found.profile.displayName = displayName;
     if (req.body.birthDate !== undefined) found.profile.birthDate = birthDate;
     if (req.body.gender !== undefined) found.profile.gender = gender;
     if (req.body.bio !== undefined) found.profile.bio = bio.slice(0, 180);
     if (favoriteGames) found.profile.favoriteGames = favoriteGames;
     found.profile = normalizePublicProfile(found.profile, found.pseudo);
-    if (passwordHash) found.passwordHash = passwordHash;
+    if (passwordHash) {
+      found.passwordHash = passwordHash;
+      found.sessionVersion = (Number(found.sessionVersion) || 0) + 1;
+    }
     if (memberCardStats.length) found.profileStats.memberCardStats = memberCardStats.length === 1 ? [memberCardStats[0], "achievementsUnlocked"] : memberCardStats;
     if (visibleProfileStats) found.profileStats.visibleProfileStats = visibleProfileStats;
     if (req.body.customAchievementIds !== undefined || customAchievementId || found.profileStats.memberCardStats.includes("customAchievement")) {
@@ -3640,7 +5023,7 @@ app.patch("/api/me", auth, async (req, res) => {
       found.profileStats.customAchievementId = customAchievementIds[0] ?? "";
     }
     refreshPublicProfileStats(found, db);
-    if (login || displayName) {
+    if (displayName) {
       for (const room of db.rooms.filter((r) => !r.finished)) {
         const player = room.players.find((p) => p.id === found.id);
         if (player) {
@@ -3659,10 +5042,11 @@ app.patch("/api/me", auth, async (req, res) => {
     processAchievementEvent(db, found.id, { type: "player.updated", payload: { changed: Object.keys(req.body).filter((key) => ["displayName", "bio", "favoriteGames", "memberCardStats"].includes(key)) } });
     return found;
   });
-  if (user === "duplicate") return res.status(409).json({ error: "Pseudo déjà utilisé." });
   if (user === "achievement") return res.status(400).json({ error: "Succès milestone indisponible." });
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
-  res.json(sanitizeUser(user));
+  const payload = sanitizeUser(user);
+  if (passwordHash) payload.sessionToken = makeToken(user);
+  res.json(payload);
 });
 
 app.patch("/api/me/cosmetics", auth, (req, res) => {
@@ -3709,6 +5093,8 @@ app.patch("/api/me/cosmetics", auth, (req, res) => {
 
 app.post("/api/shop/purchase", auth, (req, res) => {
   if (req.auth.guest) return res.status(400).json({ error: "La boutique est réservée aux comptes enregistrés." });
+  const access = userFeatureAccess(getUser(req.auth.id), "shop");
+  if (!access.allowed) return rejectFeature(res, access);
   const item = configuredShop().find((entry) => entry.id === req.body.itemId);
   if (!item) return res.status(404).json({ error: "Article introuvable." });
   if (item.rewardOnly) return res.status(400).json({ error: "Cet objet se débloque avec un succès." });
@@ -3741,6 +5127,8 @@ app.post("/api/shop/purchase", auth, (req, res) => {
 
 app.post("/api/shop/purchase-pack", auth, (req, res) => {
   if (req.auth.guest) return res.status(400).json({ error: "La boutique est réservée aux comptes enregistrés." });
+  const access = userFeatureAccess(getUser(req.auth.id), "shop");
+  if (!access.allowed) return rejectFeature(res, access);
   const packId = String(req.body.packId ?? "").trim().slice(0, 80);
   const itemIds = [...new Set(Array.isArray(req.body.itemIds) ? req.body.itemIds.map(String) : [])].slice(0, shopTypes.length);
   if (!packId || !itemIds.length) return res.status(400).json({ error: "Sélectionne au moins un élément du pack." });
@@ -3810,6 +5198,10 @@ app.post("/api/rooms", auth, async (req, res) => {
   const user = getUser(req.auth.id);
   const game = configuredGames().find((g) => g.id === req.body.gameId);
   if (!user || !game || game.enabled === false) return res.status(400).json({ error: "Création impossible." });
+  const roomAccess = userFeatureAccess(user, "rooms:create");
+  if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
+  const gameAccess = userFeatureAccess(user, `game:${game.id}`);
+  if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
   const settings = platformSettings();
   const name = String(req.body.name ?? "").trim();
   const password = String(req.body.password ?? "");
@@ -3828,8 +5220,9 @@ app.post("/api/rooms", auth, async (req, res) => {
     isPublic: req.body.isPublic !== false,
     stake,
     pokerBlinds: game.id === "texas-holdem" ? { ...pokerBlindsFromBigBlind(settings.pokerDefaultBigBlind), maximumBet: stake } : undefined,
-    battleModifiers: game.id === "bataille" ? normalizeBattleModifiers() : undefined,
-    gameModifiers: normalizeGameModifiers(game.id),
+    pokerTurnSeconds: game.id === "texas-holdem" ? settings.pokerTurnSeconds : undefined,
+    battleModifiers: game.id === "bataille" ? normalizeBattleModifiers(game.defaultModifiers) : undefined,
+    gameModifiers: normalizeGameModifiers(game.id, game.defaultModifiers),
     readyPlayerIds: [user.id],
     ownerId: user.id,
     players: [roomPlayerFor(user)],
@@ -3848,6 +5241,10 @@ app.post("/api/rooms/:code/join", auth, async (req, res) => {
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
   const game = room && games.find((g) => g.id === room.gameId);
   if (!user || !room || !game) return res.status(404).json({ error: "Table introuvable." });
+  const roomAccess = userFeatureAccess(user, "rooms:join", db);
+  if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
+  const gameAccess = userFeatureAccess(user, `game:${room.gameId}`, db);
+  if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
   if (room.players.some((p) => p.id === user.id)) return res.json(sanitizeRoom(room, req.auth.id));
   if (room.passwordHash && !maySpectate(room, user.id) && !(await bcrypt.compare(String(req.body.password ?? ""), room.passwordHash))) return res.status(403).json({ error: "Mot de passe de table requis ou invalide." });
   if (room.state) {
@@ -3865,15 +5262,23 @@ app.post("/api/rooms/:code/join", auth, async (req, res) => {
 });
 
 app.get("/api/rooms/:code", auth, (req, res) => {
-  const room = readDb().rooms.find((r) => r.code === req.params.code.toUpperCase());
+  const db = readDb();
+  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: "Table introuvable." });
+  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+  if (!access.allowed) return rejectFeature(res, access);
   if (!maySpectate(room, req.auth.id)) return res.json({ ...sanitizeLobbyRoom(room), state: room.state ? { gameId: room.gameId } : null, accessRequired: true });
-  res.json(sanitizeRoom(room, req.auth.id, undefined, req.query.spectate === "1"));
+  res.json(sanitizeRoom(room, req.auth.id, db, req.query.spectate === "1"));
 });
 
 app.post("/api/rooms/:code/spectate", auth, async (req, res) => {
   const room = readDb().rooms.find((entry) => entry.code === req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: "Table introuvable." });
+  const user = getUser(req.auth.id);
+  const roomAccess = userFeatureAccess(user, "rooms:join");
+  if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
+  const gameAccess = userFeatureAccess(user, `game:${room.gameId}`);
+  if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
   if (!maySpectate(room, req.auth.id) && room.passwordHash && !(await bcrypt.compare(String(req.body.password ?? ""), room.passwordHash))) return res.status(403).json({ error: "Mot de passe de table requis ou invalide." });
   grantSpectatorAccess(room, req.auth.id);
   res.json(sanitizeRoom(room, req.auth.id, undefined, true));
@@ -3883,6 +5288,8 @@ app.post("/api/rooms/:code/belote-team", auth, (req, res) => {
   const db = readDb();
   const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: "Table introuvable." });
+  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+  if (!access.allowed) return rejectFeature(res, access);
   try {
     chooseBeloteTeam(room, req.auth.id, String(req.body.playerId ?? req.auth.id), req.body.team);
     writeDb(db); emitRoomUpdate(room, db);
@@ -3891,6 +5298,8 @@ app.post("/api/rooms/:code/belote-team", auth, (req, res) => {
 });
 
 app.post("/api/rooms/:code/invite", auth, (req, res) => {
+  const access = userFeatureAccess(getUser(req.auth.id), "friends");
+  if (!access.allowed) return rejectFeature(res, access);
   if (req.auth.guest) return res.status(400).json({ error: "Les invitations sont réservées aux comptes enregistrés." });
   const friendId = String(req.body.friendId ?? "");
   const result = updateDb((db) => {
@@ -3921,6 +5330,8 @@ app.post("/api/rooms/:code/invite", auth, (req, res) => {
 });
 
 app.post("/api/room-invites/:id/accept", auth, (req, res) => {
+  const access = userFeatureAccess(getUser(req.auth.id), "friends");
+  if (!access.allowed) return rejectFeature(res, access);
   if (req.auth.guest) return res.status(400).json({ error: "Les invitations sont réservées aux comptes enregistrés." });
   const inviteId = req.params.id;
   const db = readDb();
@@ -3931,6 +5342,8 @@ app.post("/api/room-invites/:id/accept", auth, (req, res) => {
   const room = invite && db.rooms.find((row) => row.code === invite.code && !row.finished);
   const game = room && games.find((g) => g.id === room.gameId);
   if (!invite || !room || !game) return res.status(404).json({ error: "Invitation expirée." });
+  const tableAccess = tableFeatureAccess(user, room, db);
+  if (!tableAccess.allowed) return rejectFeature(res, tableAccess);
   if (room.players.some((p) => p.id === user.id)) return res.json(sanitizeRoom(room, req.auth.id));
   if (room.state) {
     grantSpectatorAccess(room, user.id);
@@ -4093,6 +5506,8 @@ app.post("/api/rooms/:code/ready", auth, (req, res) => {
   const db = readDb();
   const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && !entry.state && !entry.finished);
   if (!room || !room.players.some((player) => player.id === req.auth.id && !player.isBot)) return res.status(404).json({ error: "Table introuvable." });
+  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+  if (!access.allowed) return rejectFeature(res, access);
   room.readyPlayerIds ??= [];
   room.readyPlayerIds = room.readyPlayerIds.includes(req.auth.id) ? room.readyPlayerIds.filter((id) => id !== req.auth.id) : [...room.readyPlayerIds, req.auth.id];
   writeDb(db);
@@ -4105,6 +5520,8 @@ app.post("/api/rooms/:code/start", auth, (req, res) => {
   const db = readDb();
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase() && r.ownerId === req.auth.id && !r.state);
   if (!room) return res.status(404).json({ error: "Table introuvable." });
+  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+  if (!access.allowed) return rejectFeature(res, access);
   const game = configuredGames(db).find((entry) => entry.id === room.gameId);
   if (!game) return res.status(404).json({ error: "Jeu introuvable." });
   const humans = room.players.filter((player) => !player.isBot);
@@ -4130,6 +5547,7 @@ app.post("/api/rooms/:code/replay", auth, (req, res) => {
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase() && r.ownerId === req.auth.id && r.finished);
   if (!room) return res.status(404).json({ error: "Replay indisponible." });
   room.state = null;
+  room.pacing = null;
   const humans = room.players.filter((player) => !player.isBot);
   room.readyPlayerIds = humans.length === 1 ? [humans[0].id] : [];
   room.finished = false;
@@ -4162,11 +5580,30 @@ app.post("/api/rooms/:code/action", auth, (req, res) => {
   const db = readDb();
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
   if (!room?.state) return res.status(404).json({ error: "Partie non démarrée." });
+  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+  if (!access.allowed) return rejectFeature(res, access);
   if (!room.players.some((player) => player.id === req.auth.id && !player.isBot) || !room.state.players.some((player) => player.id === req.auth.id && !player.isBot)) return res.status(403).json({ error: "Un spectateur ne peut pas jouer." });
   if (room.finished && !(room.state.gameId === "texas-holdem" && req.body.type === "show")) return res.status(404).json({ error: "Cette partie est terminée." });
+  const pacingAdvanced = room.pacing && !roomPacingActive(room) ? advanceRoomPacing(room, db) : false;
+  const actionAllowedDuringPacing = (room.state.gameId === "texas-holdem" && req.body.type === "show")
+    || (room.pacing?.kind === "turn-end" && room.pacing.actorIsBot && room.state.gameId === "midnight-dice" && room.state.phase === "contract" && req.body.type === "choose-contract");
+  if (roomPacingActive(room) && !actionAllowedDuringPacing) {
+    if (pacingAdvanced) {
+      writeDb(db);
+      emitRoomUpdate(room, db);
+    }
+    const pacingError = room.pacing.kind === "round-results"
+      ? "La manche suivante commencera après les résultats."
+      : room.pacing.kind === "bot-thinking"
+        ? "L'IA prépare encore son coup."
+        : "Le tour précédent est encore affiché.";
+    return res.status(409).json({ error: pacingError });
+  }
   try {
     const actionPlayer = room.state.players?.find((player) => player.id === req.auth.id);
+    const turnBeforeActionPlayerId = room.state.players?.[room.state.currentPlayerIndex]?.id ?? "";
     const achievementSnapshot = actionAchievementSnapshot(room.state, req.auth.id);
+    const roundBeforeAction = roundProgressSnapshot(room.state);
     const actionNow = Date.now();
     if (req.body.type === "roll" && !actionPlayer?.isBot && (room.state.rollAvailableAt?.[req.auth.id] ?? 0) > actionNow) throw new Error("Laisse les dés terminer leur lancer avant de relancer.");
     if (room.state.gameId === "blackjack" && req.body.type === "bet") {
@@ -4209,7 +5646,24 @@ app.post("/api/rooms/:code/action", auth, (req, res) => {
     room.state = applyAction(room.state, req.auth.id, req.body);
     processAchievementEvent(db, req.auth.id, gameActionAchievementEvent(room, req.auth.id, req.body, achievementSnapshot), room);
     if (req.body.type === "roll" && !actionPlayer?.isBot) room.state.rollAvailableAt = { ...(room.state.rollAvailableAt ?? {}), [req.auth.id]: Date.now() + 700 };
-    runBotTurns(room, db);
+    const showingRoundResults = startRoundResultsIfNeeded(room, roundBeforeAction, actionPlayer);
+    if (!showingRoundResults) {
+      const turnAfterActionPlayerId = room.state.players?.[room.state.currentPlayerIndex]?.id ?? "";
+      const humanTurnEnded = !room.state.finished
+        && room.state.gameId !== "bataille"
+        && turnBeforeActionPlayerId === req.auth.id
+        && (turnAfterActionPlayerId !== turnBeforeActionPlayerId || didRoundFinish(roundBeforeAction, room.state));
+      if (humanTurnEnded && !roomPacingActive(room)) {
+        const timing = roomTiming(room);
+        startRoomPacing(room, "turn-end", timing.turnEndDelayMs, {
+          actorId: actionPlayer?.id ?? req.auth.id,
+          actorName: actionPlayer?.pseudo ?? "Le joueur",
+          actorIsBot: false
+        });
+      } else {
+        runBotTurns(room, db);
+      }
+    }
     finishRoomIfNeeded(room, db);
     const achievementUnlocks = consumeRoomAchievementUnlocks(room, req.auth.id);
     writeDb(db);
@@ -4219,6 +5673,21 @@ app.post("/api/rooms/:code/action", auth, (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
+});
+
+app.post("/api/rooms/:code/pacing/skip", auth, (req, res) => {
+  const db = readDb();
+  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase());
+  if (!room?.state || !room.pacing) return res.status(404).json({ error: "Aucune attente à passer." });
+  if (!room.players.some((player) => player.id === req.auth.id && !player.isBot)) return res.status(403).json({ error: "Seuls les joueurs assis peuvent accélérer la partie." });
+  if (req.body?.pacingId && req.body.pacingId !== room.pacing.id) return res.status(409).json({ error: "Cette attente est déjà terminée." });
+  room.pacing.endsAt = Date.now();
+  advanceRoomPacing(room, db, Date.now());
+  finishRoomIfNeeded(room, db);
+  writeDb(db);
+  const safeRoom = sanitizeRoom(room, req.auth.id, db);
+  emitRoomUpdate(room, db);
+  res.json(safeRoom);
 });
 
 app.get("/api/history", auth, (req, res) => {
@@ -4238,6 +5707,38 @@ app.get("/api/me/statistics", auth, (req, res) => {
   res.json({ ...stats, todayGames: stats.activity[casinoDateKey()] ?? 0 });
 });
 
+let parentalDigestRunning = false;
+async function processParentalDigests(now = Date.now()) {
+  if (parentalDigestRunning) return;
+  parentalDigestRunning = true;
+  try {
+    const db = readDb();
+    const day = casinoDateKey(now);
+    if (emailDeliveryConfigured()) {
+      for (const request of parentalControls.approvedGuardians()) {
+        const user = db.users.find((entry) => entry.id === request.userId);
+        if (!user || !isUnder13(user, now)) continue;
+        const approvalDay = casinoDateKey(request.reviewedAt || request.createdAt);
+        for (let offset = 7; offset >= 1; offset -= 1) {
+          const summaryDay = shiftDateKey(day, -offset);
+          if (summaryDay < approvalDay || parentalControls.mailWasSent(user.id, "daily", summaryDay)) continue;
+          const summary = parentalPortalSummary(request, summaryDay);
+          try { await sendParentDailySummary({ request, portalToken: request.portalToken, date: summaryDay, metrics: summary.metrics }); parentalControls.markMailSent(user.id, "daily", summaryDay, now); }
+          catch (error) { console.error("Parent daily summary failed:", error.message); break; }
+        }
+        const birthday = Date.parse(turnsThirteenAt(user.profile?.birthDate));
+        const days = Math.ceil((birthday - now) / 86400000);
+        const reminder = days <= 0 ? null : days <= 1 ? 1 : days <= 7 ? 7 : days <= 30 ? 30 : null;
+        if (reminder && !parentalControls.mailKindWasSent(user.id, `birthday-${reminder}`)) {
+          try { await sendParentBirthdayReminder({ request, portalToken: request.portalToken, days }); parentalControls.markMailSent(user.id, `birthday-${reminder}`, day, now); }
+          catch (error) { console.error("Parent birthday reminder failed:", error.message); }
+        }
+      }
+    }
+    parentalControls.prune(shiftDateKey(day, -120), now);
+  } finally { parentalDigestRunning = false; }
+}
+
 setInterval(() => {
   const db = readDb();
   const changedEvents = [];
@@ -4253,9 +5754,17 @@ setInterval(() => {
   const db = readDb();
   let changed = false;
   const now = Date.now();
+  for (const room of db.rooms.filter((entry) => entry.pacing)) {
+    if (!advanceRoomPacing(room, db, now)) continue;
+    changed = true;
+    emitRoomUpdate(room, db);
+  }
   for (const room of db.rooms.filter((entry) => entry.state?.gameId === "texas-holdem" && !entry.finished)) {
+    if (roomPacingActive(room, now)) continue;
+    const roundBeforeTick = roundProgressSnapshot(room.state);
     let roomChanged = tickPokerState(room.state, now);
-    if (roomChanged) runBotTurns(room, db);
+    const showingResults = roomChanged && startRoundResultsIfNeeded(room, roundBeforeTick);
+    if (roomChanged && !showingResults) runBotTurns(room, db);
     const current = room.state.currentPlayerIndex >= 0 ? room.state.players[room.state.currentPlayerIndex] : null;
     if (current && !current.isBot && room.state.turnDeadline && now >= room.state.turnDeadline) {
       cashOutPokerPlayer(room, db, current.id, "poker-timeout-cash-out");
@@ -4263,16 +5772,19 @@ setInterval(() => {
       io.to(room.id).emit("room-player-kicked", { code: room.code, playerId: current.id, reason: "timeout" });
       roomChanged = true;
     }
-    if (roomChanged && !room.state.finished) runBotTurns(room, db);
+    if (roomChanged && !room.state.finished && !roomPacingActive(room, now)) runBotTurns(room, db);
     if (roomChanged) {
       changed = true;
       emitRoomUpdate(room, db);
     }
   }
   for (const room of db.rooms.filter((entry) => entry.state?.gameId === "bataille" && !entry.finished)) {
+    if (roomPacingActive(room, now)) continue;
+    const roundBeforeTick = roundProgressSnapshot(room.state);
     if (!tickBattleState(room.state, now)) continue;
+    const showingResults = startRoundResultsIfNeeded(room, roundBeforeTick);
     finishRoomIfNeeded(room, db);
-    if (!room.finished) runBotTurns(room, db);
+    if (!room.finished && !showingResults) runBotTurns(room, db);
     changed = true;
     emitRoomUpdate(room, db);
   }
@@ -4283,6 +5795,25 @@ setInterval(() => {
 
 io.on("connection", (socket) => {
   socket.emit("rooms", sanitizeRooms(readDb().rooms.filter((room) => room.isPublic && !room.finished)));
+  const subscribeToChat = (payload = {}) => {
+    const token = payload.token || socket.handshake.auth?.token;
+    if (!token) return;
+    let viewer;
+    try { viewer = jwt.verify(token, JWT_SECRET); } catch { return; }
+    const db = readDb();
+    const user = db.users.find((entry) => entry.id === viewer.id && entry.active !== false && !entry.guest);
+    const staleSession = user && (Number(viewer.sessionVersion) || 0) !== (Number(user.sessionVersion) || 0);
+    if (!user || staleSession || activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) return;
+    ensureUserSocial(user);
+    socket.data.chatUserId = user.id;
+    socket.join("chat:global");
+    for (const friendId of user.friends) socket.join(`chat:direct:${directChannelId(user.id, friendId)}`);
+    const room = payload.roomCode ? chatRoomAccess(db, user.id, payload.roomCode) : null;
+    if (room) socket.join(`chat:room:${room.id}`);
+    socket.emit("chat-ready", { roomCode: room?.code ?? "" });
+  };
+  subscribeToChat();
+  socket.on("chat-subscribe", subscribeToChat);
   socket.on("watch-room", (payload) => {
     const roomId = typeof payload === "string" ? payload : payload?.roomId;
     if (!roomId || typeof payload !== "object" || !payload?.token) return;
@@ -4295,7 +5826,11 @@ io.on("connection", (socket) => {
     }
     const room = readDb().rooms.find((entry) => entry.id === roomId);
     const seated = room?.players.some((player) => player.id === viewer.id);
-    if (!room || !getUser(viewer.id) || (!seated && (!payload.spectator || !maySpectate(room, viewer.id)))) {
+    const viewerUser = getUser(viewer.id);
+    const staleSession = viewerUser && (Number(viewer.sessionVersion) || 0) !== (Number(viewerUser.sessionVersion) || 0);
+    const roomAccess = viewerUser ? userFeatureAccess(viewerUser, room?.ownerId === viewer.id ? "rooms:create" : "rooms:join") : { allowed: false };
+    const gameAccess = viewerUser && room ? userFeatureAccess(viewerUser, `game:${room.gameId}`) : { allowed: false };
+    if (!room || !viewerUser || viewerUser.active === false || staleSession || !roomAccess.allowed || !gameAccess.allowed || (!seated && (!payload.spectator || !maySpectate(room, viewer.id)))) {
       socket.emit("room-error", { error: "Table introuvable." });
       return;
     }
@@ -4307,6 +5842,7 @@ io.on("connection", (socket) => {
     socket.data.roomId = roomId;
     socket.data.userId = viewer.id;
     socket.data.spectator = payload.spectator === true || !seated;
+    socket.join(`chat:room:${room.id}`);
     const sockets = roomPresence.get(roomId) ?? new Set();
     sockets.add(socket.id);
     roomPresence.set(roomId, sockets);
@@ -4357,4 +5893,11 @@ server.listen(PORT, HOST, () => {
   const protocol = HTTPS_PFX_PATH || (HTTPS_KEY_PATH && HTTPS_CERT_PATH) ? "https" : "http";
   console.log(`KTGA.ME server listening on ${protocol}://${HOST}:${PORT}`);
   requestLogs.append({ category: "lifecycle", level: "info", method: "SYSTEM", route: "server/start", message: `Serveur démarré, processus ${process.pid}.` });
+  try { statusMonitor.backfillDowntime(); } catch (error) { console.error("Status history backfill failed:", error); }
+  collectPublicStatus();
+  setInterval(collectPublicStatus, STATUS_PROBE_INTERVAL_MS).unref();
+  settleTribunalCases();
+  setInterval(settleTribunalCases, 60 * 1000).unref();
+  processParentalDigests();
+  setInterval(processParentalDigests, 15 * 60 * 1000).unref();
 });

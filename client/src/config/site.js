@@ -6,6 +6,9 @@ export const defaultPublicSettings = {
   siteSubtitle: "Casino privé multijoueur, jetons, dés et cartes.",
   registrationsEnabled: true,
   guestAccessEnabled: true,
+  emailVerificationRequired: false,
+  emailVerificationAvailable: false,
+  minorRestrictions: ["shop", "game:texas-holdem", "game:belote"],
   signupTokens: 1000,
   dailyTokens: 250,
   dailyBonusDefaultMultiplier: 1,
@@ -16,6 +19,9 @@ export const defaultPublicSettings = {
     { id: "monthly", day: 30, operation: "multiply", value: 2, repeat: true, label: "Palier mensuel" }
   ],
   minRoomStake: 10,
+  botThinkingSeconds: 1,
+  turnEndDelaySeconds: 5,
+  roundResultsSeconds: 30,
   minPokerBuyIn: 1000,
   pokerDefaultBigBlind: 20,
   pokerTurnSeconds: 300

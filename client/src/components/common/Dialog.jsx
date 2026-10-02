@@ -20,7 +20,7 @@ export function Dialog({ title, onClose, children, className = "", layerClassNam
     if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panel.current)) { event.preventDefault(); first.focus(); }
   }
-  return createPortal(<div className={`modal-backdrop casino-dialog-layer ${layerClassName}`} onClick={() => { if (dismissible) onClose(); }}>
+  return createPortal(<div className={`modal-backdrop casino-dialog-layer ${layerClassName}`} onClick={(event) => { event.stopPropagation(); if (dismissible) onClose(); }}>
     <section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`modal casino-dialog ${className}`} onKeyDown={onKeyDown} onClick={(event) => event.stopPropagation()}>
       <div className="modal-title-row"><h2 id={titleId}>{title}</h2><button type="button" className="secondary icon-toggle" disabled={!dismissible} onClick={onClose} title="Fermer" aria-label="Fermer"><X size={18} /></button></div>
       {children}

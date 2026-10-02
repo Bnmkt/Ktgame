@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Check, Coins, Dice5, Flame, Gamepad2, Gift, Save, Settings2, ShoppingBag, Target, Trophy, X } from "lucide-react";
 import { achievementGoals, buildGuidedAchievement, gameFeats } from "./achievement-guide.js";
+import { AchievementValuePicker, itemChoices } from "./AchievementValuePicker.jsx";
 
 const icons = { trophy: Trophy, gamepad: Gamepad2, flame: Flame, coins: Coins, target: Target, dice: Dice5, badge: BadgeCheck, calendar: CalendarDays, gift: Gift, shop: ShoppingBag };
 
@@ -42,14 +43,16 @@ export function AchievementWizard({ games, achievements, shop = [], saving, erro
             <h3>{goal.label}</h3>
             {goal.id === "siteVisit" && <>
               <label>Page a visiter<select value={config.page || "lobby"} onChange={(event) => change("page", event.target.value)}>{Object.entries({ lobby: "Accueil", profile: "Profil", shop: "Boutique", leaderboard: "Classements", room: "Table", spectator: "Spectateur", event: "Evenement", admin: "Administration" }).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label>Objet a porter<select value={config.equippedItem || ""} onChange={(event) => change("equippedItem", event.target.value)}><option value="">Aucune condition d'equipement</option>{shop.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              <label>Objet a porter<AchievementValuePicker choices={itemChoices(shop)} value={config.equippedItem || ""} label="Choisir un objet a porter" allowEmpty onChange={(value) => change("equippedItem", value)} /></label>
               <label>Navigateur<select value={config.browser || ""} onChange={(event) => change("browser", event.target.value)}><option value="">Tous</option>{["firefox", "edge", "chrome", "safari", "other"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
               <label>Type d'indice dans le lien<select value={config.markerKey || "secret"} onChange={(event) => change("markerKey", event.target.value)}><option value="secret">Secret</option><option value="challenge">Defi</option></select></label>
               <label>Indice dans le lien (facultatif)<input maxLength={48} value={config.marker || ""} placeholder="answer-42" onChange={(event) => change("marker", event.target.value)} /></label>
               {config.marker && <p className="achievement-rule-note">Lien : ?{config.markerKey || "secret"}={config.marker}</p>}
             </>}
-            {goal.id === "ownItem" && <label>Objet a posseder<select value={config.ownedItem || ""} onChange={(event) => change("ownedItem", event.target.value)}><option value="">Choisir un objet</option>{shop.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
-            {["siteVisit", "activeTime", "visitDays"].includes(goal.id) && <p className="achievement-rule-note">Requiert le suivi facultatif des succes de navigation. Aucun gain de jetons ni avantage de jeu ne doit dependre de ce choix.</p>}
+            {goal.id === "ownItem" && <label>Objet a posseder<AchievementValuePicker choices={itemChoices(shop)} value={config.ownedItem || ""} label="Choisir un objet a posseder" onChange={(value) => change("ownedItem", value)} /></label>}
+            {["siteVisit", "activeTime", "visitDays", "tableTime", "roundTime"].includes(goal.id) && <p className="achievement-rule-note">Requiert le suivi facultatif des succès de navigation. Aucun gain de jetons ni avantage de jeu ne doit dépendre de ce choix.</p>}
+            {goal.id === "tableTime" && <p className="achievement-rule-note">Le temps actif du joueur comprend l'attente et les parties sur cette table. Changer de table remet ce compteur à zéro ; le mode spectateur ne compte pas.</p>}
+            {goal.id === "roundTime" && <p className="achievement-rule-note">Une manche correspond au round du jeu, à une main au poker, ou à la partie entière si le jeu n'a pas de rounds. Le compteur repart à zéro à la manche suivante et lors d'un replay.</p>}
             {goal.amount && <label>{goal.unit}<input autoFocus type="number" min="1" max="1000000000" step="1" value={config.amount} onChange={(event) => change("amount", event.target.value)} required /></label>}
             {goal.id === "feat" && <><label>Exploit<select value={config.featId} onChange={(event) => change("featId", event.target.value)}>{feats.map((feat) => <option key={feat.id} value={feat.id}>{feat.title}</option>)}</select></label><p>{feats.find((feat) => feat.id === config.featId)?.description}</p></>}
             {goal.repeatable && <label>Nombre de parties où réussir ce défi<input type="number" min="1" max="1000000000" step="1" required value={config.repetitions} onChange={(event) => change("repetitions", event.target.value)} /></label>}

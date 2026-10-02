@@ -36,14 +36,14 @@ async function api(endpoint, token, body, method = body ? "POST" : "GET") {
   assert.ok(response.ok, `${endpoint}: ${JSON.stringify(result)}`);
   return result;
 }
-const serverEnv = { NODE_ENV: "test", HOST: "127.0.0.1", PORT: String(apiPort), SQLITE_PATH: database, REQUEST_LOG_PATH: path.join(folder, "logs.sqlite"), JWT_SECRET: "event-refunds-test-only", APP_BASE_PATH: "/ktga", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "", CLIENT_DIST: "", CLIENT_ORIGIN: `http://127.0.0.1:${clientPort}` };
+const serverEnv = { NODE_ENV: "test", TEST_ADMIN_EMAIL: "bnmkt@tests.invalid", HOST: "127.0.0.1", PORT: String(apiPort), SQLITE_PATH: database, REQUEST_LOG_PATH: path.join(folder, "logs.sqlite"), JWT_SECRET: "event-refunds-test-only", APP_BASE_PATH: "/ktga", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "", CLIENT_DIST: "", CLIENT_ORIGIN: `http://127.0.0.1:${clientPort}` };
 let browser;
 try {
   const server = start([path.join(root, "server/src/index.js")], folder, serverEnv);
   await waitFor(`${apiRoot}/api/health`);
   start([path.join(root, "client/node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(clientPort), "--strictPort"], path.join(root, "client"), { VITE_BASE_PATH: "/ktga/", VITE_API_URL: apiRoot, VITE_SOCKET_URL: `http://127.0.0.1:${apiPort}`, VITE_SOCKET_PATH: "/ktga/socket.io" });
   await waitFor(`${base}/`);
-  const owner = await api("/auth/register", null, { pseudo: "bnmkt", password: "test-only-password", ageBand: "13plus", termsVersion: "2026-09-27" });
+  const owner = await api("/auth/register", null, { email: "bnmkt@tests.invalid", pseudo: "bnmkt", password: "test-only-password", birthDate: "1990-01-01", termsVersion: "2026-09-27" });
   const initialTokens = owner.user.tokens;
   async function createEvent() {
     const { event } = await api("/admin/community-events", owner.token, {});

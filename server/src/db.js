@@ -45,6 +45,7 @@ sqlite.exec(`
     id TEXT PRIMARY KEY,
     data TEXT NOT NULL,
     pseudo TEXT NOT NULL,
+    email TEXT,
     guest INTEGER NOT NULL DEFAULT 0
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_pseudo_lower ON users(lower(pseudo));
@@ -151,6 +152,13 @@ const transactionColumns = new Set(sqlite.prepare("PRAGMA table_info(transaction
 if (!transactionColumns.has("event_id")) sqlite.exec("ALTER TABLE transactions ADD COLUMN event_id TEXT");
 if (!transactionColumns.has("request_id")) sqlite.exec("ALTER TABLE transactions ADD COLUMN request_id TEXT");
 sqlite.exec("CREATE INDEX IF NOT EXISTS idx_transactions_event_created ON transactions(event_id, created_at)");
+const userColumns = new Set(sqlite.prepare("PRAGMA table_info(users)").all().map((column) => column.name));
+if (!userColumns.has("email")) sqlite.exec("ALTER TABLE users ADD COLUMN email TEXT");
+for (const row of sqlite.prepare("SELECT id, data FROM users WHERE email IS NULL").all()) {
+  const email = parseJson(row.data, {})?.email;
+  if (email) sqlite.prepare("UPDATE users SET email = ? WHERE id = ?").run(String(email).trim().toLowerCase(), row.id);
+}
+sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users(lower(email)) WHERE email IS NOT NULL");
 
 function parseJson(value, fallback) {
   try {
@@ -190,10 +198,11 @@ function userIdsForHistory(row) {
 }
 
 function insertUser(user) {
-  sqlite.prepare("INSERT INTO users (id, data, pseudo, guest) VALUES (?, ?, ?, ?)").run(
+  sqlite.prepare("INSERT INTO users (id, data, pseudo, email, guest) VALUES (?, ?, ?, ?, ?)").run(
     user.id,
     JSON.stringify(user),
     user.pseudo,
+    user.email ?? null,
     user.guest ? 1 : 0
   );
   if (normalizedStorage) sqlite.prepare("UPDATE users SET data = ? WHERE id = ?").run(JSON.stringify(normalizedStorage.splitUser(user)), user.id);

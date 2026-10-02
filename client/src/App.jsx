@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Coins, X } from "lucide-react";
+import { Coins, ShieldAlert, Users, X } from "lucide-react";
 import { api, installButtonActionFeedback, setToken } from "./api.js";
 import { defaultPublicSettings } from "./config/site.js";
 import { DisplayName, cosmeticCssRules, setCosmeticCatalogItems } from "./components/cosmetics/Cosmetics.jsx";
@@ -14,9 +14,11 @@ import { AchievementToasts, NotificationCenter } from "./components/feedback/Fee
 import { Auth } from "./pages/AuthPage.jsx";
 import { Lobby } from "./pages/LobbyPage.jsx";
 import { PublicProfileModal } from "./components/profile/PublicProfileModal.jsx";
+import { ReportPlayerDialog } from "./components/profile/ReportPlayerDialog.jsx";
 import { PrivacyProvider, legalLinks, useSiteActivity } from "./privacy/Privacy.jsx";
 import "./styles.css";
 import "./navigation/casino.css";
+import "./components/social/social.css";
 
 const Admin = lazy(() => import("./pages/AdminPage.jsx").then((module) => ({ default: module.Admin })));
 const LegalPage = lazy(() => import("./privacy/LegalPage.jsx").then((module) => ({ default: module.LegalPage })));
@@ -26,16 +28,32 @@ const SpectatorPage = lazy(() => import("./pages/SpectatorPage.jsx").then((modul
 const Profile = lazy(() => import("./pages/ProfilePage.jsx").then((module) => ({ default: module.Profile })));
 const FriendsModal = lazy(() => import("./components/profile/FriendsModal.jsx").then((module) => ({ default: module.FriendsModal })));
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage.jsx").then((module) => ({ default: module.LeaderboardPage })));
+const StatusPage = lazy(() => import("./pages/StatusPage.jsx").then((module) => ({ default: module.StatusPage })));
+const PatchnotesPage = lazy(() => import("./pages/PatchnotesPage.jsx").then((module) => ({ default: module.PatchnotesPage })));
+const ParentalPortalPage = lazy(() => import("./privacy/ParentalPortalPage.jsx").then((module) => ({ default: module.ParentalPortalPage })));
+const TribunalPage = lazy(() => import("./pages/TribunalPage.jsx").then((module) => ({ default: module.TribunalPage })));
+const SocialPanel = lazy(() => import("./components/social/SocialPanel.jsx").then((module) => ({ default: module.SocialPanel })));
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [accountRecovery, setAccountRecovery] = useState(() => new URL(window.location.href).searchParams.has("reset-password"));
   const [publicSettings, setPublicSettings] = useState(defaultPublicSettings);
   const [roomCode, setRoomCode] = useState(null);
   const [route, goTo] = useCasinoRoute();
   const view = route.view;
   useSiteActivity(user, route);
+  useEffect(() => {
+    if (!user?.minor?.restricted) return undefined;
+    const send = () => api("/api/me/guardian-activity", { method: "POST", background: true, body: JSON.stringify({ page: route.view }) }).catch(() => {});
+    send();
+    const timer = setInterval(send, 30000);
+    return () => clearInterval(timer);
+  }, [user?.id, user?.minor?.restricted, route.view]);
   const [communityEventSlug, setCommunityEventSlug] = useState(() => route.view === "event" ? route.id : "");
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [socialOpen, setSocialOpen] = useState(false);
+  const [conversationRequest, setConversationRequest] = useState({ friendId: "", revision: 0 });
+  const [tribunalAvailable, setTribunalAvailable] = useState(false);
   const [bonusFeedback, setBonusFeedback] = useState(null);
   const [exclusion, setExclusion] = useState(null);
   const activeUserId = useRef(null);
@@ -44,14 +62,30 @@ export default function App() {
   const [inboxNotifications, setInboxNotifications] = useState([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [publicProfile, setPublicProfile] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
   const [cosmeticStyles, setCosmeticStyles] = useState("");
   const [, setCosmeticCatalogRevision] = useState(0);
   const pendingRoomCode = view === "room" ? route.id : "";
   const knownNotificationIds = useRef(new Set());
   useEffect(() => installButtonActionFeedback(), []);
-  useEffect(() => { api("/api/me").then(setUser).catch(() => {}); }, []);
+  useEffect(() => {
+    if (accountRecovery) {
+      setToken("");
+      setUser(null);
+      return;
+    }
+    api("/api/me").then(setUser).catch(() => setToken(""));
+  }, [accountRecovery]);
   useEffect(() => { api("/api/config").then((settings) => setPublicSettings({ ...defaultPublicSettings, ...settings })).catch(() => {}); }, []);
   useEffect(() => { document.title = publicSettings.siteName || defaultPublicSettings.siteName; }, [publicSettings.siteName]);
+  useEffect(() => {
+    if (!user || user.guest || user.minor?.restricted || user.moderation?.type === "soft") return setTribunalAvailable(false);
+    let cancelled = false;
+    const load = () => api("/api/tribunal/availability", { background: true }).then((result) => { if (!cancelled) setTribunalAvailable(Boolean(result.available)); }).catch(() => {});
+    load();
+    const timer = window.setInterval(load, 60000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [user?.id, user?.guest, user?.minor?.restricted, user?.moderation?.type]);
   useEffect(() => {
     document.documentElement.classList.toggle("room-route-active", view === "room");
     return () => document.documentElement.classList.remove("room-route-active");
@@ -99,6 +133,7 @@ export default function App() {
     setInboxNotifications((rows) => [notification, ...rows.filter((row) => row.id !== notification.id)]);
     setRoomCode(null);
     setFriendsOpen(false);
+    setSocialOpen(false);
     setPublicProfile(null);
     setNotificationsOpen(false);
     goTo("lobby");
@@ -203,6 +238,7 @@ export default function App() {
     setCommunityEventSlug("");
     goTo("lobby", "", { replace: true });
     setFriendsOpen(false);
+    setSocialOpen(false);
     setPublicProfile(null);
     setNotifications([]);
     setInboxNotifications([]);
@@ -252,32 +288,53 @@ export default function App() {
     goTo(destination, destination === "room" ? roomCode : destination === "event" ? communityEventSlug : "");
   }
 
+  const parentAccess = view === "parents" && (new URL(window.location.href).searchParams.has("parental-verify") || new URL(window.location.href).searchParams.has("parental-access"));
+  if (parentAccess) return <Suspense fallback={<main className="legal-page" role="status">Chargement de l’espace parent…</main>}><ParentalPortalPage siteName={publicSettings.siteName} /></Suspense>;
   if (Object.hasOwn(legalLinks, view)) return <Suspense fallback={<main className="legal-page" role="status">Chargement…</main>}><LegalPage view={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
-  if (!user) return <Auth onAuth={setUser} pendingRoomCode={pendingRoomCode} settings={publicSettings} />;
+  if (view === "status") return <Suspense fallback={<main className="status-page" role="status">Chargement de l’état des services…</main>}><StatusPage siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
+  if (view === "patchnotes") return <Suspense fallback={<main className="patchnotes-page" role="status">Chargement des patchnotes…</main>}><PatchnotesPage siteName={publicSettings.siteName} user={user} onBack={() => goTo("lobby")} /></Suspense>;
+  if (accountRecovery || !user || user.requiresEmailUpgrade || user.requiresEmailVerification) return <Auth
+    onAuth={setUser}
+    onClearSession={() => { setToken(""); setUser(null); }}
+    onRecoveryComplete={() => setAccountRecovery(false)}
+    currentUser={user}
+    pendingRoomCode={pendingRoomCode}
+    settings={publicSettings}
+  />;
+  const accountRestrictions = user.minor?.restrictions ?? [];
+  const blockedView = view === "shop" && accountRestrictions.includes("shop") || view === "event" && (accountRestrictions.includes("community-events") || user.moderation?.type === "soft");
   return (
     <>
       {cosmeticStyles && <style>{cosmeticStyles}</style>}
       <AchievementToasts notifications={notifications} onClose={(id) => setNotifications((list) => list.filter((notification) => notification.id !== id))} />
-      <CasinoHeader user={user} siteName={publicSettings.siteName} siteIcon={publicSettings.siteIcon} view={view} roomCode={roomCode} eventSlug={communityEventSlug} onNavigate={navigate} onFriends={() => { setFriendsOpen(true); setNotificationsOpen(false); }} onLogout={logout}>
-      <div className="casino-wallet"><CompactNumber value={user.tokens} label="Solde exact" /><Coins size={18} /></div><DailyBonusButton user={user} setUser={setUser} settings={publicSettings} onAchievements={notifyAchievements} onFeedback={setBonusFeedback} /><div className="identity-pill"><DisplayName user={user} />{user.guest && <small>Invité</small>}</div>{!user.guest && <NotificationCenter items={inboxNotifications} open={notificationsOpen} onToggle={() => setNotificationsOpen((value) => !value)} onDelete={deleteInboxNotification} onClear={clearInboxNotifications} onAction={actOnInboxNotification} />}
+      <CasinoHeader user={user} siteName={publicSettings.siteName} siteIcon={publicSettings.siteIcon} view={view} roomCode={roomCode} eventSlug={communityEventSlug} tribunalAvailable={tribunalAvailable} onNavigate={navigate} onLogout={logout}>
+      <div className="casino-wallet"><CompactNumber value={user.tokens} label="Solde exact" /><Coins size={18} /></div><DailyBonusButton user={user} setUser={setUser} settings={publicSettings} onAchievements={notifyAchievements} onFeedback={setBonusFeedback} /><div className="identity-pill"><DisplayName user={user} />{user.guest && <small>Invité</small>}</div>{!user.guest && <button type="button" className={`secondary icon-toggle conversation-toggle ${socialOpen ? "active" : ""}`} title="Social" aria-label="Ouvrir Social" aria-expanded={socialOpen} onClick={() => { setSocialOpen((value) => !value); setNotificationsOpen(false); }}><Users size={18} /></button>}{!user.guest && <NotificationCenter items={inboxNotifications} open={notificationsOpen} onToggle={() => { setNotificationsOpen((value) => !value); setSocialOpen(false); }} onDelete={deleteInboxNotification} onClear={clearInboxNotifications} onAction={actOnInboxNotification} />}
       </CasinoHeader>
       {bonusFeedback && <div className={`casino-bonus-feedback ${bonusFeedback.error ? "error" : "daily-bonus-feedback"}`} role={bonusFeedback.error ? "alert" : "status"}><Coins size={18} /><span>{bonusFeedback.message}</span><button type="button" className="secondary icon-toggle" aria-label="Fermer le message du bonus" onClick={() => setBonusFeedback(null)}><X size={16} /></button></div>}
       <Suspense fallback={<main className="app-shell"><section className="panel route-loading" role="status">Chargement de l’interface…</section></main>}>
         {roomCode && <div hidden={view !== "room" || route.id !== roomCode}><Room key={roomCode} code={roomCode} user={user} setUser={setUser} onBack={returnToCasino} onExcluded={handleExclusion} onAchievements={notifyAchievements} /></div>}
         {view === "room" && route.id !== roomCode && <JoinTable key={route.id} code={route.id} user={user} onJoined={openCasinoRoom} onBack={() => goTo("lobby")} />}
         {view === "spectator" && <SpectatorPage key={route.id} code={route.id} user={user} onBack={() => goTo("lobby")} onJoin={() => goTo("room", route.id)} />}
-        {view === "event" && <CommunityEventPage key={route.id} slug={route.id} user={user} setUser={setUser} onBack={() => goTo("lobby")} />}
+        {view === "event" && !blockedView && <CommunityEventPage key={route.id} slug={route.id} user={user} setUser={setUser} onBack={() => goTo("lobby")} />}
         {view === "leaderboard" && <LeaderboardPage user={user} />}
+        {view === "tribunal" && <TribunalPage />}
         {view === "admin" && (user.admin || user.editor) && <Admin user={user} onBack={() => goTo("lobby")} onSettingsChange={(settings) => setPublicSettings({ ...defaultPublicSettings, ...settings })} />}
-        {(view === "profile" || view === "shop") && <Profile key={view} mode={view} user={user} setUser={setUser} onOpenShop={() => navigate("shop")} onAchievements={notifyAchievements} />}
+        {blockedView && <RestrictedFeature onBack={() => goTo("lobby")} />}
+        {(view === "profile" || view === "shop" && !blockedView) && <Profile key={view} mode={view} user={user} setUser={setUser} onOpenShop={() => navigate("shop")} onAchievements={notifyAchievements} />}
         {(view === "not-found" || (view === "admin" && !user.admin && !user.editor)) && <main className="app-shell"><div className="page-heading"><h1>{view === "admin" ? "Accès réservé" : "Page introuvable"}</h1></div><button onClick={() => goTo("lobby")}>Retour au casino</button></main>}
         {view === "lobby" && <Lobby user={user} setUser={setUser} onOpenRoom={openCasinoRoom} onEnterRoom={(code) => goTo("room", code)} onOpenEvent={openCommunityEvent} onAchievements={notifyAchievements} settings={publicSettings} />}
       </Suspense>
-      {friendsOpen && <Suspense fallback={<div role="status" className="casino-modal-loading">Chargement des amis…</div>}><FriendsModal user={user} roomCode={roomCode} onClose={() => setFriendsOpen(false)} onOpenRoom={openCasinoRoom} /></Suspense>}
+      {friendsOpen && <Suspense fallback={<div role="status" className="casino-modal-loading">Chargement des amis…</div>}><FriendsModal user={user} roomCode={roomCode} onClose={() => setFriendsOpen(false)} onOpenRoom={openCasinoRoom} onStartChat={(friendId) => { setConversationRequest((current) => ({ friendId, revision: current.revision + 1 })); setFriendsOpen(false); setNotificationsOpen(false); setSocialOpen(true); }} /></Suspense>}
+      {!user.guest && <Suspense fallback={null}><SocialPanel user={user} roomCode={["room", "spectator"].includes(view) ? route.id : roomCode} open={socialOpen} requestedFriendId={conversationRequest.friendId} requestedFriendRevision={conversationRequest.revision} onClose={() => setSocialOpen(false)} onFriends={() => { setFriendsOpen(true); setNotificationsOpen(false); }} /></Suspense>}
       {exclusion && <Dialog title="Vous avez été exclu" className="action-confirm-modal" layerClassName="action-confirm-layer" onClose={() => setExclusion(null)}><p>{exclusion.message}</p><div className="actions"><button type="button" onClick={() => setExclusion(null)}>J’ai compris</button></div></Dialog>}
-      {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} />}
+      {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} onReport={(profile) => setReportTarget(profile)} />}
+      {reportTarget && <ReportPlayerDialog player={reportTarget} roomCode={roomCode ?? ""} onClose={() => setReportTarget(null)} />}
     </>
   );
 }
 
 createRoot(document.getElementById("root")).render(<PrivacyProvider><App /></PrivacyProvider>);
+
+function RestrictedFeature({ onBack }) {
+  return <main className="app-shell"><section className="panel restricted-feature"><ShieldAlert size={34} /><span className="eyebrow">Accès adapté</span><h1>Cette fonctionnalité n’est pas disponible</h1><p>La restriction est appliquée au compte par les règles de protection ou de modération du casino.</p><button type="button" onClick={onBack}>Retour au casino</button></section></main>;
+}

@@ -6,6 +6,7 @@ import { AchievementWizard } from "./AchievementWizard.jsx";
 import { describeAchievementRule } from "./achievement-guide.js";
 import { Pagination } from "../feedback/Feedback.jsx";
 import { usePagination } from "../common/usePagination.js";
+import { AchievementValuePicker, itemChoices } from "./AchievementValuePicker.jsx";
 
 const operatorLabels = {
   eq: "est égal à", neq: "est différent de", gt: "est supérieur à", gte: "est supérieur ou égal à",
@@ -37,8 +38,12 @@ function parseValue(value, operator) {
 }
 
 function ConditionValue({ node, fields, onChange }) {
-  const choices = fields.find((entry) => entry.field === node.field)?.choices;
+  const field = fields.find((entry) => entry.field === node.field);
+  const choices = field?.choices;
   const multiple = ["containsAny", "containsAll", "in", "notIn"].includes(node.operator);
+  if (field?.visual && ["eq", "neq", "contains", "containsAny", "containsAll", "in", "notIn"].includes(node.operator)) {
+    return <AchievementValuePicker choices={choices ?? []} value={node.value} multiple={multiple} label={field.label} onChange={(value) => onChange({ ...node, value })} />;
+  }
   if (choices?.length && ["eq", "neq", "contains", "containsAny", "containsAll", "in", "notIn"].includes(node.operator)) {
     const selected = multiple ? (Array.isArray(node.value) ? node.value : node.value ? [node.value] : []) : String(node.value ?? "");
     const missing = (multiple ? selected : [selected]).filter((value) => value && !choices.some((choice) => choice.value === value));
@@ -66,8 +71,8 @@ function ConditionEditor({ node, fields, onChange, onRemove, depth = 0 }) {
     </div>;
   }
   return <div className="achievement-condition-row">
-    <select aria-label="Champ" value={node.field ?? ""} onChange={(event) => onChange({ ...node, field: event.target.value })}>{fields.map((entry) => <option key={entry.field} value={entry.field}>{entry.label}</option>)}</select>
-    <select aria-label="Comparaison" value={node.operator ?? "eq"} onChange={(event) => onChange({ ...node, operator: event.target.value, value: event.target.value === "exists" ? true : node.value })}>{Object.entries(operatorLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+    <select aria-label="Champ" value={node.field ?? ""} onChange={(event) => onChange({ ...node, field: event.target.value, valueField: undefined, value: node.operator === "exists" ? true : "" })}>{fields.map((entry) => <option key={entry.field} value={entry.field}>{entry.label}</option>)}</select>
+    <select aria-label="Comparaison" value={node.operator ?? "eq"} onChange={(event) => { const operator = event.target.value; const multi = ["containsAny", "containsAll", "in", "notIn"].includes(operator); const value = node.operator === "exists" ? "" : node.value; onChange({ ...node, operator, value: operator === "exists" ? true : multi ? Array.isArray(value) ? value : value ? [value] : [] : Array.isArray(value) ? value[0] ?? "" : value }); }}>{Object.entries(operatorLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
     {node.operator === "exists" ? <select aria-label="Présence" value={String(node.value !== false)} onChange={(event) => onChange({ ...node, value: event.target.value === "true" })}><option value="true">Oui</option><option value="false">Non</option></select> : <><select aria-label="Source de comparaison" value={node.valueField ? "field" : "literal"} onChange={(event) => onChange(event.target.value === "field" ? { ...node, valueField: fields[0]?.field, value: undefined } : { ...node, valueField: undefined, value: "" })}><option value="literal">Valeur fixe</option><option value="field">Autre champ</option></select>{node.valueField ? <select aria-label="Champ comparé" value={node.valueField} onChange={(event) => onChange({ ...node, valueField: event.target.value })}>{fields.map((entry) => <option key={entry.field} value={entry.field}>{entry.label}</option>)}</select> : <ConditionValue node={node} fields={fields} onChange={onChange} />}</>}
     {onRemove && <button type="button" className="secondary icon-toggle" onClick={onRemove} title="Supprimer"><X size={15} /></button>}
   </div>;
@@ -93,6 +98,13 @@ export function AchievementsAdmin({ achievements = [], schemas, games = [], shop
     .filter((entry) => filter === "all" || (filter === "enabled" ? entry.enabled !== false : filter === "disabled" ? entry.enabled === false : entry.builtIn === (filter === "built-in")))
     .filter((entry) => `${entry.title} ${entry.description} ${entry.group} ${entry.gameId ?? ""} ${entry.id}`.toLocaleLowerCase("fr").includes(search.trim().toLocaleLowerCase("fr"))), [achievements, filter, search]);
   const eventSchema = schemas?.events?.find((entry) => entry.id === editing?.rule?.event) ?? schemas?.events?.[0];
+  const conditionFields = useMemo(() => {
+    const items = itemChoices(shop);
+    const unlocked = achievements.map((entry) => ({ value: entry.id, label: entry.title, description: entry.description, category: entry.group, kind: "achievement" }));
+    const gameChoices = games.map((game) => ({ value: game.id, label: game.name, category: "Jeux", kind: "game" }));
+    const catalogs = { "player.ownedItemIds": items, "player.equippedItemIds": items, itemId: items, "player.achievementIds": unlocked, achievementId: unlocked, "player.favoriteGameIds": gameChoices, gameId: gameChoices };
+    return (eventSchema?.fields ?? []).map((field) => catalogs[field.field] ? { ...field, visual: true, choices: catalogs[field.field] } : field);
+  }, [eventSchema, shop, achievements, games]);
   const pages = usePagination(rows, `${filter}:${search}`, 12);
 
   function update(field, value) {
@@ -172,9 +184,9 @@ export function AchievementsAdmin({ achievements = [], schemas, games = [], shop
           <div className="admin-choice-grid"><label className={editing.enabled !== false ? "selected" : ""}><input type="checkbox" checked={editing.enabled !== false} onChange={(event) => update("enabled", event.target.checked)} /><span>Publié</span></label><label className={editing.milestone ? "selected" : ""}><input type="checkbox" checked={editing.milestone} onChange={(event) => update("milestone", event.target.checked)} /><span>Milestone</span></label><label className={editing.secret ? "selected" : ""}><input type="checkbox" checked={editing.secret} onChange={(event) => update("secret", event.target.checked)} /><span>Secret</span></label></div>
         </section>
         <section className="admin-form-section"><div className="admin-form-section-title"><Braces /><div><h3>Méthode d'obtention</h3><p>La règle est validée côté serveur et ne peut accéder qu'aux champs proposés.</p></div></div>
-          <div className="admin-field-grid"><label>Source<select value={editing.rule?.source ?? "event"} onChange={(event) => updateRule("source", event.target.value)}><option value="event">Événement temps réel</option><option value="metric">Métrique calculée</option></select></label>
-          {editing.rule?.source === "metric" ? <label>Métrique<select value={editing.rule.metric} onChange={(event) => updateRule("metric", event.target.value)}>{schemas.metrics.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label> : <><label>Événement<select value={editing.rule.event} onChange={(event) => updateRule("event", event.target.value)}>{schemas.events.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label><label>Portée<select value={editing.rule.scope} onChange={(event) => updateRule("scope", event.target.value)}>{Object.entries(scopeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></>}</div>
-          {editing.rule?.source === "event" && <><div className="admin-field-grid"><label>Agrégat<select value={editing.rule.aggregate} onChange={(event) => updateRule("aggregate", event.target.value)}>{Object.entries(aggregateLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>{["sum", "max", "distinct"].includes(editing.rule.aggregate) && <label>Champ agrégé<select value={editing.rule.valueField ?? firstField(eventSchema)} onChange={(event) => updateRule("valueField", event.target.value)}>{eventSchema.fields.map((entry) => <option key={entry.field} value={entry.field}>{entry.label}</option>)}</select></label>}</div><div className="achievement-condition-heading"><strong>Conditions</strong><small>Les groupes peuvent être imbriqués sur quatre niveaux.</small></div><ConditionEditor node={editing.rule.condition} fields={eventSchema.fields} onChange={(condition) => updateRule("condition", condition)} /></>}
+          <div className="admin-field-grid"><label>Source<select aria-label="Source" value={editing.rule?.source ?? "event"} onChange={(event) => updateRule("source", event.target.value)}><option value="event">Événement temps réel</option><option value="metric">Métrique calculée</option></select></label>
+          {editing.rule?.source === "metric" ? <label>Métrique<select value={editing.rule.metric} onChange={(event) => updateRule("metric", event.target.value)}>{schemas.metrics.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label> : <><label>Événement<select aria-label="Événement" value={editing.rule.event} onChange={(event) => updateRule("event", event.target.value)}>{schemas.events.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label><label>Portée<select value={editing.rule.scope} onChange={(event) => updateRule("scope", event.target.value)}>{Object.entries(scopeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></>}</div>
+          {editing.rule?.source === "event" && <><div className="admin-field-grid"><label>Agrégat<select value={editing.rule.aggregate} onChange={(event) => updateRule("aggregate", event.target.value)}>{Object.entries(aggregateLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>{["sum", "max", "distinct"].includes(editing.rule.aggregate) && <label>Champ agrégé<select value={editing.rule.valueField ?? firstField(eventSchema)} onChange={(event) => updateRule("valueField", event.target.value)}>{eventSchema.fields.map((entry) => <option key={entry.field} value={entry.field}>{entry.label}</option>)}</select></label>}</div><div className="achievement-condition-heading"><strong>Conditions</strong><small>Les groupes peuvent être imbriqués sur quatre niveaux.</small></div><ConditionEditor node={editing.rule.condition} fields={conditionFields} onChange={(condition) => updateRule("condition", condition)} /></>}
         </section>
       </div>
       <footer className="admin-user-editor-footer"><small>Les changements sont appliqués aux prochains événements. Les succès déjà obtenus ne sont jamais retirés automatiquement.</small><div className="actions"><button type="submit" disabled={saving}><Save size={17} />{saving ? "Enregistrement…" : "Enregistrer"}</button><button type="button" className="secondary" onClick={() => setEditing(null)}>Annuler</button></div></footer>

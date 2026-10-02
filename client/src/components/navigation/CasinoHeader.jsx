@@ -1,15 +1,18 @@
-import { Dice5, Landmark, LogOut, Shield, ShoppingBag, Sparkles, Trophy, User, Users } from "lucide-react";
+import { Dice5, Landmark, LogOut, Scale, Shield, ShoppingBag, Sparkles, Trophy, User } from "lucide-react";
 import { appPath } from "../../navigation/routes.js";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 
-export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSlug, onNavigate, onFriends, onLogout, children }) {
+export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
+  const restrictions = user.minor?.restrictions ?? [];
+  const limited = (feature) => restrictions.includes(feature) || (user.moderation?.type === "soft" && ["friends", "community-events"].includes(feature));
   const destinations = [
     ["lobby", "Casino", Landmark],
-    ["shop", "Boutique", ShoppingBag],
+    ...(!limited("shop") ? [["shop", "Boutique", ShoppingBag]] : []),
     ["leaderboard", "Classements", Trophy],
+    ...(!user.guest && !user.minor?.restricted && user.moderation?.type !== "soft" && (tribunalAvailable || view === "tribunal") ? [["tribunal", "Tribunal", Scale]] : []),
     ["profile", "Profil", User],
     ...(roomCode ? [["room", "Ma table", Dice5]] : []),
-    ...(eventSlug ? [["event", "Événement", Sparkles]] : []),
+    ...(eventSlug && !limited("community-events") ? [["event", "Événement", Sparkles]] : []),
     ...(user.admin || user.editor ? [["admin", user.admin ? "Administration" : "Studio", Shield]] : [])
   ];
   function follow(event, destination) {
@@ -22,7 +25,6 @@ export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSl
       <a className="casino-brand" href={appPath("lobby")} onClick={(event) => follow(event, "lobby")}><CosmeticIcon value="site" source={siteIcon} /> <span>{siteName}</span></a>
       <nav className="casino-navigation" aria-label="Navigation du casino">
         {destinations.map(([key, label, Icon]) => <a key={key} href={appPath(key, key === "room" ? roomCode : key === "event" ? eventSlug : "")} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={(event) => follow(event, key)}><Icon size={18} /><span>{label}</span></a>)}
-        <button type="button" onClick={onFriends} aria-haspopup="dialog"><Users size={18} /><span>Amis</span></button>
       </nav>
       <div className="casino-accountbar">
         {children}

@@ -16,6 +16,7 @@ const ranks = Array.from({ length: 100 }, (_, index) => ({ id: `p${index + 1}`, 
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
+let savedAchievement, savedShopItem;
 page.on("pageerror", (error) => errors.push(error.message));
 await page.addInitScript(() => localStorage.setItem("ktga-privacy-choice", JSON.stringify({ version: "2026-09-27", chosenAt: Date.now(), enabled: false })));
 await page.route("**/*", async (route) => {
@@ -31,6 +32,8 @@ await page.route("**/*", async (route) => {
   if (endpoint === "/api/me/statistics") return send({});
   if (endpoint === "/api/shop") return send(shop);
   if (endpoint === "/api/achievements") return send(achievements);
+  if (endpoint.startsWith("/api/admin/shop/") && route.request().method() === "PATCH") { savedShopItem = route.request().postDataJSON(); return send({ ok: true }); }
+  if (endpoint.startsWith("/api/admin/achievements/") && route.request().method() === "PATCH") { savedAchievement = route.request().postDataJSON(); return send(savedAchievement); }
   if (endpoint === "/api/admin") return send({ users, shop, achievements, games: [], overview: {}, settings: {}, pricing: {}, permissions: { manageAchievements: true, editBuiltInShopItems: true }, achievementRuleSchemas: achievementRuleSchemas([], shop) });
   if (endpoint === "/api/leaderboards") return send({ rows: ranks, total: 110, self: ranks[84], games: [], seasons: ["2026-Q3"], period: { currentSeason: "2026-Q3" }, balanceAt: "2026-09-27" });
   return send([]);
@@ -68,6 +71,12 @@ try {
   await page.getByPlaceholder("Nom, description ou identifiant").fill("Objet 055");
   assert.equal(await page.locator(".admin-table tbody tr").count(), 1);
   assert.match(await pager("Pages de la boutique admin").textContent(), /Page 1 \/ 1/);
+  await page.locator(".admin-table tbody tr").first().getByRole("button", { name: "Modifier", exact: true }).click();
+  const shopEditor = page.locator(".shop-admin-editor");
+  await shopEditor.getByLabel(/^Pack/).fill("Soirée Néon");
+  await shopEditor.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await shopEditor.waitFor({ state: "hidden" });
+  assert.equal(savedShopItem.packName, "Soirée Néon");
   await page.locator(".admin-nav").getByRole("button", { name: /Joueurs/ }).click();
   await pager("Pages des joueurs").getByRole("button", { name: "Page suivante" }).click();
   assert.match(await page.locator(".admin-table tbody tr").first().textContent(), /Joueur 021/);
@@ -80,6 +89,48 @@ try {
   await page.getByPlaceholder("Nom, identifiant, jeu ou groupe").fill("missing");
   assert.match(await pager("Pages des succès admin").textContent(), /Aucun résultat/);
   await page.getByPlaceholder("Nom, identifiant, jeu ou groupe").fill("");
+  await page.locator(".achievement-admin-grid > article").first().getByRole("button", { name: "Modifier", exact: true }).click();
+  const editor = page.locator(".achievement-rule-editor");
+  await editor.getByLabel("Source", { exact: true }).selectOption("event");
+  await editor.getByLabel("Événement", { exact: true }).selectOption("inventory.checked");
+  await editor.getByLabel("Champ", { exact: true }).selectOption("player.ownedItemIds");
+  await editor.getByLabel("Comparaison", { exact: true }).selectOption("containsAll");
+  const openItems = () => editor.getByRole("button", { name: "Inventaire : objets possedes", exact: true }).click();
+  const picker = page.getByRole("dialog", { name: "Inventaire : objets possedes" });
+  await openItems();
+  await picker.getByRole("button", { name: /Objet 001/ }).click();
+  await picker.getByRole("navigation").getByRole("button", { name: "Page suivante" }).click();
+  await picker.getByRole("button", { name: /Objet 013/ }).click();
+  await picker.getByRole("searchbox").fill("Objet 055");
+  await picker.getByRole("button", { name: /Objet 055/ }).click();
+  await picker.getByRole("button", { name: "Appliquer la selection" }).click();
+  assert.match(await editor.locator(".achievement-picker-trigger").textContent(), /Objet 001, Objet 013 \(\+1\)/);
+  await openItems();
+  await picker.getByRole("button", { name: /Objet 001/ }).click();
+  await picker.getByRole("button", { name: "Annuler", exact: true }).click();
+  await openItems();
+  assert.equal(await picker.getByRole("button", { name: /Objet 001/ }).getAttribute("aria-pressed"), "true");
+  await page.screenshot({ path: path.join(output, "achievement-picker-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 }); await noOverflow();
+  await page.screenshot({ path: path.join(output, "achievement-picker-mobile.png") });
+  await page.keyboard.press("Escape");
+  assert.equal(await editor.count(), 1);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await editor.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await editor.waitFor({ state: "hidden" });
+  assert.deepEqual(savedAchievement.rule.condition.all[0].value, ["custom-item-0", "custom-item-12", "custom-item-54"]);
+  await page.locator(".achievement-admin-grid > article").first().getByRole("button", { name: "Modifier", exact: true }).click();
+  await editor.getByLabel("Source", { exact: true }).selectOption("event");
+  await editor.getByLabel("Champ", { exact: true }).selectOption("player.achievementIds");
+  await editor.getByLabel("Comparaison", { exact: true }).selectOption("containsAny");
+  await editor.getByRole("button", { name: "Joueur : succes debloques", exact: true }).click();
+  const achievementPicker = page.getByRole("dialog", { name: "Joueur : succes debloques" });
+  await achievementPicker.getByRole("button", { name: /Succes 002/ }).click();
+  await achievementPicker.getByRole("button", { name: /Succes 003/ }).click();
+  await achievementPicker.getByRole("button", { name: "Appliquer la selection" }).click();
+  await editor.getByLabel("Comparaison", { exact: true }).selectOption("contains");
+  assert.equal(await editor.locator(".achievement-picker-trigger").textContent(), "Succes 002");
+  await editor.getByRole("button", { name: "Annuler", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await pager("Pages des succès admin").scrollIntoViewIfNeeded(); await noOverflow();
   await page.screenshot({ path: path.join(output, "admin-pagination-mobile.png") });
@@ -97,6 +148,13 @@ try {
   await page.setViewportSize({ width: 390, height: 844 }); await noOverflow();
   await pager("Pages du classement").scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(output, "leaderboard-mobile.png") });
+  await page.goto(`${base}/shop`);
+  await page.locator(".shop-subselector").getByRole("button", { name: "Premium", exact: true }).click();
+  await page.setViewportSize({ width: 1440, height: 2800 });
+  const footer = await page.locator(".legal-footer").boundingBox();
+  assert.ok(Math.abs(footer.y + footer.height - 2800) <= 2, "footer reaches viewport bottom on short pages");
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.locator(".legal-footer").evaluate((element) => element.getBoundingClientRect().top >= document.querySelector(".app-shell").getBoundingClientRect().bottom - 1), "footer never overlays content");
   assert.deepEqual(errors, []);
   console.log(`Pagination checks passed. Screenshots: ${output}`);
 } finally { await browser.close(); }
