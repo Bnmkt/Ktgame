@@ -49,7 +49,10 @@ export function sanitizedSvgIcon(source) {
       node.remove();
       return;
     }
-    [...node.attributes].forEach((attribute) => { if (!allowedAttributes.has(attribute.name.toLowerCase())) node.removeAttribute(attribute.name); });
+    [...node.attributes].forEach((attribute) => {
+      const unsafeValue = /(?:url\s*\(|javascript\s*:|data\s*:|vbscript\s*:|[<>])/i.test(attribute.value);
+      if (!allowedAttributes.has(attribute.name.toLowerCase()) || unsafeValue) node.removeAttribute(attribute.name);
+    });
   });
   [...svg.attributes].forEach((attribute) => { if (!allowedAttributes.has(attribute.name.toLowerCase()) && attribute.name !== "xmlns") svg.removeAttribute(attribute.name); });
   if (!svg.getAttribute("viewBox")) svg.setAttribute("viewBox", "0 0 24 24");

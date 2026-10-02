@@ -51,7 +51,7 @@ test("une image televersee est liee a sa patchnote et supprimee avec elle", () =
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ktga-patchnotes-"));
   const store = createPatchnoteStore({ filename: ":memory:", uploadDirectory: directory });
   const note = store.create({ version: "1.1.1a" }, "editor-1");
-  const image = store.addAttachment(note.id, { body: Buffer.from([137, 80, 78, 71]), mimeType: "image/png", originalName: "capture.png" });
+  const image = store.addAttachment(note.id, { body: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), mimeType: "image/png", originalName: "capture.png" });
   assert.ok(fs.existsSync(store.attachment(image.id).path));
   store.update(note.id, { blocks: [{ type: "image", metadata: { attachmentId: image.id, alt: "Capture" } }] });
   assert.equal(store.get(note.id, { includeDrafts: true }).blocks[0].metadata.attachmentId, image.id);
@@ -65,7 +65,7 @@ test("la duplication copie et remappe les images sans partager les fichiers", ()
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ktga-patchnotes-copy-"));
   const store = createPatchnoteStore({ filename: ":memory:", uploadDirectory: directory });
   const source = store.create({ version: "2.1.0" }, "editor-1");
-  const image = store.addAttachment(source.id, { body: Buffer.from([137, 80, 78, 71]), mimeType: "image/png", originalName: "capture.png" });
+  const image = store.addAttachment(source.id, { body: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), mimeType: "image/png", originalName: "capture.png" });
   store.update(source.id, { blocks: [{ type: "image", metadata: { attachmentId: image.id, alt: "Capture" } }] });
 
   const copy = store.duplicate(source.id, "editor-2", "2.1.0a");
