@@ -179,6 +179,10 @@ label {
 .account-setup-heading h2 { font-size: 25px; margin: 3px 0 0; }
 .account-setup-copy { color: #d4c9ae; line-height: 1.6; margin: 0 0 4px; }
 .legacy-login-hint { color: #b8aa8e; line-height: 1.45; margin-top: -5px; }
+.password-requirements { display: grid; gap: 7px 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; margin: -2px 0 2px; padding: 0; }
+.password-requirements li { align-items: center; color: #827f77; display: flex; font-size: 12px; font-weight: 750; gap: 7px; line-height: 1.3; min-width: 0; transition: color 160ms ease; }
+.password-requirements li svg { flex: 0 0 auto; height: 15px; stroke-width: 2.6; width: 15px; }
+.password-requirements li.is-met { color: #e8b84a; }
 .auth-verification { align-items: center; background: rgba(232, 184, 74, .08); border: 1px solid rgba(232, 184, 74, .3); border-radius: 7px; color: #e7d9b8; display: grid; gap: 10px; grid-template-columns: auto minmax(0, 1fr) auto; line-height: 1.45; padding: 11px 13px; }
 .auth-verification.success { background: rgba(105, 213, 170, .08); border-color: rgba(105, 213, 170, .34); color: #bcebd8; }
 .auth-verification.error { background: rgba(216, 66, 77, .09); border-color: rgba(216, 66, 77, .38); color: #f2c2c6; }
@@ -188,6 +192,7 @@ label {
   .auth-screen { align-items: start; padding: 12px; }
   .auth-panel { padding: 20px 17px; }
   .auth-panel h1 { font-size: 38px; }
+  .password-requirements { grid-template-columns: 1fr; }
   .auth-verification { grid-template-columns: auto minmax(0, 1fr); }
   .auth-verification button { grid-column: 1 / -1; width: 100%; }
 }

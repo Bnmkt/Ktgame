@@ -78,8 +78,9 @@ export function passwordPolicyError(value) {
   const password = String(value ?? "");
   if (password.length < 10) return "Le mot de passe doit contenir au moins 10 caractères.";
   if (password.length > 128) return "Le mot de passe ne peut pas dépasser 128 caractères.";
-  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((pattern) => pattern.test(password)).length;
-  if (classes < 3) return "Utilise au moins trois types de caractères : minuscules, majuscules, chiffres ou symboles.";
+  if (!/\p{L}/u.test(password) || !/\p{N}/u.test(password)) return "Le mot de passe doit contenir au moins une lettre et un chiffre.";
+  if (!/\p{Lu}/u.test(password)) return "Le mot de passe doit contenir au moins une majuscule.";
+  if (!/[^\p{L}\p{N}\s]/u.test(password)) return "Le mot de passe doit contenir au moins un caractère spécial.";
   if (/^(.)\1+$/.test(password) || /^(password|motdepasse|azerty|qwerty|1234567890)/i.test(password)) return "Ce mot de passe est trop facile à deviner.";
   return "";
 }
