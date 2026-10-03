@@ -1,24 +1,18 @@
 import { useEffect, useState } from "react";
-import { Pagination } from "../components/feedback/Feedback.jsx";
-import { usePagination } from "../components/common/usePagination.js";
 import { DailyActivityChart } from "../components/profile/DailyActivityChart.jsx";
 export { DailyActivityChart } from "../components/profile/DailyActivityChart.jsx";
-import { Activity, BadgeCheck, Boxes, CalendarDays, Check, Coins, Eye, EyeOff, Flag, Gem, KeyRound, Mail, Percent, ReceiptText, Search, Shield, ShoppingBag, Sparkles, Trophy, User, UserRound, Volume2, VolumeX, X } from "lucide-react";
+import { Activity, BadgeCheck, Coins, Eye, EyeOff, Flag, Gem, ReceiptText, Search, ShoppingBag, Sparkles, Trophy, User, Volume2, VolumeX, X } from "lucide-react";
 import { api, setToken } from "../api.js";
 import { Wardrobe } from "../components/profile/Wardrobe.jsx";
-import { AccountSecurity } from "../components/profile/AccountSecurity.jsx";
+import { AccountWorkspace } from "../components/profile/AccountWorkspace.jsx";
 import { ReportPlayerDialog } from "../components/profile/ReportPlayerDialog.jsx";
 import { ConfirmActionButton } from "../components/common/ConfirmAction.jsx";
 import { Die, PlayingCard } from "../components/game/GamePieces.jsx";
-import { CosmeticPreview, DisplayName, FriendCode, ProfileCosmeticEffect, ProfileCosmeticFrame, ProfileCosmeticShell, profileCosmeticClassName, shopTypeLabel } from "../components/cosmetics/Cosmetics.jsx";
+import { DisplayName, FriendCode, ProfileCosmeticEffect, ProfileCosmeticFrame, ProfileCosmeticShell, profileCosmeticClassName } from "../components/cosmetics/Cosmetics.jsx";
 import { memberCardOptions, publicProfileStatOptions } from "../config/site.js";
 import { gameTitle } from "../features/games/config.js";
-import { CompactNumber, achievementTypeLabel, ageFromBirthDate, formatDate, formatExactNumber, memberCardStats, memberStatOptions, shopCategoryLabel, transactionLabel } from "../utils/presentation.jsx";
-import { shopPackDefinitions } from "../utils/shop-packs.js";
-
-function packDiscountPercent(count) {
-  return Math.min(35, Math.max(0, count - 1) * 5);
-}
+import { CompactNumber, achievementTypeLabel, formatDate, formatExactNumber, memberCardStats, transactionLabel } from "../utils/presentation.jsx";
+import { ShopCatalog } from "../components/shop/ShopCatalog.jsx";
 
 function useLedgerPage(kind, filters, count, step, revision, enabled, onError) {
   const [page, setPage] = useState({ rows: [], total: 0, hasMore: false });
@@ -55,7 +49,7 @@ function ProfileParticipantList({ players = [], winners = [] }) {
 export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchievements }) {
   const isShop = mode === "shop";
   const [tab, setTab] = useState(isShop ? "shop" : "account");
-  const [accountSubtab, setAccountSubtab] = useState("details");
+  const [accountSaving, setAccountSaving] = useState("");
   const [form, setForm] = useState({ login: user.login ?? user.pseudo, displayName: user.profile?.displayName ?? user.pseudo, birthDate: user.profile?.birthDate ?? "", gender: user.profile?.gender ?? "", bio: user.profile?.bio ?? "", password: "" });
   const [statForm, setStatForm] = useState({ memberCardStats: user.profileStats?.memberCardStats ?? [user.profileStats?.memberCardStat ?? "winRate", "achievementsUnlocked"], customAchievementIds: user.profileStats?.customAchievementIds ?? [user.profileStats?.customAchievementId ?? "", ""], visibleProfileStats: user.profileStats?.visibleProfileStats ?? publicProfileStatOptions.map(([key]) => key) });
   const [statistics, setStatistics] = useState(null);
@@ -67,12 +61,6 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const [reportTarget, setReportTarget] = useState(null);
   const [achievementType, setAchievementType] = useState("games");
   const [shop, setShop] = useState([]);
-  const [shopMode, setShopMode] = useState("items");
-  const [shopType, setShopType] = useState("icons");
-  const [shopCategory, setShopCategory] = useState("classic");
-  const [previewItemId, setPreviewItemId] = useState("");
-  const [packTheme, setPackTheme] = useState("japanese-traditional");
-  const [packSelection, setPackSelection] = useState([]);
   const [historyFilters, setHistoryFilters] = useState({ search: "", game: "all", result: "all" });
   const [transactionFilters, setTransactionFilters] = useState({ search: "", game: "all", event: "all", direction: "all" });
   const [historyLimit, setHistoryLimit] = useState(40);
@@ -117,23 +105,25 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     api("/api/achievements").then(setAchievements).catch(() => {});
   }
 
-  async function saveProfile() {
+  async function savePassword() {
+    if (accountSaving) return;
+    setAccountSaving("password");
     setError("");
     setMessage("");
     try {
-      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ ...form, ...statForm }) });
+      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ password: form.password }) });
       if (updated.sessionToken) setToken(updated.sessionToken);
       setUser(updated);
-      setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", password: "" });
-      setFavorites(updated.profile?.favoriteGames ?? []);
-      setStatForm({ memberCardStats: updated.profileStats?.memberCardStats ?? ["winRate", "achievementsUnlocked"], customAchievementIds: updated.profileStats?.customAchievementIds ?? [updated.profileStats?.customAchievementId ?? "", ""], visibleProfileStats: updated.profileStats?.visibleProfileStats ?? publicProfileStatOptions.map(([key]) => key) });
-      setMessage("Profil mis à jour.");
+      setForm((current) => ({ ...current, password: "" }));
+      setMessage("Mot de passe mis à jour.");
     } catch (err) {
       setError(err.message);
-    }
+    } finally { setAccountSaving(""); }
   }
 
   async function saveEmail() {
+    if (accountSaving) return;
+    setAccountSaving("email");
     setError("");
     setMessage("");
     try {
@@ -145,13 +135,16 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
       }
       setMessage("Adresse enregistrée. Un email de vérification vient d’être envoyé.");
     } catch (err) { setError(err.message); }
+    finally { setAccountSaving(""); }
   }
 
   async function savePublicInfo() {
+    if (accountSaving) return;
+    setAccountSaving("profile");
     setError("");
     setMessage("");
     try {
-      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ ...form, favoriteGames: favorites, ...statForm }) });
+      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ displayName: form.displayName, birthDate: form.birthDate, gender: form.gender, bio: form.bio, favoriteGames: favorites, ...statForm }) });
       if (updated.sessionToken) setToken(updated.sessionToken);
       setUser(updated);
       setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", password: "" });
@@ -160,7 +153,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
       setMessage("Paramètres mis à jour.");
     } catch (err) {
       setError(err.message);
-    }
+    } finally { setAccountSaving(""); }
   }
 
   async function openPublicProfile(id) {
@@ -202,31 +195,12 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     }
   }
 
-  function selectPackTheme(nextTheme) {
-    setPackTheme(nextTheme);
-    const available = shop.filter((item) => item.packs?.includes(nextTheme) && !item.rewardOnly && !user.cosmetics?.[item.type]?.includes(item.value));
-    setPackSelection(available.map((item) => item.id));
-    setPreviewItemId(available[0]?.id ?? "");
-  }
-
-  function openPackShop() {
-    setShopMode("packs");
-    selectPackTheme(packTheme);
-  }
-
-  function togglePackItem(item) {
-    if (user.cosmetics?.[item.type]?.includes(item.value)) return;
-    setPackSelection((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]);
-    setPreviewItemId(item.id);
-  }
-
-  async function purchasePack() {
+  async function purchasePack(pack) {
     setError("");
     setMessage("");
     try {
-      const result = await api("/api/shop/purchase-pack", { method: "POST", body: JSON.stringify({ packId: effectivePackTheme, itemIds: selectedPackItems.map((item) => item.id) }) });
+      const result = await api("/api/shop/purchase-pack", { method: "POST", body: JSON.stringify({ packId: pack.packId, itemIds: pack.itemIds }) });
       setUser(result.user);
-      setPackSelection([]);
       onAchievements?.(result.achievementUnlocks ?? []);
       await reloadLedger();
       setMessage(`Pack débloqué avec ${result.pricing?.discountPercent ?? 0}% de réduction.`);
@@ -242,7 +216,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     setPurchasePending(true);
     const completed = purchaseConfirmation.kind === "item"
       ? await purchase(purchaseConfirmation.item.id)
-      : await purchasePack();
+      : await purchasePack(purchaseConfirmation.pack);
     setPurchasePending(false);
     if (completed) setPurchaseConfirmation(null);
   }
@@ -286,23 +260,6 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const wins = statistics?.wins ?? 0;
   const gamesPlayed = statistics?.gamesPlayed ?? 0;
   const displayedStats = memberCardStats({ ...user, statistics }, history, achievements);
-  const shopTypes = ["icons", "nameEffects", "memberCards", "profileBanners", "profileFrames", "profileEffects", "diceSkins", "cardSkins"];
-  const shopCategoryOrder = ["classic", "premium", "premiumShape", "premiumAnimated"];
-  const availableShopCategories = shopCategoryOrder.filter((category) => shop.some((item) => item.type === shopType && item.category === category));
-  const effectiveShopCategory = availableShopCategories.includes(shopCategory) ? shopCategory : availableShopCategories[0];
-  const filteredShop = shop.filter((item) => item.type === shopType && item.category === effectiveShopCategory);
-  const shopPages = usePagination(filteredShop, `${shopType}:${effectiveShopCategory}`, 12);
-  const previewItem = shop.find((item) => item.id === previewItemId) ?? shopPages.rows[0];
-  const packDefinitions = shopPackDefinitions(shop);
-  const availablePackThemes = Object.keys(packDefinitions);
-  const effectivePackTheme = availablePackThemes.includes(packTheme) ? packTheme : availablePackThemes[0];
-  const packItems = shop.filter((item) => item.packs?.includes(effectivePackTheme)).sort((left, right) => shopTypes.indexOf(left.type) - shopTypes.indexOf(right.type));
-  const packPages = usePagination(packItems, effectivePackTheme, 12);
-  const selectedPackItems = packItems.filter((item) => packSelection.includes(item.id) && !user.cosmetics?.[item.type]?.includes(item.value));
-  const packPreviewItem = shop.find((item) => item.id === previewItemId && item.packs?.includes(effectivePackTheme)) ?? packItems[0];
-  const packSubtotal = selectedPackItems.reduce((sum, item) => sum + item.price, 0);
-  const packDiscount = packDiscountPercent(selectedPackItems.length);
-  const packTotal = Math.ceil(packSubtotal * (100 - packDiscount) / 100);
   const historyGameIds = statistics?.gameIds ?? [];
   const filteredHistory = history;
   const transactionGameIds = statistics?.transactionGameIds ?? [];
@@ -332,7 +289,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
 
   return (
     <main className={`app-shell ${isShop ? "shop-shell" : "profile-shell"}`}>
-      <div className="page-heading"><div><span className="eyebrow">{isShop ? "Collections" : "Espace personnel"}</span><h1>{isShop ? "Boutique" : `Profil de ${user.pseudo}`}</h1></div></div>
+      <div className="page-heading"><div><span className="eyebrow">{isShop ? "Collections" : "Espace personnel"}</span><h1>{isShop ? "Boutique" : `Profil de ${user.profile?.displayName ?? user.pseudo}`}</h1></div></div>
       {error && <div className="error">{error}</div>}
       {message && <div className="success">{message}</div>}
       <div className={isShop ? "shop-page-layout" : "profile-layout"}>
@@ -343,7 +300,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
             <FriendCode code={user.friendCode} />
             <div className="vip-stats">{displayedStats.map((stat, index) => <div className="vip-ratio" key={`${stat.label}-${index}`}>{stat.icon}<span>{stat.label}</span><strong title={stat.exactValue ?? String(stat.value)}>{stat.value}</strong></div>)}</div>
           </div></ProfileCosmeticShell>
-          <div className="profile-stats">
+          <details className="account-stat-summary" open={tab !== "account"}><summary>Mes statistiques</summary><div className="profile-stats">
             <div><span>Parties</span><strong><CompactNumber value={gamesPlayed} label="Nombre exact de parties" /></strong></div>
             <div><span>Victoires</span><strong><CompactNumber value={wins} label="Nombre exact de victoires" /></strong></div>
             <div><span>Winrate</span><strong>{gamesPlayed ? `${Math.round((wins / gamesPlayed) * 100)}%` : "0%"}</strong></div>
@@ -356,6 +313,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
             <div><span>Boutique</span><strong><CompactNumber value={shopSpent} label="Dépenses boutique exactes" /></strong></div>
             <div><span>Solde</span><strong><CompactNumber value={user.tokens} label="Solde exact" /></strong></div>
           </div>
+          </details>
         </aside>}
         <section className={isShop ? "shop-page-panel" : "profile-panel"}>
           {!isShop && <nav className="profile-tabs" aria-label="Profil">
@@ -366,91 +324,11 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
             <button className={tab === "transactions" ? "active" : ""} onClick={() => setTab("transactions")}><ReceiptText size={18} /> Transactions</button>
           </nav>}
           <div className={isShop ? "shop-page-content" : "profile-content"}>
-          {tab === "account" && <nav className="segmented-tabs account-subtabs" aria-label="Réglages du compte"><button className={accountSubtab === "details" ? "active" : ""} onClick={() => setAccountSubtab("details")}><User size={17} /> Informations</button><button className={accountSubtab === "settings" ? "active" : ""} onClick={() => setAccountSubtab("settings")}><Eye size={17} /> Affichage public</button></nav>}
-          {tab === "account" && accountSubtab === "details" && <>
-            <header className="account-page-heading"><div><span className="eyebrow">Compte joueur</span><h2>Informations du profil</h2><p>Gère séparément ce que les autres joueurs voient et les informations privées de connexion.</p></div><button className="secondary" onClick={() => openPublicProfile(user.id)}><Eye size={17} />Voir mon profil</button></header>
-            {user.guest ? <p>Les invités ne peuvent pas modifier un compte. Crée un compte pour conserver tes jetons et ton historique.</p> : <div className="settings-grid account-settings-grid">
-              <section className="settings-card account-identity-card">
-                <div className="account-section-heading"><span><UserRound size={20} /></span><div><h3>Identité publique</h3><p>Le pseudo et la bio sont visibles sur ton profil public.</p></div></div>
-                <div className="account-identity-layout">
-                  <div className="account-public-fields">
-                    <label>Pseudo en jeu<input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} maxLength={32} placeholder="Nom affiché en partie" /><small>Affiché sur ta member card et dans les parties.</small></label>
-                    <label>Bio<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} maxLength={180} placeholder="Quelques mots sur ton style de jeu" /><small>{form.bio.length}/180 caractères</small></label>
-                  </div>
-                  <div className="account-personal-fields">
-                    <div className="account-fields-caption"><CalendarDays size={17} /><span><strong>Informations personnelles</strong><small>La date complète reste privée.</small></span></div>
-                    <label>Date de naissance<input value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} type="date" disabled={Boolean(user.profile?.birthDate)} />{user.profile?.birthDate && <small>Pour corriger cette date, contacte l’administration.</small>}</label>
-                    <div className="account-age-gender-row"><label>Genre<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">Non renseigné</option><option value="Homme">Homme</option><option value="Femme">Femme</option><option value="Non-binaire">Non-binaire</option><option value="Autre">Autre</option><option value="Préfère ne pas dire">Préfère ne pas dire</option></select></label><div className="derived-field"><span>Âge calculé</span><strong>{ageFromBirthDate(form.birthDate) || "-"}</strong></div></div>
-                  </div>
-                </div>
-              </section>
-              <section className="settings-card">
-                <div className="panel-heading"><span>Jeux favoris</span><small>Choisis jusqu'à 5 jeux affichés sur ton profil public.</small></div>
-                <div className="favorite-game-grid">{games.map((game) => <button key={game.id} className={favorites.includes(game.id) ? "favorite-game active" : "favorite-game"} onClick={() => toggleFavorite(game.id)} disabled={!favorites.includes(game.id) && favorites.length >= 5}>{game.name}</button>)}</div>
-              </section>
-              <section className="settings-card account-security-card">
-                <div className="account-section-heading"><span><Shield size={20} /></span><div><h3>Connexion et sécurité</h3><p>Ces informations ne sont jamais affichées aux autres joueurs.</p></div></div>
-                <div className="account-security-layout">
-                  <div className="account-email-editor"><div className="account-email-summary"><Mail size={20} /><span><small>Adresse de connexion</small><strong>{user.emailVerified ? "Adresse vérifiée" : "Vérification requise"}</strong><em>Privée</em></span></div><label><span className="sr-only">Adresse email</span><input type="email" autoComplete="email" value={form.login} onChange={(event) => setForm({ ...form, login: event.target.value })} placeholder="nom@exemple.be" /></label><button type="button" className="secondary" onClick={saveEmail} disabled={!form.login || form.login === user.login && user.emailVerified}><Mail size={16} />{form.login === user.login ? "Renvoyer la vérification" : "Modifier l’adresse"}</button></div>
-                  <label><span className="field-label"><KeyRound size={15} />Nouveau mot de passe</span><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={10} maxLength={128} type="password" autoComplete="new-password" placeholder="Laisser vide pour conserver l’actuel" /><small>10 caractères minimum avec une lettre, un chiffre, une majuscule et un caractère spécial.</small></label>
-                </div>
-                <AccountSecurity user={user} onUser={setUser} onError={setError} onMessage={setMessage} />
-              </section>
-              <div className="settings-actions account-save-actions"><span>Les modifications du profil et des favoris seront enregistrées ensemble.</span><button onClick={savePublicInfo}>Enregistrer les modifications</button></div>
-            </div>}
-          </>}
-          {tab === "account" && accountSubtab === "settings" && <>
-            <header className="account-page-heading"><div><span className="eyebrow">Confidentialité du profil</span><h2>Affichage public</h2><p>Choisis les statistiques résumées sur ta carte puis les détails visibles sur ton profil.</p></div><button className="secondary" onClick={() => openPublicProfile(user.id)}><Eye size={17} />Prévisualiser</button></header>
-            {user.guest ? <p>Les invités ne peuvent pas modifier l’affichage d’un profil public.</p> : <div className="profile-display-settings">
-              <section className="settings-card member-stat-settings">
-                <div className="account-section-heading"><span><Trophy size={20} /></span><div><h3>Member card</h3><p>Deux emplacements compacts apparaissent sur toutes les versions de ta carte.</p></div></div>
-                <div className="member-stat-slots">{[0, 1].map((index) => {
-                  const selected = statForm.memberCardStats[index] === "overallWinRate" ? "winRate" : statForm.memberCardStats[index] ?? "hidden";
-                  return <div className="member-stat-slot" key={index}><span className="member-stat-index">{index + 1}</span><div><label htmlFor={`member-stat-${index}`}>Statistique affichée</label><select id={`member-stat-${index}`} value={selected} onChange={(event) => { const memberCardStats = [...statForm.memberCardStats]; memberCardStats[index] = event.target.value; setStatForm({ ...statForm, memberCardStats }); }}>{memberStatOptions().map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{selected === "customAchievement" && <label className="member-custom-achievement">Succès personnalisé<select value={statForm.customAchievementIds[index] ?? ""} onChange={(event) => { const ids = [...statForm.customAchievementIds]; ids[index] = event.target.value; setStatForm({ ...statForm, customAchievementIds: ids }); }}><option value="">Choisir un milestone</option>{milestoneAchievements.map((achievement) => <option key={achievement.id} value={achievement.id}>{achievement.title}</option>)}</select></label>}</div></div>;
-                })}</div>
-              </section>
-              <section className="settings-card public-stat-settings">
-                <div className="account-section-heading"><span><Eye size={20} /></span><div><h3>Fiche du profil public</h3><p>Active uniquement les indicateurs que les autres joueurs peuvent consulter.</p></div></div>
-                <div className="profile-stat-visibility">{publicProfileStatOptions.map(([key, label]) => {
-                  const visible = statForm.visibleProfileStats.includes(key);
-                  return <label className={`profile-stat-toggle ${visible ? "active" : ""}`} key={key}><span><strong>{label}</strong><small>{visible ? "Visible sur le profil" : "Masqué aux autres joueurs"}</small></span><input type="checkbox" checked={visible} onChange={(event) => setStatForm({ ...statForm, visibleProfileStats: event.target.checked ? [...new Set([...statForm.visibleProfileStats, key])] : statForm.visibleProfileStats.filter((entry) => entry !== key) })} /><i aria-hidden="true" /></label>;
-                })}</div>
-              </section>
-              <div className="settings-actions account-save-actions"><span>Les changements prennent effet sur les prochaines ouvertures de ton profil.</span><button onClick={savePublicInfo}>Enregistrer l’affichage</button></div>
-            </div>}
-          </>}
+          {tab === "account" && <AccountWorkspace user={user} form={form} setForm={setForm} favorites={favorites} games={games} toggleFavorite={toggleFavorite} statForm={statForm} setStatForm={setStatForm} milestones={milestoneAchievements} onPreview={() => openPublicProfile(user.id)} onSave={savePublicInfo} onSaveEmail={saveEmail} onSavePassword={savePassword} saving={accountSaving} onUser={setUser} onError={setError} onMessage={setMessage} />}
           {tab === "customize" && <Wardrobe user={user} setUser={setUser} catalog={shop} onOpenShop={onOpenShop} />}
           {tab === "shop" && <>
-
             {!user.guest && <button className="secret-rock-trigger" type="button" onClick={openSmallRock} aria-label="Examiner la pierre" title="Une pierre inhabituelle"><Gem size={25} /></button>}
-            {user.guest ? <p>Connecte-toi avec un compte pour acheter des éléments de personnalisation.</p> : <div className="shop-layout">
-              <div className="shop-main" ref={shopMode === "items" ? shopPages.anchor : packPages.anchor}>
-                <div className="shop-mode-tabs segmented-tabs"><button className={shopMode === "items" ? "active" : ""} onClick={() => setShopMode("items")}><ShoppingBag size={17} /> Objets</button><button className={shopMode === "packs" ? "active" : ""} onClick={openPackShop}><Boxes size={17} /> Packs</button></div>
-                {shopMode === "items" ? <>
-                  <div className="shop-selector segmented-tabs">{shopTypes.map((type) => <button key={type} className={shopType === type ? "active" : ""} onClick={() => { setShopType(type); setShopCategory("classic"); setPreviewItemId(""); }}>{shopTypeLabel(type)}</button>)}</div>
-                  <div className="shop-subselector">{availableShopCategories.map((category) => <button key={category} className={effectiveShopCategory === category ? "active" : ""} onClick={() => { setShopCategory(category); setPreviewItemId(""); }}>{shopCategoryLabel(category)}</button>)}</div>
-                  <div className="shop-grid">{shopPages.rows.map((item) => {
-              const owned = user.cosmetics?.[item.type]?.includes(item.value);
-              const selected = previewItem?.id === item.id;
-              return <article className={`${owned ? "shop-item owned" : "shop-item"} ${selected ? "selected" : ""} ${item.rewardOnly ? "reward-only" : ""}`} key={item.id} onClick={() => setPreviewItemId(item.id)}><div className="shop-item-head"><span>{item.rewardOnly ? "Récompense de succès" : `${shopCategoryLabel(item.category)} · ${shopTypeLabel(item.type)}`}</span><strong>{item.name}</strong><p>{item.description}</p></div><div className="shop-buy"><div className="shop-price">{item.rewardOnly ? <><Trophy size={16} /> Secret</> : <><Coins size={16} /> <CompactNumber value={item.price} label="Prix exact" /></>}</div><button className={owned || item.rewardOnly ? "secondary" : ""} disabled={owned || item.rewardOnly} onClick={(event) => { event.stopPropagation(); setPurchaseConfirmation({ kind: "item", item }); }}>{owned ? "Débloqué" : item.rewardOnly ? "Succès requis" : "Acheter"}</button></div></article>;
-                  })}</div>
-                  <Pagination {...shopPages} pageSizes={[12, 24, 48]} label="Pages de la boutique" />
-                </> : <div className="pack-shop">
-                  <div className="pack-theme-tabs">{availablePackThemes.map((theme) => <button key={theme} className={effectivePackTheme === theme ? "active" : ""} onClick={() => selectPackTheme(theme)}><strong>{packDefinitions[theme].name}</strong><small>{packDefinitions[theme].description}</small></button>)}</div>
-                  <section className="pack-builder-head"><div><span>Pack personnalisable</span><h3>{packDefinitions[effectivePackTheme]?.name}</h3><p>Coche les objets qui t’intéressent. Chaque objet supplémentaire ajoute 5% de remise, jusqu’à 35%.</p></div><div className="pack-discount-badge"><Percent size={20} /><strong>{packDiscount}%</strong><small>de réduction</small></div></section>
-                  <div className="pack-item-grid">{packPages.rows.map((item) => {
-                    const owned = user.cosmetics?.[item.type]?.includes(item.value);
-                    const selected = packSelection.includes(item.id) && !owned;
-                    return <button type="button" key={item.id} className={`pack-item ${selected ? "selected" : ""} ${owned ? "owned" : ""}`} onClick={() => { setPreviewItemId(item.id); togglePackItem(item); }} disabled={owned}><span className="pack-checkbox">{owned || selected ? <Check size={15} /> : null}</span><span><small>{shopTypeLabel(item.type)} · {shopCategoryLabel(item.category)}</small><strong>{item.name}</strong></span><b>{owned ? "Déjà acquis" : <CompactNumber value={item.price} label="Prix exact" />}</b></button>;
-                  })}</div>
-                  <div className="pack-actions">
-                  {packPages.totalPages > 1 && <Pagination {...packPages} pageSizes={[12, 24, 48]} label="Pages des objets du pack" />}
-                  <section className="pack-checkout"><div className="pack-price-breakdown"><span><small><CompactNumber value={selectedPackItems.length} /> objet{selectedPackItems.length > 1 ? "s" : ""}</small><del>{packDiscount > 0 ? <CompactNumber value={packSubtotal} label="Sous-total exact" /> : ""}</del></span><strong><Coins size={20} /> <CompactNumber value={packTotal} label="Total exact" /></strong></div><button disabled={!selectedPackItems.length} onClick={() => setPurchaseConfirmation({ kind: "pack" })}>Acheter la sélection{packDiscount ? ` · -${packDiscount}%` : ""}</button></section>
-                  </div>
-                </div>}
-              </div>
-              <CosmeticPreview user={user} item={shopMode === "packs" ? packPreviewItem : previewItem} stats={displayedStats} />
-            </div>}
+            {user.guest ? <p>Connecte-toi avec un compte pour acheter des éléments de personnalisation.</p> : <ShopCatalog user={user} items={shop} stats={displayedStats} onPurchaseItem={(item) => setPurchaseConfirmation({ kind: "item", item })} onPurchasePack={(pack) => setPurchaseConfirmation({ kind: "pack", pack })} />}
           </>}
           {tab === "achievements" && <>
             <div className="achievement-head">
@@ -501,10 +379,10 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
       {purchaseConfirmation && <div className="modal-backdrop shop-confirmation-layer" onClick={() => { if (!purchasePending) setPurchaseConfirmation(null); }}><div className="modal shop-confirmation-modal" onClick={(event) => event.stopPropagation()}>
         <div className="shop-confirmation-icon"><ShoppingBag size={28} /></div>
         <span className="eyebrow">Confirmation d’achat</span>
-        <h2>{purchaseConfirmation.kind === "item" ? purchaseConfirmation.item.name : packDefinitions[effectivePackTheme]?.name}</h2>
-        <p>{purchaseConfirmation.kind === "item" ? <>Débloquer et équiper cet élément pour <strong><CompactNumber value={purchaseConfirmation.item.price} label="Prix exact" /> jetons</strong> ?</> : <>Acheter les <strong>{selectedPackItems.length} éléments</strong> sélectionnés pour <strong><CompactNumber value={packTotal} label="Prix exact" /> jetons</strong>{packDiscount ? ` avec ${packDiscount}% de réduction` : ""} ?</>}</p>
-        <div className="shop-confirmation-balance"><span>Solde actuel<strong><CompactNumber value={user.tokens} label="Solde exact" /></strong></span><span>Après achat<strong><CompactNumber value={Math.max(0, Number(user.tokens) - (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) : packTotal))} label="Solde prévisionnel exact" /></strong></span></div>
-        <div className="actions"><button type="button" disabled={purchasePending || (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) > Number(user.tokens) : packTotal > Number(user.tokens))} onClick={confirmPurchase}><Coins size={18} /> {purchasePending ? "Achat en cours…" : "Confirmer l’achat"}</button><button type="button" className="secondary" disabled={purchasePending} onClick={() => setPurchaseConfirmation(null)}>Annuler</button></div>
+        <h2>{purchaseConfirmation.kind === "item" ? purchaseConfirmation.item.name : purchaseConfirmation.pack.name}</h2>
+        <p>{purchaseConfirmation.kind === "item" ? <>Débloquer et équiper cet élément pour <strong><CompactNumber value={purchaseConfirmation.item.price} label="Prix exact" /> jetons</strong> ?</> : <>Acheter les <strong>{purchaseConfirmation.pack.count} éléments</strong> sélectionnés pour <strong><CompactNumber value={purchaseConfirmation.pack.total} label="Prix exact" /> jetons</strong>{purchaseConfirmation.pack.discount ? ` avec ${purchaseConfirmation.pack.discount}% de réduction` : ""} ?</>}</p>
+        <div className="shop-confirmation-balance"><span>Solde actuel<strong><CompactNumber value={user.tokens} label="Solde exact" /></strong></span><span>Après achat<strong><CompactNumber value={Math.max(0, Number(user.tokens) - (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) : purchaseConfirmation.pack.total))} label="Solde prévisionnel exact" /></strong></span></div>
+        <div className="actions"><button type="button" disabled={purchasePending || (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) > Number(user.tokens) : purchaseConfirmation.pack.total > Number(user.tokens))} onClick={confirmPurchase}><Coins size={18} /> {purchasePending ? "Achat en cours…" : "Confirmer l’achat"}</button><button type="button" className="secondary" disabled={purchasePending} onClick={() => setPurchaseConfirmation(null)}>Annuler</button></div>
       </div></div>}
       {smallRockOpen && <div className="modal-backdrop secret-rock-backdrop" onClick={() => setSmallRockOpen(false)}><div className="modal secret-rock-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-title-row"><div><small>Anomalie temporelle</small><h2>Une petite pierre</h2></div><button className="secondary icon-toggle" onClick={() => setSmallRockOpen(false)} aria-label="Fermer"><X size={18} /></button></div>

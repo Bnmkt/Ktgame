@@ -1,0 +1,40 @@
+.account-workspace { min-width: 0; }
+.account-workspace-heading { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+.account-workspace-heading h2 { font-size: 25px; margin: 4px 0 0; }
+.account-workspace-tabs { display: flex; gap: 5px; flex-wrap: wrap; border-bottom: 1px solid #3d4942; padding-bottom: 16px; }
+.account-workspace-tabs button { color: #c6d4cb; background: transparent; border-color: transparent; font-size: 13px; }
+.account-workspace-tabs button.active { background: #273a30; border-color: #70987c; color: #eef1d7; }
+.account-workspace-section { padding: 28px 0; border-bottom: 1px solid #3b4941; }
+.account-workspace-section > header { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-bottom: 23px; }
+.account-workspace-section > header h3 { font-size: 16px; margin: 0; }
+.account-workspace-section > header svg { color: #a9c5a3; }
+.account-workspace-section > header > span { color: #aebdb3; font-size: 11px; margin-left: auto; }
+.account-workspace-section > header > span.is-verified { color: #88d3a4; }
+.account-workspace-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); align-items: start; gap: 22px; margin-top: 22px; }
+.account-workspace-row > label { padding-top: 11px; color: #e3e8d8; }
+.account-workspace-row > label small { display: block; margin-top: 4px; font-size: 11px; color: #98ac9d; font-weight: 400; line-height: 1.6; }
+.account-workspace input:not([type=checkbox]), .account-workspace textarea, .account-workspace select { background: #0f1915; color: #edf0e0; border: 1px solid #526457; border-radius: 6px; font: inherit; font-size: 14px; padding: 11px 12px; width: 100%; min-width: 0; }
+.account-workspace select { min-height: 44px; color-scheme: dark; }
+.account-workspace textarea { resize: vertical; line-height: 1.6; min-height: 110px; }
+.account-workspace input:disabled { color: #a9b9aa; }
+.account-workspace-counter { display: block; text-align: right; font-size: 11px; color: #97ad9d; margin-top: 6px; }
+.account-workspace-date { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+.account-workspace-date > span { color: #cfce97; font-size: 12px; }
+.account-workspace-date > small { grid-column: 1 / -1; color: #9caf9f; font-size: 11px; }
+.account-workspace-custom { margin-top: 14px; }
+.account-workspace-visibility { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.account-workspace-visibility label { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #2d4234; font-size: 13px; gap: 12px; }
+.account-workspace-visibility input { width: 18px; min-height: 18px; height: 18px; accent-color: #d9b452; flex-shrink: 0; }
+.account-workspace-actions { display: flex; justify-content: flex-end; padding-top: 24px; }
+.account-workspace-email-action { margin-top: 13px; }
+.account-workspace-password { display: grid; gap: 16px; max-width: 520px; }
+.account-workspace-password > small { color: #a9bba9; font-size: 11px; line-height: 1.6; }
+.account-workspace-password > button { justify-self: start; }
+.account-workspace .secret-eye { color: #c8d8c1; }
+.account-workspace .secret-eye:hover { background: #304436; color: #edf2df; }
+.account-stat-summary { margin-top: 16px; border-top: 1px solid #3b4c40; padding-top: 14px; }
+.account-stat-summary summary { cursor: pointer; color: #bdcaba; font-size: 13px; font-weight: 700; }
+.account-stat-summary .profile-stats { margin-top: 16px; }
+@media (max-width: 800px) { .account-workspace-row { grid-template-columns: minmax(0, 1fr); gap: 10px; } .account-workspace-row > label { padding-top: 0; } }
+@media (max-width: 520px) { .account-workspace-tabs { display: grid; } .account-workspace-tabs button { justify-content: flex-start; } .account-workspace-visibility { grid-template-columns: minmax(0, 1fr); } .account-workspace-actions > button { width: 100%; } }
+.account-workspace .secret-field-control input { padding-right: 50px; }
