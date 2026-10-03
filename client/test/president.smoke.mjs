@@ -6,6 +6,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Server } from "../../server/node_modules/socket.io/dist/index.js";
 import { applyPresidentAction } from "../../server/src/games/engines/president.js";
+import { createTexasHoldemState, applyTexasHoldemAction } from "../../server/src/games/engines/texas-holdem.js";
+import { createYahtzeeState, applyYahtzeeAction } from "../../server/src/games/engines/yahtzee.js";
 import { games } from "../../server/src/games/shared.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -30,6 +32,14 @@ fixture("REVTOP", "3", ["A", "2"], true);
 fixture("PAIR", "K", ["A", "2"], false, 2);
 fixture("MANUAL", "2", ["4", "A"]);
 fixture("READY", "K", ["A", "A"]).pacing = null;
+const pokerRoom = fixture("POKER", "K", ["A", "A"]);
+pokerRoom.gameId = "texas-holdem";
+pokerRoom.players = players.slice(0, 2);
+pokerRoom.state = createTexasHoldemState(pokerRoom.players, { buyIn: 1000, bigBlind: 100 });
+Object.assign(pokerRoom.state, { currentPlayerIndex: 0, currentBet: 1000, streetBets: { alpha: 50, beta: 1000 }, stacks: { alpha: 950, beta: 0 }, contributions: { alpha: 50, beta: 1000 }, pot: 1050, allInPlayerIds: ["beta"] });
+const diceRoom = fixture("DICE", "K", ["A", "A"]);
+diceRoom.gameId = "yahtzee";
+diceRoom.state = createYahtzeeState(players);
 const actions = [];
 let webOrigin = "";
 const service = createServer(async (req, res) => {
@@ -59,7 +69,7 @@ const service = createServer(async (req, res) => {
       const action = JSON.parse(Buffer.concat(chunks).toString());
       actions.push({ code: room.code, action, at: Date.now() });
       if (room.pacing) return reply({ error: "Previous turn still visible" }, 409);
-      try { applyPresidentAction(room.state, user.id, action); }
+      try { ({ president: applyPresidentAction, "texas-holdem": applyTexasHoldemAction, yahtzee: applyYahtzeeAction })[room.gameId](room.state, user.id, action); }
       catch (error) { return reply({ error: error.message }, 400); }
       if (room.code === "MANUAL") await new Promise((resolve) => setTimeout(resolve, 300));
       realtime.emit("room", room);
@@ -69,6 +79,8 @@ const service = createServer(async (req, res) => {
   return reply({ ok: true });
 });
 const realtime = new Server(service, { cors: { origin: (origin, callback) => callback(null, true), credentials: true } });
+const watches = new Map();
+realtime.on("connection", (socket) => socket.on("watch-room", ({ roomId }) => { socket.join(roomId); watches.set(roomId, (watches.get(roomId) ?? 0) + 1); }));
 await new Promise((resolve) => service.listen(0, "127.0.0.1", resolve));
 const apiOrigin = `http://127.0.0.1:${service.address().port}`;
 const probe = createServer();
@@ -102,7 +114,7 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   async function begin(code) {
     await page.goto(`${webOrigin}/table/${code}`);
-    await page.locator(".president-table").waitFor();
+    await page.locator(`.board-${fixtures.get(code).gameId}`).waitFor();
     await page.locator(".board-heading h2").click();
     assert.equal(await page.evaluate(() => window.turnTones), 0, "no cue during the previous turn's pause");
     const room = fixtures.get(code);
@@ -140,6 +152,46 @@ try {
   await page.waitForTimeout(3300);
   assert.equal(actions.filter((entry) => entry.code === "MANUAL").length, 1, "manual pass cancels automatic request");
   assert.equal(await page.evaluate(() => window.turnTones), 2, "no repeated cue on action response or socket update");
+  await begin("POKER");
+  const allInDialog = page.getByRole("dialog", { name: "Un adversaire fait tapis", exact: true });
+  await allInDialog.waitFor();
+  assert.match(await allInDialog.innerText(), /950/);
+  assert.match(await allInDialog.innerText(), /tout ton tapis/);
+  await page.screenshot({ path: path.join(output, "poker-all-in-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await allInDialog.isVisible());
+  await page.screenshot({ path: path.join(output, "poker-all-in-mobile.png"), fullPage: true });
+  await allInDialog.getByRole("button", { name: "Voir la table", exact: true }).click();
+  realtime.emit("room", pokerRoom);
+  await page.waitForTimeout(650);
+  assert.equal(await allInDialog.count(), 0, "dismissed all-in decision does not reopen on an identical update");
+  assert.equal(await page.evaluate(() => window.turnTones), 2, "identical poker updates do not ring again");
+  await page.getByRole("button", { name: /^Tapis adverse/ }).click();
+  await allInDialog.getByRole("button", { name: /^Suivre/ }).click();
+  await waitFor(() => actions.some((entry) => entry.code === "POKER" && entry.action.type === "call"), "all-in call acknowledged by poker engine");
+  await allInDialog.waitFor({ state: "detached" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await begin("DICE");
+  const diceState = diceRoom.state;
+  diceState.dice = [1, 2, 3, 4, 5];
+  diceState.rollsLeft = 2;
+  realtime.emit("room", diceRoom);
+  await page.waitForTimeout(650);
+  assert.equal(await page.evaluate(() => window.turnTones), 2, "reroll stays in the same turn and does not ring again");
+  const watchCount = watches.get("DICE");
+  for (const socket of realtime.sockets.sockets.values()) if (socket.rooms.has("DICE")) socket.conn.close();
+  await waitFor(() => watches.get("DICE") > watchCount, "room watch resubscribed after transport reconnect");
+  diceState.currentPlayerIndex = 1;
+  realtime.to("DICE").emit("room", diceRoom);
+  await page.waitForTimeout(650);
+  diceState.currentPlayerIndex = 0;
+  realtime.to("DICE").emit("room", diceRoom);
+  await waitFor(async () => await page.evaluate(() => window.turnTones) === 4, "turn cue after reconnect");
+  await page.waitForTimeout(700);
+  diceState.scores.alpha = { "upper-1": 0 };
+  realtime.to("DICE").emit("room", diceRoom);
+  await page.waitForTimeout(650);
+  await waitFor(async () => await page.evaluate(() => window.turnTones) === 6, "new Yahtzee turn without a pacing pause");
   const freshContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await freshContext.addInitScript(initializeAudio);
   // Automation grants activation implicitly; simulate a first visit until a real input.
@@ -158,10 +210,13 @@ try {
   await waitFor(async () => await firstVisit.evaluate(() => window.turnTones) === 2, "initial cue retried on first interaction");
   await freshContext.close();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${webOrigin}/table/MANUAL`);
+  await page.locator(".president-table").waitFor();
   assert.ok(await page.locator(".president-table").isVisible());
   await page.screenshot({ path: path.join(output, "president-mobile.png"), fullPage: true });
   assert.deepEqual(errors, []);
   console.log("PASS: President automatic/manual passes, three-second delay after pacing, normal/revolution ranks, combination size, turn audio without duplicates, desktop/mobile.");
+  console.log("PASS: poker all-in decision, Yahtzee reroll/turn cues, real transport reconnect and resubscription, desktop/mobile.");
 } finally {
   await browser?.close();
   if (vite.exitCode === null) await new Promise((resolve) => { vite.once("exit", resolve); vite.kill(); });

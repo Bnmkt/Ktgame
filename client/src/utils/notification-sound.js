@@ -9,13 +9,13 @@ export function createNotificationSound({ tones = [[880, 0, .12, "sine"], [1320,
       if (context.state === "suspended") context.resume().catch(() => {});
     } catch { /* Browsers can deny audio before the first interaction. */ }
   };
-  const play = async () => {
+  const play = async (shouldPlay = () => true) => {
     if (!context && navigator.userActivation?.hasBeenActive) unlock();
     const audio = context;
     if (!audio || audio.state === "closed") return false;
     try { if (audio.state === "suspended") await audio.resume(); }
     catch { return false; }
-    if (context !== audio || audio.state !== "running") return false;
+    if (context !== audio || audio.state !== "running" || !shouldPlay()) return false;
     if (Date.now() - lastPlayedAt < 500) return true;
     lastPlayedAt = Date.now();
     const start = context.currentTime;

@@ -1,0 +1,3 @@
+.poker-decision-notice { margin: 12px 0; max-width: 100%; }
+.poker-decision-opponents { display: flex; flex-wrap: wrap; gap: 10px; }
+.poker-decision-dialog .actions { flex-wrap: wrap; }

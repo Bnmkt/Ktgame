@@ -15,6 +15,8 @@ import { CompactNumber, copyText } from "../utils/presentation.jsx";
 import { hasPlayablePresidentSet } from "../features/games/president.js";
 import { usePresidentAutoPass } from "../components/game/usePresidentAutoPass.js";
 import { useTurnSound } from "../components/game/useTurnSound.js";
+import { PokerAllInNotice } from "../components/game/PokerAllInNotice.jsx";
+import { playerActionExpected, turnSoundKey } from "../features/games/turn-notice.js";
 
 const pokerHandNames = ["Carte haute", "Paire", "Deux paires", "Brelan", "Suite", "Couleur", "Full", "Carré", "Quinte flush"];
 const betPresets = [
@@ -175,7 +177,8 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   useEffect(() => {
     if (!room?.id) return undefined;
     const socket = io(SOCKET_URL, { path: SOCKET_PATH, withCredentials: true });
-    socket.emit("watch-room", { roomId: room.id, token: getToken() });
+    const watch = () => socket.emit("watch-room", { roomId: room.id, token: getToken() });
+    socket.on("connect", watch);
     socket.on("room", (nextRoom) => {
       if (nextRoom.code !== code) return;
       commitRoom(nextRoom);
@@ -215,6 +218,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
       else setSelectedDice([]);
       if (body.type === "move") setAccordionFrom(null);
       if (result.state?.gameId === "president" && ["play", "pass"].includes(body.type)) setSelectedPresidentCards([]);
+      return result;
     } catch (err) {
       setError(err.message);
     } finally {
@@ -317,13 +321,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const allBlackjackBetsPlaced = room?.gameId === "blackjack" && state ? Object.keys(state.bets ?? {}).length >= state.players.filter((p) => !p.isBot).length : false;
   const isMyTurn = current?.id === user.id && !pacingActive;
   const pokerAutoEnabled = Boolean(state?.autoCheckFoldPlayerIds?.includes(user.id));
-  const isPlayerActionExpected = Boolean(isSeatedPlayer && !pacingActive && state && !state.finished && !state.nextHandAt && !state.finishedOrder?.includes(user.id) && (
-    room?.gameId === "blackjack"
-      ? (!hasBlackjackBet || (allBlackjackBetsPlaced && !blackjackHandDone))
-      : room?.gameId === "bataille"
-        ? !state.submittedPlayerIds?.includes(user.id)
-        : isMyTurn
-  ));
+  const isPlayerActionExpected = playerActionExpected(room, user.id);
   const yahtzeeCompletedTurns = room?.gameId === "yahtzee" ? Object.values(state?.scores ?? {}).reduce((sum, scores) => sum + Object.keys(scores).length, 0) : 0;
   const yahtzeeRound = room?.gameId === "yahtzee" ? Math.min(13, Math.floor(yahtzeeCompletedTurns / Math.max(1, state?.players?.length ?? 1)) + 1) : 0;
   const diceSkin = user.cosmetics?.equipped?.diceSkin ?? "default";
@@ -338,7 +336,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
     turnKey: `${code}:${current?.id}:${state?.currentSet?.playerId}:${state?.currentSet?.rank}:${state?.currentSet?.count}:${state?.revolution}:${myHand.map(cardIdentity).join(",")}`,
     onPass: () => action({ type: "pass" }, { background: true })
   });
-  useTurnSound(isPlayerActionExpected, `${code}:${user.id}`);
+  useTurnSound(isPlayerActionExpected, `${code}:${user.id}`, turnSoundKey(state));
   const winnerNames = state?.winners?.length ? state.winners.map((id) => playerName(state.players, id)).join(", ") : "Dealer / aucun gagnant";
   const invitableFriends = (friendsData.friends ?? []).filter((friend) => !room?.players?.some((player) => player.id === friend.id));
   const showFinishedResult = room?.gameId !== "blackjack" || blackjackRevealDone;
@@ -512,6 +510,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
                 </div>
                 <div className="poker-control-dock">
                 {!state.finished && !state.nextHandAt && <PokerAutoAction enabled={pokerAutoEnabled} isMyTurn={isMyTurn} turnStartedAt={state.turnStartedAt} enabledAt={state.autoCheckFoldEnabledAt?.[user.id]} onToggle={() => action({ type: "auto-check-fold", enabled: !pokerAutoEnabled })} />}
+                <PokerAllInNotice state={state} userId={user.id} expected={isPlayerActionExpected} onAction={action} />
                 {!state.finished && isMyTurn && <div className="poker-actions"><div className="actions"><button onClick={() => action({ type: pokerToCall ? "call" : "check" })}>{pokerToCall ? <>Suivre <CompactNumber value={Math.min(pokerToCall, state.stacks[user.id])} label="Somme exacte à suivre" /></> : "Parole"}</button><button className="danger-button" onClick={() => action({ type: "fold" })}>Se coucher</button><button className="secondary" disabled={(state.streetBets?.[user.id] ?? 0) + (state.stacks?.[user.id] ?? 0) > state.maximumBet} title={(state.streetBets?.[user.id] ?? 0) + (state.stacks?.[user.id] ?? 0) > state.maximumBet ? "Le tapis dépasse la mise maximale de la table" : "Engager tout le tapis"} onClick={() => action({ type: "all-in" })}>Tapis <CompactNumber value={state.stacks[user.id]} label="Tapis exact" /></button></div><div className="poker-raise"><div className="poker-presets"><button className="secondary" disabled={pokerMaximumRaise < pokerMinimumRaise} onClick={() => setPokerRaise(Math.min(pokerMaximumRaise, state.currentBet + Math.max(state.minRaise, Math.floor(state.pot / 2))))}>½ pot</button><button className="secondary" disabled={pokerMaximumRaise < pokerMinimumRaise} onClick={() => setPokerRaise(Math.min(pokerMaximumRaise, state.currentBet + Math.max(state.minRaise, state.pot)))}>Pot</button></div>{pokerMaximumRaise >= pokerMinimumRaise ? <StepperBet value={pokerRaise} onChange={setPokerRaise} min={pokerMinimumRaise} max={pokerMaximumRaise} label="Relancer à" /> : <span className="action-hint">Ton tapis ne permet pas une relance complète.</span>}<button disabled={pokerMaximumRaise < pokerMinimumRaise || pokerRaise < pokerMinimumRaise || pokerRaise > pokerMaximumRaise} onClick={() => action({ type: "raise", amount: pokerRaise })}>Relancer</button></div></div>}
                 </div>
               </div>}
