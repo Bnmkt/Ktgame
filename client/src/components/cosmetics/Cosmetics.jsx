@@ -150,14 +150,14 @@ export function FriendCode({ code }) {
   return <button className="friend-code" type="button" title="Copier le code ami" onClick={async () => { await copyText(code); setCopied(true); setTimeout(() => setCopied(false), 1800); }}><span>{copied ? "Copié !" : "Code ami"}</span><strong>{code}</strong>{copied ? <BadgeCheck size={14} /> : <Copy size={14} />}</button>;
 }
 
-export function DisplayName({ user }) {
+export function DisplayName({ user, interactive = true }) {
   const effect = user?.cosmetics?.equipped?.nameEffect ?? "none";
   const openProfile = () => {
-    if (!user?.id || user.isBot) return;
+    if (!interactive || !user?.id || user.isBot) return;
     window.dispatchEvent(new CustomEvent("ktga-public-profile", { detail: user.id }));
   };
   return (
-    <span className={`display-name name-${effect}`} role={user?.id && !user.isBot ? "button" : undefined} tabIndex={user?.id && !user.isBot ? 0 : undefined} onClick={openProfile} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openProfile(); } }}>
+    <span className={`display-name name-${effect}`} role={interactive && user?.id && !user.isBot ? "button" : undefined} tabIndex={interactive && user?.id && !user.isBot ? 0 : undefined} onClick={interactive ? openProfile : undefined} onKeyDown={interactive ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openProfile(); } } : undefined}>
       <CosmeticIcon value={user?.cosmetics?.equipped?.icon} />
       <span className="display-name-text">{user?.pseudo}</span>
     </span>

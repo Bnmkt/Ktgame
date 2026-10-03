@@ -25,3 +25,34 @@ test("les messages sont bornés, ordonnés et marqués comme lus", () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("les compteurs excluent les messages masqués et conservent les messages arrivés après la lecture", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "ktga-chat-read-"));
+  const store = createChatStore({ filename: path.join(directory, "chat.sqlite") });
+  try {
+    const channels = [{ channelType: "direct", channelId: "private" }, { channelType: "room", channelId: "table" }];
+    store.add({ ...channels[0], senderId: "bob", content: "Premier message privé" }, 1000);
+    store.add({ ...channels[1], senderId: "muted", content: "Message masqué" }, 1000);
+    store.add({ ...channels[1], senderId: "alice", content: "Mon message" }, 1500);
+    store.add({ ...channels[0], senderId: "bob", content: "Arrivé pendant la lecture" }, 3000);
+    store.markRead("alice", "direct", "private", 2000);
+    store.markRead("alice", "direct", "private", 500);
+    assert.deepEqual(store.unread("alice", channels, ["muted"]), { "direct:private": 1, "room:table": 0 });
+    assert.equal(store.unread("alice", channels)["room:table"], 1);
+  } finally { store.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("l'activité distingue les conversations ouvertes des amis sans échange", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "ktga-chat-activity-"));
+  const store = createChatStore({ filename: path.join(directory, "chat.sqlite") });
+  try {
+    const channels = ["opened", "recent", "none"].map((channelId) => ({ channelType: "direct", channelId }));
+    store.markRead("alice", "direct", "opened", 1000);
+    store.add({ ...channels[1], senderId: "bob", content: "Échange récent" }, 2000);
+    const activity = store.conversationActivity("alice", channels);
+    assert.deepEqual(activity["direct:opened"], { opened: true, lastMessageAt: "" });
+    assert.deepEqual(activity["direct:none"], { opened: false, lastMessageAt: "" });
+    assert.equal(activity["direct:recent"].lastMessageAt, new Date(2000).toISOString());
+    assert.equal(activity["direct:recent"].opened, true);
+  } finally { store.close(); rmSync(directory, { recursive: true, force: true }); }
+});

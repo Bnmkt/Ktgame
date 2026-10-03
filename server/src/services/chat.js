@@ -66,15 +66,26 @@ export function createChatStore({ filename }) {
     },
     markRead(userId, channelType, channelId, now = Date.now()) {
       if (!channelTypes.has(channelType)) return false;
-      db.prepare("INSERT INTO chat_reads(user_id,channel_type,channel_id,read_at) VALUES(?,?,?,?) ON CONFLICT(user_id,channel_type,channel_id) DO UPDATE SET read_at=excluded.read_at")
+      db.prepare("INSERT INTO chat_reads(user_id,channel_type,channel_id,read_at) VALUES(?,?,?,?) ON CONFLICT(user_id,channel_type,channel_id) DO UPDATE SET read_at=MAX(chat_reads.read_at,excluded.read_at)")
         .run(clean(userId, 100), channelType, clean(channelId, 100), iso(now));
       return true;
     },
-    unread(userId, channels) {
+    conversationActivity(userId, channels) {
+      const statement = db.prepare(`SELECT
+        (SELECT MAX(created_at) FROM chat_messages WHERE channel_type=? AND channel_id=?) AS lastMessageAt,
+        (SELECT read_at FROM chat_reads WHERE user_id=? AND channel_type=? AND channel_id=?) AS readAt`);
+      return Object.fromEntries(channels.map(({ channelType, channelId }) => {
+        const row = statement.get(channelType, channelId, userId, channelType, channelId);
+        return [`${channelType}:${channelId}`, { lastMessageAt: row.lastMessageAt ?? "", opened: Boolean(row.lastMessageAt || row.readAt) }];
+      }));
+    },
+    unread(userId, channels, hiddenSenderIds = []) {
+      const excluded = [...new Set(hiddenSenderIds.map(String))];
+      const hiddenFilter = excluded.length ? ` AND m.sender_id NOT IN (${excluded.map(() => "?").join(",")})` : "";
       const statement = db.prepare(`SELECT COUNT(*) AS count FROM chat_messages m
         LEFT JOIN chat_reads r ON r.user_id=? AND r.channel_type=m.channel_type AND r.channel_id=m.channel_id
-        WHERE m.channel_type=? AND m.channel_id=? AND m.sender_id!=? AND m.created_at>COALESCE(r.read_at,'1970-01-01T00:00:00.000Z')`);
-      return Object.fromEntries(channels.map(({ channelType, channelId }) => [`${channelType}:${channelId}`, Number(statement.get(userId, channelType, channelId, userId)?.count) || 0]));
+        WHERE m.channel_type=? AND m.channel_id=? AND m.sender_id!=? AND m.created_at>COALESCE(r.read_at,'1970-01-01T00:00:00.000Z')${hiddenFilter}`);
+      return Object.fromEntries(channels.map(({ channelType, channelId }) => [`${channelType}:${channelId}`, Number(statement.get(userId, channelType, channelId, userId, ...excluded)?.count) || 0]));
     },
     deleteForUser(userId) {
       db.prepare("UPDATE chat_messages SET sender_id='deleted-user' WHERE sender_id=?").run(userId);

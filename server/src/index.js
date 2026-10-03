@@ -3427,6 +3427,24 @@ app.get("/api/friends", auth, (req, res) => {
   res.json(result);
 });
 
+app.get("/api/chat/unread", auth, (req, res) => {
+  if (req.auth.guest) return res.json({ channels: [] });
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === req.auth.id);
+  if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+  ensureUserSocial(user);
+  const channels = user.friends.flatMap((friendId) => {
+    const friend = db.users.find((entry) => entry.id === friendId);
+    return friend && !connectionBlocked(user, friend) ? [{ channelType: "direct", channelId: directChannelId(user.id, friendId), friendId }] : [];
+  });
+  const room = req.query.roomCode ? chatRoomAccess(db, user.id, req.query.roomCode) : null;
+  if (room) channels.push({ channelType: "room", channelId: room.id, roomCode: room.code });
+  const hidden = db.users.filter((sender) => messageHiddenFor(user, sender)).map((sender) => sender.id);
+  const counts = chat.unread(user.id, channels, hidden);
+  const activity = chat.conversationActivity(user.id, channels);
+  res.json({ channels: channels.map((channel) => ({ ...channel, ...activity[`${channel.channelType}:${channel.channelId}`], count: counts[`${channel.channelType}:${channel.channelId}`] ?? 0 })) });
+});
+
 app.get("/api/chat/messages", auth, (req, res) => {
   if (req.auth.guest) return res.status(403).json({ error: "Le chat est réservé aux comptes enregistrés." });
   const db = readDb();
@@ -3436,8 +3454,7 @@ app.get("/api/chat/messages", auth, (req, res) => {
   const messages = chat.list(channel.channelType, channel.channelId)
     .filter((message) => !messageHiddenFor(user, db.users.find((entry) => entry.id === message.senderId)))
     .map((message) => decorateChatMessage(message, db));
-  chat.markRead(user.id, channel.channelType, channel.channelId);
-  res.json({ channel: { type: channel.channelType, id: channel.channelId }, messages });
+  res.json({ channel: { type: channel.channelType, id: channel.channelId }, messages, readAt: new Date().toISOString() });
 });
 
 app.post("/api/chat/messages", auth, (req, res) => {
@@ -3452,11 +3469,13 @@ app.post("/api/chat/messages", auth, (req, res) => {
   if (!chatRateAllowed(user.id)) return res.status(429).json({ error: "Tu envoies des messages trop rapidement." });
   try {
     const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content }), db);
-    chat.markRead(user.id, channel.channelType, channel.channelId);
     for (const socket of io.sockets.sockets.values()) {
       if (!socket.rooms.has(channel.socketRoom)) continue;
       const viewer = db.users.find((entry) => entry.id === socket.data.chatUserId);
-      if (!viewer || messageHiddenFor(viewer, user)) continue;
+      if (!viewer || viewer.active === false || activeModeration(viewer)?.type === "hard" || activeParentalRevocation(viewer) || messageHiddenFor(viewer, user)) continue;
+      if (socket.data.chatSessionVersion !== (Number(viewer.sessionVersion) || 0)) continue;
+      if (channel.channelType === "direct" && viewer.id !== user.id && !viewer.friends?.includes(user.id)) continue;
+      if (channel.channelType === "room" && !chatRoomAccess(db, viewer.id, channel.room.code)) continue;
       socket.emit("chat-message", message);
     }
     res.status(201).json(message);
@@ -3471,7 +3490,9 @@ app.post("/api/chat/read", auth, (req, res) => {
   const user = db.users.find((entry) => entry.id === req.auth.id);
   const channel = user ? resolveChatChannel(db, user, req.body) : null;
   if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
-  chat.markRead(user.id, channel.channelType, channel.channelId);
+  const through = Date.parse(req.body.readAt);
+  if (!Number.isFinite(through) || through > Date.now()) return res.status(400).json({ error: "Date de lecture invalide." });
+  chat.markRead(user.id, channel.channelType, channel.channelId, through);
   res.json({ ok: true });
 });
 
@@ -6176,6 +6197,8 @@ io.on("connection", (socket) => {
     if (!user || staleSession || activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) return;
     ensureUserSocial(user);
     socket.data.chatUserId = user.id;
+    socket.data.chatSessionVersion = Number(user.sessionVersion) || 0;
+    for (const joined of socket.rooms) if (joined.startsWith("chat:")) socket.leave(joined);
     socket.join("chat:global");
     for (const friendId of user.friends) socket.join(`chat:direct:${directChannelId(user.id, friendId)}`);
     const room = payload.roomCode ? chatRoomAccess(db, user.id, payload.roomCode) : null;
