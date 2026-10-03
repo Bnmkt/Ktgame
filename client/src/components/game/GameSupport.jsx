@@ -102,16 +102,7 @@ export function cardIdentity(card) {
   return card ? `${card.rank}-${card.suit}` : "";
 }
 
-export function presidentCardValue(rank, revolution = false) {
-  const value = ({ "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, J: 11, Q: 12, K: 13, A: 14, "2": 15 })[rank] ?? 0;
-  return revolution ? 18 - value : value;
-}
-
-export function canPlayPresidentSet(state, rank, count) {
-  if (!state?.currentSet) return true;
-  if (count !== state.currentSet.count) return false;
-  return presidentCardValue(rank, state.revolution) > presidentCardValue(state.currentSet.rank, state.revolution);
-}
+export { canPlayPresidentSet, presidentCardValue } from "../../features/games/president.js";
 
 export function yahtzeeTotal(scores = {}) {
   const upper = ["upper-1", "upper-2", "upper-3", "upper-4", "upper-5", "upper-6"].reduce((sum, key) => sum + (scores[key] ?? 0), 0);

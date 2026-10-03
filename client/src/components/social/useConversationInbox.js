@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { api, getToken, SOCKET_PATH, SOCKET_URL } from "../../api.js";
-import { createConversationSound } from "./conversation-sound.js";
+import { createNotificationSound } from "../../utils/notification-sound.js";
 
 export const conversationKey = (channel) => `${channel.channelType}:${channel.channelId}`;
 
@@ -46,7 +46,7 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
   useEffect(() => {
     setChannels([]);
     try { setSoundEnabled(localStorage.getItem(`ktga-conversation-sound:${userId}`) !== "off"); } catch { setSoundEnabled(true); }
-    const sound = createConversationSound();
+    const sound = createNotificationSound();
     const seen = new Set();
     const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { token: getToken() }, transports: ["websocket", "polling"], withCredentials: true });
     socketRef.current = socket;

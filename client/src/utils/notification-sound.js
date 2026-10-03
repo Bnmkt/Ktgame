@@ -1,4 +1,4 @@
-export function createConversationSound() {
+export function createNotificationSound({ tones = [[880, 0, .12, "sine"], [1320, .06, .07, "sine"]] } = {}) {
   let context;
   let lastPlayedAt = 0;
   const unlock = () => {
@@ -9,15 +9,20 @@ export function createConversationSound() {
       if (context.state === "suspended") context.resume().catch(() => {});
     } catch { /* Browsers can deny audio before the first interaction. */ }
   };
-  const play = () => {
+  const play = async () => {
     if (!context && navigator.userActivation?.hasBeenActive) unlock();
-    if (!context || context.state !== "running" || Date.now() - lastPlayedAt < 500) return;
+    const audio = context;
+    if (!audio || audio.state === "closed") return false;
+    try { if (audio.state === "suspended") await audio.resume(); }
+    catch { return false; }
+    if (context !== audio || audio.state !== "running") return false;
+    if (Date.now() - lastPlayedAt < 500) return true;
     lastPlayedAt = Date.now();
     const start = context.currentTime;
-    for (const [frequency, delay, volume] of [[880, 0, .12], [1320, .06, .07]]) {
+    for (const [frequency, delay, volume, type] of tones) {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
-      oscillator.type = "sine";
+      oscillator.type = type;
       oscillator.frequency.value = frequency;
       gain.gain.setValueAtTime(0, start + delay);
       gain.gain.linearRampToValueAtTime(volume, start + delay + .008);
@@ -28,6 +33,7 @@ export function createConversationSound() {
       oscillator.stop(start + delay + .56);
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
     }
+    return true;
   };
   window.addEventListener("pointerdown", unlock);
   window.addEventListener("keydown", unlock);

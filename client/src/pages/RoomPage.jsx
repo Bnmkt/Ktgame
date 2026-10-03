@@ -12,6 +12,9 @@ import { BeloteTeams } from "../components/room/BeloteTeams.jsx";
 import { ActionLog, BattleModifiersPanel, BlackjackScoresTable, FinishedLeaderboard, GameModifiersPanel, OtherPlayerRolls, RoomStatusPanel, ScorePanel, WagerPanel } from "../components/room/RoomPanels.jsx";
 import { defaultBattleModifiers, defaultGameModifiers, gameTitle, playerName, scoreCategories, suits } from "../features/games/config.js";
 import { CompactNumber, copyText } from "../utils/presentation.jsx";
+import { hasPlayablePresidentSet } from "../features/games/president.js";
+import { usePresidentAutoPass } from "../components/game/usePresidentAutoPass.js";
+import { useTurnSound } from "../components/game/useTurnSound.js";
 
 const pokerHandNames = ["Carte haute", "Paire", "Deux paires", "Brelan", "Suite", "Couleur", "Full", "Carré", "Quinte flush"];
 const betPresets = [
@@ -110,9 +113,10 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const [selectedDice, setSelectedDice] = useState([]);
   const [selectDiceToKeep, setSelectDiceToKeep] = useState(() => window.localStorage.getItem("ktga-dice-selection-mode") === "keep");
   const [scoreConfirmation, setScoreConfirmation] = useState(null);
-  const previousTurnPlayer = useRef(null);
   const [accordionFrom, setAccordionFrom] = useState(null);
   const [selectedPresidentCards, setSelectedPresidentCards] = useState([]);
+  const [presidentActionBusy, setPresidentActionBusy] = useState(false);
+  const presidentActionPending = useRef(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [roomSettingsOpen, setRoomSettingsOpen] = useState(false);
   const [tableFullscreen, setTableFullscreen] = useState(false);
@@ -187,7 +191,14 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
     return () => socket.disconnect();
   }, [code, room?.id, user.id, onBack, onExcluded, commitRoom]);
 
-  async function action(body) {
+  async function action(body, { background = false } = {}) {
+    const isPresidentAction = room?.gameId === "president" && ["play", "pass"].includes(body.type);
+    if (isPresidentAction) {
+      if (presidentActionPending.current) return;
+      presidentActionPending.current = true;
+      setPresidentActionBusy(true);
+      presidentAutoPass.cancel();
+    }
     const isDiceRoll = body.type === "roll";
     if (isDiceRoll) {
       if (diceRollRequestPending.current) return;
@@ -196,7 +207,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
     }
     setError("");
     try {
-      const result = await api(`/api/rooms/${code}/action`, { method: "POST", body: JSON.stringify(body) });
+      const result = await api(`/api/rooms/${code}/action`, { method: "POST", background, body: JSON.stringify(body) });
       commitRoom(result);
       syncUserFromRoom(result);
       onAchievements?.(result.achievementUnlocks ?? []);
@@ -207,6 +218,10 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
     } catch (err) {
       setError(err.message);
     } finally {
+      if (isPresidentAction) {
+        presidentActionPending.current = false;
+        setPresidentActionBusy(false);
+      }
       if (isDiceRoll) {
         diceRollRequestPending.current = false;
         setDiceRollLocked(false);
@@ -302,7 +317,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const allBlackjackBetsPlaced = room?.gameId === "blackjack" && state ? Object.keys(state.bets ?? {}).length >= state.players.filter((p) => !p.isBot).length : false;
   const isMyTurn = current?.id === user.id && !pacingActive;
   const pokerAutoEnabled = Boolean(state?.autoCheckFoldPlayerIds?.includes(user.id));
-  const isPlayerActionExpected = Boolean(state && !state.finished && !state.nextHandAt && (
+  const isPlayerActionExpected = Boolean(isSeatedPlayer && !pacingActive && state && !state.finished && !state.nextHandAt && !state.finishedOrder?.includes(user.id) && (
     room?.gameId === "blackjack"
       ? (!hasBlackjackBet || (allBlackjackBetsPlaced && !blackjackHandDone))
       : room?.gameId === "bataille"
@@ -318,6 +333,12 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const selectedPresidentHand = presidentHand.filter((card) => selectedPresidentCards.includes(cardIdentity(card)));
   const presidentRequiredCount = state?.gameId === "president" ? state.currentSet?.count ?? null : null;
   const presidentSelectionPlayable = state?.gameId === "president" && selectedPresidentHand.length > 0 && (!presidentRequiredCount || selectedPresidentHand.length === presidentRequiredCount) && canPlayPresidentSet(state, selectedPresidentHand[0].rank, selectedPresidentHand.length);
+  const presidentAutoPass = usePresidentAutoPass({
+    enabled: state?.gameId === "president" && isPlayerActionExpected && Boolean(state.currentSet) && myHand.length > 0 && !hasPlayablePresidentSet(state, myHand),
+    turnKey: `${code}:${current?.id}:${state?.currentSet?.playerId}:${state?.currentSet?.rank}:${state?.currentSet?.count}:${state?.revolution}:${myHand.map(cardIdentity).join(",")}`,
+    onPass: () => action({ type: "pass" }, { background: true })
+  });
+  useTurnSound(isPlayerActionExpected, `${code}:${user.id}`);
   const winnerNames = state?.winners?.length ? state.winners.map((id) => playerName(state.players, id)).join(", ") : "Dealer / aucun gagnant";
   const invitableFriends = (friendsData.friends ?? []).filter((friend) => !room?.players?.some((player) => player.id === friend.id));
   const showFinishedResult = room?.gameId !== "blackjack" || blackjackRevealDone;
@@ -357,28 +378,6 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   }, [room?.gameId, roomHasStarted, gameModifierSignature]);
   useEffect(() => { setScoreConfirmation(null); }, [state?.currentPlayerIndex, state?.finished]);
   useEffect(() => { setSelectedPresidentCards([]); }, [state?.currentPlayerIndex, state?.finished, myHand.length]);
-  useEffect(() => {
-    const wasExpected = previousTurnPlayer.current === user.id;
-    previousTurnPlayer.current = isPlayerActionExpected ? user.id : (current?.id ?? null);
-    if (!state || state.finished || wasExpected || !isPlayerActionExpected) return;
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass || (navigator.userActivation && !navigator.userActivation.hasBeenActive)) return;
-    const context = new AudioContextClass();
-    const gain = context.createGain();
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.3, context.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.72);
-    gain.connect(context.destination);
-    [659.25, 783.99].forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      oscillator.type = index ? "triangle" : "sine";
-      oscillator.frequency.value = frequency;
-      oscillator.connect(gain);
-      oscillator.start(context.currentTime + index * 0.11);
-      oscillator.stop(context.currentTime + 0.5 + index * 0.11);
-    });
-    setTimeout(() => context.close().catch(() => {}), 700);
-  }, [current?.id, isPlayerActionExpected, state?.finished, user.id]);
 
   async function leaveTable() {
     if (room?.gameId === "texas-holdem" && state && !state.finished) {
@@ -522,7 +521,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
               {!state.finished && room.gameId === "president" && <section className="card-game-arena president-table">
                 <div className="president-opponents">{state.players.filter((player) => player.id !== user.id && !state.finishedOrder?.includes(player.id)).map((player) => { const count = state.hands[player.id]?.length ?? 0; return <article className={current?.id === player.id ? "active" : ""} key={player.id}><div><DisplayName user={player} /><small>{count} carte{count > 1 ? "s" : ""}</small></div><div className="opponent-card-fan">{Array.from({ length: Math.min(3, count) }, (_, index) => <PlayingCard key={index} hidden skin={player.cosmetics?.equipped?.cardSkin ?? cardSkin} />)}</div></article>; })}</div>
                 <div className="president-center-line"><div className="president-deck-stack"><PlayingCard hidden skin={cardSkin} /><span>{myHand.length + state.players.filter((player) => player.id !== user.id).reduce((sum, player) => sum + (state.hands[player.id]?.length ?? 0), 0)} en jeu</span></div><div className={`president-pile ${state.revolution ? "revolution" : ""}`}><span className="eyebrow">{state.revolution ? "Révolution active" : state.currentSet ? "Pli en cours" : "Nouvelle ouverture"}</span><div className="card-row">{state.currentSet ? (state.pile.at(-1)?.cards ?? []).map((card, index) => <PlayingCard key={`${cardIdentity(card)}-${index}`} card={card} skin={cardSkin} />) : <div className="empty-card-slot">Pose libre</div>}</div><strong>{state.currentSet ? `${state.currentSet.count} × ${state.currentSet.rank}` : "Toute combinaison autorisée"}</strong></div><div className="president-direction"><span>{state.revolution ? "Valeur décroissante" : "Valeur croissante"}</span><b>{state.revolution ? "2 → 3" : "3 → 2"}</b></div></div>
-                <div className={`president-self-zone ${isMyTurn ? "active" : ""}`}><header><div><span className="eyebrow">Ta main</span><h3>{isMyTurn ? "Choisis précisément les cartes à poser" : `Au tour de ${current?.pseudo ?? "l'adversaire"}`}</h3></div><div className="president-requirement"><small>Combinaison requise</small><strong>{state.currentSet ? `${state.currentSet.count} carte${state.currentSet.count > 1 ? "s" : ""} · au-dessus de ${state.currentSet.rank}` : "Libre"}</strong></div></header><div className="president-card-hand">{presidentHand.map((card, index) => { const key = cardIdentity(card); const selected = selectedPresidentCards.includes(key); const rankAllowed = canPlayPresidentSet(state, card.rank, state.currentSet?.count ?? 1); const blockedBySelection = selectedPresidentHand.length > 0 && selectedPresidentHand[0].rank !== card.rank; const selectionFull = Boolean(presidentRequiredCount && selectedPresidentHand.length >= presidentRequiredCount && !selected); return <button type="button" key={key} className={`${selected ? "selected" : ""} ${!rankAllowed ? "unplayable" : ""}`} style={{ "--hand-index": index }} disabled={!isMyTurn || !rankAllowed || blockedBySelection || selectionFull} aria-pressed={selected} onClick={() => setSelectedPresidentCards((cards) => cards.includes(key) ? cards.filter((entry) => entry !== key) : [...cards, key])}><PlayingCard card={card} skin={cardSkin} /><span>{selected ? "Sélectionnée" : suits[card.suit]?.name}</span></button>; })}</div><footer><div className="president-selection-summary"><strong>{selectedPresidentHand.length ? `${selectedPresidentHand.length} × ${selectedPresidentHand[0].rank}` : "Aucune carte sélectionnée"}</strong><small>{selectedPresidentHand.length ? selectedPresidentHand.map((card) => `${card.rank}${suits[card.suit]?.symbol}`).join(" · ") : "Clique directement les cartes et leur couleur."}</small></div><div className="actions"><button disabled={!isMyTurn || !presidentSelectionPlayable} onClick={() => action({ type: "play", cards: selectedPresidentHand.map(({ rank, suit }) => ({ rank, suit })) })}>Jouer la sélection</button><button className="secondary" disabled={!isMyTurn || !state.currentSet} onClick={() => action({ type: "pass" })}>Passer</button></div></footer></div>
+                <div className={`president-self-zone ${isMyTurn ? "active" : ""}`}><header><div><span className="eyebrow">Ta main</span><h3>{isMyTurn ? "Choisis précisément les cartes à poser" : `Au tour de ${current?.pseudo ?? "l'adversaire"}`}</h3></div><div className="president-requirement"><small>Combinaison requise</small><strong>{state.currentSet ? `${state.currentSet.count} carte${state.currentSet.count > 1 ? "s" : ""} · ${state.revolution ? "en dessous de" : "au-dessus de"} ${state.currentSet.rank}` : "Libre"}</strong></div></header><div className="president-card-hand">{presidentHand.map((card, index) => { const key = cardIdentity(card); const selected = selectedPresidentCards.includes(key); const rankAllowed = canPlayPresidentSet(state, card.rank, state.currentSet?.count ?? 1); const blockedBySelection = selectedPresidentHand.length > 0 && selectedPresidentHand[0].rank !== card.rank; const selectionFull = Boolean(presidentRequiredCount && selectedPresidentHand.length >= presidentRequiredCount && !selected); return <button type="button" key={key} className={`${selected ? "selected" : ""} ${!rankAllowed ? "unplayable" : ""}`} style={{ "--hand-index": index }} disabled={!isMyTurn || presidentActionBusy || !rankAllowed || blockedBySelection || selectionFull} aria-pressed={selected} onClick={() => setSelectedPresidentCards((cards) => cards.includes(key) ? cards.filter((entry) => entry !== key) : [...cards, key])}><PlayingCard card={card} skin={cardSkin} /><span>{selected ? "Sélectionnée" : suits[card.suit]?.name}</span></button>; })}</div><footer><div className="president-selection-summary"><strong>{selectedPresidentHand.length ? `${selectedPresidentHand.length} × ${selectedPresidentHand[0].rank}` : "Aucune carte sélectionnée"}</strong><small>{selectedPresidentHand.length ? selectedPresidentHand.map((card) => `${card.rank}${suits[card.suit]?.symbol}`).join(" · ") : "Clique directement les cartes et leur couleur."}</small></div><div className="actions"><button disabled={!isMyTurn || presidentActionBusy || !presidentSelectionPlayable} onClick={() => action({ type: "play", cards: selectedPresidentHand.map(({ rank, suit }) => ({ rank, suit })) })}>Jouer la sélection</button><button className="secondary" disabled={!isMyTurn || presidentActionBusy || !state.currentSet} onClick={() => action({ type: "pass" })}>Passer{presidentAutoPass.deadline && <> · <PacingCountdown endsAt={presidentAutoPass.deadline} /> s</>}</button></div></footer></div>
               </section>}
 
               {!state.finished && room.gameId === "golf-solitaire" && <section className="solo-card-table golf-card-table">
