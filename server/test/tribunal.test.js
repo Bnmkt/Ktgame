@@ -17,6 +17,54 @@ test("le score comportemental ne peut qu'alourdir une décision future", () => {
   assert.ok(tribunalVerdict(1, 0, undefined, 3).finalScore < 1);
 });
 
+test("les sanctions administratives 49,3 diminuent le comportement et restent idempotentes", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "ktga-tribunal-admin-"));
+  const store = createTribunalStore({ filename: path.join(directory, "tribunal.sqlite") });
+  try {
+    store.updateSettings({ administrativeSoftBanPenalty: 6, administrativeHardBanPenalty: 18 });
+    const soft = store.recordAdministrativeDecision({ id: "admin-soft-1", userId: "accused", adminId: "admin", kind: "softBan", reason: "Interactions suspendues", startsAt: "2026-10-02T10:00:00.000Z", endsAt: "2026-10-09T10:00:00.000Z", durationDays: 7 }, Date.parse("2026-10-02T10:00:00.000Z"));
+    assert.match(soft.code, /^49\.3-/);
+    assert.equal(soft.source, "administrative-49-3");
+    assert.equal(soft.behaviorBefore, 100);
+    assert.equal(soft.behaviorAfter, 94);
+    assert.equal(soft.settlementApplied, true);
+    store.recordAdministrativeDecision({ id: "admin-soft-1", userId: "accused", adminId: "admin", kind: "softBan", reason: "Motif modifié" });
+    assert.deepEqual(store.behavior("accused"), { score: 94, cases: 1, sanctions: 1 });
+    const hard = store.recordAdministrativeDecision({ id: "admin-hard-1", userId: "accused", adminId: "admin", kind: "hardBan", reason: "Accès suspendu", durationDays: 3 }, Date.parse("2026-10-03T10:00:00.000Z"));
+    assert.equal(hard.behaviorBefore, 94);
+    assert.equal(hard.behaviorAfter, 76);
+    assert.deepEqual(store.behavior("accused"), { score: 76, cases: 2, sanctions: 2 });
+    assert.equal(store.adminSnapshot().cases.filter((entry) => entry.source === "administrative-49-3").length, 2);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("une sanction temporaire confirmée impose la baisse minimale configurée", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "ktga-tribunal-override-"));
+  const store = createTribunalStore({ filename: path.join(directory, "tribunal.sqlite") });
+  try {
+    store.updateSettings({ minimumVotes: 1, administrativeHardBanPenalty: 15, verdictRules: [
+      { id: "warning", maximumScore: 4, outcome: "warning", label: "Avertissement", defaultDays: 0 },
+      { id: "clear", maximumScore: 5, outcome: "not-guilty", label: "Non coupable", defaultDays: 0 }
+    ] });
+    const report = store.createReport({ reporterId: "reporter", accusedId: "accused", category: "spam", description: "Messages répétés malgré plusieurs demandes d’arrêt explicites." }, 1000);
+    const dossier = store.openCaseFromReports({ reportIds: [report.id], adminId: "admin" }, 2000);
+    store.assign("juror", [dossier.id], 3000);
+    store.vote(dossier.id, "juror", 4, "Les faits justifient un avertissement.", 4000);
+    const [resolved] = store.resolveDue(5000, dossier.id);
+    assert.equal(resolved.behaviorAfter, 100);
+    store.recordAdministrativeDecision({ id: "other-decision", userId: "accused", adminId: "admin", kind: "softBan", reason: "Autres faits constatés après la délibération" }, 5500);
+    const enforced = store.confirmDecision(dossier.id, "admin", { outcome: "hard-ban-review", days: 2 }, 6000);
+    assert.equal(enforced.behaviorAfter, 80);
+    assert.deepEqual(store.behavior("accused"), { score: 80, cases: 2, sanctions: 2 });
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("un signalement devient un dossier assigné, voté puis résolu", () => {
   const directory = mkdtempSync(path.join(tmpdir(), "ktga-tribunal-"));
   const store = createTribunalStore({ filename: path.join(directory, "tribunal.sqlite"), random: () => 0 });

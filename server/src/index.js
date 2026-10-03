@@ -5033,6 +5033,7 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
   const requestedEmail = normalizeEmail(req.body.login ?? currentTarget?.email);
   if (currentTarget && validEmail(requestedEmail) && requestedEmail !== normalizeEmail(currentTarget.email) && !emailDeliveryConfigured()) return res.status(503).json({ error: "Le service email est indisponible : l’adresse n’a pas été modifiée." });
   const passwordHash = newPassword ? await bcrypt.hash(newPassword, 10) : null;
+  const moderationDecisions = [];
   const result = updateDb((db) => {
     const user = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
     if (!user) return null;
@@ -5074,10 +5075,17 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
       for (const type of ["softBan", "hardBan"]) {
         const input = req.body.moderation[type];
         if (!input || typeof input !== "object") continue;
-        const wasActive = activeModeration(user)?.type === (type === "hardBan" ? "hard" : "soft");
+        const previous = user.moderation[type] ?? {};
+        const wasActive = previous.active === true && (!previous.endsAt || Date.parse(previous.endsAt) > Date.now());
+        const active = input.active === true;
         const endsAt = input.endsAt && Number.isFinite(Date.parse(input.endsAt)) ? new Date(input.endsAt).toISOString() : "";
-        user.moderation[type] = { active: input.active === true, reason: normalizePlainText(input.reason, 240), endsAt, updatedAt: new Date().toISOString(), updatedBy: req.auth.id };
-        if (type === "hardBan" && !wasActive && input.active === true) user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
+        const updatedAt = new Date().toISOString();
+        const caseId = active ? (!wasActive || !previous.caseId ? `admin-sanction-${randomUUID()}` : previous.caseId) : previous.caseId ?? "";
+        const startedAt = active ? (!wasActive ? updatedAt : previous.startedAt || previous.updatedAt || updatedAt) : previous.startedAt ?? "";
+        user.moderation[type] = { active, reason: normalizePlainText(input.reason, 240), endsAt, updatedAt, updatedBy: req.auth.id, caseId, startedAt };
+        if (active && caseId) moderationDecisions.push({ id: caseId, userId: user.id, adminId: req.auth.id, kind: type, reason: user.moderation[type].reason, startsAt: startedAt, endsAt, durationDays: endsAt ? Math.max(1, Math.ceil((Date.parse(endsAt) - Date.parse(startedAt)) / 86400000)) : 0 });
+        if (active && !wasActive) pushNotification(user, { type: "moderation-decision", title: "Sanction administrative", message: `${user.moderation[type].reason || "Une sanction temporaire a été appliquée à ton compte."} Cette décision est inscrite au registre du tribunal selon la procédure 49,3. Un recours écrit peut être envoyé à ${process.env.CONTACT_EMAIL || "contact@netdis.org"}.` });
+        if (type === "hardBan" && !wasActive && active) user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
       }
     }
     refreshPublicProfileStats(user, db);
@@ -5085,6 +5093,12 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
   });
   if (!result) return res.status(404).json({ error: "Joueur introuvable." });
   if (result === "duplicate") return res.status(409).json({ error: "Adresse email invalide ou déjà utilisée." });
+  try {
+    for (const decision of moderationDecisions) tribunal.recordAdministrativeDecision(decision);
+  } catch (error) {
+    console.error("Administrative sanction history failed:", error.message);
+    return res.status(500).json({ error: "La sanction est enregistrée, mais son inscription au registre du tribunal a échoué. Enregistre à nouveau la fiche pour relancer la synchronisation." });
+  }
   if (result.verificationToken) {
     try { await sendEmailVerification({ user: result.user, token: result.verificationToken, siteName: result.siteName }); }
     catch (error) { console.error("Admin email verification delivery failed:", error.message); return res.status(503).json({ error: "Le compte a été modifié, mais l’email de validation n’a pas pu être envoyé." }); }

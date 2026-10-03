@@ -28,6 +28,8 @@ export const defaultTribunalSettings = Object.freeze({
   behaviorPenaltyThreshold: 60,
   behaviorPenaltyMaximum: 1.5,
   priorSanctionPenalty: 0.2,
+  administrativeSoftBanPenalty: 5,
+  administrativeHardBanPenalty: 15,
   verdictRules: [
     { id: "permanent-ban", maximumScore: 0, outcome: "permanent-ban-review", label: "Bannissement définitif à confirmer", defaultDays: 0 },
     { id: "hard-ban", maximumScore: 1, outcome: "hard-ban-review", label: "Bannissement temporaire à confirmer", defaultDays: 7 },
@@ -71,6 +73,8 @@ export function normalizeTribunalSettings(value = {}) {
     behaviorPenaltyThreshold: Math.round(clamp(value.behaviorPenaltyThreshold ?? 60, 1, 100)),
     behaviorPenaltyMaximum: Math.round(clamp(value.behaviorPenaltyMaximum ?? 1.5, 0, 3) * 100) / 100,
     priorSanctionPenalty: Math.round(clamp(value.priorSanctionPenalty ?? 0.2, 0, 1) * 100) / 100,
+    administrativeSoftBanPenalty: Math.round(clamp(value.administrativeSoftBanPenalty ?? 5, 1, 100)),
+    administrativeHardBanPenalty: Math.round(clamp(value.administrativeHardBanPenalty ?? 15, 1, 100)),
     verdictRules
   };
 }
@@ -197,6 +201,42 @@ export function createTribunalStore({ filename, random = Math.random }) {
     behavior(userId) {
       const row = db.prepare("SELECT score, cases, sanctions FROM tribunal_behavior WHERE user_id = ?").get(userId);
       return { score: row ? Number(row.score) : 100, cases: row ? Number(row.cases) : 0, sanctions: row ? Number(row.sanctions) : 0 };
+    },
+    recordAdministrativeDecision({ id, userId, adminId, kind, reason, startsAt, endsAt, durationDays = 0 }, now = Date.now()) {
+      const caseId = clean(id, 100) || randomUUID();
+      const existing = db.prepare("SELECT * FROM tribunal_cases WHERE id = ?").get(caseId);
+      if (existing) return mapCase(existing);
+      if (!userId || !adminId || !["softBan", "hardBan"].includes(kind)) throw new Error("INVALID_ADMINISTRATIVE_DECISION");
+      const settings = store.settings();
+      const behaviorBefore = store.behavior(userId).score;
+      const penalty = kind === "softBan" ? settings.administrativeSoftBanPenalty : settings.administrativeHardBanPenalty;
+      const behaviorAfter = Math.max(0, behaviorBefore - penalty);
+      const outcome = kind === "softBan" ? "social-ban" : "hard-ban-review";
+      const label = kind === "softBan" ? "Restriction sociale" : "Bannissement temporaire";
+      const at = iso(now);
+      const begins = Number.isFinite(Date.parse(startsAt)) ? new Date(startsAt).toISOString() : at;
+      const expires = Number.isFinite(Date.parse(endsAt)) ? new Date(endsAt).toISOString() : "";
+      const days = Math.round(clamp(durationDays, 0, 3650));
+      const sanitizedReason = clean(reason, 240) || "Décision administrative";
+      const evidence = [
+        { type: "moderation", label: "Sanction appliquée", value: label, occurredAt: begins },
+        { type: "moderation", label: "Motif administratif", value: sanitizedReason, occurredAt: begins },
+        { type: "moderation", label: "Échéance", value: expires || "Durée indéterminée", occurredAt: begins }
+      ];
+      const code = `49.3-${randomUUID().slice(0, 8).toUpperCase()}`;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare(`INSERT INTO tribunal_cases(
+          id, public_code, accused_id, title, summary, evidence_json, status, source, report_count, minimum_votes,
+          starts_at, ends_at, raw_score, final_score, behavior_before, behavior_after, outcome, resolved_at, resolved_by,
+          settlement_applied, sanction_applied, hard_ban_days, social_ban_days, created_at
+        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(caseId, code, userId, "Décision administrative 49,3", `${label} appliqué directement par l’administration. ${sanitizedReason}`, JSON.stringify(evidence), "resolved", "administrative-49-3", 0, 0, begins, begins, null, null, behaviorBefore, behaviorAfter, outcome, at, adminId, 1, 1, kind === "hardBan" ? days : 0, kind === "softBan" ? Math.min(days, 30) : 0, begins);
+        db.prepare("INSERT INTO tribunal_behavior(user_id, score, cases, sanctions, updated_at) VALUES(?, ?, 1, 1, ?) ON CONFLICT(user_id) DO UPDATE SET score = excluded.score, cases = cases + 1, sanctions = sanctions + 1, updated_at = excluded.updated_at")
+          .run(userId, behaviorAfter, at);
+        db.exec("COMMIT");
+      } catch (error) { db.exec("ROLLBACK"); throw error; }
+      return mapCase(db.prepare("SELECT * FROM tribunal_cases WHERE id = ?").get(caseId));
     },
     reportStats(userId) {
       const row = db.prepare("SELECT count(*) AS total, count(DISTINCT reporter_id) AS reporters, sum(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending FROM tribunal_reports WHERE accused_id = ?").get(userId);
@@ -342,7 +382,12 @@ export function createTribunalStore({ filename, random = Math.random }) {
       const allowed = new Set(["permanent-ban-review", "hard-ban-review", "social-ban", "warning", "not-guilty"]);
       const decision = allowed.has(outcome) ? outcome : row.outcome;
       const sanctionApplied = ["permanent-ban-review", "hard-ban-review", "social-ban"].includes(decision);
-      const behaviorAfter = decision === "not-guilty" ? Number(row.behavior_before) : Number(row.behavior_after);
+      const settings = store.settings();
+      const behaviorBefore = Number(row.behavior_before);
+      const minimumPenalty = decision === "social-ban" ? settings.administrativeSoftBanPenalty : ["permanent-ban-review", "hard-ban-review"].includes(decision) ? settings.administrativeHardBanPenalty : 0;
+      const currentBehavior = store.behavior(row.accused_id).score;
+      const penalty = Math.max(minimumPenalty, behaviorBefore - Number(row.behavior_after));
+      const behaviorAfter = decision === "not-guilty" ? currentBehavior : Math.max(0, currentBehavior - penalty);
       db.exec("BEGIN IMMEDIATE");
       try {
         db.prepare("UPDATE tribunal_cases SET status = 'resolved', outcome = ?, behavior_after = ?, sanction_applied = ?, hard_ban_days = ?, social_ban_days = ?, resolved_by = ?, resolved_at = ? WHERE id = ?")
