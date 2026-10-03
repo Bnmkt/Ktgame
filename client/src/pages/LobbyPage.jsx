@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, EyeOff, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Trophy, Users, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
 import { JoinRoomDialog } from "../components/navigation/JoinRoomDialog.jsx";
 import { PlayingCard } from "../components/game/GamePieces.jsx";
-import { RulesModal, StepperBet } from "../components/game/GameSupport.jsx";
+import { RulesModal } from "../components/game/GameSupport.jsx";
+import { GameRoomsModal } from "../components/navigation/GameRoomsModal.jsx";
 import { defaultPublicSettings, gameRules } from "../config/site.js";
 import { CompactNumber, gameAudienceLabel, gameCategoryLabel, gameComplexityLabel } from "../utils/presentation.jsx";
 
@@ -29,77 +30,6 @@ function EventCountdown({ startsAt }) {
 function formatEventDate(value) {
   return new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
-
-export function GameRoomsModal({ game, rooms, user, stake, setStake, isPublic, setIsPublic, roomName, setRoomName, roomPassword, setRoomPassword, joinCode, setJoinCode, joinPassword, setJoinPassword, onCreate, onJoin, onEnterRoom, onRules, onClose, canJoin = true, settings = defaultPublicSettings }) {
-  if (!game) return null;
-  const minimumStake = Math.max(game.id === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(game.entryPot) || 0);
-  const filteredRooms = rooms.filter((room) => room.gameId === game.id);
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal casino-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title-row">
-          <div>
-            <h2>{game.name}</h2>
-            <p>{game.description || gameRules[game.id]?.goal}</p>
-          </div>
-          <button className="secondary icon-toggle" onClick={onClose}><X size={18} /></button>
-        </div>
-
-        <div className={`room-console room-browser-columns ${canJoin ? "" : "single-panel"}`}>
-          <section className="room-panel create-panel">
-            <div className="panel-heading">
-              <span>Créer une table</span>
-              <small>Configure le nom, l'accès, la mise et la visibilité avant d'ouvrir le salon.</small>
-            </div>
-            <div className="room-field-grid">
-              <label>Nom de la table<input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder={`Table ${game.name} VIP`} /></label>
-              <label>Mot de passe optionnel<input value={roomPassword} onChange={(e) => setRoomPassword(e.target.value)} placeholder="4 caractères minimum" type="password" /></label>
-            </div>
-            <StepperBet value={Math.max(stake, minimumStake)} onChange={setStake} min={minimumStake} max={Math.max(minimumStake, Number(user.tokens) || 0)} label={game.id === "texas-holdem" ? "Cave par joueur" : "Mise par joueur"} />
-            <div className="room-panel-actions">
-              <button className="secondary" onClick={() => setIsPublic((v) => !v)}>{isPublic ? <Eye size={18} /> : <EyeOff size={18} />} {isPublic ? "Publique" : "Privée"}</button>
-              <button onClick={() => onCreate(game.id)}><Plus size={18} /> Créer</button>
-            </div>
-            <button className="secondary room-rules-button" onClick={() => onRules(game.id)}><HelpCircle size={18} /> Consulter les règles</button>
-          </section>
-
-          {canJoin && <section className="room-panel browse-panel">
-            <div className="panel-heading">
-              <span>Tables existantes</span>
-              <small>Rejoins une table publique ou utilise directement un code d'invitation.</small>
-            </div>
-            <div className="direct-room-join">
-              <strong>Rejoindre par code</strong>
-              <div className="room-field-grid">
-                <label>Code de la table<input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="Ex : A1B2C3" /></label>
-                <label>Mot de passe<input value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} placeholder="Si nécessaire" type="password" /></label>
-              </div>
-              <button className="direct-join-button" onClick={() => onJoin(joinCode)}>Rejoindre avec ce code</button>
-            </div>
-
-            <div className="available-room-heading">
-              <strong>Tables publiques</strong>
-              <small>{filteredRooms.length} disponible{filteredRooms.length > 1 ? "s" : ""}</small>
-            </div>
-            <div className="table-list">
-              {filteredRooms.length === 0 && <div className="empty-state">Aucune table publique active pour ce jeu.</div>}
-              {filteredRooms.map((room) => (
-                <button className="table-row" key={room.id} onClick={() => onEnterRoom(room.code)}>
-                  <span className="table-name"><strong>{room.name}</strong><small>Code {room.code}</small></span>
-                  <span className="table-pill">{room.players.length} joueur{room.players.length > 1 ? "s" : ""}</span>
-                  {room.inProgress && <span className="table-pill">En cours</span>}
-                  {room.hasPassword && <span className="table-pill locked">Protégée</span>}
-                  <span className="table-pill gold"><CompactNumber value={room.stake} suffix=" jetons" label="Mise exacte" /></span>
-                </button>
-              ))}
-            </div>
-          </section>}
-        </div>
-        </div>
-      </div>
-  );
-}
-
 export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onAchievements, settings = defaultPublicSettings }) {
   const [games, setGames] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -109,8 +39,6 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const [isPublic, setIsPublic] = useState(true);
   const [roomName, setRoomName] = useState("");
   const [roomPassword, setRoomPassword] = useState("");
-  const [joinCode, setJoinCode] = useState("");
-  const [joinPassword, setJoinPassword] = useState("");
   const [gameTypeFilter, setGameTypeFilter] = useState("all");
   const [gameCategoryFilter, setGameCategoryFilter] = useState("all");
   const [gameAudienceFilter, setGameAudienceFilter] = useState("all");
@@ -119,6 +47,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [rulesGame, setRulesGame] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
+  const [tableTab, setTableTab] = useState("create");
+  const [creating, setCreating] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [error, setError] = useState("");
   const [eventCarousel, setEventCarousel] = useState({ events: [], focusIndex: 0 });
@@ -151,7 +81,9 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   }, [user.id, user.guest]);
 
   async function createRoom(gameId) {
+    if (creating) return;
     setError("");
+    setCreating(true);
     try {
       const room = await api("/api/rooms", { method: "POST", body: JSON.stringify({ gameId, stake, isPublic, name: roomName, password: roomPassword }) });
       setRoomName("");
@@ -159,18 +91,17 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       onOpenRoom(room.code);
     } catch (err) {
       setError(err.message);
-    }
+    } finally { setCreating(false); }
   }
 
-  async function joinRoom(code) {
+  function chooseTables(game, tab) {
     setError("");
-    try {
-      const room = await api(`/api/rooms/${code}/join`, { method: "POST", body: JSON.stringify({ password: joinPassword }) });
-      setJoinPassword("");
-      onOpenRoom(room.code, room.spectator);
-    } catch (err) {
-      setError(err.message);
-    }
+    setRoomName("");
+    setRoomPassword("");
+    setIsPublic(true);
+    setStake((value) => Math.max(value, game.id === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(game.entryPot) || 0));
+    setTableTab(tab);
+    setSelectedGame(game);
   }
 
   const categoryFilters = ["all", ...new Set(games.map((game) => game.category).filter(Boolean))];
@@ -202,7 +133,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   return (
     <main className="app-shell">
       <div className="page-heading lobby-heading"><div><span className="eyebrow">Le casino</span><h1>À quelle table joues-tu ?</h1></div></div>
-      {error && <div className="error">{error}</div>}
+      {error && !selectedGame && <div className="error">{error}</div>}
       {(user.minor?.restricted || user.moderation?.type === "soft") && <div className="account-limitation-notice"><ShieldCheck size={18} /><span><strong>Accès adapté</strong>Certaines fonctions et certains jeux ne sont pas disponibles pour ce compte.</span></div>}
       {activeCarouselEvent && <section className="lobby-event-carousel" aria-label="Événements communautaires">
         <button className="secondary icon-toggle event-carousel-arrow" disabled={eventIndex === 0} onClick={() => setEventIndex((index) => Math.max(0, index - 1))} aria-label="Événement précédent"><ChevronLeft /></button>
@@ -248,7 +179,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
                 <h3>{game.name}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label="Favori" fill="currentColor" />}</h3>
                 <p>{game.description || gameRules[game.id]?.goal}</p>
                 <div className="card-meta"><span>{gameCategoryLabel(game.category)}</span><span>{gameComplexityLabel(game.complexity)}</span><span>{rooms.filter((room) => room.gameId === game.id).length} tables publiques</span></div>
-                <div className="card-actions"><button onClick={() => setSelectedGame(game)}><Play size={18} /> Ouvrir</button><button className="secondary" onClick={() => setRulesGame(game.id)}><HelpCircle size={18} /></button></div>
+                <div className="game-table-actions"><button type="button" onClick={() => chooseTables(game, "create")}><Plus size={18} />Créer une table</button>{!joiningRestricted && <button type="button" className="secondary" onClick={() => chooseTables(game, "browse")}><DoorOpen size={17} />Rejoindre ({rooms.filter((room) => room.gameId === game.id).length})</button>}<button type="button" className="secondary game-table-rules" title={`Règles de ${game.name}`} aria-label={`Règles de ${game.name}`} onClick={() => setRulesGame(game.id)}><HelpCircle size={18} /></button></div>
               </article>
             ))}
           </div>
@@ -256,8 +187,16 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
         </section>
       </div>
       {joinOpen && <JoinRoomDialog userId={user.id} onClose={() => setJoinOpen(false)} onJoined={onOpenRoom} />}
-      <RulesModal gameId={rulesGame} onClose={() => setRulesGame(null)} />
-      <GameRoomsModal game={selectedGame} rooms={rooms} user={user} stake={stake} setStake={setStake} isPublic={isPublic} setIsPublic={setIsPublic} roomName={roomName} setRoomName={setRoomName} roomPassword={roomPassword} setRoomPassword={setRoomPassword} joinCode={joinCode} setJoinCode={setJoinCode} joinPassword={joinPassword} setJoinPassword={setJoinPassword} onCreate={createRoom} onJoin={joinRoom} onEnterRoom={onEnterRoom} onRules={setRulesGame} onClose={() => setSelectedGame(null)} canJoin={!joiningRestricted} settings={settings} />
+      <div className={selectedGame ? "game-table-rules-layer" : undefined}><RulesModal gameId={rulesGame} onClose={() => setRulesGame(null)} /></div>
+      {selectedGame && <GameRoomsModal
+        key={selectedGame.id} game={selectedGame} initialTab={tableTab} rooms={rooms} user={user}
+        stake={stake} setStake={setStake} isPublic={isPublic} setIsPublic={setIsPublic}
+        roomName={roomName} setRoomName={(value) => { setRoomName(value); setError(""); }}
+        roomPassword={roomPassword} setRoomPassword={(value) => { setRoomPassword(value); setError(""); }}
+        onCreate={createRoom} onOpenRoom={onOpenRoom} onEnterRoom={onEnterRoom} onRules={setRulesGame}
+        onClose={() => { setSelectedGame(null); setError(""); }} canJoin={!joiningRestricted}
+        settings={settings} error={error} busy={creating}
+      />}
     </main>
   );
 }

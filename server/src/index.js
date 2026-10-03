@@ -40,6 +40,7 @@ import { battleBotAction } from "./games/engines/bataille.js";
 import { normalizeCosmeticCss, normalizeCosmeticDesign, normalizeCosmeticMotion } from "./services/cosmetic-validation.js";
 import { friendRoomPresence } from "./services/friend-presence.js";
 import { createOnlinePresence } from "./services/online-presence.js";
+import { roomCredentialsError } from "./services/room-credentials.js";
 import { buildLeaderboard } from "./services/leaderboards.js";
 import {
   appendEventPotEntry,
@@ -5622,8 +5623,8 @@ app.post("/api/rooms", auth, async (req, res) => {
   const settings = platformSettings();
   const name = String(req.body.name ?? "").trim();
   const password = String(req.body.password ?? "");
-  if (name && name.length < 3) return res.status(400).json({ error: "Nom de table trop court." });
-  if (password && password.length < 4) return res.status(400).json({ error: "Mot de passe de table trop court." });
+  const credentialsError = await roomCredentialsError({ name, password, user }, bcrypt.compare);
+  if (credentialsError) return res.status(400).json({ error: credentialsError });
   const minimumStake = Math.max(game.id === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(game.entryPot) || 0);
   const stake = Math.max(minimumStake, Number(req.body.stake || minimumStake));
   if (user.tokens < stake) return res.status(400).json({ error: "Jetons insuffisants." });
@@ -5632,7 +5633,7 @@ app.post("/api/rooms", auth, async (req, res) => {
     id: randomUUID(),
     code: roomCode(),
     gameId: game.id,
-    name: name || `${game.name} de ${user.pseudo}`,
+    name: name || (displayNameFor(user).includes("@") ? game.name : `${game.name} de ${displayNameFor(user)}`),
     passwordHash,
     isPublic: req.body.isPublic !== false,
     stake,

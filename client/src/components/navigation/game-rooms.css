@@ -1,0 +1,68 @@
+.modal.game-table-dialog { display: flex; flex-direction: column; max-width: 880px; max-height: 90dvh; overflow: hidden; }
+.game-table-dialog > .modal-title-row { flex-shrink: 0; }
+.game-table-rules-layer > .modal-backdrop { z-index: 40; }
+.game-table-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #3c443a; padding-bottom: 14px; flex-shrink: 0; }
+.game-table-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.game-table-tabs button { background: #121b18; border-color: #4c5349; color: #dedecf; }
+.game-table-tabs button.active { background: #293b30; border-color: #94bf9b; color: #d3f2db; }
+.game-table-tabs button span { font-size: 12px; font-weight: 800; }
+.game-table-code { font-size: 12px; }
+.game-table-body { min-height: 0; overflow-y: auto; padding: 20px 2px; scrollbar-gutter: stable; }
+.game-table-body h3 { font-size: 18px; margin: 0 0 18px; }
+.game-table-section-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
+.game-table-section-title > span { color: #b3b9aa; font-size: 12px; }
+.game-table-list { display: grid; gap: 10px; }
+.game-table-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 14px; border: 1px solid #465444; border-radius: 6px; background: #131f19; padding: 14px; }
+.game-table-entry-title { min-width: 0; }
+.game-table-entry-title strong { font-size: 15px; overflow-wrap: anywhere; }
+.game-table-entry-title small { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; color: #bdc4b6; font-size: 12px; margin-top: 6px; }
+.game-table-occupancy { display: flex; align-items: center; gap: 6px; color: #c9dcc9; font-size: 13px; }
+.game-table-stake { color: #e8c96b; font-size: 13px; }
+.game-table-empty { display: grid; justify-items: center; gap: 14px; text-align: center; padding: 26px 12px; color: #c4cebf; }
+.game-table-empty > svg { color: #9abfaa; }
+.game-table-empty h3 { margin: 0; }
+.game-table-form { display: flex; flex-direction: column; min-height: 0; }
+.game-table-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.game-table-settings fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.game-table-settings legend { color: #ebdfbf; font-size: 13px; font-weight: 800; margin-bottom: 10px; }
+.game-table-settings > label, .game-table-settings > .secret-field { grid-column: 1 / -1; }
+.game-table-settings input[readonly] { cursor: text; }
+.game-table-access { display: flex; gap: 8px; }
+.game-table-access button { flex: 1; }
+.game-table-settings .bet-stepper { margin: 0; }
+.game-table-settings .bet-control { grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr); }
+.game-table-settings .bet-step-group { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.game-table-settings .chip-button { padding: 5px 2px; }
+.game-table-protection { display: flex; align-items: center; gap: 9px; }
+.game-table-protection input { width: 18px; height: 18px; min-height: 18px; margin: 0; }
+.game-table-create-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; border-top: 1px solid #424b3c; padding: 16px 0 0; flex-shrink: 0; }
+.game-table-create-footer strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
+.game-table-create-footer small { display: block; color: #c3c7b7; font-size: 12px; margin-top: 5px; }
+.game-table-create-footer > .error { grid-column: 1 / -1; margin: 0; }
+.game-table-create-footer > button { grid-column: 2; grid-row: 1; }
+.game-table-bottom { padding-top: 14px; flex-shrink: 0; }
+.game-table-bottom button { font-size: 12px; min-height: 34px; }
+.game-table-actions { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; margin-top: auto; }
+.game-table-actions > button:first-child { grid-column: 1 / -1; }
+.game-table-actions > button { min-width: 0; }
+.game-table-actions .game-table-rules { padding: 0; }
+@media (max-width: 640px) {
+  .game-table-toolbar { align-items: stretch; }
+  .game-table-tabs { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .game-table-tabs button { font-size: 12px; padding: 9px 7px; white-space: normal; }
+  .game-table-settings { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .game-table-entry { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px; }
+  .game-table-entry-title { grid-column: 1 / -1; }
+  .game-table-entry > button { grid-column: 1 / -1; }
+  .game-table-stake { justify-self: end; }
+  .game-table-create-footer { grid-template-columns: minmax(0, 1fr); }
+  .game-table-create-footer > button { grid-column: 1; grid-row: auto; width: 100%; }
+}
+@media (max-width: 360px) {
+  .game-table-settings .bet-control { grid-template-columns: minmax(0, 1fr) 80px minmax(0, 1fr); }
+  .game-table-settings .bet-step-group { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-height: 550px) {
+  .modal.game-table-dialog { overflow-y: auto; }
+  .game-table-dialog .game-table-form, .game-table-dialog .game-table-body { flex-shrink: 0; }
+}
