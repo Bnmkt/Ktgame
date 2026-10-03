@@ -39,6 +39,7 @@ import { texasHoldemBotAction } from "./games/engines/texas-holdem.js";
 import { battleBotAction } from "./games/engines/bataille.js";
 import { normalizeCosmeticCss, normalizeCosmeticDesign, normalizeCosmeticMotion } from "./services/cosmetic-validation.js";
 import { friendRoomPresence } from "./services/friend-presence.js";
+import { createOnlinePresence } from "./services/online-presence.js";
 import { buildLeaderboard } from "./services/leaderboards.js";
 import {
   appendEventPotEntry,
@@ -822,6 +823,26 @@ io.engine.on("connection_error", (error) => {
   requestLogs.append({ category: "socket", level: "warning", method: "WS", route: `${APP_BASE_PATH}/socket.io`, status: 400, origin: error.req?.headers?.origin, message: `Connexion temps réel refusée (code ${Number(error.code) || 0}).` });
 });
 const roomPresence = new Map();
+const pendingInboxUpdates = new Set();
+function invalidateInbox(userId) {
+  if (pendingInboxUpdates.has(userId)) return;
+  pendingInboxUpdates.add(userId);
+  queueMicrotask(() => {
+    pendingInboxUpdates.delete(userId);
+    io.to(`account:${userId}`).emit("inbox-updated");
+  });
+}
+function invalidateConnections(...ids) {
+  for (const id of new Set(ids)) io.to(`account:${id}`).emit("connections-updated");
+}
+const onlinePresence = createOnlinePresence({ onChange: (userId) => {
+  const db = readDb();
+  const user = db.users.find((entry) => entry.id === userId);
+  for (const friendId of user?.friends ?? []) {
+    const friend = db.users.find((entry) => entry.id === friendId);
+    if (friend?.friends?.includes(userId) && !connectionBlocked(user, friend)) io.to(`account:${friendId}`).emit("presence-updated");
+  }
+} });
 const spectatorAccess = new Map();
 function grantSpectatorAccess(room, userId) {
   for (const [key, expires] of spectatorAccess) if (expires <= Date.now()) spectatorAccess.delete(key);
@@ -1216,6 +1237,8 @@ function pushNotification(user, notification) {
     createdAt: new Date().toISOString()
   });
   user.notifications = user.notifications.slice(0, 100);
+  // The write finishes synchronously before clients are asked to reload their own inbox.
+  invalidateInbox(user.id);
   return user.notifications[0];
 }
 
@@ -3411,7 +3434,7 @@ app.get("/api/friends", auth, (req, res) => {
     user.roomInvites = (user.roomInvites ?? []).filter((invite) => db.rooms.some((room) => room.code === invite.code && !room.finished));
     const byIds = (ids) => ids.map((id) => db.users.find((u) => u.id === id)).filter(Boolean).map((friend) => sanitizeFriendUser(friend, db));
     return {
-      friends: byIds(user.friends).map((friend) => ({ ...friend, ...friendRoomPresence(db.rooms, friend.id, user, (roomId, userId) => [...(roomPresence.get(roomId) ?? [])].some((socketId) => io.sockets.sockets.get(socketId)?.data.userId === userId)) })),
+      friends: byIds(user.friends).map((friend) => ({ ...friend, online: onlinePresence.has(friend.id), ...friendRoomPresence(db.rooms, friend.id, user, (roomId, userId) => [...(roomPresence.get(roomId) ?? [])].some((socketId) => io.sockets.sockets.get(socketId)?.data.userId === userId)) })),
       incoming: byIds(user.friendRequests.incoming),
       outgoing: byIds(user.friendRequests.outgoing),
       hiddenPlayers: byIds(user.blockedUsers),
@@ -3564,6 +3587,7 @@ app.post("/api/friends/request", auth, (req, res) => {
   if (result === "missing") return res.status(404).json({ error: "Joueur introuvable." });
   if (result === "friend") return res.status(400).json({ error: "Ce joueur est déjà dans tes amis." });
   if (result === "blocked") return res.status(403).json({ error: "Cette connexion n’est pas disponible." });
+  invalidateConnections(req.auth.id, targetId);
   res.json({ ok: true });
 });
 
@@ -3583,11 +3607,13 @@ app.post("/api/friends/:id/accept", auth, (req, res) => {
     friend.friendRequests.outgoing = friend.friendRequests.outgoing.filter((id) => id !== user.id);
     user.friends = [...new Set([...user.friends, friend.id])];
     friend.friends = [...new Set([...friend.friends, user.id])];
+    pushNotification(friend, { type: "friend-accepted", title: "Demande acceptée", message: `${displayNameFor(user)} est maintenant dans tes amis.`, actorId: user.id });
     return true;
   });
   if (!result) return res.status(404).json({ error: "Joueur introuvable." });
   if (result === "missing") return res.status(400).json({ error: "Demande introuvable." });
   if (result === "blocked") return res.status(403).json({ error: "Cette connexion n’est pas disponible." });
+  invalidateConnections(req.auth.id, friendId);
   res.json({ ok: true });
 });
 
@@ -3604,6 +3630,7 @@ app.post("/api/friends/:id/decline", auth, (req, res) => {
     friend.friendRequests.incoming = friend.friendRequests.incoming.filter((id) => id !== user.id);
     friend.friendRequests.outgoing = friend.friendRequests.outgoing.filter((id) => id !== user.id);
   });
+  invalidateConnections(req.auth.id, friendId);
   res.json({ ok: true });
 });
 
@@ -3618,6 +3645,7 @@ app.delete("/api/friends/:id", auth, (req, res) => {
     user.friends = user.friends.filter((id) => id !== friend.id);
     friend.friends = friend.friends.filter((id) => id !== user.id);
   });
+  invalidateConnections(req.auth.id, friendId);
   res.json({ ok: true });
 });
 
@@ -6196,8 +6224,14 @@ io.on("connection", (socket) => {
     const staleSession = user && (Number(viewer.sessionVersion) || 0) !== (Number(user.sessionVersion) || 0);
     if (!user || staleSession || activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) return;
     ensureUserSocial(user);
+    if (socket.data.chatUserId && socket.data.chatUserId !== user.id) {
+      onlinePresence.disconnect(socket.data.chatUserId, socket.id);
+      socket.leave(`account:${socket.data.chatUserId}`);
+    }
     socket.data.chatUserId = user.id;
     socket.data.chatSessionVersion = Number(user.sessionVersion) || 0;
+    socket.join(`account:${user.id}`);
+    onlinePresence.connect(user.id, socket.id);
     for (const joined of socket.rooms) if (joined.startsWith("chat:")) socket.leave(joined);
     socket.join("chat:global");
     for (const friendId of user.friends) socket.join(`chat:direct:${directChannelId(user.id, friendId)}`);
@@ -6244,6 +6278,7 @@ io.on("connection", (socket) => {
     socket.emit("room", sanitizeRoom(room, viewer.id, undefined, socket.data.spectator));
   });
   socket.on("disconnect", () => {
+    if (socket.data.chatUserId) onlinePresence.disconnect(socket.data.chatUserId, socket.id);
     const roomId = socket.data.roomId;
     if (!roomId) return;
     const sockets = roomPresence.get(roomId);

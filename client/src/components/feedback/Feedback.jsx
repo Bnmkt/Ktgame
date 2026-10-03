@@ -16,7 +16,7 @@ export function AchievementToasts({ notifications, onClose }) {
 export function NotificationCenter({ items, open, onToggle, onDelete, onClear, onAction }) {
   return (
     <div className="notification-center">
-      <button className="notification-button secondary" onClick={onToggle} title="Notifications">
+      <button className="notification-button secondary" onClick={onToggle} title="Notifications" aria-label="Notifications" aria-expanded={open}>
         <Bell size={18} />
         {items.length > 0 && <span>{items.length}</span>}
       </button>

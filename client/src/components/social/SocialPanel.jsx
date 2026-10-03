@@ -3,6 +3,7 @@ import { Globe2, GripHorizontal, MessageCircle, MessagesSquare, PanelRight, Pict
 import { api } from "../../api.js";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { useConversationInbox } from "./useConversationInbox.js";
+import { PresenceDot } from "../profile/FriendPresence.jsx";
 
 const tabs = [
   { id: "journal", label: "Journal", icon: ReceiptText, needsRoom: true },
@@ -107,7 +108,8 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
     loadFriends();
     const friendTimer = window.setInterval(loadFriends, 10000);
     window.addEventListener("ktga-connections-updated", loadFriends);
-    return () => { window.clearInterval(friendTimer); window.removeEventListener("ktga-connections-updated", loadFriends); };
+    window.addEventListener("ktga-presence-updated", loadFriends);
+    return () => { window.clearInterval(friendTimer); window.removeEventListener("ktga-connections-updated", loadFriends); window.removeEventListener("ktga-presence-updated", loadFriends); };
   }, [open, loadFriends]);
 
   useEffect(() => { loadedChannel.current = null; setMessages([]); setLoading(false); loadActive(); }, [loadActive]);
@@ -185,7 +187,7 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
       <div className="conversation-window-actions"><button type="button" className="secondary icon-toggle" onClick={toggleSound} aria-pressed={soundEnabled} title={soundEnabled ? "Couper le son du chat" : "Activer le son du chat"} aria-label={soundEnabled ? "Couper le son du chat" : "Activer le son du chat"}>{soundEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}</button><button type="button" className="secondary icon-toggle" onClick={toggleMode} title={mode === "docked" ? "Passer en fenêtre" : "Attacher à droite"} aria-label={mode === "docked" ? "Passer en fenêtre" : "Attacher à droite"}>{mode === "docked" ? <PictureInPicture2 size={17} /> : <PanelRight size={17} />}</button><button type="button" className="secondary icon-toggle" onClick={onClose} aria-label="Fermer Social"><X size={18} /></button></div>
     </header>
     <nav className="conversation-tabs" aria-label="Canaux de conversation">{tabs.map(({ id, label, icon: Icon, needsRoom }) => { const count = id === "direct" ? unreadDirect : id === "room" ? unreadRoom : 0; return <button type="button" key={id} disabled={needsRoom && !roomCode} className={`${activeTab === id ? "active" : ""} ${count ? "conversation-channel-unread" : ""}`} onClick={() => setActiveTab(id)}><Icon size={17} /><span>{label}{count > 0 && <span className="conversation-unread-count" aria-label={`${count} messages non lus`}>{count > 99 ? "99+" : count}</span>}</span></button>; })}</nav>
-    {activeTab === "direct" && <div className="conversation-contact-strip" role="tablist" aria-label="Conversations avec les amis"><button type="button" className="conversation-contact-add icon-toggle" onClick={onFriends} title="Choisir un ami" aria-label="Choisir un ami"><Plus size={17} /></button>{conversations.map((friend) => { const count = friendChannels.get(friend.id)?.count ?? 0; return <button type="button" role="tab" aria-selected={friend.id === friendId} className={`${friend.id === friendId ? "active" : ""} ${count ? "conversation-channel-unread" : ""}`} key={friend.id} onClick={() => setFriendId(friend.id)}><DisplayName user={friend} interactive={false} />{count > 0 && <span className="conversation-unread-count" aria-label={`${count} messages non lus`}>{count > 99 ? "99+" : count}</span>}</button>; })}{!conversations.length && <span>Aucune conversation ouverte</span>}</div>}
+    {activeTab === "direct" && <div className="conversation-contact-strip" role="tablist" aria-label="Conversations avec les amis"><button type="button" className="conversation-contact-add icon-toggle" onClick={onFriends} title="Choisir un ami" aria-label="Choisir un ami"><Plus size={17} /></button>{conversations.map((friend) => { const count = friendChannels.get(friend.id)?.count ?? 0; return <button type="button" role="tab" aria-selected={friend.id === friendId} className={`${friend.id === friendId ? "active" : ""} ${count ? "conversation-channel-unread" : ""}`} key={friend.id} onClick={() => setFriendId(friend.id)}><PresenceDot online={friend.online} /><DisplayName user={friend} interactive={false} />{count > 0 && <span className="conversation-unread-count" aria-label={`${count} messages non lus`}>{count > 99 ? "99+" : count}</span>}</button>; })}{!conversations.length && <span>Aucune conversation ouverte</span>}</div>}
     <div className="conversation-feed" ref={scrollRef} aria-live="polite">
       {loading && <p className="conversation-empty">Chargement…</p>}
       {!loading && activeTab === "journal" && journal.map((entry) => <article className="conversation-journal-entry" key={entry.id ?? `${entry.at}-${entry.text}`}><time>{formatTime(entry.at)}</time><div><strong>{entry.actor || "Table"}</strong><p>{entry.text}</p></div></article>)}

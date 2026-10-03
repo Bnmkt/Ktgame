@@ -69,6 +69,8 @@ export default function App() {
   const [, setCosmeticCatalogRevision] = useState(0);
   const pendingRoomCode = view === "room" ? route.id : "";
   const knownNotificationIds = useRef(new Set());
+  const inboxRevision = useRef(0);
+  const inboxInitialized = useRef(false);
   useEffect(() => installButtonActionFeedback(), []);
   useEffect(() => {
     if (accountRecovery) {
@@ -148,15 +150,16 @@ export default function App() {
       return;
     }
     const ownerId = user.id;
-    const rows = await api("/api/notifications").catch(() => []);
-    if (ownerId !== activeUserId.current) return;
+    const revision = ++inboxRevision.current;
+    const rows = await api("/api/notifications", { background: true }).catch(() => null);
+    if (!rows || ownerId !== activeUserId.current || revision !== inboxRevision.current) return;
     const lastExclusion = rows.find((row) => row.type === "room-exclusion");
     if (lastExclusion) showExclusion(lastExclusion);
     const nextIds = new Set(rows.map((row) => row.id));
-    if (toastNew) {
+    if (toastNew && inboxInitialized.current) {
       const newRows = rows.filter((row) => !knownNotificationIds.current.has(row.id));
       if (newRows.length) {
-        const toastItems = newRows.map((row) => ({ ...row, id: `notice-${row.id}`, toastLabel: "Notification" }));
+        const toastItems = newRows.map((row) => ({ ...row, id: `notice-${row.id}`, toastLabel: row.type === "achievement" ? "Succès débloqué" : "Notification" }));
         setNotifications((list) => [...toastItems, ...list].slice(0, 5));
         setTimeout(() => {
           setNotifications((list) => list.filter((notification) => !toastItems.some((item) => item.id === notification.id)));
@@ -164,17 +167,22 @@ export default function App() {
       }
     }
     knownNotificationIds.current = nextIds;
+    inboxInitialized.current = true;
     setInboxNotifications((current) => JSON.stringify(current) === JSON.stringify(rows) ? current : rows);
   }
 
   useEffect(() => {
+    inboxRevision.current += 1;
+    knownNotificationIds.current = new Set();
+    inboxInitialized.current = false;
+    setInboxNotifications([]);
     loadInboxNotifications();
     if (!user || user.guest) return undefined;
     const refresh = () => {
       if (document.visibilityState === "visible") loadInboxNotifications({ toastNew: true });
     };
     const onVisibility = () => { if (document.visibilityState === "visible") refresh(); };
-    const interval = setInterval(refresh, 60000);
+    const interval = setInterval(refresh, 10000);
     window.addEventListener("focus", refresh);
     window.addEventListener("ktga-inbox-updated", refresh);
     document.addEventListener("visibilitychange", onVisibility);
@@ -217,17 +225,7 @@ export default function App() {
   }
 
   async function notifyAchievements(ids = []) {
-    const uniqueIds = [...new Set(ids)].filter(Boolean);
-    if (!uniqueIds.length) return;
-    const all = await api("/api/achievements").catch(() => []);
-    const unlocked = uniqueIds.map((id) => all.find((achievement) => achievement.id === id)).filter(Boolean);
-    if (!unlocked.length) return;
-    const items = unlocked.map((achievement) => ({ ...achievement, id: `${achievement.id}-${Date.now()}-${Math.random().toString(16).slice(2)}` }));
-    setNotifications((list) => [...items, ...list].slice(0, 5));
-    setTimeout(() => {
-      setNotifications((list) => list.filter((notification) => !items.some((item) => item.id === notification.id)));
-    }, 6500);
-    await loadInboxNotifications();
+    if (ids.some(Boolean)) await loadInboxNotifications({ toastNew: true });
   }
 
   async function logout() {

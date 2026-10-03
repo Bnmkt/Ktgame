@@ -32,6 +32,7 @@ const users = ["alpha", "beta", "gamma", "delta", "admin"].map((id) => ({
   friends: id === "alpha" ? ["beta", "gamma", "delta"] : ["alpha"], friendRequests: { incoming: [], outgoing: [] }
 }));
 const database = new DatabaseSync(path.join(temporary, "main.sqlite"));
+users.push({ ...users[0], id: "epsilon", pseudo: "epsilon", email: "epsilon@example.com", profile: { displayName: "epsilon", birthDate: "2000-01-01" }, friends: [] });
 database.exec("CREATE TABLE users(id TEXT PRIMARY KEY,data TEXT NOT NULL,pseudo TEXT NOT NULL,email TEXT,guest INTEGER NOT NULL DEFAULT 0); CREATE TABLE rooms(id TEXT PRIMARY KEY,code TEXT NOT NULL UNIQUE,game_id TEXT NOT NULL,is_public INTEGER NOT NULL DEFAULT 1,finished INTEGER NOT NULL DEFAULT 0,created_at TEXT,data TEXT NOT NULL);");
 for (const user of users) database.prepare("INSERT INTO users VALUES(?,?,?,?,0)").run(user.id, JSON.stringify(user), user.pseudo, user.email);
 const room = { id: "chat-table", code: "CHAT01", name: "Table de test", gameId: "yahtzee", ownerId: "alpha", players: users.slice(0, 2), stake: 10, isPublic: true, finished: false, state: null, readyPlayerIds: [] };
@@ -163,6 +164,62 @@ try {
   await request("beta", "/api/chat/messages", { channelType: "room", roomCode: "CHAT01", content: "Message masque" });
   await page.waitForTimeout(400);
   assert.equal(await page.getByText("Message masque", { exact: true }).count(), 0, "muted messages are not delivered");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole("button", { name: /^Amis/ }).click();
+  await page.getByRole("button", { name: "Choisir un ami", exact: true }).click();
+  const friendRows = page.locator(".connections-content .player-network-row");
+  const betaRow = friendRows.filter({ has: page.getByRole("button", { name: "Discuter avec beta", exact: true }) });
+  await betaRow.getByText("Hors ligne", { exact: true }).waitFor();
+  const betaContext = await browser.newContext();
+  await betaContext.addCookies([{ name: "ktga_session", value: token("beta"), url: apiOrigin, httpOnly: true, sameSite: "Lax" }]);
+  await betaContext.addInitScript(() => localStorage.setItem("ktga-privacy-choice", JSON.stringify({ version: "2026-09-27", chosenAt: Date.now(), enabled: false })));
+  const betaPage = await betaContext.newPage();
+  await betaPage.goto(origin);
+  await betaPage.locator(".conversation-toggle").waitFor();
+  await page.bringToFront();
+  await betaRow.getByText("En ligne", { exact: true }).waitFor();
+  assert.ok(await betaRow.locator(".friend-presence-dot.is-online").isVisible(), "online indicator survives Ghostery");
+  assert.equal(await friendRows.first().getByRole("button", { name: "Discuter avec beta", exact: true }).count(), 1, "online friends sort first");
+  const secondBetaPage = await betaContext.newPage();
+  await secondBetaPage.goto(origin);
+  await secondBetaPage.locator(".conversation-toggle").waitFor();
+  await betaPage.close();
+  await page.bringToFront();
+  await page.waitForTimeout(5500);
+  assert.equal(await betaRow.getByText("En ligne", { exact: true }).count(), 1, "closing one tab does not mark a friend offline");
+  await page.screenshot({ path: path.join(previews, "friends-presence-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await betaRow.locator(".friend-presence-dot.is-online").isVisible());
+  const identityLayout = await betaRow.evaluate((row) => {
+    const identity = row.querySelector(".friend-identity").getBoundingClientRect();
+    const actions = row.querySelector(".player-network-actions").getBoundingClientRect();
+    const label = row.querySelector(".display-name-text").getBoundingClientRect();
+    return { stacked: identity.bottom <= actions.top, labelWidth: label.width, contained: actions.right <= row.getBoundingClientRect().right };
+  });
+  assert.ok(identityLayout.stacked && identityLayout.contained && identityLayout.labelWidth > 20, "mobile identity and controls do not overlap");
+  await page.screenshot({ path: path.join(previews, "friends-presence-mobile.png"), fullPage: true });
+  await betaContext.close();
+  await betaRow.getByText("Hors ligne", { exact: true }).waitFor();
+  await page.getByRole("dialog", { name: "Amis", exact: true }).getByRole("button", { name: "Fermer", exact: true }).click();
+  const requestAt = Date.now();
+  await request("epsilon", "/api/friends/request", { userId: "alpha" });
+  await page.locator(".achievement-toast").filter({ hasText: "epsilon" }).waitFor();
+  assert.ok(Date.now() - requestAt < 3000, "friend request arrives without waiting for polling");
+  await page.getByRole("button", { name: "Notifications", exact: true }).click();
+  const friendNotice = page.locator(".notification-friend-request").filter({ hasText: "epsilon" });
+  await friendNotice.getByRole("button", { name: "Accepter", exact: true }).waitFor();
+  await friendNotice.getByRole("button", { name: "Ignorer", exact: true }).click();
+  await waitFor(async () => (await request("alpha", "/api/friends", undefined, "GET")).incoming.some((row) => row.id === "epsilon"), "ignored request remains pending");
+  const invitationRoom = await request("beta", "/api/rooms", { gameId: "421", stake: 10, name: "Invitation instantanee" });
+  const invitationAt = Date.now();
+  await request("beta", `/api/rooms/${invitationRoom.code}/invite`, { friendId: "alpha" });
+  const inviteNotice = page.locator(".notification-room-invite").filter({ hasText: "Invitation instantanee" });
+  await inviteNotice.getByRole("button", { name: "Accepter", exact: true }).waitFor();
+  assert.ok(Date.now() - invitationAt < 3000, "room invite arrives without waiting for polling");
+  assert.equal(await inviteNotice.getByRole("button", { name: "Accepter", exact: true }).isEnabled(), true);
+  await inviteNotice.getByRole("button", { name: "Refuser", exact: true }).click();
+  const otherInbox = await request("gamma", "/api/notifications", undefined, "GET");
+  assert.equal(otherInbox.some((row) => row.roomCode === invitationRoom.code), false, "invitations are scoped to the recipient");
   const sanction = { login: "delta@example.com", tokens: 10000, moderation: { softBan: { active: true, reason: "Test sanction temporaire", endsAt: new Date(Date.now() + 86400000).toISOString() } } };
   await request("admin", "/api/admin/users/delta", sanction, "PATCH");
   const sanctioned = await request("admin", "/api/admin/users/delta", undefined, "GET");
@@ -176,6 +233,7 @@ try {
   console.log("PASS: opened conversations, recent order, persistence, nickname selection, private/table sound and badges, mute, desktop/mobile.");
   console.log(process.env.BLOCKER_MODULE ? "PASS: Ghostery content blocking enabled throughout the browser checks." : "NOTE: content blocking not requested; set BLOCKER_MODULE to test it.");
   console.log("PASS: temporary administrative sanction lowers behavior once and creates a 49,3 tribunal record.");
+  console.log("PASS: online friends, multiple tabs, disconnect grace, desktop/mobile, instant invitations and recipient isolation.");
 } finally {
   await browser?.close();
   for (const child of processes) {

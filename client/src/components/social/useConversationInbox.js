@@ -55,6 +55,12 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
       refresh();
     };
     socket.on("connect", subscribe);
+    socket.on("inbox-updated", () => {
+      window.dispatchEvent(new Event("ktga-inbox-updated"));
+      window.dispatchEvent(new Event("ktga-connections-updated"));
+    });
+    socket.on("presence-updated", () => window.dispatchEvent(new Event("ktga-presence-updated")));
+    socket.on("connections-updated", () => window.dispatchEvent(new Event("ktga-connections-updated")));
     socket.on("chat-message", (message) => {
       if (seen.has(message.id)) return;
       seen.add(message.id);

@@ -100,6 +100,10 @@
 .join-code-modal .actions { justify-content: flex-end; }
 .friend-join.available { background: #153e2a; border-color: #65bd89; color: #9aefb7; }
 .friend-join.available:hover { background: #1b5035; }
+.friend-identity { min-width: 0; }
+.friend-presence-label { display: flex !important; align-items: center; gap: 6px; color: #b8c4bc; font-size: 12px; margin-top: 4px; }
+.friend-presence-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #78847d; border: 1px solid #b0bbb4; }
+.friend-presence-dot.is-online { background: #73dda2; border-color: #98edbd; }
 .player-network-actions .danger-button { color: #ffb9bd; }
 .event-action-buttons { justify-content: center; margin: 20px 0; }
 .event-ranking-tabs button { color: #d9dfda; font-size: 12px; }
@@ -157,8 +161,8 @@
 .connections-tabs small { background: #121b16; border-radius: 4px; color: #e7d59e; padding: 2px 6px; }
 .connections-content, .connections-results { min-height: 200px; }
 .connections-content h3 { font-size: 16px; margin: 18px 0 10px; }
-.connections-modal .player-network-row { flex-wrap: wrap; gap: 12px; }
-.connections-modal .player-network-actions { margin-left: auto; }
+.connections-modal .player-network-row { gap: 12px; grid-template-columns: minmax(130px, 1fr) auto; }
+.connections-modal .player-network-actions { margin-left: auto; flex-wrap: wrap; }
 .connections-modal .player-network-row > div:first-child small { display: block; }
 .connections-modal .player-network-row .display-name,
 .connections-modal .player-network-row .display-name * { color: #f4ead4 !important; text-shadow: none !important; }
@@ -242,6 +246,9 @@
   .casino-dialog .modal-title-row h2 { font-size: 20px; }
   .connections-tabs { flex-wrap: nowrap; overflow-x: auto; }
   .connections-tabs button { flex: 1 0 auto; }
+  .connections-modal .player-network-row { grid-template-columns: minmax(0, 1fr); }
+  .connections-modal .player-network-actions { justify-content: flex-start; margin-left: 0; }
+  .friend-invite-label { display: none; }
 }
 @media (max-width: 440px) {
   .wardrobe-grid, .shop-shell .shop-grid { grid-template-columns: 1fr; }
