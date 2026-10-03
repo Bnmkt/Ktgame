@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Coins, ShieldAlert, Users, X } from "lucide-react";
+import { Coins, Shield, ShieldAlert, Users, X } from "lucide-react";
 import { api, installButtonActionFeedback, setToken } from "./api.js";
 import { defaultPublicSettings } from "./config/site.js";
 import { DisplayName, cosmeticCssRules, setCosmeticCatalogItems } from "./components/cosmetics/Cosmetics.jsx";
@@ -9,6 +9,7 @@ import { DailyBonusButton } from "./components/navigation/DailyBonusButton.jsx";
 import { Dialog } from "./components/common/Dialog.jsx";
 import { JoinTable } from "./components/navigation/JoinTable.jsx";
 import { useCasinoRoute } from "./navigation/useCasinoRoute.js";
+import { appPath } from "./navigation/routes.js";
 import { CompactNumber } from "./utils/presentation.jsx";
 import { AchievementToasts, NotificationCenter } from "./components/feedback/Feedback.jsx";
 import { Auth } from "./pages/AuthPage.jsx";
@@ -33,6 +34,8 @@ const PatchnotesPage = lazy(() => import("./pages/PatchnotesPage.jsx").then((mod
 const ParentalPortalPage = lazy(() => import("./privacy/ParentalPortalPage.jsx").then((module) => ({ default: module.ParentalPortalPage })));
 const TribunalPage = lazy(() => import("./pages/TribunalPage.jsx").then((module) => ({ default: module.TribunalPage })));
 const SocialPanel = lazy(() => import("./components/social/SocialPanel.jsx").then((module) => ({ default: module.SocialPanel })));
+const HelpPage = lazy(() => import("./components/help/HelpContent.jsx").then((module) => ({ default: module.HelpPage })));
+const HelpOnboarding = lazy(() => import("./components/help/HelpOnboarding.jsx").then((module) => ({ default: module.HelpOnboarding })));
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -290,6 +293,7 @@ export default function App() {
   }
 
   const parentAccess = view === "parents" && (new URL(window.location.href).searchParams.has("parental-verify") || new URL(window.location.href).searchParams.has("parental-access"));
+  if (["faq", "guide"].includes(view)) return <Suspense fallback={<main className="app-shell" role="status">Chargement de l’aide…</main>}><HelpPage key={view} mode={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
   if (parentAccess) return <Suspense fallback={<main className="legal-page" role="status">Chargement de l’espace parent…</main>}><ParentalPortalPage siteName={publicSettings.siteName} /></Suspense>;
   if (Object.hasOwn(legalLinks, view)) return <Suspense fallback={<main className="legal-page" role="status">Chargement…</main>}><LegalPage view={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
   if (view === "status") return <Suspense fallback={<main className="status-page" role="status">Chargement de l’état des services…</main>}><StatusPage siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
@@ -309,7 +313,7 @@ export default function App() {
       {cosmeticStyles && <style>{cosmeticStyles}</style>}
       <AchievementToasts notifications={notifications} onClose={(id) => setNotifications((list) => list.filter((notification) => notification.id !== id))} />
       <CasinoHeader user={user} siteName={publicSettings.siteName} siteIcon={publicSettings.siteIcon} view={view} roomCode={roomCode} eventSlug={communityEventSlug} tribunalAvailable={tribunalAvailable} onNavigate={navigate} onLogout={logout}>
-      <div className="casino-wallet"><CompactNumber value={user.tokens} label="Solde exact" /><Coins size={18} /></div><DailyBonusButton user={user} setUser={setUser} settings={publicSettings} onAchievements={notifyAchievements} onFeedback={setBonusFeedback} /><div className="identity-pill"><DisplayName user={user} />{user.guest && <small>Invité</small>}</div>{!user.guest && <button type="button" className={`secondary icon-toggle conversation-toggle ${socialOpen ? "active" : ""} ${conversationUnread ? "conversation-toggle-unread" : ""}`} title={conversationUnread ? `Social · ${conversationUnread} messages non lus` : "Social"} aria-label={conversationUnread ? `Ouvrir Social, ${conversationUnread} messages non lus` : "Ouvrir Social"} aria-expanded={socialOpen} onClick={() => { setSocialOpen((value) => !value); setNotificationsOpen(false); }}><Users size={18} />{conversationUnread > 0 && <span className="conversation-toggle-count" aria-hidden="true">{conversationUnread > 99 ? "99+" : conversationUnread}</span>}</button>}{!user.guest && <NotificationCenter items={inboxNotifications} open={notificationsOpen} onToggle={() => { setNotificationsOpen((value) => !value); setSocialOpen(false); }} onDelete={deleteInboxNotification} onClear={clearInboxNotifications} onAction={actOnInboxNotification} />}
+      <div className="casino-wallet"><CompactNumber value={user.tokens} label="Solde exact" /><Coins size={18} /></div><DailyBonusButton user={user} setUser={setUser} settings={publicSettings} onAchievements={notifyAchievements} onFeedback={setBonusFeedback} /><div className="identity-pill"><DisplayName user={user} />{user.guest && <small>Invité</small>}{(user.admin || user.editor) && <a href={appPath("admin")} className={`secondary icon-toggle casino-management-link ${view === "admin" ? "active" : ""}`} title={user.admin ? "Administration" : "Studio"} aria-label={user.admin ? "Administration" : "Studio"} onClick={(event) => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate("admin"); } }}><Shield size={18} /></a>}</div>{!user.guest && <button type="button" className={`secondary icon-toggle conversation-toggle ${socialOpen ? "active" : ""} ${conversationUnread ? "conversation-toggle-unread" : ""}`} title={conversationUnread ? `Social · ${conversationUnread} messages non lus` : "Social"} aria-label={conversationUnread ? `Ouvrir Social, ${conversationUnread} messages non lus` : "Ouvrir Social"} aria-expanded={socialOpen} onClick={() => { setSocialOpen((value) => !value); setNotificationsOpen(false); }}><Users size={18} />{conversationUnread > 0 && <span className="conversation-toggle-count" aria-hidden="true">{conversationUnread > 99 ? "99+" : conversationUnread}</span>}</button>}{!user.guest && <NotificationCenter items={inboxNotifications} open={notificationsOpen} onToggle={() => { setNotificationsOpen((value) => !value); setSocialOpen(false); }} onDelete={deleteInboxNotification} onClear={clearInboxNotifications} onAction={actOnInboxNotification} />}
       </CasinoHeader>
       {bonusFeedback && <div className={`casino-bonus-feedback ${bonusFeedback.error ? "error" : "daily-bonus-feedback"}`} role={bonusFeedback.error ? "alert" : "status"}><Coins size={18} /><span>{bonusFeedback.message}</span><button type="button" className="secondary icon-toggle" aria-label="Fermer le message du bonus" onClick={() => setBonusFeedback(null)}><X size={16} /></button></div>}
       <Suspense fallback={<main className="app-shell"><section className="panel route-loading" role="status">Chargement de l’interface…</section></main>}>
@@ -330,6 +334,7 @@ export default function App() {
       {exclusion && <Dialog title="Vous avez été exclu" className="action-confirm-modal" layerClassName="action-confirm-layer" onClose={() => setExclusion(null)}><p>{exclusion.message}</p><div className="actions"><button type="button" onClick={() => setExclusion(null)}>J’ai compris</button></div></Dialog>}
       {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} onReport={(profile) => setReportTarget(profile)} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} roomCode={roomCode ?? ""} onClose={() => setReportTarget(null)} />}
+      <Suspense fallback={null}><HelpOnboarding key={user.id} user={user} /></Suspense>
     </>
   );
 }

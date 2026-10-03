@@ -1,4 +1,4 @@
-import { Dice5, Landmark, LogOut, Scale, Shield, ShoppingBag, Sparkles, Trophy, User } from "lucide-react";
+import { Dice5, Landmark, LogOut, Scale, ShoppingBag, Sparkles, Trophy, User } from "lucide-react";
 import { appPath } from "../../navigation/routes.js";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 
@@ -13,7 +13,6 @@ export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSl
     ["profile", "Profil", User],
     ...(roomCode ? [["room", "Ma table", Dice5]] : []),
     ...(eventSlug && !limited("community-events") ? [["event", "Événement", Sparkles]] : []),
-    ...(user.admin || user.editor ? [["admin", user.admin ? "Administration" : "Studio", Shield]] : [])
   ];
   function follow(event, destination) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

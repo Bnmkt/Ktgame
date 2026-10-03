@@ -1,0 +1,75 @@
+.player-help-surface { background: #101718; border: 1px solid #5b533b; border-radius: 8px; padding: 24px; }
+.player-help-navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 20px; border-bottom: 1px solid #3b4942; }
+.player-help-navigation a { display: inline-flex; align-items: center; gap: 8px; color: #c7d4cd; padding: 10px 16px; text-decoration: none; border: 1px solid #46554b; border-radius: 6px; }
+.player-help-navigation a.active { background: #263e31; color: #def3df; border-color: #82ad8d; }
+.player-help-navigation > button { margin-left: auto; }
+.player-help-filters { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 16px; margin: 24px 0; }
+.player-help-filters label > span:not(.sr-only) { display: flex; align-items: center; gap: 9px; background: #fffaf0; border-radius: 6px; color: #4e5c52; padding-left: 12px; }
+.player-help-filters input { background: transparent; border: 0; min-width: 0; }
+.player-help-filters select, .player-help-editor select { width: 100%; min-height: 40px; font: inherit; border: 1px solid #60725f; border-radius: 6px; background: #17241d; color: #e2eedf; padding: 8px; }
+.player-help-intro { color: #bacbc1; max-width: 760px; line-height: 1.7; margin-bottom: 28px; }
+.player-help-question { border-bottom: 1px solid #364c40; padding: 18px 0; }
+.player-help-question summary { display: flex; gap: 20px; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; }
+.player-help-question summary::-webkit-details-marker { display: none; }
+.player-help-question summary small { display: block; color: #8bc4a5; font-size: 11px; margin-bottom: 5px; }
+.player-help-question summary strong { font-size: 16px; line-height: 1.5; }
+.player-help-question summary > svg { flex-shrink: 0; color: #d7b757; }
+.player-help-question > div { max-width: 850px; padding-top: 14px; }
+.player-help-guide-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; align-items: start; }
+.player-help-contents { position: sticky; top: 22px; }
+.player-help-contents h2 { font-size: 14px; }
+.player-help-contents nav { display: grid; gap: 5px; }
+.player-help-contents a { display: flex; gap: 10px; padding: 12px 10px; font-size: 13px; color: #bdcdc4; border-left: 3px solid transparent; text-decoration: none; line-height: 1.5; }
+.player-help-contents a > span { color: #809688; font-size: 11px; padding-top: 2px; }
+.player-help-contents a.active { border-color: #e8c05c; color: #ffe3a0; background: #26342b; font-weight: 800; }
+.player-help-contents a, .player-help-chapter h2, .player-help-question summary strong, .player-help-editor-list strong { overflow-wrap: anywhere; }
+.player-help-chapter { padding: 0 0 35px; margin-bottom: 30px; border-bottom: 1px solid #405047; scroll-margin-top: 24px; }
+.player-help-chapter header > span { font-size: 11px; color: #8bc4a5; font-weight: 700; }
+.player-help-chapter h2 { font-size: 23px; margin-top: 8px; }
+.player-help-figure { margin: 22px 0 0; }
+.player-help-figure img { display: block; width: 100%; max-height: 620px; object-fit: contain; background: #0b1210; border: 1px solid #445447; border-radius: 6px; }
+.player-help-figure figcaption { color: #a6bbae; font-size: 12px; padding-top: 8px; }
+.modal.player-help-welcome { display: flex; flex-direction: column; width: 850px; max-width: calc(100vw - 24px); max-height: 90dvh; overflow: hidden; }
+.player-help-welcome .modal-title-row, .player-help-step-controls, .player-help-step-head, .player-help-step-dots { flex-shrink: 0; }
+.player-help-welcome .modal-title-row h2 { min-width: 0; overflow-wrap: anywhere; }
+.player-help-step-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #9bc2ab; }
+.player-help-welcome progress { height: 5px; width: 100%; accent-color: #dfb950; margin: 12px 0 20px; flex-shrink: 0; }
+.player-help-step-body { min-height: 0; overflow-y: auto; padding-right: 12px; }
+.player-help-step-body h3 { font-size: 22px; }
+.player-help-step-body .player-help-figure img { max-height: 330px; }
+.player-help-step-dots { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 0; }
+.player-help-step-dots button { width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 50%; background: #192821; color: #d0dfd3; border-color: #4e6657; font-size: 12px; }
+.player-help-step-dots button.active { background: #c9a047; color: #1a190f; }
+.player-help-step-controls { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid #455348; padding-top: 16px; }
+.player-help-step-controls > div { display: flex; gap: 8px; }
+.player-help-editor { min-width: 0; }
+.player-help-control-scope { display: contents; }
+.player-help-editor-toolbar { display: flex; gap: 12px; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+.player-help-editor-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 22px; align-items: start; }
+.player-help-editor-list { display: grid; gap: 7px; max-height: 70vh; overflow-y: auto; }
+.player-help-editor-list button { display: grid; gap: 4px; text-align: left; justify-content: stretch; background: #15201d; color: #d6ded8; border-color: #405548; }
+.player-help-editor-list button.active { background: #35422b; border-color: #c9a047; color: #fff0bd; }
+.player-help-editor-list small { color: #a7b7a9; }
+.player-help-editor-fields { display: grid; gap: 18px; min-width: 0; }
+.player-help-editor-fields textarea { width: 100%; min-height: 280px; resize: vertical; padding: 12px; font: inherit; line-height: 1.6; }
+.player-help-editor-fields input, .player-help-editor-fields textarea { background: #0d1714; color: #edf2e6; border: 1px solid #536454; border-radius: 6px; }
+.player-help-editor-fields .player-help-intro-input { min-height: 85px; }
+.player-help-editor-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.player-help-editor-row label { flex: 1; min-width: 140px; }
+.player-help-editor-controls { display: flex; flex-wrap: wrap; gap: 9px; }
+.player-help-editor-settings { margin: 24px 0; padding-bottom: 24px; border-bottom: 1px solid #455348; }
+.player-help-editor .player-help-publish { display: flex; align-items: center; gap: 8px; }
+.player-help-publish input { width: 18px; min-height: 18px; height: 18px; accent-color: #d9b452; }
+.player-help-editor-fields label > span { display: inline-flex; align-items: center; gap: 7px; }
+.player-help-editor-preview { padding: 20px; background: #11241b; border: 1px solid #3f6851; border-radius: 6px; }
+@media (max-width: 760px) {
+  .player-help-surface { padding: 16px; }
+  .player-help-guide-layout, .player-help-editor-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .player-help-contents { position: static; }
+  .player-help-contents nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .player-help-filters { grid-template-columns: minmax(0, 1fr); }
+  .player-help-navigation > button { margin-left: 0; }
+  .player-help-editor-list { max-height: 230px; }
+}
+@media (max-height: 500px) { .modal.player-help-welcome { overflow-y: auto; } .player-help-step-body { flex-shrink: 0; } }
+.player-help-surface .patchnote-markdown, .player-help-welcome .patchnote-markdown, .player-help-editor .patchnote-markdown { color: #cad7cc; line-height: 1.75; font-size: 14px; }

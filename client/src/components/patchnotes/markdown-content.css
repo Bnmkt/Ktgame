@@ -1,0 +1,21 @@
+.patchnote-markdown { min-width: 0; overflow-wrap: anywhere; }
+.patchnote-markdown > :first-child { margin-top: 0; }
+.patchnote-markdown > :last-child { margin-bottom: 0; }
+.patchnote-markdown p { margin: 0 0 12px; }
+.patchnote-markdown h1, .patchnote-markdown h2, .patchnote-markdown h3, .patchnote-markdown h4 { letter-spacing: 0; margin: 18px 0 8px; }
+.patchnote-markdown h1 { font-size: 24px; }
+.patchnote-markdown h2 { border: 0; font-size: 21px; padding: 0; }
+.patchnote-markdown h3 { font-size: 18px; }
+.patchnote-markdown ul, .patchnote-markdown ol { display: grid; gap: 6px; margin: 10px 0; padding-left: 23px; }
+.patchnote-markdown li::marker { color: #dfbd57; }
+.patchnote-markdown a { color: #7dc9ed; text-underline-offset: 3px; }
+.patchnote-markdown strong { color: #f4e3b9; }
+.patchnote-markdown code { background: #080d0e; border: 1px solid #36413d; border-radius: 4px; color: #9edfc6; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; padding: 2px 5px; }
+.patchnote-markdown pre { background: #080d0e; border: 1px solid #36413d; border-radius: 6px; max-width: 100%; overflow-x: auto; padding: 13px; }
+.patchnote-markdown pre code { background: transparent; border: 0; padding: 0; }
+.patchnote-markdown blockquote { border-left: 3px solid #8071aa; color: #cfc5df; margin: 12px 0; padding-left: 14px; }
+.patchnote-markdown table { border-collapse: collapse; display: block; margin: 14px 0; max-width: 100%; overflow-x: auto; width: max-content; }
+.patchnote-markdown th, .patchnote-markdown td { border: 1px solid #3d4842; padding: 8px 10px; text-align: left; }
+.patchnote-markdown th { background: #192321; color: #e6d19a; }
+.patchnote-markdown hr { border: 0; border-top: 1px solid #414942; margin: 20px 0; }
+.patchnote-markdown input[type="checkbox"] { accent-color: #d5ac3f; margin-right: 7px; }

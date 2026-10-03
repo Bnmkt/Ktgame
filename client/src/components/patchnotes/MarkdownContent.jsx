@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import "./markdown-content.css";
 
 function safeMarkdownUrl(value) {
   const href = String(value ?? "").trim();
@@ -8,10 +9,11 @@ function safeMarkdownUrl(value) {
   return "";
 }
 
-export function MarkdownContent({ children, className = "" }) {
+export function MarkdownContent({ children, className = "", inlineImages = true }) {
   return <div className={`patchnote-markdown ${className}`}><ReactMarkdown
     remarkPlugins={[remarkGfm]}
     components={{
+      ...(!inlineImages ? { img: () => null } : {}),
       a: ({ href, children: label }) => {
         const safeHref = safeMarkdownUrl(href);
         return safeHref ? <a href={safeHref} target="_blank" rel="noopener noreferrer">{label}</a> : <span>{label}</span>;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Gamepad2, HeartPulse, LayoutDashboard, Lock, Newspaper, Plus, RefreshCw, Save, Scale, Search, Settings, Shield, ShieldCheck, ShoppingBag, Spade, Sparkles, Trophy, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, Copy, Gamepad2, HeartPulse, LayoutDashboard, Lock, Newspaper, Plus, RefreshCw, Save, Scale, Search, Settings, Shield, ShieldCheck, ShoppingBag, Spade, Sparkles, Trophy, Users, X } from "lucide-react";
 import { api } from "../api.js";
 import { ConfirmActionButton, ConfirmDialog } from "../components/common/ConfirmAction.jsx";
 import { currentCosmeticCss, defaultIconKey, defaultVisualDesign, shopTypeLabel } from "../components/cosmetics/Cosmetics.jsx";
@@ -19,6 +19,7 @@ import { PatchnotesAdmin } from "../components/admin/PatchnotesAdmin.jsx";
 import { AdminOverview } from "../components/admin/AdminOverview.jsx";
 import { TribunalAdmin } from "../components/admin/TribunalAdmin.jsx";
 import { shopPackName } from "../utils/shop-packs.js";
+import { HelpAdmin } from "../components/admin/HelpAdmin.jsx";
 
 export function Admin({ user, onBack, onSettingsChange }) {
   const isAdministrator = Boolean(user.admin);
@@ -215,7 +216,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
       { value: "games", label: "Jeux", icon: Gamepad2, count: data.games.length },
       { value: "achievements", label: "Succès", icon: Trophy, count: data.achievements?.length ?? 0 },
       { value: "shop", label: "Boutique", icon: ShoppingBag, count: data.shop.length },
-      { value: "patchnotes", label: "Patchnotes", icon: Newspaper }
+      { value: "patchnotes", label: "Patchnotes", icon: Newspaper },
+      { value: "help", label: "FAQ et tutos", icon: BookOpen }
     ] },
     { label: "Administration", items: [
       { value: "users", label: "Comptes joueurs", icon: Users, count: data.users.length },
@@ -226,7 +228,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
   ] : [{ label: "Édition", items: [
     { value: "shop", label: "Studio boutique", icon: ShoppingBag, count: data.shop.length },
     { value: "events", label: "Événements", icon: Sparkles },
-    { value: "patchnotes", label: "Patchnotes", icon: Newspaper }
+    { value: "patchnotes", label: "Patchnotes", icon: Newspaper },
+    { value: "help", label: "FAQ et tutos", icon: BookOpen }
   ] }];
   const adminNavigation = adminNavigationGroups.flatMap((group) => group.items);
   const activeNavigation = adminNavigation.find((item) => item.value === tab) ?? adminNavigation[0];
@@ -260,6 +263,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
         {data.permissions?.manageAchievements && tab === "achievements" && <AchievementsAdmin achievements={data.achievements} schemas={data.achievementRuleSchemas} games={data.games} shop={data.shop} reload={load} reportError={setError} notifySuccess={notifySuccess} />}
 
         {tab === "patchnotes" && <PatchnotesAdmin reportError={setError} notifySuccess={notifySuccess} />}
+        {tab === "help" && <HelpAdmin reportError={setError} notifySuccess={notifySuccess} />}
 
         {(tab === "shop" || (isAdministrator && ["users", "games"].includes(tab))) && <section className="card admin-list" ref={pages.anchor}>
           <div className="admin-section-heading">

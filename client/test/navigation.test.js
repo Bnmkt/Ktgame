@@ -22,6 +22,14 @@ test("les anciens liens d'invitation restent accessibles", () => {
   assert.deepEqual(readRoute({ pathname: "/ktga/", search: "?event=challenge" }, "/ktga/"), { view: "event", id: "challenge" });
 });
 
+test("public FAQ and guide routes work at root and under an absolute deployment prefix", () => {
+  for (const base of ["/", "/ktga/"]) for (const view of ["faq", "guide"]) {
+    const pathname = appPath(view, "", base);
+    assert.deepEqual(readRoute({ pathname, search: "" }, base), { view });
+    assert.ok(pathname.startsWith("/"));
+  }
+});
+
 test("les routes inconnues, hors base et mal encodees sont rejetees", () => {
   for (const path of ["/autre/shop", "/ktgashop", "/ktga/table", "/ktga/table/%", "/ktga/table/a%2Fb", "/ktga/profil/autre", "/ktga/inconnue"]) {
     assert.equal(readRoute({ pathname: path, search: "" }, "/ktga/").view, "not-found", path);

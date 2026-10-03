@@ -30,10 +30,12 @@
 .casino-navigation a:hover, .casino-navigation button:hover { background: #25312b; color: #fff5d9; transform: none; }
 .casino-brand:focus-visible, .casino-navigation a:focus-visible { outline: 2px solid #f1d88f; outline-offset: 3px; }
 .casino-logout { flex: 0 0 auto; }
+.casino-management-link { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; color: #d5d8c2; border: 1px solid #5d6550; border-radius: 6px; text-decoration: none; }
+.casino-management-link.active { color: #ffe095; background: #363323; border-color: #b5a15a; }
 .casino-accountbar { align-items: center; display: flex; flex: 0 0 auto; gap: 12px; justify-content: flex-end; margin-left: auto; min-width: 0; }
 .casino-wallet { align-items: center; color: #edd17f; display: inline-flex; font-variant-numeric: tabular-nums; font-weight: 800; gap: 8px; white-space: nowrap; }
 .casino-accountbar .identity-pill { background: transparent; border: 0; min-width: 0; padding: 0; }
-.casino-accountbar .identity-pill { justify-content: flex-end; text-align: right; }
+.casino-accountbar .identity-pill { justify-content: flex-end; text-align: right; gap: 8px; }
 .casino-accountbar .identity-pill .display-name-text { max-width: 150px; overflow-wrap: anywhere; white-space: normal; }
 .casino-accountbar .daily-bonus-button { flex-shrink: 0; font-size: 13px; min-height: 42px; padding: 6px 12px; }
 .casino-accountbar .daily-bonus-button small { font-size: 10px; }

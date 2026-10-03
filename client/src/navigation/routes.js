@@ -1,4 +1,4 @@
-const paths = { lobby: "", profile: "profil", shop: "shop", leaderboard: "classements", tribunal: "tribunal", admin: "admin", patchnotes: "patchnotes", status: "status", room: "table", spectator: "observer", event: "evenement", terms: "conditions", legal: "mentions-legales", privacy: "confidentialite", cookies: "cookies", parents: "parents" };
+const paths = { lobby: "", profile: "profil", shop: "shop", leaderboard: "classements", tribunal: "tribunal", admin: "admin", faq: "faq", guide: "guide", patchnotes: "patchnotes", status: "status", room: "table", spectator: "observer", event: "evenement", terms: "conditions", legal: "mentions-legales", privacy: "confidentialite", cookies: "cookies", parents: "parents" };
 
 export function appPath(view, id = "", base = import.meta.env?.BASE_URL ?? "/") {
   const prefix = `/${base.replace(/^\/+|\/+$/g, "")}`.replace(/\/$/, "");
@@ -19,7 +19,7 @@ export function readRoute(location, base = import.meta.env?.BASE_URL ?? "/") {
   }
   if (parts.length === 1) {
     const view = Object.keys(paths).find((key) => paths[key] === parts[0]);
-    if (["profile", "shop", "leaderboard", "tribunal", "admin", "patchnotes", "status", "terms", "legal", "privacy", "cookies", "parents"].includes(view)) return { view };
+    if (["profile", "shop", "leaderboard", "tribunal", "admin", "faq", "guide", "patchnotes", "status", "terms", "legal", "privacy", "cookies", "parents"].includes(view)) return { view };
   }
   if (parts.length === 2 && ["table", "observer", "evenement"].includes(parts[0])) {
     try {
