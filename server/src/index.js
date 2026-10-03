@@ -105,6 +105,7 @@ import {
 } from "./services/account-security.js";
 import { createStatusMonitor } from "./services/status-monitor.js";
 import { createPatchnoteStore } from "./services/patchnotes.js";
+import { createHelpStore } from "./services/help-content.js";
 import { createTribunalStore, tribunalCategories } from "./services/tribunal.js";
 import { createChatStore, directChannelId } from "./services/chat.js";
 
@@ -668,6 +669,9 @@ const patchnotes = createPatchnoteStore({
   currentVersion: APP_VERSION
 });
 process.on("exit", () => patchnotes.close());
+const helpFilename = process.env.HELP_DB_PATH ? path.resolve(process.cwd(), process.env.HELP_DB_PATH) : `${process.env.SQLITE_PATH ? path.resolve(process.cwd(), process.env.SQLITE_PATH) : path.join(__dirname, "..", "data", "ktga.sqlite")}.help.sqlite`;
+const playerHelp = createHelpStore({ filename: helpFilename, uploadDirectory: path.join(path.dirname(helpFilename), "help-images") });
+process.on("exit", () => playerHelp.close());
 const serverStartedAt = Date.now();
 const requestTelemetry = {
   active: 0,
@@ -777,6 +781,7 @@ app.use((req, res, next) => {
   res.once("close", recordRequest);
   next();
 });
+app.use("/api/admin/help", express.json({ limit: "2mb" }));
 app.use(express.json());
 app.use("/api", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
 app.use("/api/auth", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: AUTH_RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
@@ -4903,6 +4908,34 @@ app.patch("/api/admin/status/incidents/:id", auth, requireAdmin, (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Incident invalide." });
   }
+});
+
+app.get("/api/help", (_req, res) => {
+  res.setHeader("Cache-Control", "no-cache");
+  res.json(playerHelp.read(true));
+});
+app.get("/api/help/images/:id", (req, res) => {
+  const image = playerHelp.image(req.params.id);
+  if (!image) return res.status(404).json({ error: "Image introuvable." });
+  res.type(image.mimeType).setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  res.sendFile(image.filename);
+});
+app.get("/api/me/help", auth, (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ needsWelcome: playerHelp.needsWelcome(getUser(req.auth.id)) });
+});
+app.post("/api/me/help/dismiss", auth, (req, res) => res.json(playerHelp.dismiss(req.auth.id)));
+app.get("/api/admin/help", auth, requireBackOffice, (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json(playerHelp.read());
+});
+app.put("/api/admin/help", auth, requireBackOffice, (req, res) => {
+  try { res.json(playerHelp.save(req.body)); }
+  catch (error) { res.status(400).json({ error: error.message }); }
+});
+app.post("/api/admin/help/images", auth, requireBackOffice, express.raw({ type: ["image/png", "image/jpeg", "image/webp", "image/gif"], limit: "3mb" }), (req, res) => {
+  try { res.status(201).json(playerHelp.upload(req.body, req.get("Content-Type"))); }
+  catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 app.get("/api/admin/patchnotes", auth, requireBackOffice, (_req, res) => {
