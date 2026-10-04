@@ -10,6 +10,7 @@ import { createBugReportStore } from "../src/services/bug-reports.js";
 import { sanitizeBugDiagnostics, safeDiagnosticRoute, redactBugPublicText } from "../src/services/bug-diagnostics.js";
 import { sanitizeBugImage } from "../src/services/bug-images.js";
 import { registerBugReportRoutes } from "../src/services/bug-report-routes.js";
+import { DatabaseSync } from "node:sqlite";
 
 function chunk(type, bytes) {
   const data = Buffer.concat([Buffer.from(type), bytes]); let crc = 0xffffffff;
@@ -43,11 +44,13 @@ test("PNG: removes metadata and trailing payload, rejects damaged or oversized i
 });
 test("reports remain private; receipt and owner access do not expose other dossiers", (t) => {
   const s = fixture(t), a = s.create(input(), { id: "alice" }), b = s.create(input(), { id: "bob" });
-  assert.match(a.report.code, /^BUG \d+$/); assert.equal(s.list().totalItems, 0);
+  assert.match(a.report.code, /^BUG \d+$/); assert.equal(s.list().totalItems, 2);
+  assert.ok(s.list().rows.every((row) => row.title === "Signalement en attente de relecture"));
+  assert.equal(s.list({ search: a.report.title }).totalItems, 0);
   assert.equal(a.report.context.page, "/table/TABLE1");
-  assert.equal(s.get(a.report.id), null); assert.equal(s.get(a.report.id, { viewer: { id: "bob" } }), null);
+  assert.equal(s.get(a.report.id).privateView, false); assert.equal(s.get(a.report.id, { viewer: { id: "bob" } }).description, "");
   assert.equal(s.get(a.report.id, { receipt: a.receipt }).privateView, true);
-  assert.equal(s.get(a.report.id, { receipt: b.receipt }), null);
+  assert.equal(s.get(a.report.id, { receipt: b.receipt }).privateView, false);
   s.relate(a.report.id, b.report.id, "related", "staff");
   assert.equal(s.get(a.report.id, { viewer: { id: "alice" } }).links.length, 0);
   assert.equal(s.get(a.report.id, { admin: true }).links.length, 1);
@@ -55,8 +58,30 @@ test("reports remain private; receipt and owner access do not expose other dossi
   assert.throws(() => s.publish(a.report.id, { visible: true, title: a.report.title, description: a.report.description }, "staff"), /Relis/);
   s.publish(a.report.id, { visible: true, reviewed: true, title: "Titre relu", description: "Une description publique relue sans information personnelle." }, "staff");
   const publicData = s.get(a.report.id); assert.equal(publicData.title, "Titre relu"); assert.equal(publicData.privateView, false);
-  for (const key of ["context", "diagnostics", "reporterId", "expected", "assignee", "actions"]) assert.ok(!Object.hasOwn(publicData, key));
-  assert.equal(s.list().totalItems, 1);
+  for (const key of ["context", "diagnostics", "reporterId", "assignee", "actions"]) assert.ok(!Object.hasOwn(publicData, key));
+  assert.equal(publicData.expected, ""); assert.equal(s.list().totalItems, 2);
+});
+test("reviewed reproduction details are public without exposing originals or private context", (t) => {
+  const s = fixture(t), a = s.create(input({ expected: "PRIVATE expected", actual: "PRIVATE actual", steps: "PRIVATE steps" }), { id: "alice" });
+  const pending = s.get(a.report.id);
+  assert.equal(pending.awaitingReview, true); assert.equal(pending.status, "received"); assert.equal(pending.expected, ""); assert.ok(!JSON.stringify(pending).includes("PRIVATE"));
+  s.publish(a.report.id, { visible: true, reviewed: true, title: "Titre public", description: "La relance est bloquée sur certaines tables.", expected: "Relancer les dés", actual: "Bouton désactivé", steps: "Lancer puis tenter de relancer. Email private@example.com" }, "staff");
+  const published = s.get(a.report.id);
+  assert.equal(published.expected, "Relancer les dés"); assert.equal(published.actual, "Bouton désactivé"); assert.ok(!published.steps.includes("private@example.com")); assert.equal(published.context, undefined);
+  assert.equal(s.get(a.report.id, { admin: true }).expected, "PRIVATE expected");
+  s.publish(a.report.id, { visible: false, title: "Titre public", description: "La relance est bloquée sur certaines tables." }, "staff");
+  assert.equal(s.get(a.report.id).expected, ""); assert.equal(s.get(a.report.id).description, "");
+});
+test("older bug databases gain reviewed fields without copying unreviewed personal data", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "ktga-bug-migration-")), filename = path.join(directory, "bugs.sqlite");
+  let s = createBugReportStore({ filename });
+  try {
+    const a = s.create(input({ expected: "PRIVATE" })); s.close(); s = null;
+    const db = new DatabaseSync(filename);
+    for (const field of ["public_expected", "public_actual", "public_steps"]) db.exec(`ALTER TABLE bug_reports DROP COLUMN ${field}`);
+    db.close(); s = createBugReportStore({ filename });
+    assert.equal(s.get(a.report.id, { admin: true }).expected, "PRIVATE"); assert.equal(s.get(a.report.id, { admin: true }).publicExpected, "");
+  } finally { s?.close(); assert.equal(path.dirname(path.resolve(directory)), path.resolve(tmpdir())); assert.ok(path.basename(directory).startsWith("ktga-bug-migration-")); rmSync(directory, { recursive: true, force: true }); }
 });
 test("diagnostic consent is enforced by the server and retained at most 90 days", (t) => {
   let time = Date.parse("2026-01-01T00:00:00Z"); const s = fixture(t, { now: () => time });
@@ -131,17 +156,21 @@ test("public endpoints reveal private details only to verified staff or owners",
   t.after(() => new Promise((resolve) => server.close(resolve))); const origin = `http://127.0.0.1:${server.address().port}`;
   const a = s.create(input(), { id: "alice" });
   const read = (user, suffix = "") => fetch(`${origin}/api/bugs/${a.report.id}${suffix}`, { headers: user ? { "X-Test-User": user } : {} });
-  assert.equal((await read()).status, 404); assert.equal((await read("bob")).status, 404);
+  assert.equal((await read()).status, 200); assert.equal((await (await read("bob")).json()).description, "");
   assert.equal((await (await read("editor")).json()).reporterId, "alice");
   assert.equal((await (await read("alice")).json()).privateView, true);
   assert.equal((await fetch(`${origin}/api/admin/bugs`, { headers: { "X-Test-User": "alice" } })).status, 403);
   s.publish(a.report.id, { visible: true, reviewed: true, title: "Version publique", description: "Description publique de ce problème sans détail privé." }, "admin");
   const publicView = await (await read()).json(); assert.equal(publicView.privateView, false); assert.equal(publicView.description, "Description publique de ce problème sans détail privé.");
   assert.equal((await (await read("admin")).json()).description, a.report.description);
+  const publicList = await (await fetch(`${origin}/api/bugs`)).json(); assert.equal(publicList.totalItems, 1);
   const body = input();
   const submit = () => fetch(`${origin}/api/bugs`, { method: "POST", headers: { "Content-Type": "application/json", "X-Test-User": "alice" }, body: JSON.stringify(body) });
   const creation = await submit(); assert.equal(creation.status, 201); const created = (await creation.json()).report;
   assert.equal((await submit()).status, 200); assert.equal(notices.length, 1); assert.equal(notices[0].kind, "bug-received");
+  assert.equal((await (await fetch(`${origin}/api/bugs`)).json()).totalItems, 2);
+  const editorList = await (await fetch(`${origin}/api/bugs`, { headers: { "X-Test-User": "editor" } })).json();
+  assert.equal(editorList.rows.find((row) => row.id === created.id).title, body.title);
   const publish = (visible) => fetch(`${origin}/api/admin/bugs/${created.id}/publication`, { method: "POST", headers: { "Content-Type": "application/json", "X-Test-User": "editor" }, body: JSON.stringify({ visible, reviewed: true, title: "Titre public", description: "Un problème public relu avant sa publication." }) });
   assert.equal((await publish(true)).status, 200); assert.equal(notices.length, 2); assert.equal(notices[1].kind, "bug-published");
   assert.equal((await publish(true)).status, 200); assert.equal((await publish(false)).status, 200); assert.equal(notices.length, 2);

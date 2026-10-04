@@ -40,11 +40,13 @@ try {
   const errors = [];
   async function pageFor(id) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "Europe/Brussels" });
+    context.setDefaultNavigationTimeout(60000);
+    context.setDefaultTimeout(45000);
     if (id) await context.addCookies([{ name: "ktga_session", value: token(id), url: apiOrigin, httpOnly: true, sameSite: "Lax" }]);
     await context.addInitScript(() => localStorage.setItem("ktga-privacy-choice", JSON.stringify({ version: "2026-09-27", chosenAt: Date.now(), enabled: false })));
     const page = await context.newPage(); page.on("pageerror", (error) => errors.push(error.message)); if (blocker) await blocker.enableBlockingInPage(page); return page;
   }
-  const previews = path.join(root, "docs", "previews"); mkdirSync(previews, { recursive: true });
+  const previews = process.env.PREVIEW_DIRECTORY || path.join(root, "docs", "previews"); mkdirSync(previews, { recursive: true });
   async function assertPageFrame(page, selector) {
     const frame = page.locator(selector);
     await frame.waitFor();
@@ -62,6 +64,7 @@ try {
   await form.getByLabel("Description", { exact: true }).fill("Le bouton de lancer ne se réactive pas après le premier lancer.");
   await form.getByLabel("Résultat attendu", { exact: true }).fill("Un deuxième lancer possible");
   await form.getByLabel("Résultat obtenu", { exact: true }).fill("Le bouton reste grisé");
+  await form.getByLabel("Étapes pour reproduire", { exact: true }).fill("Lancer les dés puis cliquer à nouveau sur Lancer.");
   const inputBox = await form.getByLabel("Description", { exact: true }).boundingBox();
   await player.mouse.move(inputBox.x + 30, inputBox.y + 30); await player.mouse.down(); await player.mouse.move(3, 3, { steps: 8 }); await player.mouse.up();
   assert.equal(await form.isVisible(), true, "drag from modal must not close it");
@@ -81,6 +84,13 @@ try {
   const payload = (await noConsentRequest).postDataJSON(); assert.equal(payload.diagnosticConsent, false); assert.ok(!Object.hasOwn(payload, "diagnostics"));
   const submitted = await (await submittedResponse).json(); const principal = submitted.report.id; assert.equal(submitted.report.images.length, 2); assert.equal(submitted.report.diagnostics, null);
   await form.getByRole("heading", { name: `BUG ${principal}`, exact: true }).waitFor();
+  await form.getByRole("link", { name: "Consulter le suivi", exact: true }).click();
+  await player.getByRole("heading", { name: "Le lancer reste bloqué", exact: true }).waitFor();
+  await player.getByText("Un deuxième lancer possible", { exact: true }).waitFor();
+  await player.getByText("Le bouton reste grisé", { exact: true }).waitFor();
+  await player.getByText("Lancer les dés puis cliquer à nouveau sur Lancer.", { exact: true }).waitFor();
+  await player.getByRole("heading", { name: "Contexte privé", exact: true }).waitFor();
+  await player.getByRole("button", { name: "Signaler un bug", exact: true }).click();
   await form.getByRole("button", { name: "Nouveau signalement", exact: true }).click(); await form.getByLabel("Titre", { exact: true }).fill("Lancer bloqué avec diagnostic"); await form.getByLabel("Description", { exact: true }).fill("Le bouton reste bloqué lorsque je relance les dés.");
   await form.getByRole("button", { name: "Diagnostic facultatif", exact: true }).click(); await form.getByRole("checkbox").check();
   await player.evaluate(async () => { window.dispatchEvent(new ErrorEvent("error", { error: new TypeError("SECRET password"), filename: "https://private.invalid/app.js?token=SECRET", lineno: 42 })); const { api } = await import("/ktga/src/api.js"); await api("/api/SECRET?token=SECRET", { background: true }).catch(() => {}); });
@@ -92,7 +102,8 @@ try {
   const dependency = (await request("bob", "/api/bugs", "POST", reportInput("Lancer bloqué avec dépendance"), 201)).report.id;
   await request("editor", `/api/admin/bugs/${duplicate}/relations`, "POST", { targetId: principal, type: "duplicate" });
   await request("editor", `/api/admin/bugs/${dependency}/relations`, "POST", { targetId: principal, type: "depends_on" });
-  await request("bob", `/api/bugs/${principal}`, "GET", undefined, 404);
+  const pendingPublic = await request("bob", `/api/bugs/${principal}`);
+  assert.equal(pendingPublic.privateView, false); assert.equal(pendingPublic.description, ""); assert.equal(pendingPublic.awaitingReview, true);
   const editor = await pageFor("editor"); await editor.goto(`${origin}${base}/admin`, { waitUntil: "domcontentloaded" });
   await editor.getByRole("button", { name: "Signalements de bugs", exact: true }).click();
   await editor.locator(".issue-admin-table tr").filter({ hasText: `BUG ${principal} ·` }).waitFor();
@@ -108,9 +119,12 @@ try {
   await dossier.getByRole("button", { name: "Enregistrer", exact: true }).click(); await dossier.getByText("Modifications enregistrées.", { exact: true }).waitFor();
   await dossier.getByRole("button", { name: "Publication", exact: true }).click();
   await dossier.getByLabel("Titre public", { exact: true }).fill("Un bouton de lancer reste désactivé");
-  await dossier.getByLabel("Description publique", { exact: true }).fill("Après un premier lancer, le bouton peut rester désactivé. Une correction est prévue.");
+  await dossier.getByLabel("Description publique", { exact: true }).fill("Après un premier lancer, le bouton peut rester **désactivé**. Une correction est prévue.\n\n### Reproduction\n\n- Ouvrir la table\n- Lancer les dés\n\n> Le bouton doit redevenir disponible.\n\n[Règles](/ktga/faq)\n\n![Image externe](https://private.invalid/capture.png)\n\n<img src=x onerror=alert(1)>\n\n[URL interdite](javascript:alert(1))");
+  await dossier.getByLabel("Résultat attendu public", { exact: true }).fill("Un deuxième lancer possible");
+  await dossier.getByLabel("Résultat obtenu public", { exact: true }).fill("Le bouton reste grisé");
+  await dossier.getByLabel("Étapes pour reproduire publiques", { exact: true }).fill("Lancer les dés puis cliquer à nouveau sur Lancer.");
   await dossier.getByRole("checkbox", { name: "Publier cette capture", exact: true }).first().check();
-  await dossier.getByRole("checkbox", { name: "Afficher ce bug dans le suivi public", exact: true }).check();
+  await dossier.getByRole("checkbox", { name: "Publier le contenu relu du bug", exact: true }).check();
   await dossier.getByRole("checkbox", { name: /^J’ai vérifié/ }).check();
   await editor.screenshot({ path: path.join(previews, "bugs-admin-publication-desktop.png"), fullPage: true });
   await dossier.getByRole("button", { name: "Enregistrer", exact: true }).click(); await dossier.getByText("Modifications enregistrées.", { exact: true }).waitFor();
@@ -127,7 +141,12 @@ try {
   await editor.getByRole("button", { name: "Modifier en série", exact: true }).click();
   const batch = editor.getByRole("dialog", { name: "Modifier 1 signalements", exact: true }); await batch.getByLabel("Priorité", { exact: true }).selectOption("critical"); await batch.getByRole("button", { name: "Appliquer aux dossiers sélectionnés", exact: true }).click(); await batch.waitFor({ state: "hidden" });
   assert.equal((await request("editor", `/api/bugs/${dependency}`)).priority, "critical");
-  await editor.goto(`${origin}${base}/bugs/${principal}`); await editor.getByRole("button", { name: "Informations privées", exact: true }).click(); await editor.getByText("Dossier privé · réservé aux administrateurs et éditeurs.", { exact: true }).waitFor(); assert.ok((await editor.locator(".issue-page-panel").innerText()).includes("CONFIDENTIAL"));
+  await editor.goto(`${origin}${base}/bugs/${principal}`); await editor.getByText("Dossier privé · réservé aux administrateurs et éditeurs.", { exact: true }).waitFor(); assert.ok((await editor.locator(".issue-page-panel").innerText()).includes("CONFIDENTIAL"));
+  await editor.getByRole("heading", { name: "Résultat attendu", exact: true }).waitFor();
+  await editor.getByRole("heading", { name: "Résultat obtenu", exact: true }).waitFor();
+  await editor.getByRole("heading", { name: "Étapes pour reproduire", exact: true }).waitFor();
+  await editor.getByRole("heading", { name: "Contexte privé", exact: true }).waitFor();
+  await editor.screenshot({ path: path.join(previews, "bugs-private-details-desktop.png"), fullPage: true });
   await editor.goto(`${origin}${base}/admin`); await editor.getByRole("button", { name: /^Studio boutique/ }).click(); await editor.getByRole("button", { name: "Créer un objet", exact: true }).click();
   const studio = editor.locator(".shop-admin-editor"); await studio.getByLabel("Nom de l’élément", { exact: true }).fill("Brouillon conservé");
   const studioField = await studio.getByLabel("Nom de l’élément", { exact: true }).boundingBox(); await editor.mouse.move(studioField.x + 15, studioField.y + 10); await editor.mouse.down(); await editor.mouse.move(2, 2, { steps: 8 }); await editor.mouse.up();
@@ -140,6 +159,13 @@ try {
   await player.screenshot({ path: path.join(previews, "bugs-report-table-fullscreen.png") });
   await player.locator(".issue-form-dialog").getByRole("button", { name: "Fermer", exact: true }).click(); await player.evaluate(() => document.exitFullscreen());
   const visitor = await pageFor(); await visitor.goto(`${origin}${base}/bugs`);
+  await visitor.locator(".issue-list-row").filter({ hasText: `BUG ${dependency}` }).getByText("Signalement en attente de relecture", { exact: true }).waitFor();
+  await visitor.locator(".issue-list-row").filter({ hasText: `BUG ${dependency}` }).click();
+  await visitor.getByText("Ce signalement a été reçu. Son contenu attend une relecture avant publication.", { exact: true }).waitFor();
+  assert.equal(await visitor.getByRole("heading", { name: "Contexte privé", exact: true }).count(), 0);
+  assert.equal(await visitor.getByRole("textbox", { name: "Ajouter une précision", exact: true }).count(), 0);
+  await visitor.screenshot({ path: path.join(previews, "bugs-pending-public-desktop.png"), fullPage: true });
+  await visitor.getByRole("button", { name: "Tous les bugs", exact: true }).click();
   await visitor.getByText("Un bouton de lancer reste désactivé", { exact: true }).waitFor();
   await assertPageFrame(visitor, ".issue-page-panel");
   await visitor.screenshot({ path: path.join(previews, "bugs-public-list-desktop.png"), fullPage: true });
@@ -149,6 +175,16 @@ try {
   await visitor.setViewportSize({ width: 1440, height: 1000 });
   await visitor.getByText("Un bouton de lancer reste désactivé", { exact: true }).click(); await visitor.getByRole("heading", { name: "Un bouton de lancer reste désactivé", exact: true }).waitFor();
   await assertPageFrame(visitor, ".issue-page-panel");
+  await visitor.getByText("Un deuxième lancer possible", { exact: true }).waitFor();
+  await visitor.getByText("Le bouton reste grisé", { exact: true }).waitFor();
+  await visitor.getByText("Lancer les dés puis cliquer à nouveau sur Lancer.", { exact: true }).waitFor();
+  await visitor.locator(".patchnote-markdown strong").getByText("désactivé", { exact: true }).waitFor();
+  assert.equal(await visitor.locator(".patchnote-markdown li").count(), 2);
+  assert.equal(await visitor.locator(".patchnote-markdown blockquote").count(), 1);
+  assert.equal(await visitor.locator(".patchnote-markdown img").count(), 0);
+  assert.equal(await visitor.locator('.patchnote-markdown a[href^="javascript:"]').count(), 0);
+  assert.equal(await visitor.locator(".patchnote-markdown").getByRole("link", { name: "Règles", exact: true }).getAttribute("href"), "/ktga/faq");
+  assert.equal(await visitor.getByRole("heading", { name: "Contexte privé", exact: true }).count(), 0);
   assert.equal(await visitor.getByRole("button", { name: "Informations privées", exact: true }).count(), 0);
   await visitor.screenshot({ path: path.join(previews, "bugs-public-desktop.png"), fullPage: true });
   await visitor.setViewportSize({ width: 390, height: 844 }); await visitor.getByRole("button", { name: "Signaler un bug", exact: true }).click(); await visitor.screenshot({ path: path.join(previews, "bugs-report-mobile.png"), fullPage: true });

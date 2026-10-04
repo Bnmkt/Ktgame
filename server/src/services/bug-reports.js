@@ -43,7 +43,8 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
       title TEXT NOT NULL,category TEXT NOT NULL,description TEXT NOT NULL,expected TEXT NOT NULL,actual TEXT NOT NULL,steps TEXT NOT NULL,
       frequency TEXT NOT NULL,impact TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'received',priority TEXT NOT NULL DEFAULT 'normal',assignee TEXT NOT NULL DEFAULT '',
       group_id INTEGER REFERENCES bug_groups(id) ON DELETE SET NULL,visible INTEGER NOT NULL DEFAULT 0,
-      public_title TEXT NOT NULL DEFAULT '',public_description TEXT NOT NULL DEFAULT '',context TEXT NOT NULL DEFAULT '{}',diagnostics TEXT,
+      public_title TEXT NOT NULL DEFAULT '',public_description TEXT NOT NULL DEFAULT '',
+      public_expected TEXT NOT NULL DEFAULT '',public_actual TEXT NOT NULL DEFAULT '',public_steps TEXT NOT NULL DEFAULT '',context TEXT NOT NULL DEFAULT '{}',diagnostics TEXT,
       consent_at TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL
     );
     INSERT INTO sqlite_sequence(name,seq) SELECT 'bug_reports',1000 WHERE NOT EXISTS(SELECT 1 FROM sqlite_sequence WHERE name='bug_reports');
@@ -67,6 +68,10 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
       actor_id TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS bug_actions_bug ON bug_actions(bug_id,created_at);
   `);
+  const columns = new Set(db.prepare("PRAGMA table_info(bug_reports)").all().map((column) => column.name));
+  for (const column of ["public_expected", "public_actual", "public_steps"]) {
+    if (!columns.has(column)) db.exec(`ALTER TABLE bug_reports ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+  }
   const timestamp = () => new Date(now()).toISOString();
   const rowFor = (id) => db.prepare("SELECT * FROM bug_reports WHERE id=?").get(bugId(id));
   let transactionDepth = 0;
@@ -81,26 +86,28 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
   const owns = (row, viewer, receipt) => Boolean(row && (viewer?.id && row.reporter_id === viewer.id || equalHash(row.receipt_hash, receipt)));
   function get(id, { viewer, receipt, admin = false } = {}) {
     const row = rowFor(id);
-    if (!row || !admin && !row.visible && !owns(row, viewer, receipt)) return null;
+    if (!row) return null;
     const privateView = admin || owns(row, viewer, receipt);
     const report = {
-      id: row.id, code: `BUG ${row.id}`, title: privateView ? row.title : row.public_title, category: row.category,
-      description: privateView ? row.description : row.public_description, status: row.status, priority: row.priority,
+      id: row.id, code: `BUG ${row.id}`, title: privateView ? row.title : row.visible ? row.public_title : "Signalement en attente de relecture", category: row.category,
+      description: privateView ? row.description : row.visible ? row.public_description : "", status: row.status, priority: row.priority,
+      visible: Boolean(row.visible), awaitingReview: !row.visible,
+      expected: privateView ? row.expected : row.visible ? row.public_expected : "", actual: privateView ? row.actual : row.visible ? row.public_actual : "", steps: privateView ? row.steps : row.visible ? row.public_steps : "",
       createdAt: row.created_at, updatedAt: row.updated_at, privateView,
       images: db.prepare(`SELECT id,visible FROM bug_images WHERE bug_id=? ${privateView ? "" : "AND visible=1"}`).all(row.id).map((entry) => ({ id: entry.id, visible: Boolean(entry.visible) })),
-      comments: db.prepare(`SELECT id,kind,body,visible,created_at FROM bug_comments WHERE bug_id=? ${admin ? "" : privateView ? "AND kind!='internal'" : "AND visible=1 AND kind!='internal'"} ORDER BY id DESC LIMIT 100`).all(row.id).reverse().map((entry) => ({ id: entry.id, kind: entry.kind, body: entry.body, visible: Boolean(entry.visible), createdAt: entry.created_at })),
+      comments: db.prepare(`SELECT id,kind,body,visible,created_at FROM bug_comments WHERE bug_id=? ${admin ? "" : privateView ? "AND kind!='internal'" : row.visible ? "AND visible=1 AND kind!='internal'" : "AND 1=0"} ORDER BY id DESC LIMIT 100`).all(row.id).reverse().map((entry) => ({ id: entry.id, kind: entry.kind, body: entry.body, visible: Boolean(entry.visible), createdAt: entry.created_at })),
       links: db.prepare(`SELECT l.source_id,l.target_id,l.type,b.id,b.public_title,b.title,b.visible,b.status FROM bug_links l JOIN bug_reports b ON b.id=CASE WHEN l.source_id=? THEN l.target_id ELSE l.source_id END WHERE (l.source_id=? OR l.target_id=?) ${privateView ? "" : "AND b.visible=1"} ORDER BY b.id LIMIT 100`).all(row.id, row.id, row.id)
         .filter((entry) => admin || entry.visible)
         .map((entry) => ({ id: entry.id, title: admin ? entry.title : entry.public_title, status: entry.status, type: entry.type, direction: entry.source_id === row.id ? "outgoing" : "incoming", sourceId: entry.source_id, targetId: entry.target_id }))
     };
-    if (privateView) Object.assign(report, { expected: row.expected, actual: row.actual, steps: row.steps, frequency: row.frequency, impact: row.impact, context: JSON.parse(row.context), diagnostics: row.diagnostics ? JSON.parse(row.diagnostics) : null, consentAt: row.consent_at, visible: Boolean(row.visible) });
-    if (admin) Object.assign(report, { reporterId: row.reporter_id, assignee: row.assignee, groupId: row.group_id, publicTitle: row.public_title, publicDescription: row.public_description, actions: db.prepare("SELECT kind,body,created_at,actor_id FROM bug_actions WHERE bug_id=? ORDER BY id DESC LIMIT 100").all(row.id) });
+    if (privateView) Object.assign(report, { frequency: row.frequency, impact: row.impact, context: JSON.parse(row.context), diagnostics: row.diagnostics ? JSON.parse(row.diagnostics) : null, consentAt: row.consent_at });
+    if (admin) Object.assign(report, { reporterId: row.reporter_id, assignee: row.assignee, groupId: row.group_id, publicTitle: row.public_title, publicDescription: row.public_description, publicExpected: row.public_expected, publicActual: row.public_actual, publicSteps: row.public_steps, actions: db.prepare("SELECT kind,body,created_at,actor_id FROM bug_actions WHERE bug_id=? ORDER BY id DESC LIMIT 100").all(row.id) });
     return report;
   }
   function list(input = {}, { admin = false, viewer, mine = false } = {}) {
     const clauses = [], params = [];
     if (mine) { clauses.push("reporter_id=?"); params.push(viewer?.id ?? ""); }
-    else if (!admin) clauses.push("visible=1");
+    const titleColumn = admin || mine ? "title" : "CASE WHEN visible=1 THEN public_title ELSE 'Signalement en attente de relecture' END";
     for (const [field, values] of [["status", bugMetadata.statuses], ["priority", bugMetadata.priorities], ["category", bugMetadata.categories]]) {
       if (input[field] && input[field] !== "all") { valid(values, input[field], field); clauses.push(`${field}=?`); params.push(input[field]); }
     }
@@ -108,13 +115,13 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     if (admin && input.assignee) { clauses.push("assignee=?"); params.push(clean(input.assignee, 80)); }
     if (admin && input.group) { clauses.push("group_id=?"); params.push(bugId(input.group)); }
     const query = clean(input.search, 100);
-    if (query) { clauses.push(`(${admin || mine ? "title" : "public_title"} LIKE ? ESCAPE '\\' OR CAST(id AS TEXT)=?)`); params.push(`%${query.replace(/[\\%_]/g, "\\$&")}%`, query.replace(/^BUG\s*/i, "")); }
+    if (query) { clauses.push(`(${titleColumn} LIKE ? ESCAPE '\\' OR CAST(id AS TEXT)=?)`); params.push(`%${query.replace(/[\\%_]/g, "\\$&")}%`, query.replace(/^BUG\s*/i, "")); }
     const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
     const totalItems = db.prepare(`SELECT COUNT(*) AS count FROM bug_reports ${where}`).get(...params).count;
     const pageSize = [20, 50, 100].includes(Number(input.pageSize)) ? Number(input.pageSize) : 20;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const page = Math.max(1, Math.min(totalPages, Math.trunc(Number(input.page) || 1)));
-    const rows = db.prepare(`SELECT id,${admin || mine ? "title" : "public_title"} AS title,category,status,priority,visible,created_at,updated_at${admin ? ",assignee,group_id,(SELECT COUNT(*) FROM bug_comments c WHERE c.bug_id=bug_reports.id AND c.visible=0 AND c.kind!='internal') AS pending_comments" : ""} FROM bug_reports ${where} ORDER BY updated_at DESC,id DESC LIMIT ? OFFSET ?`).all(...params, pageSize, (page - 1) * pageSize).map((row) => ({ ...row, code: `BUG ${row.id}`, visible: Boolean(row.visible) }));
+    const rows = db.prepare(`SELECT id,${titleColumn} AS title,category,status,priority,visible,created_at,updated_at${admin ? ",assignee,group_id,(SELECT COUNT(*) FROM bug_comments c WHERE c.bug_id=bug_reports.id AND c.visible=0 AND c.kind!='internal') AS pending_comments" : ""} FROM bug_reports ${where} ORDER BY updated_at DESC,id DESC LIMIT ? OFFSET ?`).all(...params, pageSize, (page - 1) * pageSize).map((row) => ({ ...row, code: `BUG ${row.id}`, visible: Boolean(row.visible) }));
     return { rows, totalItems, totalPages, page, pageSize };
   }
   function stageImage(body) {
@@ -178,11 +185,12 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     if (!row) throw new Error("Bug introuvable.");
     const visible = input.visible === true;
     const title = redactBugPublicText(input.title, 160), description = redactBugPublicText(input.description, 6000);
+    const expected = redactBugPublicText(input.expected ?? row.public_expected, 3000), actual = redactBugPublicText(input.actual ?? row.public_actual, 3000), steps = redactBugPublicText(input.steps ?? row.public_steps, 5000);
     if (visible && (input.reviewed !== true || title.length < 4 || description.length < 20)) throw new Error("Relis et valide les textes publics avant publication.");
     const images = Array.isArray(input.imageIds) ? [...new Set(input.imageIds)] : [];
     if (images.length > 6 || images.some((image) => !db.prepare("SELECT 1 FROM bug_images WHERE id=? AND bug_id=?").get(image, row.id))) throw new Error("Capture invalide.");
     transaction(() => {
-      db.prepare("UPDATE bug_reports SET visible=?,public_title=?,public_description=?,updated_at=? WHERE id=?").run(visible ? 1 : 0, title, description, timestamp(), row.id);
+      db.prepare("UPDATE bug_reports SET visible=?,public_title=?,public_description=?,public_expected=?,public_actual=?,public_steps=?,updated_at=? WHERE id=?").run(visible ? 1 : 0, title, description, expected, actual, steps, timestamp(), row.id);
       db.prepare("UPDATE bug_images SET visible=0 WHERE bug_id=?").run(row.id);
       if (visible) for (const image of images) db.prepare("UPDATE bug_images SET visible=1 WHERE id=?").run(image);
       audit(row.id, actor, "publication", visible ? "Version publique relue et publiée ; diagnostics et contexte privés." : "Publication retirée.");
@@ -293,7 +301,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     const row = db.prepare("SELECT * FROM bug_images WHERE id=? AND bug_id IS NOT NULL").get(clean(id, 80));
     if (!row) return null;
     const report = get(row.bug_id, options);
-    if (!report || !report.privateView && !row.visible) return null;
+    if (!report || !report.privateView && (!report.visible || !row.visible)) return null;
     return { path: path.resolve(uploadDirectory, row.filename), mimeType: "image/png" };
   }
   function prune() {

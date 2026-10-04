@@ -34,7 +34,7 @@ export function registerBugReportRoutes({ app, auth, requireBackOffice, store, i
   app.get("/api/bugs", wrap((req, res) => {
     const user = viewer(req), mine = req.query.mine === "true";
     if (mine && !user?.id) return res.status(401).json({ error: "Connecte-toi pour consulter tes signalements." });
-    res.json(store.list(req.query, { viewer: user, mine }));
+    res.json(store.list(req.query, { viewer: user, mine, admin: Boolean(user?.admin || user?.editor) }));
   }));
   app.get("/api/bugs/images/:id", wrap((req, res) => {
     const image = store.image(req.params.id, access(req));
