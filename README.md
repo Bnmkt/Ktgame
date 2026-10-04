@@ -74,6 +74,10 @@ L'administration permet de gérer les joueurs, les jeux, les objets de la boutiq
 
 Dans **Supervision > Statut public**, les incidents détectés sont regroupés par service et par épisode. Leur description automatique et leur diagnostic restent privés ; l'administration peut ajouter une analyse en Markdown, suivre les actions et clôturer le dossier. Le retour à la normale et la clôture du suivi sont indépendants. Un incident public doit être publié explicitement.
 
+Les onglets de services, les filtres de gravité et d'état et la sélection par page permettent de modifier jusqu'à 100 dossiers en série. Le classement sans suite exige un justificatif libre ou prédéfini (prestataire externe, refus SMTP, anomalie ponctuelle, maintenance, doublon). Les notes sont ajoutées par défaut, sans remplacer celles de chaque dossier ; toutes les modifications sont historisées. Ces dossiers ne sont pas publiés dans l'historique public. Un clic sur leur segment anormal affiche « En investigation » et rouvre le suivi privé, sans exposer ses notes ou son justificatif et sans changer la disponibilité mesurée. Les clics répétés ne créent pas de nouvelles entrées de suivi tant que le dossier est déjà en investigation.
+
+Sur Windows, `couper-serveur.cmd` force l'arrêt du serveur même sans `.server.pid`. Il vérifie le chemin du programme ; pour un lancement relatif, il contrôle aussi le port configuré et l'identité du service sur la boucle locale. Les autres programmes Node ne sont pas arrêtés. Une simulation est disponible avec `powershell.exe -NoProfile -ExecutionPolicy Bypass -File server/scripts/stop-server.ps1 -WhatIf`.
+
 Les anciens relevés conservés sont repris au premier démarrage de cette version, avec des heures approximatives. Pour les emails, une vérification réussie est conservée quinze minutes ; un échec est revérifié après une minute. Les codes SMTP utiles sont conservés côté administration, sans identifiants de connexion.
 
 ---

@@ -2730,6 +2730,12 @@ app.get("/api/status", (req, res) => {
   res.json(statusMonitor.payload(req.query.days));
 });
 
+app.post("/api/status/investigate", rateLimit({ windowMs: 60000, limit: 10, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Trop de demandes d’investigation. Réessaie dans une minute." } }), (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try { res.json(statusMonitor.investigate(req.body ?? {})); }
+  catch (error) { res.status(400).json({ error: error.message }); }
+});
+
 app.get("/api/patchnotes/images/:id", (req, res) => {
   const image = patchnotes.attachment(req.params.id);
   if (!image || !fs.existsSync(image.path)) return res.status(404).json({ error: "Image introuvable." });
@@ -4917,7 +4923,18 @@ app.get("/api/admin/status", auth, requireAdmin, (_req, res) => {
 
 app.get("/api/admin/status/detections", auth, requireAdmin, (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.json(statusMonitor.detections.list(req.query));
+  try { res.json(statusMonitor.detections.list(req.query)); }
+  catch (error) { res.status(400).json({ error: error.message }); }
+});
+
+app.post("/api/admin/status/detections/batch", auth, requireAdmin, (req, res) => {
+  try { res.json(statusMonitor.detections.batch(req.body?.ids, req.body?.changes ?? {}, req.auth.id)); }
+  catch (error) { res.status(400).json({ error: error.message }); }
+});
+
+app.get("/api/admin/status/detections/:id/history", auth, requireAdmin, (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ actions: statusMonitor.detections.history(req.params.id) });
 });
 
 app.patch("/api/admin/status/detections/:id", auth, requireAdmin, (req, res) => {

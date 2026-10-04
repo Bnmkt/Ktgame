@@ -309,25 +309,31 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
     return incidentRows().find((incident) => incident.id === id);
   }
 
-  function payload(days, { includeFutureUpdates = false } = {}) {
+  function timelinePeriod(days) {
     const settings = statusSettings();
     const rangeDays = Math.max(1, Math.min(settings.historyDays, Math.trunc(Number(days) || settings.historyDays)));
     const timestamp = now();
     const start = new Date(timestamp - (rangeDays - 1) * 86400000);
     start.setUTCHours(0, 0, 0, 0);
-    const rows = db.prepare("SELECT * FROM status_slots WHERE bucket_at >= ? ORDER BY bucket_at ASC").all(start.toISOString());
-    const monitoringSince = db.prepare("SELECT MIN(bucket_at) AS at FROM status_slots").get()?.at ?? null;
-    const incidents = incidentRows({ includeFutureUpdates });
-    const activeIncidents = incidents.filter((incident) => incident.state === "in_progress");
-    const dates = Array.from({ length: rangeDays }, (_, index) => new Date(start.getTime() + index * 86400000).toISOString().slice(0, 10));
     const displayIntervalMinutes = rangeDays <= SHORT_RANGE_DAYS
       ? Math.min(settings.displayIntervalMinutes, SHORT_RANGE_INTERVAL_MINUTES)
       : settings.displayIntervalMinutes;
     const intervalMs = displayIntervalMinutes * 60000;
     const timelineStart = Math.floor(start.getTime() / intervalMs) * intervalMs;
     const timelineEnd = Math.floor(timestamp / intervalMs) * intervalMs;
+    return { settings, rangeDays, timestamp, start, displayIntervalMinutes, intervalMs, timelineStart, timelineEnd };
+  }
+
+  function payload(days, { includeFutureUpdates = false } = {}) {
+    const { settings, rangeDays, timestamp, start, displayIntervalMinutes, intervalMs, timelineStart, timelineEnd } = timelinePeriod(days);
+    const rows = db.prepare("SELECT * FROM status_slots WHERE bucket_at >= ? ORDER BY bucket_at ASC").all(start.toISOString());
+    const monitoringSince = db.prepare("SELECT MIN(bucket_at) AS at FROM status_slots").get()?.at ?? null;
+    const incidents = incidentRows({ includeFutureUpdates });
+    const activeIncidents = incidents.filter((incident) => incident.state === "in_progress");
+    const dates = Array.from({ length: rangeDays }, (_, index) => new Date(start.getTime() + index * 86400000).toISOString().slice(0, 10));
     const timeline = [];
     for (let at = timelineStart; at <= timelineEnd; at += intervalMs) timeline.push({ at: new Date(at).toISOString(), components: {} });
+    const investigationRanges = detections.publicRanges(new Date(timelineStart).toISOString(), new Date(timelineEnd + intervalMs).toISOString());
     const timelineIncidents = incidents.filter((incident) => {
       if (!["in_progress", "completed"].includes(incident.state) || !incident.scheduledAt) return false;
       const affectedAt = Date.parse(incident.scheduledAt);
@@ -383,6 +389,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
           uptime: known.length ? (known.length - outages) / known.length * 100 : null,
           samples,
           latencyMs: samples ? slotRows.reduce((sum, row) => sum + Number(row.latency_sum || 0), 0) / samples : null,
+          investigation: Boolean(outages || degraded) && investigationRanges.some((entry) => entry.component_id === definition.id && Date.parse(entry.first_at) < Date.parse(point.at) + intervalMs && Date.parse(entry.last_at) >= Date.parse(point.at)),
           incidentIds: timelineIncidents.filter((entry) => {
             if (!entry.components.includes(definition.id)) return false;
             const pointStart = Date.parse(point.at);
@@ -423,7 +430,19 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
     };
   }
 
+  function investigate({ component, at, days } = {}) {
+    if (!componentIds.has(component) || typeof at !== "string" || !Number.isFinite(Date.parse(at))) throw new Error("Relevé invalide.");
+    const { intervalMs, timelineStart, timelineEnd } = timelinePeriod(days);
+    const timestamp = Date.parse(at);
+    if (timestamp < timelineStart || timestamp > timelineEnd || timestamp % intervalMs || new Date(timestamp).toISOString() !== at) throw new Error("Relevé invalide.");
+    const end = new Date(timestamp + intervalMs).toISOString();
+    const anomaly = db.prepare("SELECT 1 FROM status_slots WHERE component_id=? AND bucket_at>=? AND bucket_at<? AND worst_status IN ('outage','degraded') LIMIT 1").get(component, at, end);
+    const affected = anomaly && detections.publicRanges(at, end).some((row) => row.component_id === component);
+    if (!affected) throw new Error("Ce relevé ne correspond pas à un dossier classé sans suite.");
+    return detections.reopenPublic(component, at, end);
+  }
+
   prune();
-  return { recordSnapshot, backfillDowntime, prune, payload, statusSettings, updateStatusSettings, incidentRows, createIncident, updateIncident, detections, close: () => db.close() };
+  return { recordSnapshot, backfillDowntime, prune, payload, investigate, statusSettings, updateStatusSettings, incidentRows, createIncident, updateIncident, detections, close: () => db.close() };
 }
 

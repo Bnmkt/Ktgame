@@ -76,9 +76,14 @@ test("les anciens relevés sont repris une seule fois, sans perdre les notes au 
     assert.match(row.description, /approximatives/);
     assert.ok(row.recovered_at);
     monitor.detections.update(row.id, { notes: "Revue historique", state: "closed" }, "admin");
-    monitor.close(); monitor = createStatusMonitor({ filename });
+    monitor.close(); monitor = null;
+    const previousSchema = new DatabaseSync(filename);
+    previousSchema.exec("ALTER TABLE status_detections DROP COLUMN dismissal_reason; ALTER TABLE status_detections DROP COLUMN dismissed_at; ALTER TABLE status_detections DROP COLUMN public_reopened_at;");
+    previousSchema.close();
+    monitor = createStatusMonitor({ filename });
     assert.equal(monitor.detections.list({ state: "all" }).totalItems, 1);
     assert.equal(monitor.detections.list({ state: "closed" }).rows[0].notes, "Revue historique");
+    assert.equal(monitor.detections.list({ state: "closed" }).rows[0].dismissal_reason, "");
   } finally {
     monitor?.close();
     const resolved = path.resolve(directory);
@@ -137,4 +142,99 @@ test("la sonde SMTP retente les échecs après une minute et garde les succès q
   assert.equal(smtpDiagnostic({ code: "secret@example.com", command: "AUTH user:password", error: "secret" }).includes("secret"), false);
   const inactive = createEmailStatusProbe({ verify: async () => ({ configured: false, ok: false }) });
   assert.equal((await inactive()).status, "unknown");
+});
+
+test("les filtres par service, gravité et état conservent des comptes cohérents", () => {
+  const timestamp = Date.parse("2026-10-04T08:30:00Z");
+  const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });
+  try {
+    monitor.recordSnapshot([{ id: "email", status: "outage" }, { id: "api", status: "degraded" }], timestamp);
+    const email = monitor.detections.list({ component: "email" }).rows[0];
+    assert.throws(() => monitor.detections.update(email.id, { state: "dismissed" }, "admin"), /justificatif/);
+    const dismissed = monitor.detections.update(email.id, { state: "dismissed", dismissal_reason: "Prestataire externe." }, "admin");
+    assert.ok(dismissed.dismissed_at);
+    assert.equal(dismissed.closed_at, null);
+    assert.equal(monitor.detections.summary().pending, 1);
+    assert.equal(monitor.detections.list().totalItems, 1);
+    assert.equal(monitor.detections.list({ state: "closed" }).totalItems, 0);
+    assert.equal(monitor.detections.list({ state: "dismissed" }).totalItems, 1);
+    const filtered = monitor.detections.list({ state: "all", component: "email", severity: "outage" });
+    assert.deepEqual({ ...filtered.counts }, { email: 1 });
+    assert.equal(filtered.totalItems, 1);
+    assert.equal(monitor.detections.list({ state: "all", component: "email", severity: "degraded" }).totalItems, 0);
+    assert.ok(filtered.dismissalPresets.find((entry) => entry.id === "provider"));
+    for (const input of [{ component: "invalid" }, { severity: "invalid" }, { state: "invalid" }]) assert.throws(() => monitor.detections.list(input), /invalide/);
+  } finally { monitor.close(); }
+});
+
+test("les modifications groupées sont atomiques, conservent les titres et ajoutent les notes par défaut", () => {
+  const timestamp = Date.parse("2026-10-04T08:30:00Z");
+  const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });
+  try {
+    monitor.recordSnapshot([{ id: "email", status: "outage" }, { id: "api", status: "degraded" }], timestamp);
+    const rows = monitor.detections.list().rows;
+    const ids = rows.map((row) => row.id);
+    monitor.detections.update(ids[0], { notes: "Vérification initiale." }, "admin");
+    assert.throws(() => monitor.detections.batch(ids, { state: "closed" }, "admin"), /conclusion/);
+    assert.equal(monitor.detections.list().rows.every((row) => row.state === "open"), true);
+    assert.throws(() => monitor.detections.batch([...ids, "missing"], { state: "in_progress" }, "admin"), /Aucun changement/);
+    assert.throws(() => monitor.detections.batch(ids, { state: "dismissed", dismissal_reason: " " }, "admin"), /justificatif/);
+    assert.throws(() => monitor.detections.batch([], { state: "open" }, "admin"), /100/);
+    assert.throws(() => monitor.detections.batch(Array(101).fill(ids[0]), { state: "open" }, "admin"), /100/);
+    assert.throws(() => monitor.detections.batch(ids, { title: "Commun" }, "admin"), /individuellement/);
+    assert.throws(() => monitor.detections.batch(ids, {}, "admin"), /modification/);
+    assert.equal(monitor.detections.history(ids[0]).length, 1);
+    assert.deepEqual(monitor.detections.batch([...ids, ids[0]], { state: "dismissed", notes: "Fournisseur sollicité.", dismissal_reason: "Incident externe." }, "admin"), { updated: 2 });
+    const dismissed = monitor.detections.list({ state: "dismissed" }).rows;
+    assert.equal(dismissed.find((row) => row.id === ids[0]).notes, "Vérification initiale.\n\nFournisseur sollicité.");
+    assert.deepEqual(dismissed.map((row) => row.title), rows.map((row) => row.title));
+    monitor.detections.batch(ids, { state: "closed", notesMode: "replace", notes: "Conclusion." }, "admin");
+    assert.equal(monitor.detections.list({ state: "closed" }).rows.every((row) => row.notes === "Conclusion."), true);
+    const history = monitor.detections.history(ids[0]);
+    assert.equal(history.length, 3);
+    assert.match(history[1].notes, /Vérification initiale/);
+    monitor.detections.update(ids[0], { notes: "x".repeat(7999) }, "admin");
+    assert.throws(() => monitor.detections.batch(ids, { notes: "Note supplémentaire." }, "admin"), /8 000/);
+    assert.equal(monitor.detections.list({ state: "closed" }).rows.find((row) => row.id === ids[1]).notes, "Conclusion.");
+  } finally { monitor.close(); }
+});
+
+test("un clic public rouvre uniquement les dossiers sans suite du segment anormal, sans exposer leur justification", () => {
+  let timestamp = Date.parse("2026-10-03T22:32:00Z");
+  const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });
+  try {
+    monitor.updateStatusSettings({ historyDays: 90, displayIntervalMinutes: 15 });
+    monitor.recordSnapshot([{ id: "email", status: "outage", diagnostic: "EAUTH privé" }, { id: "api", status: "degraded" }], timestamp);
+    const row = monitor.detections.list().rows.find((entry) => entry.component_id === "email");
+    const apiRow = monitor.detections.list().rows.find((entry) => entry.component_id === "api");
+    timestamp += 60000;
+    monitor.recordSnapshot([{ id: "email", status: "operational" }], timestamp);
+    timestamp = Date.parse("2026-10-04T10:00:00Z");
+    monitor.recordSnapshot([{ id: "email", status: "operational" }], timestamp);
+    monitor.detections.update(row.id, { state: "dismissed", notes: "Analyse privée.", dismissal_reason: "Refus OVH, détail privé." }, "admin");
+    monitor.detections.update(apiRow.id, { state: "dismissed", dismissal_reason: "Autre dossier." }, "admin");
+    const data = monitor.payload(7);
+    assert.equal(data.history.length, 0);
+    assert.equal(data.incidents.length, 0);
+    const clickable = data.timeline.filter((point) => point.components.email.investigation);
+    assert.equal(clickable.length, 1);
+    assert.equal(clickable[0].at, "2026-10-03T22:30:00.000Z");
+    for (const secret of [row.id, "Analyse privée", "Refus OVH", "EAUTH"]) assert.equal(JSON.stringify(data).includes(secret), false);
+    assert.throws(() => monitor.investigate({ component: "games", at: clickable[0].at, days: 7 }), /ne correspond/);
+    assert.throws(() => monitor.investigate({ component: "email", at: "2026-10-04T10:00:00.000Z", days: 7 }), /ne correspond/);
+    assert.throws(() => monitor.investigate({ component: "invalid", at: "invalid" }), /invalide/);
+    assert.equal(monitor.detections.list().totalItems, 0);
+    assert.deepEqual(monitor.investigate({ component: "email", at: clickable[0].at, days: 7 }), { state: "in_progress" });
+    const reopened = monitor.detections.list().rows[0];
+    assert.equal(reopened.dismissal_reason, "Refus OVH, détail privé.");
+    assert.equal(reopened.notes, "Analyse privée.");
+    assert.equal(reopened.public_reopened_at, new Date(timestamp).toISOString());
+    assert.equal(monitor.detections.list({ state: "dismissed" }).rows[0].id, apiRow.id);
+    assert.equal(monitor.detections.history(row.id).at(0).created_by, "public-status");
+    monitor.investigate({ component: "email", at: clickable[0].at, days: 7 });
+    assert.equal(monitor.detections.history(row.id).length, 2);
+    assert.equal(monitor.payload(7).timeline.filter((point) => point.components.email.investigation).length, 1);
+    monitor.detections.update(row.id, { state: "closed" }, "admin");
+    assert.equal(monitor.payload(7).timeline.some((point) => point.components.email.investigation), false);
+  } finally { monitor.close(); }
 });

@@ -46,6 +46,17 @@ function StatusTimeline({ data }) {
     const timeline = scrollRef.current;
     if (timeline) timeline.scrollLeft = timeline.scrollWidth - timeline.clientWidth;
   }, [data.rangeDays]);
+  async function openJustification(component, point, incidents) {
+    const investigation = Boolean(point.components[component.id].investigation);
+    setSelectedJustification({ component, point, incidents, investigation, pending: investigation });
+    if (!investigation) return;
+    try {
+      await api("/api/status/investigate", { method: "POST", body: JSON.stringify({ component: component.id, at: point.at, days: data.rangeDays }), background: true });
+      setSelectedJustification((current) => current?.point.at === point.at && current.component.id === component.id ? { ...current, pending: false } : current);
+    } catch (failure) {
+      setSelectedJustification((current) => current?.point.at === point.at && current.component.id === component.id ? { ...current, pending: false, error: failure.message } : current);
+    }
+  }
   return <div className="status-timeline-matrix">
     <div className="status-timeline-labels"><div className="status-timeline-label-heading">Service</div>{data.components.map((component) => { const Icon = componentIcons[component.id] ?? Server; return <div className="status-timeline-label" key={component.id}><span><Icon size={19} /></span><div><h3>{component.name}</h3><StatusBadge status={component.status} /><strong>{formatUptime(component.uptime)}</strong></div></div>; })}</div>
     <div ref={scrollRef} className="status-timeline-scroll" tabIndex="0" aria-label={`Historique synchronisé sur ${data.rangeDays} jours`}>
@@ -54,15 +65,16 @@ function StatusTimeline({ data }) {
         {data.components.map((component) => <div className="status-timeline-row" style={timelineGridStyle} key={component.id}>{data.timeline.map((point) => {
           const value = point.components[component.id];
           const incidents = (value.incidentIds ?? []).map((id) => data.justifications?.find((incident) => incident.id === id)).filter(Boolean);
-          const title = `${formatDate(point.at, true)} · ${statusMeta[value.status]?.label ?? value.status}${value.uptime == null ? "" : ` · ${formatUptime(value.uptime)}`}${value.latencyMs == null ? "" : ` · ${Math.round(value.latencyMs)} ms`}${incidents.length ? " · Justification disponible" : ""}`;
-          return incidents.length
-            ? <button type="button" key={point.at} className={`status-day status-${value.status} has-justification`} title={title} aria-label={`${component.name}, ${title}`} onClick={() => setSelectedJustification({ component, point, incidents })} />
+          const title = `${formatDate(point.at, true)} · ${statusMeta[value.status]?.label ?? value.status}${value.uptime == null ? "" : ` · ${formatUptime(value.uptime)}`}${value.latencyMs == null ? "" : ` · ${Math.round(value.latencyMs)} ms`}${incidents.length ? " · Justification disponible" : value.investigation ? " · Consulter le suivi" : ""}`;
+          return incidents.length || value.investigation
+            ? <button type="button" key={point.at} className={`status-day status-${value.status} has-justification`} title={title} aria-label={`${component.name}, ${title}`} onClick={() => openJustification(component, point, incidents)} />
             : <span key={point.at} className={`status-day status-${value.status}`} title={title} />;
         })}</div>)}
       </div>
     </div>
-    {selectedJustification && <Dialog title="Justification du relevé" className="status-justification-dialog" onClose={() => setSelectedJustification(null)}>
+    {selectedJustification && <Dialog title={selectedJustification.investigation ? "En investigation" : "Justification du relevé"} className="status-justification-dialog" onClose={() => setSelectedJustification(null)}>
       <div className="status-justification-context"><strong>{selectedJustification.component.name}</strong><span>Segment du {formatDate(selectedJustification.point.at, true)}</span></div>
+      {selectedJustification.investigation && <div className="status-investigation-message">{selectedJustification.pending ? <p role="status">Transmission du relevé à l’équipe…</p> : selectedJustification.error ? <><p role="alert" className="error">{selectedJustification.error}</p><button type="button" className="secondary" onClick={() => openJustification(selectedJustification.component, selectedJustification.point, selectedJustification.incidents)}><RefreshCw size={16} />Réessayer</button></> : <p>Une anomalie a été relevée sur ce service. Le suivi est en investigation par l’équipe. Des informations seront publiées lorsqu’elles seront disponibles.</p>}</div>}
       <div className="status-justification-list">{selectedJustification.incidents.map((incident) => <Incident key={incident.id} incident={incident} components={data.components} />)}</div>
     </Dialog>}
   </div>;

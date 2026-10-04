@@ -23,9 +23,44 @@
 .status-detection-observation { border-left: 3px solid #78bea7; padding-left: 14px; }
 .status-detection-warning { align-items: start; color: #efc777; display: flex; font-size: 13px; gap: 8px; }
 .status-detection-warning svg { flex-shrink: 0; }
+.status-detection-types { overflow-x: auto; }
+.status-detection-types button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; white-space: nowrap; }
+.status-detection-types button span { color: #c2ccb9; font-size: 12px; }
+.status-detection-filters { display: flex; flex-wrap: wrap; gap: 12px; }
+.status-detection-filters label { display: grid; gap: 6px; font-size: 13px; min-width: 200px; }
+.status-detection-kind { display: grid; gap: 6px; min-width: 0; }
+.status-detection-kind > span { font-size: 13px; font-weight: 800; }
+.status-detection-kind .segmented-tabs { overflow-x: auto; padding: 3px; }
+.status-detection-kind .segmented-tabs button { font-size: 13px; min-height: 34px; white-space: nowrap; }
+.status-detection-filters select, .status-detection-dialog select { background: #192220; border: 1px solid #465347; border-radius: 6px; color: #f4e8cb; font: inherit; min-height: 42px; min-width: 0; padding: 8px 12px; }
+.status-detection-filters select:focus-visible, .status-detection-dialog select:focus-visible { outline: 2px solid #cda54a; outline-offset: 2px; }
+.status-detection-selection { align-items: center; border-block: 1px solid #3b4338; display: flex; flex-wrap: wrap; gap: 12px 20px; padding: 12px 0; }
+.status-detection-selection > label { align-items: center; display: flex; gap: 8px; }
+.status-detection-selection > span { color: #b9c8bd; font-size: 13px; }
+.status-detection-selection .actions { margin-left: auto; flex-wrap: wrap; }
+.status-detection-selection input, .status-detection-pick input { accent-color: #ddb34a; flex: 0 0 18px; height: 18px; margin: 0; width: 18px; }
+.status-detection-pick { padding-top: 2px; }
+.status-detection-row-title { flex: 1; min-width: 0; }
+.status-detection-row.is-selected { border-color: #d6ad49; }
+.status-detection-reason { display: grid; gap: 12px; }
+.status-detection-reason-summary { border-left: 2px solid #dbb65c; color: #c8d1c4; font-size: 14px; padding-left: 12px; }
+.status-detection-reason-summary strong { font-size: 13px; color: #ebcd82; }
+.status-detection-notice { color: #91d9bd; font-size: 13px; }
+.status-detection-batch-list { color: #c8d1c4; font-size: 13px; margin: 0; max-height: 140px; overflow-y: auto; padding-left: 20px; }
+.status-detection-history summary { cursor: pointer; color: #ecd18c; }
+.status-detection-history ol { padding-left: 20px; }
+.status-detection-history li { border-bottom: 1px solid #3b4338; font-size: 13px; margin-bottom: 12px; padding-bottom: 12px; }
+.status-detection-history small { display: block; color: #a6b9ae; margin-top: 6px; }
 @media (max-width: 600px) {
   .status-detection-row { padding: 14px; }
   .status-detection-row header { flex-wrap: wrap; }
   .status-detection-row .actions button { width: 100%; }
-  .status-detection-section .segmented-tabs { flex-wrap: wrap; }
+  .status-detection-section .segmented-tabs { flex-wrap: nowrap; }
+  .status-detection-filters label { flex: 1; min-width: 0; }
+  .status-detection-kind { width: 100%; }
+  .status-detection-filters select { width: 100%; }
+  .status-detection-state { white-space: normal; }
+  .status-detection-selection .actions { display: grid; grid-template-columns: 1fr; width: 100%; margin-left: 0; }
+  .status-detection-dialog .actions { display: grid; grid-template-columns: 1fr; }
+  .status-detection-dialog .actions button { min-height: 42px; white-space: normal; width: 100%; }
 }
