@@ -200,6 +200,9 @@ function mailTransport(environment = process.env) {
     host: environment.SMTP_HOST,
     port: Number(environment.SMTP_PORT || 587),
     secure: String(environment.SMTP_SECURE ?? "").toLowerCase() === "true",
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     ...(environment.SMTP_USER ? { auth: { user: environment.SMTP_USER, pass: environment.SMTP_PASS } } : {})
   });
   return transport;
@@ -215,7 +218,7 @@ export async function verifyEmailDelivery(environment = process.env) {
     await mailTransport(environment).verify();
     return { configured: true, ok: true };
   } catch (error) {
-    return { configured: true, ok: false, error: error instanceof Error ? error.message : String(error) };
+    return { configured: true, ok: false, error: error instanceof Error ? error.message : String(error), code: error.code, command: error.command, responseCode: error.responseCode };
   }
 }
 

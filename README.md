@@ -72,6 +72,10 @@ Ils peuvent continuer à fonctionner après l'atteinte de leur objectif principa
 
 L'administration permet de gérer les joueurs, les jeux, les objets de la boutique, les succès, les événements, les statistiques et les informations techniques du serveur.
 
+Dans **Supervision > Statut public**, les incidents détectés sont regroupés par service et par épisode. Leur description automatique et leur diagnostic restent privés ; l'administration peut ajouter une analyse en Markdown, suivre les actions et clôturer le dossier. Le retour à la normale et la clôture du suivi sont indépendants. Un incident public doit être publié explicitement.
+
+Les anciens relevés conservés sont repris au premier démarrage de cette version, avec des heures approximatives. Pour les emails, une vérification réussie est conservée quinze minutes ; un échec est revérifié après une minute. Les codes SMTP utiles sont conservés côté administration, sans identifiants de connexion.
+
 ---
 
 ## 🃏 Jeux disponibles

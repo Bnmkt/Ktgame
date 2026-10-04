@@ -1,0 +1,31 @@
+.status-detection-section { border-top: 1px solid #3c433b; display: grid; gap: 16px; padding-top: 24px; }
+.status-detection-section .admin-form-heading { align-items: start; display: flex; gap: 12px; justify-content: space-between; }
+.status-detection-section .admin-form-heading p { max-width: 760px; }
+.status-detection-list { display: grid; gap: 12px; }
+.status-detection-row { background: #101817; border: 1px solid #3b4338; border-radius: 6px; min-width: 0; padding: 18px; }
+.status-detection-row header { align-items: start; display: flex; gap: 12px; justify-content: space-between; }
+.status-detection-row h4 { color: #f6e7c3; font-size: 17px; margin: 8px 0 14px; overflow-wrap: anywhere; }
+.status-detection-severity { align-items: center; display: inline-flex; font-size: 12px; gap: 6px; }
+.status-detection-severity.severity-outage { color: #fa9caa; }
+.status-detection-severity.severity-degraded { color: #e6bd60; }
+.status-detection-state { color: #d6cda9; font-size: 12px; white-space: nowrap; }
+.status-detection-row dl { display: flex; flex-wrap: wrap; gap: 14px 32px; margin: 0 0 16px; }
+.status-detection-row dt { color: #a6b9ae; font-size: 12px; margin-bottom: 4px; }
+.status-detection-row dd { color: #f0e4c6; font-size: 13px; margin: 0; }
+.status-detection-description, .status-detection-observation p { color: #bdcbbf; font-size: 14px; line-height: 1.6; white-space: pre-line; }
+.status-detection-diagnostic, .status-detection-observation code { color: #a9d9ee; font-size: 13px; overflow-wrap: anywhere; }
+.status-detection-row .actions { flex-wrap: wrap; margin-top: 14px; }
+.status-detection-row .actions small { color: #a6b9ae; }
+.status-detection-dialog { max-width: 760px; }
+.status-detection-dialog form { display: grid; gap: 16px; }
+.status-detection-dialog label { display: grid; gap: 7px; }
+.status-detection-dialog input, .status-detection-dialog select, .status-detection-dialog textarea { width: 100%; }
+.status-detection-observation { border-left: 3px solid #78bea7; padding-left: 14px; }
+.status-detection-warning { align-items: start; color: #efc777; display: flex; font-size: 13px; gap: 8px; }
+.status-detection-warning svg { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .status-detection-row { padding: 14px; }
+  .status-detection-row header { flex-wrap: wrap; }
+  .status-detection-row .actions button { width: 100%; }
+  .status-detection-section .segmented-tabs { flex-wrap: wrap; }
+}

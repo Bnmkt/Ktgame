@@ -106,6 +106,7 @@ import {
   verifyUserMfa
 } from "./services/account-security.js";
 import { createStatusMonitor } from "./services/status-monitor.js";
+import { createEmailStatusProbe, smtpDiagnostic } from "./services/email-status-probe.js";
 import { createPatchnoteStore } from "./services/patchnotes.js";
 import { createHelpStore } from "./services/help-content.js";
 import { createTribunalStore, tribunalCategories } from "./services/tribunal.js";
@@ -1029,8 +1030,10 @@ setInterval(collectServerHealthSample, 5000).unref();
 
 const STATUS_PROBE_INTERVAL_MS = Math.max(30000, Number(process.env.STATUS_PROBE_INTERVAL_MS) || 60000);
 let statusProbeRunning = false;
-let lastEmailProbeAt = 0;
-let cachedEmailProbe = { configured: emailDeliveryConfigured(), ok: false };
+const emailStatusProbe = createEmailStatusProbe({
+  verify: verifyEmailDelivery,
+  onFailure: (result) => requestLogs.append({ category: "status", level: "error", method: "SYSTEM", route: "status/email", message: smtpDiagnostic(result) })
+});
 let lastStatusPruneAt = 0;
 
 function publicWebsiteUrl() {
@@ -1096,15 +1099,6 @@ function databaseStatusProbe() {
   } catch {
     return { id: "database", status: "outage", latencyMs: performance.now() - startedAt, message: "Le stockage ne répond pas à la sonde." };
   }
-}
-
-async function emailStatusProbe(timestamp = Date.now()) {
-  if (timestamp - lastEmailProbeAt >= 15 * 60 * 1000 || !lastEmailProbeAt) {
-    cachedEmailProbe = await verifyEmailDelivery();
-    lastEmailProbeAt = timestamp;
-  }
-  if (!cachedEmailProbe.configured) return { id: "email", status: "unknown", message: "Le service email n’est pas activé." };
-  return { id: "email", status: cachedEmailProbe.ok ? "operational" : "outage", message: cachedEmailProbe.ok ? "Le serveur email accepte les connexions." : "Le serveur email ne répond pas à la sonde." };
 }
 
 async function collectPublicStatus() {
@@ -3860,6 +3854,7 @@ function adminOverview(db) {
     return total + (positive ? Math.max(0, amount) : Math.max(0, -amount));
   }, 0);
   return {
+    detectedIncidents: statusMonitor.detections.summary(),
     users: {
       total: users.length,
       dataRequests: dataRequests.summary(),
@@ -4918,6 +4913,19 @@ app.get("/api/admin/health/logs", auth, requireAdmin, (req, res) => {
 app.get("/api/admin/status", auth, requireAdmin, (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.json(statusMonitor.payload(7, { includeFutureUpdates: true }));
+});
+
+app.get("/api/admin/status/detections", auth, requireAdmin, (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json(statusMonitor.detections.list(req.query));
+});
+
+app.patch("/api/admin/status/detections/:id", auth, requireAdmin, (req, res) => {
+  try {
+    const detection = statusMonitor.detections.update(req.params.id, req.body ?? {}, req.auth.id);
+    if (!detection) return res.status(404).json({ error: "Incident détecté introuvable." });
+    res.json({ detection });
+  } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 app.put("/api/admin/status/settings", auth, requireAdmin, (req, res) => {

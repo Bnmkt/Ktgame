@@ -123,6 +123,7 @@ try {
   await request("alpha", `/api/admin/users/alpha/data-requests/${rights.requests[0].id}/approve`, undefined, 403);
   const admin = await pageFor("editor");
   console.log("Unified account editor and guarded actions...");
+  await request("editor", "/api/admin", undefined, 200, "GET");
   await admin.goto(`${origin}/admin`, { waitUntil: "domcontentloaded" });
   await admin.getByRole("button", { name: /^Comptes joueurs/ }).first().click();
   await admin.locator("tr").filter({ hasText: "alpha@example.com" }).getByRole("button", { name: /Modifier/ }).click();
@@ -211,8 +212,66 @@ try {
   const status = await request("editor", "/api/admin/status", undefined, 200, "GET");
   const found = status.incidents.find((entry) => entry.title === "Fixture horodatage");
   assert.equal(found.scheduledAt, "2026-10-25T01:30:45.000Z");
+  console.log("Private detected incidents remain editable after recovery...");
+  const statusDb = new DatabaseSync(path.join(temporary, "STATUS_DB_PATH.sqlite"));
+  const at = new Date(Date.now() - 600000).toISOString();
+  statusDb.prepare("INSERT INTO status_detections(id,component_id,severity,title,description,first_at,last_at,recovered_at,diagnostic,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
+    .run("fixture-smtp", "email", "outage", "Fixture SMTP", "Connexion SMTP refusée. Cause à confirmer.", at, at, new Date().toISOString(), "Authentification refusée · EAUTH · AUTH · 535", at);
+  statusDb.close();
+  await request("beta", "/api/admin/status/detections", undefined, 403, "GET");
+  await request("beta", "/api/admin/status/detections/fixture-smtp", { state: "closed", notes: "Interdit" }, 403, "PATCH");
+  await admin.getByRole("button", { name: "Actualiser les incidents détectés", exact: true }).click();
+  const detected = admin.locator(".status-detection-row").filter({ hasText: "Fixture SMTP" });
+  await detected.getByRole("button", { name: "Compléter / clôturer", exact: true }).click();
+  const followup = admin.getByRole("dialog");
+  await followup.getByLabel("Analyse, actions et conclusion").fill("Cause **confirmée en test**, service rétabli. Note privée.");
+  await followup.getByLabel("État du suivi").selectOption("closed");
+  await followup.getByRole("button", { name: "Clôturer le suivi", exact: true }).click();
+  await admin.locator(".status-detection-section").getByRole("button", { name: "Clôturés", exact: true }).click();
+  await detected.getByText("Clôturé", { exact: true }).waitFor();
+  const anonymous = await fetch(`${apiOrigin}/api/status`).then((response) => response.json());
+  assert.equal(JSON.stringify(anonymous).includes("Note privée"), false);
+  assert.equal(JSON.stringify(anonymous).includes("EAUTH"), false);
+  await admin.locator(".status-detection-section").screenshot({ path: path.join(previews, "detected-incidents-desktop.png") });
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await admin.locator(".status-detection-section").screenshot({ path: path.join(previews, "detected-incidents-mobile.png") });
+  assert.equal(await admin.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await detected.getByRole("button", { name: "Préparer un incident public", exact: true }).click();
+  const publishing = admin.getByRole("dialog");
+  assert.equal(await publishing.getByLabel("Heure du relevé concerné").inputValue(), await admin.evaluate((value) => {
+    const date = new Date(value); const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }, at));
+  assert.equal((await request("editor", "/api/admin/status", undefined, 200, "GET")).history.some((entry) => entry.title === "Fixture SMTP"), false);
+  await publishing.getByRole("button", { name: "Publier", exact: true }).click();
+  await waitFor(async () => (await request("editor", "/api/admin/status", undefined, 200, "GET")).history.some((entry) => entry.title === "Fixture SMTP"), "explicit incident publication");
+
+  console.log("Muting a non-friend from the shared public profile...");
+  const viewer = await pageFor("beta");
+  await viewer.goto(origin, { waitUntil: "domcontentloaded" });
+  await viewer.getByRole("button", { name: /^Ouvrir Social/ }).waitFor();
+  await request("newbie", "/api/chat/messages", { channelType: "global", content: "Message du joueur à mettre en sourdine" }, 201);
+  assert.equal((await request("beta", "/api/users/newbie/public", undefined, 200, "GET")).relationship.isFriend, false);
+  await viewer.evaluate(() => window.dispatchEvent(new CustomEvent("ktga-public-profile", { detail: "newbie" })));
+  const profileDialog = viewer.locator(".public-profile-modal");
+  await profileDialog.getByRole("button", { name: "Mettre ce joueur en sourdine", exact: true }).click();
+  await profileDialog.getByRole("button", { name: "Réactiver les messages de ce joueur", exact: true }).waitFor();
+  assert.equal((await request("beta", "/api/users/newbie/public", undefined, 200, "GET")).relationship.muted, true);
+  assert.equal((await request("beta", "/api/chat/messages?channelType=global", undefined, 200, "GET")).messages.some((entry) => entry.senderId === "newbie"), false);
+  await viewer.screenshot({ path: path.join(previews, "public-profile-muted.png"), fullPage: true });
+  await profileDialog.getByRole("button", { name: "Fermer le profil", exact: true }).click();
+  await viewer.evaluate(() => window.dispatchEvent(new CustomEvent("ktga-public-profile", { detail: "newbie" })));
+  await profileDialog.getByRole("button", { name: "Réactiver les messages de ce joueur", exact: true }).click();
+  await profileDialog.getByRole("button", { name: "Mettre ce joueur en sourdine", exact: true }).waitFor();
+  assert.equal((await request("beta", "/api/chat/messages?channelType=global", undefined, 200, "GET")).messages.some((entry) => entry.senderId === "newbie"), true);
   assert.deepEqual(errors, []);
   console.log("Passed account editor, dates, permissions, full ZIP and isolated SMTP with Ghostery.");
+} catch (error) {
+  console.error(output.slice(-3500));
+  for (const context of browser?.contexts() ?? []) for (const page of context.pages()) {
+    console.error(page.url(), await page.locator("body").innerText().catch(() => ""));
+  }
+  throw error;
 } finally {
   await browser?.close();
   for (const child of processes) child.kill();

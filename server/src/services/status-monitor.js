@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { createStatusDetections } from "./status-detections.js";
 
 export const STATUS_SLOT_MS = 15 * 60 * 1000;
 export const publicStatusComponents = [
@@ -124,6 +125,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
     );
   `);
 
+  const detections = createStatusDetections(db, publicStatusComponents, now);
   const readSlot = db.prepare("SELECT * FROM status_slots WHERE bucket_at = ? AND component_id = ?");
   const upsertSlot = db.prepare(`INSERT INTO status_slots(bucket_at,component_id,latest_status,worst_status,sample_count,latency_sum,latency_max,message,updated_at)
     VALUES(?,?,?,?,?,?,?,?,?)
@@ -172,6 +174,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
       clean(component.message, 300),
       new Date(timestamp).toISOString()
     );
+    detections.observe(component, timestamp);
   }
 
   function recordSnapshot(components, timestamp = now()) {
@@ -211,6 +214,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
   }
 
   function prune(timestamp = now()) {
+    detections.prune(timestamp);
     db.prepare("DELETE FROM status_slots WHERE bucket_at < ?").run(new Date(timestamp - (statusSettings().historyDays + 10) * 86400000).toISOString());
     db.prepare("DELETE FROM status_incident_updates WHERE incident_id IN (SELECT id FROM status_incidents WHERE updated_at < ?)").run(new Date(timestamp - 400 * 86400000).toISOString());
     db.prepare("DELETE FROM status_incidents WHERE updated_at < ?").run(new Date(timestamp - 400 * 86400000).toISOString());
@@ -420,6 +424,6 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
   }
 
   prune();
-  return { recordSnapshot, backfillDowntime, prune, payload, statusSettings, updateStatusSettings, incidentRows, createIncident, updateIncident, close: () => db.close() };
+  return { recordSnapshot, backfillDowntime, prune, payload, statusSettings, updateStatusSettings, incidentRows, createIncident, updateIncident, detections, close: () => db.close() };
 }
 
