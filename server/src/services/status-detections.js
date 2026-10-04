@@ -50,9 +50,17 @@ export function createStatusDetections(db, components, now) {
   if (!db.prepare("SELECT 1 FROM status_settings WHERE key='detections-migration'").get()) {
     db.exec("BEGIN IMMEDIATE");
     try {
-      for (const row of db.prepare("SELECT * FROM status_slots ORDER BY bucket_at,component_id").iterate()) {
-        if (["degraded", "outage"].includes(row.worst_status)) observe({ id: row.component_id, status: row.worst_status, message: row.latest_status === row.worst_status ? row.message : "Anomalie enregistrée dans cette tranche, puis retour à la normale.", latencyMs: row.latency_max }, Date.parse(row.bucket_at), "history");
-        observe({ id: row.component_id, status: row.latest_status, message: row.message }, Date.parse(row.updated_at), "history");
+      // Finish each bounded read before writing: temporary SQLite iterators can be finalized by GC.
+      const history = db.prepare("SELECT * FROM status_slots WHERE (bucket_at,component_id)>(?,?) ORDER BY bucket_at,component_id LIMIT 500");
+      let cursor = ["", ""];
+      for (;;) {
+        const rows = history.all(...cursor);
+        if (!rows.length) break;
+        for (const row of rows) {
+          if (["degraded", "outage"].includes(row.worst_status)) observe({ id: row.component_id, status: row.worst_status, message: row.latest_status === row.worst_status ? row.message : "Anomalie enregistrée dans cette tranche, puis retour à la normale.", latencyMs: row.latency_max }, Date.parse(row.bucket_at), "history");
+          observe({ id: row.component_id, status: row.latest_status, message: row.message }, Date.parse(row.updated_at), "history");
+        }
+        cursor = [rows.at(-1).bucket_at, rows.at(-1).component_id];
       }
       db.prepare("INSERT INTO status_settings(key,value) VALUES('detections-migration','1')").run();
       db.exec("COMMIT");

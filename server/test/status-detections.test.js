@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { createStatusMonitor } from "../src/services/status-monitor.js";
 import { createEmailStatusProbe, smtpDiagnostic } from "../src/services/email-status-probe.js";
 
@@ -84,6 +85,42 @@ test("les anciens relevés sont repris une seule fois, sans perdre les notes au 
     if (path.dirname(resolved) !== path.resolve(tmpdir()) || !path.basename(resolved).startsWith("ktga-detections-test-")) throw new Error("Unsafe fixture cleanup");
     rmSync(resolved, { recursive: true, force: true });
   }
+});
+
+test("la reprise volumineuse résiste au ramasse-miettes et traverse les limites des lots", () => {
+  const moduleUrl = new URL("../src/services/status-detections.js", import.meta.url).href;
+  const script = `
+    import assert from "node:assert/strict";
+    import { DatabaseSync } from "node:sqlite";
+    import { createStatusDetections } from ${JSON.stringify(moduleUrl)};
+    const db = new DatabaseSync(":memory:");
+    db.exec("CREATE TABLE status_settings(key TEXT PRIMARY KEY,value TEXT); CREATE TABLE status_slots(bucket_at TEXT,component_id TEXT,latest_status TEXT,worst_status TEXT,updated_at TEXT,latency_max REAL,message TEXT,PRIMARY KEY(bucket_at,component_id));");
+    const components = ["website", "api", "realtime", "games", "database", "email"].map((id) => ({ id, name: id }));
+    const insert = db.prepare("INSERT INTO status_slots VALUES(?,?,?,?,?,0,'fixture')");
+    for (let index=0; index<201; index++) for (const component of components) {
+      const at = new Date(Date.parse("2026-10-01T00:00:00Z") + index * 900000).toISOString();
+      const status = component.id === "email" && index >= 82 && index <= 85 ? "outage" : "operational";
+      insert.run(at, component.id, status, status, at);
+    }
+    const prepare = db.prepare.bind(db);
+    let reads = 0;
+    db.prepare = (sql) => {
+      const statement = prepare(sql);
+      return sql.startsWith("SELECT * FROM status_detections WHERE component_id")
+        ? { get: (...args) => { if (++reads % 100 === 0) global.gc(); return statement.get(...args); } }
+        : statement;
+    };
+    const detections = createStatusDetections(db, components, () => Date.parse("2026-10-04T00:00:00Z"));
+    assert.equal(detections.list().totalItems, 1);
+    assert.equal(detections.list().rows[0].component_id, "email");
+    assert.ok(detections.list().rows[0].recovered_at);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM status_slots").get().count, 1206);
+    assert.equal(db.prepare("SELECT value FROM status_settings WHERE key='detections-migration'").get().value, "1");
+    assert.ok(reads > 1000);
+    db.close();
+  `;
+  const result = spawnSync(process.execPath, ["--expose-gc", "--input-type=module", "-e", script], { encoding: "utf8", windowsHide: true, timeout: 30000 });
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
 });
 
 test("la sonde SMTP retente les échecs après une minute et garde les succès quinze minutes", async () => {
