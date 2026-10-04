@@ -4,20 +4,21 @@ import { api } from "../../api.js";
 import { appPath } from "../../navigation/routes.js";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { Dialog } from "../common/Dialog.jsx";
+import { DateTimeInput } from "../common/DateTimeInput.jsx";
+import { browserTimeZone } from "../../utils/dates.js";
 import { MarkdownContent } from "../patchnotes/MarkdownContent.jsx";
 
 const statusLabels = { operational: "Opérationnel", degraded: "Dégradé", maintenance: "Maintenance", outage: "Indisponible", unknown: "Inconnu" };
 const typeLabels = { maintenance: "Maintenance", warning: "Avertissement", outage: "Panne" };
 const stateLabels = { scheduled: "Planifié", in_progress: "En cours", completed: "Terminé" };
-const localDateTime = (value) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
 const incidentStages = ["scheduled", "in_progress", "completed"];
 const stageTabs = [{ id: "display", label: "Display" }, { id: "scheduled", label: "Scheduled" }, { id: "in_progress", label: "InProgress" }, { id: "completed", label: "Completed" }];
 const stageUpdates = (incident = {}) => incidentStages.map((state) => {
   const existing = (incident.updates ?? []).filter((entry) => entry.state === state).at(-1);
   const fallback = state === "scheduled" ? incident.createdAt : state === "in_progress" ? incident.startedAt : incident.completedAt;
-  return { id: existing?.id, state, createdAt: localDateTime(existing?.createdAt ?? fallback ?? new Date()), message: existing?.message ?? "" };
+  return { id: existing?.id, state, createdAt: existing?.createdAt ?? fallback ?? new Date().toISOString(), message: existing?.message ?? "" };
 });
-const blankDraft = () => ({ title: "", message: "", type: "warning", state: "scheduled", components: [], scheduledAt: localDateTime(new Date()), startedAt: "", completedAt: "", updates: stageUpdates() });
+const blankDraft = () => ({ title: "", message: "", type: "warning", state: "scheduled", components: [], scheduledAt: new Date().toISOString(), startedAt: "", completedAt: "", updates: stageUpdates() });
 
 function IncidentEditor({ draft, setDraft, components, mode, busy, onClose, onSave }) {
   const editing = mode !== "new";
@@ -33,14 +34,15 @@ function IncidentEditor({ draft, setDraft, components, mode, busy, onClose, onSa
   }));
   return <Dialog title={resolving ? "Résoudre l’incident" : editing ? "Modifier l’incident" : "Publier un incident"} className="public-status-editor" onClose={onClose} dismissible={!busy}>
     <form onSubmit={onSave}>
+      <small>Heures locales · {browserTimeZone()}</small>
       <nav className="status-incident-tabs" aria-label="Étapes de l’incident">{stageTabs.map((entry) => <button type="button" key={entry.id} className={tab === entry.id ? "active" : ""} onClick={() => setTab(entry.id)}>{entry.label}</button>)}</nav>
       {tab === "display" ? <section className="status-incident-tab-panel"><div className="admin-field-grid status-incident-fields">
         <label>Type<select value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })}><option value="maintenance">Maintenance</option><option value="warning">Avertissement</option><option value="outage">Panne</option></select></label>
-        {!editing && <label>État initial<select value={draft.state} onChange={(event) => { const state = event.target.value; setDraft({ ...draft, state, startedAt: state === "in_progress" ? draft.startedAt || localDateTime(new Date()) : "" }); }}><option value="scheduled">Planifié</option><option value="in_progress">En cours</option></select></label>}
-        <label>Heure du relevé concerné<input type="datetime-local" required value={draft.scheduledAt} onChange={(event) => setDraft({ ...draft, scheduledAt: event.target.value })} /></label>
+        {!editing && <label>État initial<select value={draft.state} onChange={(event) => { const state = event.target.value; setDraft({ ...draft, state, startedAt: state === "in_progress" ? draft.startedAt || new Date().toISOString() : "" }); }}><option value="scheduled">Planifié</option><option value="in_progress">En cours</option></select></label>}
+        <label>Heure du relevé concerné<DateTimeInput required value={draft.scheduledAt} onValueChange={(value) => setDraft({ ...draft, scheduledAt: value })} /></label>
         <label className="status-incident-title">Titre<input value={draft.title} maxLength="120" required onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Maintenance du service de jeu" /></label>
       </div><label className="status-incident-message">Texte Markdown<textarea value={draft.message} maxLength="4000" required onChange={(event) => setDraft({ ...draft, message: event.target.value })} placeholder="Décris l’impact visible et les actions en cours." /></label>{draft.message && <MarkdownContent className="status-markdown-preview">{draft.message}</MarkdownContent>}</section>
-        : <section className="status-incident-tab-panel"><div className="status-stage-heading"><div><strong>{stateLabels[tab]}</strong><small>Cette entrée apparaît dans la chronologie lorsque cette étape est atteinte.</small></div></div><label>Date et heure<input type="datetime-local" value={stage?.createdAt ?? ""} onChange={(event) => updateStage({ createdAt: event.target.value })} /></label><label className="status-incident-message">Texte Markdown<textarea value={stage?.message ?? ""} maxLength="4000" onChange={(event) => updateStage({ message: event.target.value })} placeholder={`Message pour l’étape « ${stateLabels[tab]} »`} /></label>{stage?.message && <MarkdownContent className="status-markdown-preview">{stage.message}</MarkdownContent>}</section>}
+        : <section className="status-incident-tab-panel"><div className="status-stage-heading"><div><strong>{stateLabels[tab]}</strong><small>Cette entrée apparaît dans la chronologie lorsque cette étape est atteinte.</small></div></div><label>Date et heure<DateTimeInput value={stage?.createdAt ?? ""} onValueChange={(value) => updateStage({ createdAt: value })} /></label><label className="status-incident-message">Texte Markdown<textarea value={stage?.message ?? ""} maxLength="4000" onChange={(event) => updateStage({ message: event.target.value })} placeholder={`Message pour l’étape « ${stateLabels[tab]} »`} /></label>{stage?.message && <MarkdownContent className="status-markdown-preview">{stage.message}</MarkdownContent>}</section>}
       <fieldset className="status-component-picker"><legend>Services concernés</legend>{components.map((component) => <label key={component.id} className={draft.components.includes(component.id) ? "selected" : ""}><input type="checkbox" checked={draft.components.includes(component.id)} onChange={() => toggle(component.id)} /><span><strong>{component.name}</strong><small>{statusLabels[component.status]}</small></span></label>)}</fieldset>
       <div className="actions"><button type="button" className="secondary" onClick={onClose} disabled={busy}>Annuler</button><button type="submit" disabled={busy || !draft.components.length}>{busy ? "Enregistrement…" : resolving ? "Confirmer la résolution" : editing ? "Enregistrer" : draft.state === "scheduled" ? "Planifier" : "Publier"}</button></div>
     </form>
@@ -73,16 +75,16 @@ export function PublicStatusAdmin({ reportError }) {
     const state = component && component.status !== "operational" ? "in_progress" : "scheduled";
     setEditor({ mode: "new" });
     const draft = blankDraft();
-    setDraft({ ...draft, type: component?.status === "outage" ? "outage" : component?.status === "degraded" ? "warning" : "maintenance", state, startedAt: state === "in_progress" ? localDateTime(new Date()) : "", components: component ? [component.id] : [] });
+    setDraft({ ...draft, type: component?.status === "outage" ? "outage" : component?.status === "degraded" ? "warning" : "maintenance", state, startedAt: state === "in_progress" ? new Date().toISOString() : "", components: component ? [component.id] : [] });
   }
   function openEdit(incident) {
     setEditor({ mode: "edit", id: incident.id });
-    setDraft({ title: incident.title, message: incident.message, type: incident.type, state: incident.state, components: incident.components, scheduledAt: localDateTime(incident.scheduledAt), startedAt: localDateTime(incident.startedAt), completedAt: localDateTime(incident.completedAt), updates: stageUpdates(incident) });
+    setDraft({ title: incident.title, message: incident.message, type: incident.type, state: incident.state, components: incident.components, scheduledAt: incident.scheduledAt ?? "", startedAt: incident.startedAt ?? "", completedAt: incident.completedAt ?? "", updates: stageUpdates(incident) });
   }
   function openResolve(incident) {
     setEditor({ mode: "resolve", id: incident.id });
-    const updates = stageUpdates(incident).map((entry) => entry.state === "completed" ? { ...entry, createdAt: localDateTime(new Date()), message: entry.message || "L’incident est résolu." } : entry);
-    setDraft({ title: incident.title, message: incident.message, type: incident.type, state: "completed", components: incident.components, scheduledAt: localDateTime(incident.scheduledAt), startedAt: localDateTime(incident.startedAt), completedAt: localDateTime(new Date()), updates });
+    const updates = stageUpdates(incident).map((entry) => entry.state === "completed" ? { ...entry, createdAt: new Date().toISOString(), message: entry.message || "L’incident est résolu." } : entry);
+    setDraft({ title: incident.title, message: incident.message, type: incident.type, state: "completed", components: incident.components, scheduledAt: incident.scheduledAt ?? "", startedAt: incident.startedAt ?? "", completedAt: new Date().toISOString(), updates });
   }
   async function save(event) {
     event.preventDefault();
@@ -90,10 +92,10 @@ export function PublicStatusAdmin({ reportError }) {
     try {
       const body = { ...draft };
       for (const field of ["scheduledAt", "startedAt", "completedAt"]) {
-        if (body[field]) body[field] = new Date(body[field]).toISOString();
+        if (body[field]) { if (!Number.isFinite(Date.parse(body[field]))) throw new Error("Date ou heure invalide."); }
         else delete body[field];
       }
-      body.updates = draft.updates.map((entry) => ({ ...entry, ...(entry.createdAt ? { createdAt: new Date(entry.createdAt).toISOString() } : {}) }));
+      body.updates = draft.updates;
       const result = await api(editor.mode === "new" ? "/api/admin/status/incidents" : `/api/admin/status/incidents/${editor.id}`, { method: editor.mode === "new" ? "POST" : "PATCH", body: JSON.stringify(body) });
       setData(result.status); setEditor(null); reportError?.("");
     } catch (error) { reportError?.(error.message); }

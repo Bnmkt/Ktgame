@@ -5,6 +5,8 @@ import { ConfirmActionButton, ConfirmDialog } from "../common/ConfirmAction.jsx"
 import { Die, PlayingCard } from "../game/GamePieces.jsx";
 import { CompactNumber } from "../../utils/presentation.jsx";
 import { EventCombinationsEditor } from "./EventCombinationsEditor.jsx";
+import { DateTimeInput } from "../common/DateTimeInput.jsx";
+import { browserTimeZone } from "../../utils/dates.js";
 
 const labels = { draft: "Brouillon", scheduled: "Planifié", active: "En cours", finished: "Terminé", cancelled: "Annulé" };
 const editorTabs = [["general", "Général"], ["objective", "Objectif"], ["game", "Jeu & effets"], ["actions", "Actions"], ["rewards", "Pot & gains"], ["appearance", "Apparence"], ["monitoring", "Suivi"]];
@@ -13,8 +15,6 @@ const cardSuits = [["hearts", "Cœur", "♥"], ["diamonds", "Carreau", "♦"], [
 const cardRanks = [["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"], ["7", "7"], ["8", "8"], ["9", "9"], ["10", "10"], ["J", "Valet"], ["Q", "Dame"], ["K", "Roi"], ["A", "As"]];
 const cardScopeLabels = { suitEffects: "Famille", valueEffects: "Valeur", specificEffects: "Carte précise" };
 const clone = (value) => structuredClone(value);
-const localDateTime = (value) => value ? new Date(value).toISOString().slice(0, 16) : "";
-const isoDateTime = (value) => value ? new Date(value).toISOString() : null;
 
 function deepSet(source, path, value) {
   const result = clone(source);
@@ -81,6 +81,8 @@ function EventEditor({ detail, shop, onClose, onSaved, reportError }) {
   const set = (path, value) => setDraft((current) => deepSet(current, path, value));
 
   async function save() {
+    const invalid = document.querySelector(".community-event-editor input:invalid");
+    if (invalid) { invalid.reportValidity(); return; }
     setBusy("save"); reportError("");
     try { const result = await api(`/api/admin/community-events/${draft.id}`, { method: "PATCH", body: JSON.stringify(draft) }); setDraft(clone(result.event)); await onSaved(); }
     catch (error) { reportError(error.message); } finally { setBusy(""); }
@@ -152,7 +154,7 @@ function EventEditor({ detail, shop, onClose, onSaved, reportError }) {
     <div className="event-editor-layout"><fieldset className="event-editor-form" disabled={finished}>
       {tab === "general" && <>
         <section className="admin-form-section"><h3>Identité et publication</h3><div className="admin-field-grid"><Field label="Nom interne"><input value={draft.internalName} onChange={(e) => set("internalName", e.target.value)} /></Field><Field label="Nom affiché"><input value={draft.name} onChange={(e) => set("name", e.target.value)} /></Field><Field label="Slug" hint={launched ? "Adresse figée depuis le lancement." : "Adresse publique de l’événement."}><input disabled={launched} value={draft.slug} onChange={(e) => set("slug", e.target.value)} /></Field></div><Field label="Résumé"><input value={draft.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} /></Field><Field label="Description complète"><textarea value={draft.description} onChange={(e) => set("description", e.target.value)} /></Field></section>
-        <section className="admin-form-section"><h3>Fenêtre temporelle</h3><div className="admin-field-grid"><Field label="Début"><input type="datetime-local" disabled={launched} value={localDateTime(draft.startsAt)} onChange={(e) => set("startsAt", isoDateTime(e.target.value))} /></Field><Field label="Fin"><input type="datetime-local" value={localDateTime(draft.endsAt)} onChange={(e) => set("endsAt", isoDateTime(e.target.value))} /></Field></div><div className="event-duration-readout"><Clock3 /><span>Durée calculée</span><strong>{Math.max(0, (new Date(draft.endsAt) - new Date(draft.startsAt)) / 60000).toLocaleString("fr-BE")} minutes</strong><small>10 minutes minimum · 30 jours maximum</small></div><div className="event-toggle-grid"><Toggle title="Démarrage automatique" text="Active l’événement à la date prévue." checked={draft.autoStart} onChange={(value) => set("autoStart", value)} /><Toggle title="Clôture automatique" text="Distribue les gains à l’échéance." checked={draft.autoFinish} onChange={(value) => set("autoFinish", value)} /><Toggle title="Visible avant le début" text="Affiche la promotion sur l’accueil." checked={draft.showBeforeStart} onChange={(value) => set("showBeforeStart", value)} /></div></section>
+        <section className="admin-form-section"><h3>Fenêtre temporelle</h3><p>Heures locales · {browserTimeZone()}</p><div className="admin-field-grid"><Field label="Début"><DateTimeInput required disabled={launched} value={draft.startsAt} onValueChange={(value) => set("startsAt", value || null)} /></Field><Field label="Fin"><DateTimeInput required value={draft.endsAt} onValueChange={(value) => set("endsAt", value || null)} /></Field></div><div className="event-duration-readout"><Clock3 /><span>Durée calculée</span><strong>{Math.max(0, (new Date(draft.endsAt) - new Date(draft.startsAt)) / 60000).toLocaleString("fr-BE")} minutes</strong><small>10 minutes minimum · 30 jours maximum</small></div><div className="event-toggle-grid"><Toggle title="Démarrage automatique" text="Active l’événement à la date prévue." checked={draft.autoStart} onChange={(value) => set("autoStart", value)} /><Toggle title="Clôture automatique" text="Distribue les gains à l’échéance." checked={draft.autoFinish} onChange={(value) => set("autoFinish", value)} /><Toggle title="Visible avant le début" text="Affiche la promotion sur l’accueil." checked={draft.showBeforeStart} onChange={(value) => set("showBeforeStart", value)} /></div></section>
       </>}
       {tab === "objective" && <>
         <section className="admin-form-section"><h3>Objectif global</h3><div className="admin-field-grid"><Field label="Nom"><input value={draft.objective.name} onChange={(e) => set("objective.name", e.target.value)} /></Field><Field label="Maximum"><input type="number" disabled={started} value={draft.objective.max} onChange={(e) => set("objective.max", Number(e.target.value))} /></Field><Field label="Valeur de départ"><input type="number" disabled={started} value={draft.objective.startValue} onChange={(e) => set("objective.startValue", Number(e.target.value))} /></Field><Field label="Minimum"><input type="number" disabled={started} value={draft.objective.minimum} onChange={(e) => set("objective.minimum", Number(e.target.value))} /></Field></div><Field label="Description"><textarea value={draft.objective.description} onChange={(e) => set("objective.description", e.target.value)} /></Field><div className="event-toggle-grid"><Toggle title="Fin à zéro" text="Clôture dès que le minimum est atteint." checked={draft.objective.finishAtMinimum} onChange={(value) => set("objective.finishAtMinimum", value)} /><Toggle title="Continuer après réussite" text="Autorise encore les actions jusqu’à l’échéance. Avec Fin à zéro désactivé, la progression peut dépasser 100 %." checked={draft.objective.continueAfterCompletion} onChange={(value) => set("objective.continueAfterCompletion", value)} /></div></section>

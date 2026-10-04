@@ -28,6 +28,12 @@ export function shiftDateKey(dateKey, days) {
   return date.toISOString().slice(0, 10);
 }
 
+export function validDateOnly(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return false;
+  const date = new Date(`${value}T12:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 export function casinoTimeParts(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) return null;

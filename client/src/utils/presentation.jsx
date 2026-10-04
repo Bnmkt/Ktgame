@@ -1,5 +1,6 @@
 import { BadgeCheck, Play, Trophy } from "lucide-react";
 import { gameTitle } from "../features/games/config.js";
+import { casinoDate } from "./dates.js";
 
 export function gameCategoryLabel(value) {
   return ({ all: "Tous", score: "Score", combination: "Combinaisons", casino: "Casino", duel: "Duel", shedding: "Défausse", "push-your-luck": "Stop ou encore", bluff: "Bluff", draft: "Draft tactique", puzzle: "Puzzle", solitaire: "Solitaire" })[value] ?? value;
@@ -120,8 +121,8 @@ export function statDisplay(stat, user, history = [], achievements = [], index =
   const wins = user.statistics?.wins ?? history.filter((row) => row.winners?.includes(user.id)).length;
   const gamesPlayed = user.statistics?.gamesPlayed ?? history.length;
   const ratio = gamesPlayed ? `${Math.round((wins / gamesPlayed) * 100)}%` : "0%";
-  const today = new Date().toISOString().slice(0, 10);
-  const todayGames = user.statistics?.todayGames ?? history.filter((row) => String(row.finishedAt ?? "").slice(0, 10) === today).length;
+  const today = casinoDate();
+  const todayGames = user.statistics?.todayGames ?? history.filter((row) => row.finishedAt && casinoDate(row.finishedAt) === today).length;
   const unlocked = achievements.filter((achievement) => achievement.unlocked);
   if (stat === "todayGames") return { icon: <Play size={18} />, label: "Aujourd'hui", value: formatCompactNumber(todayGames), exactValue: formatExactNumber(todayGames) };
   if (stat === "overallWinRate" || stat === "winRate") return { icon: <Trophy size={18} />, label: "Winrate", value: ratio };

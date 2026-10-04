@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Filter, RefreshCw, Search } from "lucide-react";
 import { api } from "../../api.js";
+import { DateTimeInput } from "../common/DateTimeInput.jsx";
+import { localDateTime, localDateTimeToIso } from "../../utils/dates.js";
 
 const categories = [["authentication", "Authentification"], ["access", "Accès refusé"], ["cors", "Origine refusée (CORS)"], ["rate-limit", "Limite de requêtes"], ["server", "Erreur serveur"], ["request", "Requête invalide / introuvable"], ["interrupted", "Connexion interrompue"], ["socket", "Connexion temps réel"], ["cache", "Cache (304)"], ["success", "Succès"], ["lifecycle", "Démarrage serveur"]];
-const localDate = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-const initialFilters = () => ({ from: localDate(new Date(Date.now() - 24 * 3600000)), to: "", level: "", category: "", status: "", method: "", search: "" });
+const initialFilters = () => ({ from: localDateTime(new Date(Date.now() - 24 * 3600000)), to: "", level: "", category: "", status: "", method: "", search: "" });
 const dateLabel = (at) => new Date(at).toLocaleString("fr-BE", { dateStyle: "short", timeStyle: "medium" });
 
 export function HealthLogs() {
@@ -21,7 +22,7 @@ export function HealthLogs() {
     let active = true;
     const query = new URLSearchParams({ page: String(page) });
     for (const [key, value] of Object.entries(filters)) {
-      if (value) query.set(key, ["from", "to"].includes(key) ? new Date(value).toISOString() : value);
+      if (value) query.set(key, ["from", "to"].includes(key) ? localDateTimeToIso(value) : value);
     }
     if (!filters.to) query.set("to", snapshot.current);
     setLoading(true);
@@ -41,7 +42,7 @@ export function HealthLogs() {
     <header className="metrics-heading"><div><span className="eyebrow">Historique persistant</span><h2>Journaux du serveur</h2><p>Requêtes, refus de connexion et erreurs, y compris avant authentification.</p></div><button className="secondary" disabled={loading} onClick={() => update(filters)}><RefreshCw size={17} className={loading ? "spinning" : ""} />Actualiser</button></header>
     <div className="health-log-notice">Conservation : {data?.retentionDays ?? 14} jours, jusqu’à {(data?.maxRows ?? 100000).toLocaleString("fr-BE")} entrées. Les dates sont affichées en {timezone}. Seules les requêtes parvenues au serveur peuvent être enregistrées. Les données commencent à l’activation de ce journal.</div>
     <form className="health-log-filters" onSubmit={(event) => { event.preventDefault(); update(); }}>
-      <label>Du<input type="datetime-local" {...field("from")} /></label><label>Au<input type="datetime-local" {...field("to")} /></label>
+      <label>Du<DateTimeInput storage="local" value={draft.from} onValueChange={(value) => setDraft((current) => ({ ...current, from: value }))} /></label><label>Au<DateTimeInput storage="local" value={draft.to} onValueChange={(value) => setDraft((current) => ({ ...current, to: value }))} /></label>
       <label>Niveau<select {...field("level")}><option value="">Tous les niveaux</option><option value="info">Informations</option><option value="warning">Avertissements / refus</option><option value="error">Erreurs serveur</option></select></label>
       <label>Catégorie<select {...field("category")}><option value="">Toutes les catégories</option>{categories.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label>Statut HTTP<input type="number" min="100" max="599" placeholder="Ex. 401, 429, 500" {...field("status")} /></label>
