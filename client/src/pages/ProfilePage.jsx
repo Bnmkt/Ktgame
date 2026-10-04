@@ -49,7 +49,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const isShop = mode === "shop";
   const [tab, setTab] = useState(isShop ? "shop" : "account");
   const [accountSaving, setAccountSaving] = useState("");
-  const [form, setForm] = useState({ login: user.login ?? user.pseudo, displayName: user.profile?.displayName ?? user.pseudo, birthDate: user.profile?.birthDate ?? "", gender: user.profile?.gender ?? "", bio: user.profile?.bio ?? "", titleGameId: user.profile?.titleGameId ?? "", password: "" });
+  const [form, setForm] = useState({ login: user.login ?? user.pseudo, displayName: user.profile?.displayName ?? user.pseudo, birthDate: user.profile?.birthDate ?? "", gender: user.profile?.gender ?? "", bio: user.profile?.bio ?? "", titleGameId: user.profile?.titleGameId ?? "", titleLevel: user.profile?.titleLevel ?? 0, titleHidden: user.profile?.titleHidden ?? false, password: "" });
   const [statForm, setStatForm] = useState({ memberCardStats: user.profileStats?.memberCardStats ?? [user.profileStats?.memberCardStat ?? "winRate", "achievementsUnlocked"], customAchievementIds: user.profileStats?.customAchievementIds ?? [user.profileStats?.customAchievementId ?? "", ""], visibleProfileStats: user.profileStats?.visibleProfileStats ?? publicProfileStatOptions.map(([key]) => key) });
   const [statistics, setStatistics] = useState(null);
   const [ledgerRevision, setLedgerRevision] = useState(0);
@@ -143,10 +143,10 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     setError("");
     setMessage("");
     try {
-      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ displayName: form.displayName, birthDate: form.birthDate, gender: form.gender, bio: form.bio, titleGameId: form.titleGameId ?? user.profile?.titleGameId ?? "", favoriteGames: favorites, ...statForm }) });
+      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ displayName: form.displayName, birthDate: form.birthDate, gender: form.gender, bio: form.bio, titleGameId: form.titleGameId ?? user.profile?.titleGameId ?? "", titleLevel: form.titleLevel ?? 0, titleHidden: form.titleHidden ?? false, favoriteGames: favorites, ...statForm }) });
       if (updated.sessionToken) setToken(updated.sessionToken);
       setUser(updated);
-      setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", titleGameId: updated.profile?.titleGameId ?? "", password: "" });
+      setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", titleGameId: updated.profile?.titleGameId ?? "", titleLevel: updated.profile?.titleLevel ?? 0, titleHidden: updated.profile?.titleHidden ?? false, password: "" });
       setFavorites(updated.profile?.favoriteGames ?? []);
       setStatForm({ memberCardStats: updated.profileStats?.memberCardStats ?? ["winRate", "achievementsUnlocked"], customAchievementIds: updated.profileStats?.customAchievementIds ?? [updated.profileStats?.customAchievementId ?? "", ""], visibleProfileStats: updated.profileStats?.visibleProfileStats ?? publicProfileStatOptions.map(([key]) => key) });
       setMessage("Paramètres mis à jour.");

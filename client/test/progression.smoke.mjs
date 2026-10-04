@@ -8,6 +8,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import jwt from "../../server/node_modules/jsonwebtoken/index.js";
+import { DEFAULT_GAME_TITLES } from "../../server/src/services/game-titles.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const temporary = mkdtempSync(path.join(tmpdir(), "ktga-progression-browser-"));
@@ -18,7 +19,7 @@ const secret = randomBytes(32).toString("hex"), token = (id) => jwt.sign({ id, g
 const database = new DatabaseSync(path.join(temporary, "main.sqlite"));
 database.exec("CREATE TABLE users(id TEXT PRIMARY KEY,data TEXT NOT NULL,pseudo TEXT NOT NULL,email TEXT,guest INTEGER NOT NULL DEFAULT 0)");
 for (const id of ["alice", "bob", "editor", "admin"]) {
-  const user = { id, pseudo: id, email: `${id}@example.com`, emailVerifiedAt: new Date().toISOString(), guest: false, active: true, admin: id === "admin", editor: id === "editor", createdAt: "2020-01-01T00:00:00Z", tokens: 100000, profile: { displayName: id, birthDate: "2000-01-01" }, friends: [], friendRequests: { incoming: [], outgoing: [] } };
+  const user = { id, pseudo: id, email: `${id}@example.com`, emailVerifiedAt: new Date().toISOString(), guest: false, active: true, admin: id === "admin", editor: id === "editor", createdAt: "2020-01-01T00:00:00Z", tokens: 100000, profile: { displayName: id, birthDate: "2000-01-01", favoriteGames: id === "alice" ? ["yahtzee", "bataille"] : [] }, friends: [], friendRequests: { incoming: [], outgoing: [] } };
   database.prepare("INSERT INTO users VALUES(?,?,?,?,0)").run(id, JSON.stringify(user), user.pseudo, user.email);
 }
 database.close();
@@ -69,6 +70,11 @@ try {
   const spectating = await request("bob", `/api/rooms/${levelRoom.code}/join`, "POST", {}); assert.equal(spectating.spectator, true);
   await request("bob", `/api/rooms/${levelRoom.code}/action`, "POST", { type: "roll" }, 403);
   const publicProfile = await request("bob", "/api/users/alice/public"); assert.equal(publicProfile.gameTitle.title, "Lanceur");
+  assert.deepEqual(player.gameProgression.find((row) => row.gameId === "yahtzee").unlockedTitles.map((row) => row.level), [1, 3]);
+  await request("alice", "/api/me", "PATCH", { titleGameId: "blackjack", titleLevel: 3 }, 403);
+  await request("alice", "/api/me", "PATCH", { titleGameId: "missing", titleLevel: 1 }, 400);
+  await request("alice", "/api/me", "PATCH", { titleGameId: "yahtzee", titleLevel: "1" }, 400);
+  await request("alice", "/api/me", "PATCH", { titleHidden: "true" }, 400);
   for (let i = 1; i <= 5; i++) await request("admin", "/api/admin/achievements", "POST", { id: `test-chain-${i}`, title: `Chaine ${i}`, description: "Progression en cascade", group: "Blackjack", type: "games", gameId: "blackjack", target: 1, rule: { source: "event", event: "game.xp", scope: "event", aggregate: "match", condition: { all: [{ field: "gameId", operator: "eq", value: "blackjack" }, { field: "xp", operator: "gte", value: i * 50 }] } }, rewards: { xp: [{ gameId: "blackjack", amount: 50 }] } }, 201);
   await request("admin", "/api/admin/achievements", "POST", { id: "test-chain-start", title: "Depart", description: "Declencher une chaine", group: "Blackjack", type: "games", target: 1, rule: { source: "metric", metric: "gamesPlayed" }, rewards: { xp: [{ gameId: "blackjack", amount: 50 }] } }, 201);
   await request("admin", "/api/admin/users/bob/achievements", "PATCH", { states: { "test-chain-start": true } });
@@ -91,13 +97,29 @@ try {
   }
   const page = await pageFor("alice"); await page.goto(`${origin}${base}/profil`);
   await page.locator(".xp-workspace").waitFor(); await page.locator(".xp-game-list").getByText("Niveau 3", { exact: true }).waitFor();
+  assert.deepEqual(await page.locator(".xp-game-list article header strong").allTextContents(), ["Yahtzee", "Bataille"]);
+  await page.getByRole("button", { name: "Bataille", exact: true }).click();
+  assert.deepEqual(await page.locator(".xp-game-list article header strong").allTextContents(), ["Yahtzee"]);
+  await page.getByRole("button", { name: "Bataille", exact: true }).click();
+  assert.equal(await page.getByLabel("Afficher la progression", { exact: true }).count(), 0);
+  assert.equal(await page.getByLabel("Titre affiché", { exact: true }).locator('option[value="yahtzee:1"]').count(), 1);
+  assert.equal(await page.getByLabel("Titre affiché", { exact: true }).locator('option[value="yahtzee:5"]').count(), 0);
   await noOverflow(page, ".xp-workspace"); await page.screenshot({ path: path.join(previews, "game-progression-profile-desktop.png"), fullPage: true });
   await page.getByRole("button", { name: "Profil public", exact: true }).click(); await page.locator(".public-profile-modal .xp-workspace").waitFor();
   assert.equal(await page.locator(".public-profile-modal .player-game-title").innerText(), "Lanceur");
-  await page.setViewportSize({ width: 390, height: 844 }); await noOverflow(page, ".public-profile-modal .xp-workspace"); await page.screenshot({ path: path.join(previews, "game-progression-public-mobile.png") });
+  assert.deepEqual(await page.locator(".public-profile-modal .xp-game-list article header strong").allTextContents(), ["Yahtzee", "Bataille"]);
+  assert.equal(await page.locator(".public-profile-modal h2").count(), 0);
+  assert.equal(await page.locator(".public-profile-modal .xp-workspace select").count(), 0);
+  await page.setViewportSize({ width: 390, height: 844 }); await noOverflow(page, ".public-profile-modal .xp-workspace"); await noOverflow(page, ".public-profile-layout"); await noOverflow(page, ".public-profile-scroll"); await page.screenshot({ path: path.join(previews, "game-progression-public-mobile.png") });
   await page.locator(".public-profile-modal").getByRole("button", { name: "Fermer le profil", exact: true }).click();
-  await page.getByLabel("Jeu du titre affiché", { exact: true }).selectOption("blackjack"); await page.getByRole("button", { name: "Enregistrer le profil", exact: true }).click();
-  await waitFor(async () => (await request("alice", "/api/me")).profile.titleGameId === "blackjack", "title selection saved");
+  await page.getByLabel("Titre affiché", { exact: true }).selectOption("yahtzee:1"); await page.getByRole("button", { name: "Enregistrer le profil", exact: true }).click();
+  await waitFor(async () => (await request("alice", "/api/me")).gameTitle.titleLevel === 1, "lower-tier title selection saved");
+  assert.equal((await request("bob", "/api/users/alice/public")).gameTitle.title, "Apprenti");
+  await page.getByLabel("Titre affiché", { exact: true }).selectOption("hidden"); await page.getByRole("button", { name: "Enregistrer le profil", exact: true }).click();
+  await waitFor(async () => (await request("alice", "/api/me")).gameTitle === null, "hidden title selection saved");
+  await page.getByLabel("Titre affiché", { exact: true }).selectOption("blackjack:1"); await page.getByRole("button", { name: "Enregistrer le profil", exact: true }).click();
+  await waitFor(async () => { const user = await request("alice", "/api/me"); return user.profile.titleGameId === "blackjack" && user.profile.titleLevel === 1 && !user.profile.titleHidden; }, "title selection saved");
+  await page.reload(); await page.locator(".xp-workspace").waitFor(); assert.equal(await page.getByLabel("Titre affiché", { exact: true }).inputValue(), "blackjack:1");
   await page.screenshot({ path: path.join(previews, "game-progression-profile-mobile.png"), fullPage: true });
   await page.goto(`${origin}${base}/shop`); await page.getByLabel("Inventaire", { exact: true }).selectOption("all");
   for (const [type, name] of [["diceSkins", "dice"], ["cardSkins", "cards"]]) {
@@ -115,9 +137,9 @@ try {
   await admin.getByLabel("Nom du titre 2", { exact: true }).fill("Champion"); await admin.getByRole("button", { name: "Enregistrer", exact: true }).click();
   await waitFor(async () => (await request("alice", "/api/me")).gameProgression.find((row) => row.gameId === "yahtzee").title === "Champion", "per-game titles saved");
   const waiting = await request("alice", "/api/rooms", "POST", { gameId: "yahtzee", name: "Carriere Yahtzee", stake: 10, minLevel: 3, maxLevel: 4 });
-  assert.equal(waiting.players.find((row) => row.id === "alice").gameTitle.title, "Champion");
+  assert.equal(waiting.players.find((row) => row.id === "alice").gameTitle.title, "Apprenti");
   const message = await request("alice", "/api/chat/messages", "POST", { channelType: "room", roomCode: waiting.code, content: "Bienvenue a la table" }, 201);
-  assert.equal(message.sender.gameTitle.title, "Champion");
+  assert.equal(message.sender.gameTitle.title, "Apprenti");
   await request("alice", `/api/rooms/${waiting.code}/level-settings`, "POST", { minLevel: 4, maxLevel: 5 }, 400);
   await request("bob", `/api/rooms/${waiting.code}/level-settings`, "POST", { minLevel: 1 }, 404);
   await admin.screenshot({ path: path.join(previews, "game-progression-admin-desktop.png"), fullPage: true });
@@ -129,6 +151,24 @@ try {
   await achievement.getByLabel("XP récompense 1", { exact: true }).fill("175"); await admin.screenshot({ path: path.join(previews, "achievement-rewards-editor-desktop.png") });
   await achievement.getByRole("button", { name: "Enregistrer", exact: true }).click(); await achievement.waitFor({ state: "hidden" });
   assert.equal((await request("alice", "/api/achievements")).find((row) => row.id === "test-victory").rewards.xp[0].amount, 175);
+  await request("admin", "/api/admin/settings", "PATCH", { gameProgression: { ...config, games: Object.fromEntries(Object.entries(DEFAULT_GAME_TITLES).map(([id, titles]) => [id, { titles }])) } });
+  await request("admin", "/api/admin/achievements", "POST", { id: "test-title-levels", title: "Paliers de titres", description: "Verifier les titres precedents", group: "Yahtzee", type: "games", gameId: "yahtzee", target: 999999, rule: { source: "metric", metric: "gamesPlayed" }, rewards: { xp: [{ gameId: "yahtzee", amount: 3500 }] } }, 201);
+  await request("admin", "/api/admin/users/alice/achievements", "PATCH", { states: { "test-title-levels": true } });
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto(`${origin}${base}/profil`); await page.locator(".xp-workspace").waitFor();
+  const choices = page.getByLabel("Titre affiché", { exact: true });
+  assert.equal(await choices.locator('option[value="yahtzee:10"]').innerText(), "Brelan · niveau 10");
+  assert.equal(await choices.locator('option[value="yahtzee:20"]').count(), 0);
+  await choices.selectOption("yahtzee:5"); await page.getByRole("button", { name: "Enregistrer le profil", exact: true }).click();
+  await waitFor(async () => (await request("alice", "/api/me")).gameTitle.title === "Paire", "preset lower-tier title saved");
+  await page.locator(".xp-workspace").screenshot({ path: path.join(previews, "favorite-title-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 }); await noOverflow(page, ".xp-workspace"); await page.locator(".xp-workspace").screenshot({ path: path.join(previews, "favorite-title-mobile.png") });
+  await page.getByRole("button", { name: "Profil public", exact: true }).click();
+  await page.locator(".public-profile-modal .xp-workspace").scrollIntoViewIfNeeded(); await noOverflow(page, ".public-profile-scroll");
+  assert.equal(await page.locator(".public-profile-modal .player-game-title").innerText(), "Paire");
+  await page.screenshot({ path: path.join(previews, "favorite-title-public-mobile.png") });
+  const crossGame = await request("alice", "/api/rooms", "POST", { gameId: "blackjack", name: "Titre choisi", stake: 10 });
+  assert.equal(crossGame.players.find((row) => row.id === "alice").gameTitle.title, "Paire");
+  assert.equal((await request("alice", "/api/chat/messages", "POST", { channelType: "room", roomCode: crossGame.code, content: "Titre conserve" }, 201)).sender.gameTitle.title, "Paire");
   assert.deepEqual(errors, []); console.log("Passed progression profiles, per-game titles/settings persistence, reward picker, shop symbols, mobile layouts and Ghostery.");
 } catch (error) {
   console.error(output.slice(-3500)); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) console.error(page.url(), (await page.locator("body").innerText().catch(() => "")).slice(-4000)); throw error;

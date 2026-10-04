@@ -6501,6 +6501,7 @@ textarea {
 }
 
 .public-profile-scroll::-webkit-scrollbar { width: 10px; }
+.public-profile-scroll > .modal-title-row { justify-content: flex-end; margin-bottom: 16px; }
 .public-profile-scroll::-webkit-scrollbar-track { background: rgba(5, 9, 11, 0.44); border-radius: 0 16px 16px 0; }
 .public-profile-scroll::-webkit-scrollbar-thumb { background: linear-gradient(#f0cd75, #8f671d); border: 2px solid rgba(5, 9, 11, 0.62); border-radius: 999px; }
 .public-profile-modal > .profile-cosmetic-frame-layer,
@@ -6535,6 +6536,8 @@ textarea {
 .public-profile-layout-solo {
   grid-template-columns: minmax(360px, 520px);
 }
+
+.public-profile-layout > * { min-width: 0; }
 
 .public-profile-modal .vip-card {
   height: auto;
@@ -6619,9 +6622,11 @@ textarea {
   border: 1px solid rgba(232, 199, 119, 0.16);
   border-radius: 10px;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
   padding: 10px 12px;
+  min-width: 0;
 }
 
 .profile-cosmetics-preview > div > span {
@@ -6634,6 +6639,14 @@ textarea {
 .profile-cosmetics-preview .die { height: 54px; padding: 7px; width: 54px; }
 .profile-cosmetics-preview .playing-card { height: 64px; min-width: 46px; }
 .profile-cosmetics-preview .skin-preview-row { gap: 7px; }
+.profile-cosmetics-preview .skin-preview-row .playing-card { width: 46px; min-width: 46px; height: 64px; flex: 0 0 46px; padding: 5px; }
+.profile-cosmetics-preview .playing-card strong { font-size: 18px; line-height: 1; }
+.profile-cosmetics-preview .playing-card span { font-size: 25px; line-height: 1; }
+@media (max-width: 600px) {
+  .public-profile-layout { grid-template-columns: minmax(0, 1fr); }
+  .profile-cosmetics-preview > div { justify-content: center; }
+  .profile-cosmetics-preview > div > span { width: 100%; text-align: center; }
+}
 
 .activity-card {
   margin-top: 18px;

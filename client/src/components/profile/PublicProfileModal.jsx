@@ -54,13 +54,10 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
   }
   return (
     <ModalBackdrop className="modal-backdrop" onClick={onClose}>
-      <div className={profileCosmeticClassName(profile, "modal public-profile-modal")} onClick={(e) => e.stopPropagation()}>
+      <div className={profileCosmeticClassName(profile, "modal public-profile-modal")} role="dialog" aria-modal="true" aria-label="Profil public" onClick={(e) => e.stopPropagation()}>
         <ProfileCosmeticEffect user={profile} />
         <ProfileCosmeticFrame user={profile} />
         <div className="public-profile-scroll"><div className="modal-title-row">
-          <div>
-            <h2>Profil de {profile.pseudo}</h2>
-          </div>
           <div className="modal-title-actions">
             {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary" disabled={relationship.isFriend || relationship.requested} onClick={() => onFriendRequest?.(profile.id)}>{relationship.isFriend ? "Ami" : relationship.requested ? "Demande envoyée" : "Ajouter en ami"}</button>}
             {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary icon-toggle" disabled={Boolean(connectionBusy)} aria-pressed={Boolean(relationship.muted)} title={relationship.muted ? "Réactiver les messages" : "Mettre en sourdine"} aria-label={relationship.muted ? "Réactiver les messages de ce joueur" : "Mettre ce joueur en sourdine"} onClick={() => controlConnection("muted", relationship.muted ? "DELETE" : "POST")}>{relationship.muted ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>}
@@ -82,7 +79,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
             {publicStats.length > 0 && <div className="public-profile-grid">{publicStats.map(([key, label, value]) => <div key={key}><span>{label}</span><strong>{value}</strong></div>)}</div>}
             <div className="profile-cosmetics-preview" aria-label="Dés et cartes équipés">
               <div><span>Dés</span><Die value={5} kept={false} skin={profile.cosmetics?.equipped?.diceSkin} /></div>
-              <div><span>Cartes</span><div className="skin-preview-row"><PlayingCard card={{ rank: "A", suit: "S" }} skin={profile.cosmetics?.equipped?.cardSkin} /><PlayingCard hidden skin={profile.cosmetics?.equipped?.cardSkin} /></div></div>
+              <div><span>Cartes</span><div className="skin-preview-row"><PlayingCard card={{ rank: "A", suit: "S" }} skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /><PlayingCard hidden skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /></div></div>
             </div>
           </aside>
           {hasDetails && <section className="public-profile-side">
@@ -96,7 +93,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
             </div>}
           </section>}
         </div>
-        <GameProgression rows={profile.gameProgression} />
+        <GameProgression rows={profile.gameProgression} favorites={favoriteGames} />
         <DailyActivityChart activity={profile.activity ?? []} /></div>
       </div>
     </ModalBackdrop>

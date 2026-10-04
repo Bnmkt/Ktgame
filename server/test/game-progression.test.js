@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { awardGameXp, compileXpFormula, DEFAULT_XP_FORMULA, gameProgress, grantAchievementRewards, normalizeAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits } from "../src/services/game-progression.js";
+import { awardGameXp, compileXpFormula, DEFAULT_XP_FORMULA, equippedGameTitle, gameProgress, gameXpRules, grantAchievementRewards, normalizeAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "../src/services/game-progression.js";
+import { DEFAULT_GAME_TITLES } from "../src/services/game-titles.js";
+import { games } from "../src/games/shared.js";
 import { achievementRuleSchemas, consumeAchievementEvent, normalizeAchievementDefinition } from "../src/services/achievement-rules.js";
 
 test("French XP formula supports decimal commas, powers, round and floor without executing code", () => {
@@ -54,4 +56,43 @@ test("achievement editor schemas offer game level and XP metrics, events and rew
   assert.equal(definition.rewards.xp[0].amount, 30);
   const rule = { source: "event", event: "game.level", scope: "career", aggregate: "max", valueField: "level", condition: { field: "gameId", operator: "eq", value: "yahtzee" } };
   assert.equal(consumeAchievementEvent(rule, { type: "game.level", payload: { gameId: "yahtzee", level: 8 } }).progress.value, 8);
+});
+
+test("all fifteen games have eight default titles at the requested thresholds", () => {
+  const config = normalizeProgressionConfig({}, games.map((game) => game.id));
+  assert.equal(Object.keys(DEFAULT_GAME_TITLES).length, 15);
+  for (const game of games) {
+    const titles = unlockedGameTitles(config, game.id, 100);
+    assert.deepEqual(titles.map((row) => row.level), [1, 5, 10, 20, 40, 60, 80, 100]);
+    assert.equal(unlockedGameTitles(config, game.id, 4).length, 1);
+    assert.equal(unlockedGameTitles(config, game.id, 5).length, 2);
+    assert.equal(titles.at(-1).label, DEFAULT_GAME_TITLES[game.id].at(-1).label);
+  }
+  assert.equal(config.games.yahtzee.titles[2].label, "Brelan");
+  assert.equal(config.games.blackjack.titles[4].label, "Vingt et Un");
+});
+
+test("a chosen lower-tier title stays equipped after leveling and invalid or removed titles fall back safely", () => {
+  const config = normalizeProgressionConfig({ formula: "10*N" }, ["yahtzee", "blackjack"]);
+  const user = { gameXp: { yahtzee: 1900, blackjack: 0 }, profile: { titleGameId: "yahtzee", titleLevel: 5 } };
+  assert.equal(gameProgress(user, "yahtzee", config).level, 20);
+  assert.equal(equippedGameTitle(user, config, ["yahtzee", "blackjack"]).title, "Paire");
+  awardGameXp(user, "yahtzee", 1000, config);
+  assert.equal(equippedGameTitle(user, config, ["yahtzee", "blackjack"]).title, "Paire");
+  user.profile.titleLevel = 100;
+  assert.equal(equippedGameTitle(user, config, ["yahtzee", "blackjack"]).title, "Carré");
+  user.profile.titleLevel = 5;
+  config.games.yahtzee.titles = config.games.yahtzee.titles.filter((row) => row.level !== 5);
+  assert.equal(equippedGameTitle(user, config, ["yahtzee", "blackjack"]).title, "Carré");
+  user.profile.titleHidden = true;
+  assert.equal(equippedGameTitle(user, config, ["yahtzee", "blackjack"]), null);
+});
+
+test("per-game titles do not freeze inherited XP amounts", () => {
+  const config = normalizeProgressionConfig({ completionXp: 20, victoryXp: 25 }, ["yahtzee", "blackjack"]);
+  assert.deepEqual(gameXpRules(config, "yahtzee"), { completionXp: 20, victoryXp: 25 });
+  const changed = normalizeProgressionConfig({ ...config, completionXp: 80 }, ["yahtzee", "blackjack"]);
+  assert.deepEqual(gameXpRules(changed, "yahtzee"), { completionXp: 80, victoryXp: 25 });
+  const overridden = normalizeProgressionConfig({ ...changed, games: { ...changed.games, yahtzee: { ...changed.games.yahtzee, victoryXp: 100 } } }, ["yahtzee"]);
+  assert.deepEqual(gameXpRules(overridden, "yahtzee"), { completionXp: 80, victoryXp: 100 });
 });

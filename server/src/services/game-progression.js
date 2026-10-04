@@ -1,3 +1,5 @@
+import { DEFAULT_GAME_TITLES } from "./game-titles.js";
+
 export const DEFAULT_XP_FORMULA = "ARRONDI((12 + 30 * N + 8 * N^1,5) * (1 + 0,4 * ENT(N / 10)^1,25))";
 export const MAX_XP = 1000000000000;
 const curves = new Map();
@@ -70,9 +72,14 @@ export function normalizeProgressionConfig(input = {}, gameIds = []) {
     completionXp: integer(input.completionXp, 50, 1000000), victoryXp: integer(input.victoryXp, 25, 1000000),
     titles: titles(input.titles ?? [{ level: 1, label: "Débutant" }, { level: 5, label: "Habitué" }, { level: 10, label: "Confirmé" }, { level: 25, label: "Expert" }, { level: 50, label: "Maître" }]), games: {}
   };
-  for (const id of gameIds) if (Object.hasOwn(input.games ?? {}, id)) {
-    const row = input.games[id];
-    config.games[id] = { completionXp: integer(row.completionXp, config.completionXp, 1000000), victoryXp: integer(row.victoryXp, config.victoryXp, 1000000), ...(row.titles ? { titles: titles(row.titles) } : {}) };
+  for (const id of gameIds) {
+    const row = input.games?.[id] ?? {};
+    const gameTitles = row.titles ?? (input.titles === undefined ? DEFAULT_GAME_TITLES[id] : undefined);
+    if (Object.hasOwn(input.games ?? {}, id) || gameTitles) config.games[id] = {
+      ...(row.completionXp !== undefined ? { completionXp: integer(row.completionXp, config.completionXp, 1000000) } : {}),
+      ...(row.victoryXp !== undefined ? { victoryXp: integer(row.victoryXp, config.victoryXp, 1000000) } : {}),
+      ...(gameTitles ? { titles: titles(gameTitles) } : {})
+    };
   }
   progressionCurve(config);
   return config;
@@ -91,8 +98,21 @@ export function gameProgress(user, gameId, config) {
   const curve = progressionCurve(config);
   let lo = 0, hi = curve.length - 1;
   while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (curve[mid].totalXp <= xp) lo = mid; else hi = mid - 1; }
-  const row = curve[lo], title = (config.games?.[gameId]?.titles ?? config.titles).filter((entry) => entry.level <= row.level).at(-1)?.label ?? "";
-  return { gameId, xp, level: row.level, title, levelXp: xp - row.totalXp, nextXp: row.nextXp, capped: row.nextXp === 0 };
+  const row = curve[lo], title = unlockedGameTitles(config, gameId, row.level).at(-1);
+  return { gameId, xp, level: row.level, title: title?.label ?? "", titleLevel: title?.level ?? 0, levelXp: xp - row.totalXp, nextXp: row.nextXp, capped: row.nextXp === 0 };
+}
+export function unlockedGameTitles(config, gameId, level) {
+  return (config.games?.[gameId]?.titles ?? config.titles).filter((entry) => entry.level <= level);
+}
+export function gameXpRules(config, gameId) {
+  return { completionXp: config.games?.[gameId]?.completionXp ?? config.completionXp, victoryXp: config.games?.[gameId]?.victoryXp ?? config.victoryXp };
+}
+export function equippedGameTitle(user, config, gameIds) {
+  if (user?.profile?.titleHidden || !gameIds.length) return null;
+  const gameId = gameIds.includes(user?.profile?.titleGameId) ? user.profile.titleGameId : [...gameIds].sort((a, b) => (user?.gameXp?.[b] ?? 0) - (user?.gameXp?.[a] ?? 0))[0];
+  const progress = gameProgress(user, gameId, config);
+  const chosen = unlockedGameTitles(config, gameId, progress.level).find((row) => row.level === user?.profile?.titleLevel);
+  return chosen ? { ...progress, title: chosen.label, titleLevel: chosen.level } : progress;
 }
 export function awardGameXp(user, gameId, amount, config) {
   if (!user || user.guest || user.isBot || !Number.isSafeInteger(amount) || amount <= 0) return null;

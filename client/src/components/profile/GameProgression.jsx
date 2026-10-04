@@ -1,13 +1,19 @@
-import { useState } from "react";
 import { TrendingUp } from "lucide-react";
 import "./game-progression.css";
 
-export function GameProgression({ rows = [], titleGameId, onTitleChange }) {
-  const [filter, setFilter] = useState("played");
-  const visible = rows.filter((row) => filter === "all" || row.xp > 0).sort((a, b) => b.xp - a.xp);
-  return <section className="xp-workspace"><header><div><span className="eyebrow">Carrière</span><h3><TrendingUp size={20} />Progression par jeu</h3></div><label>Jeux<select aria-label="Afficher la progression" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="played">Jeux avec de l’XP</option><option value="all">Tous les jeux</option></select></label></header>
-    {onTitleChange && <label className="xp-equipped-title">Titre affiché sur le profil et les chats<select aria-label="Jeu du titre affiché" value={titleGameId ?? ""} onChange={(event) => onTitleChange(event.target.value)}><option value="">Automatique : jeu avec le plus d’XP</option>{rows.map((row) => <option key={row.gameId} value={row.gameId}>{row.gameName} : {row.title || "Sans titre"} · niveau {row.level}</option>)}</select></label>}
-    {!visible.length && <p className="xp-empty">Pas encore d’XP. Les parties terminées et les succès font progresser chaque jeu séparément.</p>}
+export function GameProgression({ rows = [], favorites = [], selection, equippedTitle, onTitleChange }) {
+  const visible = favorites.map((id) => rows.find((row) => row.gameId === id)).filter(Boolean);
+  const selectedRow = rows.find((row) => row.gameId === selection?.titleGameId);
+  const selectedTitle = selectedRow?.unlockedTitles?.find((row) => row.level === selection?.titleLevel);
+  const chosen = selectedTitle ? { gameId: selectedRow.gameId, titleLevel: selectedTitle.level } : selectedRow ? { gameId: selectedRow.gameId, titleLevel: selectedRow.titleLevel } : equippedTitle;
+  const value = selection?.titleHidden || !chosen?.titleLevel ? "hidden" : `${chosen.gameId}:${chosen.titleLevel}`;
+  if (!onTitleChange && !visible.length) return null;
+  return <section className="xp-workspace"><header><div><span className="eyebrow">Carrière</span><h3><TrendingUp size={20} />Progression des jeux favoris</h3></div></header>
+    {onTitleChange && <label className="xp-equipped-title">Titre affiché<select aria-label="Titre affiché" value={value} onChange={(event) => {
+      if (event.target.value === "hidden") onTitleChange({ titleGameId: "", titleLevel: 0, titleHidden: true });
+      else { const [titleGameId, titleLevel] = event.target.value.split(":"); onTitleChange({ titleGameId, titleLevel: Number(titleLevel), titleHidden: false }); }
+    }}><option value="hidden">Sans titre</option>{rows.filter((row) => row.unlockedTitles?.length).map((row) => <optgroup key={row.gameId} label={row.gameName}>{row.unlockedTitles.map((title) => <option key={title.level} value={`${row.gameId}:${title.level}`}>{title.label} · niveau {title.level}</option>)}</optgroup>)}</select></label>}
+    {!visible.length && <p className="xp-empty">Aucun jeu favori.</p>}
     <div className="xp-game-list">{visible.map((row) => <article key={row.gameId}><header><strong>{row.gameName}</strong><span>Niveau {row.level}</span></header><div><b>{row.title || "Sans titre"}</b><small>{row.xp.toLocaleString("fr-FR")} XP</small></div><progress max={row.nextXp || 1} value={row.capped ? 1 : Math.min(row.nextXp, row.levelXp)} aria-label={`${row.gameName} : niveau ${row.level}`} /><small>{row.capped ? "Niveau maximal atteint" : `${row.levelXp.toLocaleString("fr-FR")} / ${row.nextXp.toLocaleString("fr-FR")} XP vers le niveau ${row.level + 1}`}</small></article>)}</div>
   </section>;
 }

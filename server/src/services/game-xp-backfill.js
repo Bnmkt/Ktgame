@@ -1,4 +1,4 @@
-import { awardGameXp, gameProgress } from "./game-progression.js";
+import { awardGameXp, gameProgress, gameXpRules } from "./game-progression.js";
 
 export function backfillHistoricalGameXp(sqlite, userId, config, gameIds, { apply = false } = {}) {
   sqlite.exec(apply ? "BEGIN IMMEDIATE" : "BEGIN");
@@ -20,7 +20,7 @@ export function backfillHistoricalGameXp(sqlite, userId, config, gameIds, { appl
       summary.completed++; summary.won += Number(Boolean(row.won));
       // The same per-player receipt is used by normal game completion, including zero awards.
       if (Object.hasOwn(data.xpAwards ?? {}, userId)) { alreadyCredited++; summary.alreadyCredited++; continue; }
-      const rules = config.games[row.game_id] ?? config;
+      const rules = gameXpRules(config, row.game_id);
       const reward = awardGameXp(user, row.game_id, rules.completionXp + (row.won ? rules.victoryXp : 0), config);
       const amount = reward?.amount ?? 0;
       summary.addedXp += amount;

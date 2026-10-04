@@ -41,7 +41,7 @@ import { normalizeCosmeticCss, normalizeCosmeticDesign, normalizeCosmeticMotion 
 import { friendRoomPresence } from "./services/friend-presence.js";
 import { createOnlinePresence } from "./services/online-presence.js";
 import { roomCredentialsError } from "./services/room-credentials.js";
-import { awardGameXp, gameProgress, grantAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits } from "./services/game-progression.js";
+import { awardGameXp, equippedGameTitle, gameProgress, gameXpRules, grantAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "./services/game-progression.js";
 import { buildLeaderboard } from "./services/leaderboards.js";
 import {
   appendEventPotEntry,
@@ -500,13 +500,15 @@ function platformSettings(db = readDb()) {
 }
 
 function progressionConfig(db) { return platformSettings(db).gameProgression; }
-function playerProgression(user, db) {
+function playerProgression(user, db, includeTitles = false) {
   const config = progressionConfig(db);
-  return games.map((game) => ({ ...gameProgress(user, game.id, config), gameName: game.name }));
+  return games.map((game) => {
+    const progress = gameProgress(user, game.id, config);
+    return { ...progress, gameName: game.name, ...(includeTitles ? { unlockedTitles: unlockedGameTitles(config, game.id, progress.level) } : {}) };
+  });
 }
-function playerTitle(user, db, gameId = user?.profile?.titleGameId) {
-  if (!gameId) gameId = games.map((game) => game.id).sort((left, right) => (user?.gameXp?.[right] ?? 0) - (user?.gameXp?.[left] ?? 0))[0];
-  return games.some((game) => game.id === gameId) ? gameProgress(user, gameId, progressionConfig(db)) : null;
+function playerTitle(user, db) {
+  return equippedGameTitle(user, progressionConfig(db), games.map((game) => game.id));
 }
 function playerLevelContext(user, db, gameId) {
   const rows = playerProgression(user, db), current = rows.find((row) => row.gameId === gameId);
@@ -1223,6 +1225,8 @@ function normalizePublicProfile(profile = {}, fallbackName = "") {
     gender: String(profile.gender ?? "").slice(0, 32),
     bio: normalizePlainText(profile.bio, 180),
     titleGameId: games.some((game) => game.id === profile.titleGameId) ? profile.titleGameId : "",
+    titleLevel: Number.isSafeInteger(profile.titleLevel) && profile.titleLevel >= 0 && profile.titleLevel <= 1000 ? profile.titleLevel : 0,
+    titleHidden: Boolean(profile.titleHidden),
     favoriteGames: Array.isArray(profile.favoriteGames) ? [...new Set(profile.favoriteGames.map(String))].slice(0, 5) : []
   };
 }
@@ -1380,7 +1384,7 @@ function sanitizeUser(user, db = readDb()) {
   const settings = platformSettings(db);
   const moderation = activeModeration(user);
   const parentalRevocation = activeParentalRevocation(user);
-  return { gameProgression: playerProgression(user, db), gameTitle: playerTitle(user, db), id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, mfa: mfaSummary(user), minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
+  return { gameProgression: playerProgression(user, db, true), gameTitle: playerTitle(user, db), id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, mfa: mfaSummary(user), minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
 }
 
 function roomPlayerFor(user) {
@@ -1459,7 +1463,7 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
     const fullUser = db.users.find((u) => u.id === player.id);
     const sanitized = !fullUser
       ? { ...player, profile: publicProfileFor(player), profileStats: normalizeProfileStats(player.profileStats) }
-      : { ...player, gameTitle: playerTitle(fullUser, db, room.gameId), login: fullUser.pseudo, pseudo: displayNameFor(fullUser), age: ageFromBirthDate(fullUser.profile?.birthDate), cosmetics: normalizeCosmetics(fullUser.cosmetics), profileStats: normalizeProfileStats(fullUser.profileStats), profile: publicProfileFor(fullUser) };
+      : { ...player, gameTitle: playerTitle(fullUser, db), login: fullUser.pseudo, pseudo: displayNameFor(fullUser), age: ageFromBirthDate(fullUser.profile?.birthDate), cosmetics: normalizeCosmetics(fullUser.cosmetics), profileStats: normalizeProfileStats(fullUser.profileStats), profile: publicProfileFor(fullUser) };
     sanitizedPlayers.set(player.id, sanitized);
     return sanitized;
   };
@@ -2231,10 +2235,9 @@ function resolveChatChannel(db, user, input = {}) {
 
 function decorateChatMessage(message, db = readDb()) {
   const sender = db.users.find((entry) => entry.id === message.senderId);
-  const room = message.channelType === "room" ? db.rooms.find((entry) => entry.id === message.channelId) : null;
   return {
     ...message,
-    sender: sender ? { ...sanitizeFriendUser(sender, db), gameTitle: playerTitle(sender, db, room?.gameId ?? sender.profile?.titleGameId) } : { id: message.senderId, pseudo: "Compte supprimé", cosmetics: structuredClone(defaultCosmetics) }
+    sender: sender ? sanitizeFriendUser(sender, db) : { id: message.senderId, pseudo: "Compte supprimé", cosmetics: structuredClone(defaultCosmetics) }
   };
 }
 
@@ -2532,7 +2535,7 @@ function finishRoomIfNeeded(room, db) {
   db.history.push(historyRow);
   for (const player of room.players.filter((p) => !p.isBot)) {
     const user = db.users.find((u) => u.id === player.id);
-    const config = progressionConfig(db), xpRules = config.games[room.gameId] ?? config;
+    const config = progressionConfig(db), xpRules = gameXpRules(config, room.gameId);
     const amount = xpRules.completionXp + (winners.includes(player.id) ? xpRules.victoryXp : 0);
     const xp = awardGameXp(user, room.gameId, amount, config);
     if (xp) {
@@ -5604,6 +5607,13 @@ app.patch("/api/me", auth, async (req, res) => {
   if (login && !validEmail(login)) return res.status(400).json({ error: "Adresse email invalide." });
   const currentAccount = readDb().users.find((entry) => entry.id === req.auth.id);
   if (req.body.titleGameId && !games.some((game) => game.id === req.body.titleGameId)) return res.status(400).json({ error: "Jeu du titre invalide." });
+  if (req.body.titleHidden !== undefined && typeof req.body.titleHidden !== "boolean") return res.status(400).json({ error: "Affichage du titre invalide." });
+  if (req.body.titleLevel !== undefined && (!Number.isSafeInteger(req.body.titleLevel) || req.body.titleLevel < 0 || req.body.titleLevel > 1000)) return res.status(400).json({ error: "Palier du titre invalide." });
+  if (req.body.titleLevel > 0) {
+    const gameId = req.body.titleGameId ?? currentAccount?.profile?.titleGameId;
+    const config = progressionConfig(readDb());
+    if (!gameId || !unlockedGameTitles(config, gameId, gameProgress(currentAccount, gameId, config).level).some((row) => row.level === req.body.titleLevel)) return res.status(403).json({ error: "Ce titre n'est pas encore debloque." });
+  }
   if (login && normalizeEmail(currentAccount?.email) !== login) return res.status(400).json({ error: "Modifie l'adresse email depuis l'écran de sécurité du compte." });
   if (displayName && displayName.length < 3) return res.status(400).json({ error: "Pseudo en jeu trop court." });
   const allowedGenders = ["", "Homme", "Femme", "Non-binaire", "Autre", "Préfère ne pas dire"];
@@ -5638,7 +5648,10 @@ app.patch("/api/me", auth, async (req, res) => {
     if (favoriteGames) found.profile.favoriteGames = favoriteGames;
     if (req.body.titleGameId !== undefined) {
       found.profile.titleGameId = req.body.titleGameId;
+      if (req.body.titleLevel === undefined) found.profile.titleLevel = 0;
     }
+    if (req.body.titleLevel !== undefined) found.profile.titleLevel = req.body.titleLevel;
+    if (req.body.titleHidden !== undefined) found.profile.titleHidden = req.body.titleHidden;
     found.profile = normalizePublicProfile(found.profile, found.pseudo);
     if (passwordHash) {
       found.passwordHash = passwordHash;

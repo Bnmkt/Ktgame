@@ -15,11 +15,11 @@ export function ProgressionSettings({ value, onChange, games = [] }) {
   }, [value]);
   if (!value) return <p role="status">Chargement de la progression...</p>;
   const override = value.games?.[gameId];
-  const current = gameId ? override ?? value : value;
+  const current = gameId ? { ...value, ...override } : value;
   const update = (key, next) => onChange({ ...value, [key]: next });
   const updateGame = (key, next) => {
     if (!gameId) return update(key, next);
-    onChange({ ...value, games: { ...value.games, [gameId]: { completionXp: current.completionXp, victoryXp: current.victoryXp, ...(override?.titles ? { titles: override.titles } : {}), [key]: next } } });
+    onChange({ ...value, games: { ...value.games, [gameId]: { ...override, [key]: next } } });
   };
   const titleRows = override?.titles ?? value.titles;
   const rows = (preview ?? []).filter((row) => row.level <= range && (measure !== "nextXp" || row.nextXp > 0));
