@@ -205,8 +205,8 @@ function mailTransport(environment = process.env) {
   return transport;
 }
 
-export async function sendTransactionalEmail({ to, subject, text, html }, environment = process.env) {
-  await mailTransport(environment).sendMail({ from: environment.EMAIL_FROM, to, subject, text, html });
+export async function sendTransactionalEmail({ to, subject, text, html, attachments, messageId }, environment = process.env) {
+  await mailTransport(environment).sendMail({ from: environment.EMAIL_FROM, to, subject, text, html, attachments, messageId });
 }
 
 export async function verifyEmailDelivery(environment = process.env) {

@@ -36,17 +36,25 @@ export function createChatStore({ filename }) {
       read_at TEXT NOT NULL,
       PRIMARY KEY(user_id, channel_type, channel_id)
     );
+    CREATE TABLE IF NOT EXISTS chat_direct_members (
+      user_id TEXT NOT NULL, channel_id TEXT NOT NULL,
+      PRIMARY KEY(user_id, channel_id)
+    );
   `);
   let writesSinceCleanup = 0;
 
   return {
-    add({ channelType, channelId, senderId, content }, now = Date.now()) {
+    add({ channelType, channelId, senderId, content, participantIds = [] }, now = Date.now()) {
       if (!channelTypes.has(channelType)) throw new Error("INVALID_CHAT_CHANNEL");
       const message = {
         id: randomUUID(), channelType, channelId: clean(channelId, 100), senderId: clean(senderId, 100),
         content: clean(content, 500), createdAt: iso(now)
       };
       if (!message.channelId || !message.senderId || !message.content) throw new Error("INVALID_CHAT_MESSAGE");
+      if (channelType === "direct") {
+        const member = db.prepare("INSERT OR IGNORE INTO chat_direct_members(user_id,channel_id) VALUES(?,?)");
+        for (const id of new Set([senderId, ...participantIds])) member.run(clean(id, 100), message.channelId);
+      }
       db.prepare("INSERT INTO chat_messages(id,channel_type,channel_id,sender_id,content,created_at) VALUES(?,?,?,?,?,?)")
         .run(message.id, message.channelType, message.channelId, message.senderId, message.content, message.createdAt);
       db.prepare("DELETE FROM chat_messages WHERE created_at < ?").run(iso(now - 180 * 86400000));
@@ -90,6 +98,7 @@ export function createChatStore({ filename }) {
     deleteForUser(userId) {
       db.prepare("UPDATE chat_messages SET sender_id='deleted-user' WHERE sender_id=?").run(userId);
       db.prepare("DELETE FROM chat_reads WHERE user_id=?").run(userId);
+      db.prepare("DELETE FROM chat_direct_members WHERE user_id=?").run(userId);
     },
     close() { db.close(); }
   };

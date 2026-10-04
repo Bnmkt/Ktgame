@@ -58,7 +58,9 @@ import {
   purchaseCommunityEventActions,
   validateCommunityEvent
 } from "./services/community-events.js";
-import { databaseHealth, readDb, setCatalogSource, updateDb, writeDb } from "./db.js";
+import { databaseFilename, databaseHealth, readDb, setCatalogSource, updateDb, writeDb } from "./db.js";
+import { createDataRequestStore } from "./services/data-requests.js";
+import { registerDataRequestRoutes } from "./services/data-request-routes.js";
 import { archiveDays, archiveRows } from "./storage/archives.js";
 import { ledgerPage } from "./storage/ledger.js";
 import { playerStatistics } from "./services/player-statistics.js";
@@ -68,7 +70,7 @@ import {
   consumeAchievementEvent,
   normalizeAchievementDefinition
 } from "./services/achievement-rules.js";
-import { casinoDateKey, casinoTimeParts, shiftDateKey } from "./services/time.js";
+import { casinoDateKey, casinoTimeParts, shiftDateKey, validDateOnly } from "./services/time.js";
 import { calculateDailyBonusStatus, defaultDailyBonusRules, normalizeDailyBonusConfig } from "./services/daily-bonus.js";
 import { createRequestLogStore, requestLogMiddleware } from "./services/request-logs.js";
 import {
@@ -185,6 +187,9 @@ const tribunal = createTribunalStore({ filename: TRIBUNAL_DB_PATH });
 process.on("exit", () => tribunal.close());
 const chat = createChatStore({ filename: CHAT_DB_PATH });
 process.on("exit", () => chat.close());
+const dataRequestFilename = process.env.DATA_REQUEST_DB_PATH ? path.resolve(process.cwd(), process.env.DATA_REQUEST_DB_PATH) : `${databaseFilename}.rights.sqlite`;
+const dataRequests = createDataRequestStore({ filename: dataRequestFilename });
+process.on("exit", () => dataRequests.close());
 
 const defaultGameDescriptions = {
   yahtzee: "Marquer le plus de points après 13 catégories.",
@@ -3247,6 +3252,14 @@ app.post("/api/auth/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
+registerDataRequestRoutes({ app, auth, requireAdmin, store: dataRequests, readDb, updateDb, siteName: () => platformSettings().siteName, paths: {
+  main: databaseFilename, chat: CHAT_DB_PATH, parental: PARENTAL_DB_PATH, tribunal: TRIBUNAL_DB_PATH,
+  logs: path.resolve(process.env.REQUEST_LOG_PATH || path.join(__dirname, "..", "data", "request-logs.sqlite")),
+  notes: path.resolve(process.env.PATCHNOTES_DB_PATH || path.join(__dirname, "..", "data", "patchnotes.sqlite")),
+  noteImages: path.resolve(process.env.PATCHNOTES_UPLOAD_DIR || path.join(__dirname, "..", "data", "patchnote-images")),
+  help: helpFilename, requests: dataRequestFilename
+} });
+
 app.get("/api/me", auth, (req, res) => {
   const sessionUser = sessions.get(req.auth.id);
   if (sessionUser) {
@@ -3497,7 +3510,7 @@ app.post("/api/chat/messages", auth, (req, res) => {
   if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
   if (!chatRateAllowed(user.id)) return res.status(429).json({ error: "Tu envoies des messages trop rapidement." });
   try {
-    const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content }), db);
+    const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content, participantIds: channel.friend ? [channel.friend.id] : [] }), db);
     for (const socket of io.sockets.sockets.values()) {
       if (!socket.rooms.has(channel.socketRoom)) continue;
       const viewer = db.users.find((entry) => entry.id === socket.data.chatUserId);
@@ -3849,6 +3862,7 @@ function adminOverview(db) {
   return {
     users: {
       total: users.length,
+      dataRequests: dataRequests.summary(),
       active: users.filter((user) => user.active !== false).length,
       inactive: users.filter((user) => user.active === false).length,
       admins: users.filter((user) => user.admin).length,
@@ -4228,6 +4242,7 @@ function adminUserDetail(db, user) {
     transactions,
     statistics: {
       gamesPlayed: statistics.gamesPlayed,
+      todayGames: statistics.activity[casinoDateKey()] ?? 0,
       wins: statistics.wins,
       winRate: statistics.gamesPlayed ? Math.round((statistics.wins / statistics.gamesPlayed) * 100) : 0,
       transactions: statistics.transactions,
@@ -4244,6 +4259,8 @@ function adminUserDetail(db, user) {
       outgoing: user.friendRequests.outgoing.map(relation).filter(Boolean)
     },
     security: {
+      mfa: mfaSummary(user),
+      loginLock: authLockStatus(user),
       sessionVersion: Math.max(0, Number(user.sessionVersion) || 0),
       emailVerificationPending: Boolean(user.emailVerification),
       emailVerificationSentAt: user.emailVerification?.sentAt ?? null,
@@ -4252,6 +4269,15 @@ function adminUserDetail(db, user) {
       passwordResetSentAt: user.passwordReset?.sentAt ?? null,
       passwordResetExpiresAt: user.passwordReset?.expiresAt ?? null
     },
+    parental: {
+      managed: isUnder13(user),
+      parentEmail: user.registrationAuthorization?.parentalApproval?.parentEmail ?? "",
+      code: user.registrationAuthorization?.parentalApproval?.code ?? (user.registrationAuthorization?.parentalApproval?.requestId ? parentalControls.getInternal(user.registrationAuthorization.parentalApproval.requestId)?.code : "") ?? "",
+      turnsThirteenAt: user.profile?.birthDate ? turnsThirteenAt(user.profile.birthDate) : null,
+      revokedUntil: activeParentalRevocation(user)?.revokedUntil ?? null,
+      restrictions: isUnder13(user) ? platformSettings(db).minorRestrictions : []
+    },
+    dataRequests: dataRequests.list(user.id),
     tribunal: {
       behavior: tribunal.behavior(user.id),
       reports: tribunal.reportStats(user.id)
@@ -4705,10 +4731,11 @@ app.get("/api/admin", auth, requireBackOffice, (req, res) => {
   const db = readDb();
   const isAdministrator = Boolean(req.backOfficeUser?.admin);
   const settings = platformSettings(db);
+  const dataRequestCounts = isAdministrator ? dataRequests.pendingCounts() : {};
   const registeredUsers = db.users.filter((user) => !user.guest).map((user) => {
     const statistics = playerStatistics(db, user.id);
     const signupTransaction = user.createdAt ? null : archiveRows(db.transactions, { userId: user.id, reason: "signup-bonus" }, { limit: 1 })[0];
-    return { id: user.id, login: user.email ?? user.pseudo, legacyLogin: !validEmail(user.email), emailVerified: Boolean(user.emailVerifiedAt), displayName: displayNameFor(user), bio: user.profile?.bio ?? "", tokens: user.tokens, active: user.active !== false, admin: Boolean(user.admin), editor: Boolean(user.editor), gamesPlayed: statistics.gamesPlayed, wins: statistics.wins, lastDailyClaim: user.lastDailyClaim ?? null, createdAt: user.createdAt ?? signupTransaction?.createdAt ?? null, lastLoginAt: user.lastLoginAt ?? null };
+    return { id: user.id, login: user.email ?? user.pseudo, legacyLogin: !validEmail(user.email), emailVerified: Boolean(user.emailVerifiedAt), displayName: displayNameFor(user), bio: user.profile?.bio ?? "", tokens: user.tokens, active: user.active !== false, admin: Boolean(user.admin), editor: Boolean(user.editor), gamesPlayed: statistics.gamesPlayed, wins: statistics.wins, lastDailyClaim: user.lastDailyClaim ?? null, createdAt: user.createdAt ?? signupTransaction?.createdAt ?? null, lastLoginAt: user.lastLoginAt ?? null, dataRequestPending: dataRequestCounts[user.id] ?? 0 };
   });
   const permissions = {
     role: isAdministrator ? "admin" : "editor",
@@ -4857,6 +4884,17 @@ app.post("/api/admin/users/:id/revoke-sessions", auth, requireAdmin, (req, res) 
     if (!target) return false;
     target.sessionVersion = (Number(target.sessionVersion) || 0) + 1;
     delete target.passwordReset;
+    return true;
+  });
+  if (!found) return res.status(404).json({ error: "Joueur introuvable." });
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/users/:id/unlock-login", auth, requireAdmin, (req, res) => {
+  const found = updateDb((db) => {
+    const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
+    if (!target) return false;
+    resetAuthFailures(target);
     return true;
   });
   if (!found) return res.status(404).json({ error: "Joueur introuvable." });
@@ -5109,6 +5147,15 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
+  for (const field of ["birthDate", "lastDailyClaim"]) {
+    const value = req.body[field];
+    if (value && (!validDateOnly(value) || value > casinoDateKey())) return res.status(400).json({ error: "La date doit être valide et ne peut pas être dans le futur." });
+  }
+  if (req.body.tokens !== undefined && (!Number.isSafeInteger(Number(req.body.tokens)) || Number(req.body.tokens) < 0 || Number(req.body.tokens) > 100000000)) return res.status(400).json({ error: "Le solde doit être un entier entre 0 et 100 000 000." });
+  if (req.params.id === req.auth.id && req.body.active === false) return res.status(400).json({ error: "Tu ne peux pas désactiver ton propre compte." });
+  for (const sanction of Object.values(req.body.moderation ?? {})) {
+    if (sanction?.active && (!String(sanction.reason ?? "").trim() || sanction.endsAt && (!Number.isFinite(Date.parse(sanction.endsAt)) || Date.parse(sanction.endsAt) <= Date.now()))) return res.status(400).json({ error: "Une sanction active nécessite un motif et, si renseignée, une échéance valide dans le futur." });
+  }
   const newPassword = String(req.body.password ?? "");
   const passwordError = newPassword ? passwordPolicyError(newPassword) : "";
   if (passwordError) return res.status(400).json({ error: passwordError });
@@ -5121,9 +5168,10 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
     const user = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
     if (!user) return null;
     const email = normalizeEmail(req.body.login ?? user.email);
-    if (!validEmail(email) || db.users.some((entry) => entry.id !== user.id && normalizeEmail(entry.email) === email)) return "duplicate";
+    const unchangedLegacy = !validEmail(user.email) && (req.body.login === undefined || String(req.body.login) === String(user.pseudo));
+    if (!unchangedLegacy && (!validEmail(email) || db.users.some((entry) => entry.id !== user.id && normalizeEmail(entry.email) === email))) return "duplicate";
     ensureUserSocial(user);
-    const emailChanged = normalizeEmail(user.email) !== email;
+    const emailChanged = !unchangedLegacy && normalizeEmail(user.email) !== email;
     if (emailChanged) {
       user.email = email;
       user.emailVerifiedAt = null;
@@ -5138,10 +5186,10 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
     user.profile.gender = String(req.body.gender ?? user.profile.gender ?? "").trim().slice(0, 32);
     if (Array.isArray(req.body.favoriteGames)) user.profile.favoriteGames = [...new Set(req.body.favoriteGames.map(String))].filter((id) => games.some((game) => game.id === id)).slice(0, 5);
     if (req.body.profileStats && typeof req.body.profileStats === "object") user.profileStats = normalizeProfileStats(req.body.profileStats);
-    const requestedBalance = Math.max(0, Math.floor(Number(req.body.tokens) || 0));
+    const requestedBalance = req.body.tokens === undefined ? Number(user.tokens) || 0 : Number(req.body.tokens);
     const balanceDelta = requestedBalance - (Number(user.tokens) || 0);
     if (balanceDelta) addTokens(db, user.id, balanceDelta, { reason: "admin-adjustment", note: "Solde modifié depuis la fiche joueur" });
-    const nextActive = req.body.active !== false;
+    const nextActive = req.body.active === undefined ? user.active !== false : req.body.active !== false;
     if (user.active !== false && !nextActive) user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
     user.active = nextActive;
     if (req.body.lastDailyClaim === null || req.body.lastDailyClaim === "") user.lastDailyClaim = null;

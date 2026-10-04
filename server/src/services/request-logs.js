@@ -44,6 +44,7 @@ export function createRequestLogStore({ filename, retentionDays = 14, maxRows = 
       user_id TEXT NOT NULL, request_id TEXT NOT NULL, origin TEXT NOT NULL, browser TEXT NOT NULL, message TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS request_logs_at ON request_logs(at);
+    CREATE INDEX IF NOT EXISTS request_logs_user_at ON request_logs(user_id, at);
     CREATE INDEX IF NOT EXISTS request_logs_category_at ON request_logs(category, at);
     CREATE INDEX IF NOT EXISTS request_logs_status_at ON request_logs(status, at);`);
   const insert = db.prepare("INSERT INTO request_logs(at,level,category,method,route,status,duration,user_id,request_id,origin,browser,message) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");

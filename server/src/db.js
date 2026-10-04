@@ -12,6 +12,7 @@ const configuredSqlitePath = process.env.SQLITE_PATH;
 const sqlitePath = configuredSqlitePath
   ? path.resolve(process.cwd(), configuredSqlitePath)
   : path.join(dataDir, "ktga.sqlite");
+export const databaseFilename = sqlitePath;
 const legacyJsonPath = path.join(dataDir, "db.json");
 
 const initialDb = {

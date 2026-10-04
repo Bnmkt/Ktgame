@@ -19,6 +19,7 @@ export function AdminOverview({ overview, settings, onNavigate, formatDate }) {
   const events = overview.events ?? {};
   const netToday = (economy.creditsToday ?? 0) - (economy.debitsToday ?? 0);
   const attention = [
+    users.dataRequests?.pending ? { tone: users.dataRequests.overdue ? "danger" : "warning", icon: MailWarning, title: `${users.dataRequests.pending} demande(s) de données personnelles`, detail: users.dataRequests.overdue ? `${users.dataRequests.overdue} échéance(s) dépassée(s) : traiter sans délai.` : "Consulte les fiches signalées dans les comptes joueurs pour approuver les envois.", tab: "users" } : null,
     settings.emailVerificationRequired && !settings.emailVerificationAvailable ? { tone: "danger", icon: AlertTriangle, title: "Envoi d’emails indisponible", detail: "La validation est obligatoire mais le service SMTP n’est pas configuré.", tab: "settings" } : null,
     users.pendingVerification ? { tone: "warning", icon: MailWarning, title: `${users.pendingVerification} email(s) à valider`, detail: "Comptes créés avec une adresse encore non confirmée.", tab: "users" } : null,
     users.legacyLogins ? { tone: "warning", icon: Users, title: `${users.legacyLogins} ancien(s) identifiant(s)`, detail: "Ces joueurs doivent remplacer leur login par une adresse email.", tab: "users" } : null,
