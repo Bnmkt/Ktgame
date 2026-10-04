@@ -1,0 +1,12 @@
+import { Plus, Trash2 } from "lucide-react";
+
+const emptyChallenge = () => ({ question: "", options: [{ id: "1", text: "" }, { id: "2", text: "" }], answerId: "1", explanation: "" });
+
+export function GuideInteractionEditor({ entry, onChange }) {
+  const challenge = entry.challenge;
+  const change = (fields) => onChange({ challenge: { ...challenge, ...fields } });
+  return <section className="player-help-interaction-editor">
+    <header><h3>Une petite mise en situation</h3><label><input type="checkbox" checked={Boolean(challenge)} onChange={(event) => onChange({ challenge: event.target.checked ? emptyChallenge() : null })} />Question facultative</label></header>
+    {challenge && <><label>Question aux joueurs<input value={challenge.question} maxLength={240} onChange={(event) => change({ question: event.target.value })} /></label><fieldset className="player-help-choice-editor"><legend>Réponses proposées</legend>{challenge.options.map((option, index) => <div key={option.id}><label className="player-help-correct-choice"><input type="radio" name={`help-answer-${entry.id}`} checked={challenge.answerId === option.id} onChange={() => change({ answerId: option.id })} aria-label={`Définir la réponse ${index + 1} comme correcte`} /></label><label><span className="sr-only">Réponse {index + 1}</span><input value={option.text} maxLength={160} onChange={(event) => change({ options: challenge.options.map((row) => row.id === option.id ? { ...row, text: event.target.value } : row) })} /></label><button type="button" className="secondary icon-toggle" title={`Retirer la réponse ${index + 1}`} aria-label={`Retirer la réponse ${index + 1}`} disabled={challenge.options.length <= 2} onClick={() => { const options = challenge.options.filter((row) => row.id !== option.id); change({ options, answerId: challenge.answerId === option.id ? options[0].id : challenge.answerId }); }}><Trash2 size={16} /></button></div>)}</fieldset><button type="button" className="secondary" disabled={challenge.options.length >= 4} onClick={() => change({ options: [...challenge.options, { id: crypto.randomUUID(), text: "" }] })}><Plus size={16} />Ajouter une réponse</button><label>Explication après le choix<textarea aria-label="Explication après le choix" className="player-help-short-input" value={challenge.explanation} maxLength={800} onChange={(event) => change({ explanation: event.target.value })} /></label></>}
+  </section>;
+}

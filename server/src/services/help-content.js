@@ -3,10 +3,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { matchesImageSignature } from "./patchnotes.js";
-import { defaultHelpEntries } from "../content/help-defaults.js";
+import { defaultHelpEntries, upgradeDefaultGuides } from "../content/help-defaults.js";
+import { guideIntroduction } from "../content/help-guide.js";
 
 const clean = (value, length) => String(value ?? "").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim().slice(0, length);
 const imageTypes = new Map([["image/png", "png"], ["image/jpeg", "jpg"], ["image/webp", "webp"], ["image/gif", "gif"]]);
+function normalizeChallenge(input) {
+  if (!input) return null;
+  if (!Array.isArray(input.options) || input.options.length < 2 || input.options.length > 4) throw new Error("La mise en situation doit proposer de 2 à 4 réponses.");
+  const options = input.options.map((option, index) => ({ id: clean(option?.id, 40) || String(index + 1), text: clean(option?.text, 160) }));
+  const ids = new Set(options.map((option) => option.id));
+  const question = clean(input.question, 240), explanation = clean(input.explanation, 800), answerId = clean(input.answerId, 40);
+  if (!question || !explanation || options.some((option) => !option.text || !/^[a-zA-Z0-9_-]+$/.test(option.id)) || ids.size !== options.length || !ids.has(answerId)) throw new Error("Complète la question, les réponses, la bonne réponse et son explication.");
+  return { question, options, answerId, explanation };
+}
 export function normalizeHelpDocument(input) {
   if (!Array.isArray(input?.entries) || input.entries.length > 100) throw new Error("Le guide peut contenir jusqu’à 100 rubriques.");
   const ids = new Set();
@@ -19,7 +29,7 @@ export function normalizeHelpDocument(input) {
     if (!title || !body) throw new Error("Chaque rubrique doit avoir un titre et un texte.");
     const image = clean(entry.image, 180);
     if (image && (!/^\/(?:guides\/|api\/help\/images\/)[a-zA-Z0-9_/-]+\.(?:png|jpg|jpeg|webp|gif)$/.test(image) || image.includes(".."))) throw new Error("L’image doit provenir du site ou de l’éditeur.");
-    return { id, kind: entry.kind, title, body, category: clean(entry.category, 60) || "Général", image, imageAlt: clean(entry.imageAlt, 200), published: entry.published !== false, position };
+    return { id, kind: entry.kind, title, body, lead: clean(entry.lead, 280), challenge: entry.kind === "guide" ? normalizeChallenge(entry.challenge) : null, category: clean(entry.category, 60) || "Général", image, imageAlt: clean(entry.imageAlt, 200), published: entry.published !== false, position };
   });
   return { title: clean(input.title, 100) || "Bienvenue au casino", intro: clean(input.intro, 1000), welcomeEnabled: input.welcomeEnabled !== false, entries };
 }
@@ -34,7 +44,11 @@ export function createHelpStore({ filename, uploadDirectory, now = () => Date.no
     CREATE TABLE IF NOT EXISTS help_reads(user_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, dismissed_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS help_images(id TEXT PRIMARY KEY, mime_type TEXT NOT NULL);
   `);
-  if (!db.prepare("SELECT 1 FROM help_settings").get()) save({ title: "Bienvenue au casino", intro: "Des jeux de cartes et de dés, des jetons virtuels et surtout des parties entre joueurs. Voici de quoi trouver tes repères.", welcomeEnabled: true, entries: defaultHelpEntries }, true);
+  if (!db.prepare("SELECT 1 FROM help_settings").get()) save({ title: "Bienvenue au casino", intro: guideIntroduction, welcomeEnabled: true, entries: defaultHelpEntries }, true);
+  else if (!readSettings().guideFormatVersion) {
+    const upgraded = upgradeDefaultGuides(read());
+    save(upgraded);
+  }
   function readSettings() {
     return JSON.parse(db.prepare("SELECT data FROM help_settings WHERE id=1").get().data);
   }
@@ -48,7 +62,7 @@ export function createHelpStore({ filename, uploadDirectory, now = () => Date.no
     const previous = initial ? null : read();
     const timestamp = new Date(now()).toISOString();
     const { entries, ...settings } = document;
-    const meta = { ...settings, revision: (previous?.revision ?? 0) + 1, launchedAt: previous?.launchedAt ?? timestamp, updatedAt: timestamp };
+    const meta = { ...settings, guideFormatVersion: 1, revision: (previous?.revision ?? 0) + 1, launchedAt: previous?.launchedAt ?? timestamp, updatedAt: timestamp };
     db.exec("BEGIN IMMEDIATE");
     try {
       db.prepare("INSERT OR REPLACE INTO help_settings VALUES(1,?)").run(JSON.stringify(meta));

@@ -1,5 +1,7 @@
+import { guideContent, guideIntroduction } from "./help-guide.js";
+
 const entry = (id, kind, category, title, body, image = "", imageAlt = "") => ({ id, kind, category, title, body, image, imageAlt, published: true });
-export const defaultHelpEntries = [
+export const legacyHelpEntries = [
   entry("guide-start", "guide", "Premiers pas", "Ton premier tour au casino", "Le casino propose des mini-jeux de cartes et de dés, en solo, avec des bots ou entre joueurs. **Tout est gratuit à jouer.**\n\nLes jetons sont uniquement virtuels : ils ne s’achètent pas avec de l’argent réel et ne peuvent pas être retirés, revendus ou échangés contre un prix.\n\nLe menu **Casino** rassemble les jeux et les tables. **Profil** contient ton compte, tes statistiques, ta personnalisation et ton historique. Les pages **Boutique** et **Classements** sont accessibles directement dans le menu."),
   entry("guide-table", "guide", "Tables et jeux", "Créer ou rejoindre une table", "Sur la fiche d’un jeu, **Créer une table** ouvre les réglages : mise par joueur, visibilité publique ou privée, nom facultatif et code d’accès facultatif. Confirme avec **Créer la table**.\n\n**Rejoindre** affiche les tables publiques de ce jeu. **J’ai un code** ou **Rejoindre avec un code** permet d’entrer dans une table privée ou publique grâce à son code. Une table protégée demande ensuite son code d’accès.\n\nLe nom de la table est public : n’y écris jamais ton email ni un mot de passe. Partage le code de la table et son éventuel code d’accès uniquement avec les joueurs invités.", "/guides/create-table.png", "Réglages de création d’une table"),
   entry("guide-play", "guide", "Tables et jeux", "La salle d’attente et la partie", "Dans la salle d’attente, le maître de table règle les options disponibles, invite des joueurs et ajoute des bots si le jeu les accepte. Chaque joueur confirme sa participation avant le lancement.\n\nLes **Règles** de la table détaillent le jeu et ses variantes. Pendant la partie, attends ton tour et la validation du serveur après une action. Les dés conservés, cartes jouées et combinaisons disponibles dépendent du jeu.\n\nDes pauses permettent de regarder le tour des bots et les résultats d’une manche ; les commandes affichées permettent de passer l’attente selon les droits et paramètres de la table. **Rejouer** ramène en salle d’attente pour accueillir de nouveaux joueurs."),
@@ -27,3 +29,19 @@ export const defaultHelpEntries = [
   entry("faq-status", "faq", "Assistance", "Une action reste en attente : est-ce une panne ?", "Une action peut attendre la réponse du serveur ou une pause de partie. Ne multiplie pas les clics. Vérifie ta connexion et la page **État des services**. Les incidents justifiés y donnent des informations sur leur période et leur résolution. Si le problème persiste, signale le jeu, l’heure et le code de table, sans inclure d’identifiants de connexion."),
   entry("faq-updates", "faq", "Assistance", "Où lire les nouveautés ou revoir ce guide ?", "Les **Patchnotes** présentent les versions et leurs changements. La page **Guide du joueur** rassemble les tutos et permet de rouvrir le guide d’accueil. La FAQ et les liens utiles restent accessibles dans le bas de page.")
 ];
+
+export const defaultHelpEntries = legacyHelpEntries.map((entry) => ({ ...entry, ...(guideContent[entry.id] ?? {}) }));
+
+export function upgradeDefaultGuides(document) {
+  const oldEntries = new Map(legacyHelpEntries.filter((entry) => entry.kind === "guide").map((entry) => [entry.id, entry]));
+  const originals = ["title", "body", "category", "image", "imageAlt"];
+  return {
+    ...document,
+    intro: document.intro === "Des jeux de cartes et de dés, des jetons virtuels et surtout des parties entre joueurs. Voici de quoi trouver tes repères." ? guideIntroduction : document.intro,
+    entries: document.entries.map((entry) => {
+      const original = oldEntries.get(entry.id);
+      if (!original || entry.kind !== "guide" || entry.lead || entry.challenge || !originals.every((key) => entry[key] === original[key])) return entry;
+      return { ...entry, ...guideContent[entry.id] };
+    })
+  };
+}

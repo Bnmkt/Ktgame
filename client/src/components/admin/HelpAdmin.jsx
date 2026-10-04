@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, BookOpen, Check, Eye, FileText, HelpCircle, ImagePl
 import { api } from "../../api.js";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { HelpArticle } from "../help/HelpContent.jsx";
+import { GuideInteractionEditor } from "./GuideInteractionEditor.jsx";
 
 export function HelpAdmin({ reportError, notifySuccess }) {
   const [document, setDocument] = useState(null);
@@ -59,8 +60,8 @@ export function HelpAdmin({ reportError, notifySuccess }) {
     } catch (error) { reportError(error.message); }
     finally { setBusy(""); event.target.value = ""; }
   }
-  if (!document) return <p role="status">Chargement de l’éditeur d’aide…</p>;
-  return <section className="player-help-editor">
+  if (!document) return <section className="card player-help-editor"><p role="status">Chargement de l’éditeur d’aide…</p></section>;
+  return <section className="card player-help-editor">
     <header className="player-help-editor-toolbar"><div><span className="eyebrow">Contenu public</span><h2>FAQ et guide du joueur</h2></div><button type="button" disabled={Boolean(busy)} onClick={save}><Save size={18} />{busy === "save" ? "Enregistrement…" : "Enregistrer"}</button></header>
     <fieldset className="player-help-control-scope" disabled={Boolean(busy)}>
     <div className="segmented-tabs"><button type="button" className={kind === "faq" ? "active" : ""} onClick={() => changeKind("faq")}><HelpCircle size={17} />Questions fréquentes</button><button type="button" className={kind === "guide" ? "active" : ""} onClick={() => changeKind("guide")}><BookOpen size={17} />Tutos et accueil</button></div>
@@ -68,8 +69,10 @@ export function HelpAdmin({ reportError, notifySuccess }) {
     <div className="player-help-editor-toolbar"><span>{entries.length} rubrique{entries.length !== 1 ? "s" : ""}</span><button type="button" className="secondary" disabled={Boolean(busy) || document.entries.length >= 100} onClick={add}><Plus size={17} />{kind === "faq" ? "Ajouter une question" : "Ajouter une étape"}</button></div>
     <div className="player-help-editor-layout"><nav className="player-help-editor-list" aria-label="Rubriques à modifier">{entries.map((entry, index) => <button type="button" key={entry.id} className={entry.id === selected?.id ? "active" : ""} onClick={() => { setSelectedId(entry.id); setPreview(false); }}><strong>{index + 1}. {entry.title}</strong><small>{entry.category} · {entry.published ? "Publié" : "Brouillon"}</small></button>)}</nav>
       {selected ? <div className="player-help-editor-fields"><label>{kind === "faq" ? "Question" : "Titre de l’étape"}<input value={selected.title} maxLength={160} onChange={(event) => update({ title: event.target.value })} /></label><div className="player-help-editor-row"><label>Rubrique<input value={selected.category} maxLength={60} onChange={(event) => update({ category: event.target.value })} /></label><label className="player-help-publish"><input type="checkbox" checked={selected.published} onChange={(event) => update({ published: event.target.checked })} /><Check size={16} />Publié</label></div>
+        {kind === "guide" && <label>Accroche personnelle<textarea aria-label="Accroche personnelle" className="player-help-short-input" value={selected.lead ?? ""} maxLength={280} onChange={(event) => update({ lead: event.target.value })} /></label>}
         <div className="segmented-tabs"><button type="button" className={!preview ? "active" : ""} onClick={() => setPreview(false)}><FileText size={16} />Texte Markdown</button><button type="button" className={preview ? "active" : ""} onClick={() => setPreview(true)}><Eye size={16} />Aperçu</button></div>
-        {preview ? <div className="player-help-editor-preview"><h3>{selected.title}</h3><HelpArticle entry={selected} /></div> : <label>{kind === "faq" ? "Réponse" : "Contenu"}<textarea aria-label={kind === "faq" ? "Réponse" : "Contenu"} value={selected.body} maxLength={12000} onChange={(event) => update({ body: event.target.value })} /></label>}
+        {preview ? <div className="player-help-editor-preview"><h3>{selected.title}</h3><HelpArticle entry={selected} interactive={kind === "guide"} /></div> : <label>{kind === "faq" ? "Réponse" : "Contenu"}<textarea aria-label={kind === "faq" ? "Réponse" : "Contenu"} value={selected.body} maxLength={12000} onChange={(event) => update({ body: event.target.value })} /></label>}
+        {kind === "guide" && !preview && <GuideInteractionEditor entry={selected} onChange={update} />}
         <label><span><ImagePlus size={16} />Image du site</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={Boolean(busy)} onChange={upload} /></label>
         {selected.image && <><label>Description de l’image<input value={selected.imageAlt} maxLength={200} onChange={(event) => update({ imageAlt: event.target.value })} /></label><button type="button" className="secondary" onClick={() => update({ image: "", imageAlt: "" })}>Retirer l’image</button></>}
         <div className="player-help-editor-controls"><button type="button" className="secondary icon-toggle" title="Monter la rubrique" aria-label="Monter la rubrique" disabled={selected.id === entries[0]?.id} onClick={() => move(-1)}><ArrowUp size={17} /></button><button type="button" className="secondary icon-toggle" title="Descendre la rubrique" aria-label="Descendre la rubrique" disabled={selected.id === entries.at(-1)?.id} onClick={() => move(1)}><ArrowDown size={17} /></button><ConfirmActionButton className="danger-button" dialogTitle="Supprimer cette rubrique ?" message={`« ${selected.title} » sera retirée lors du prochain enregistrement.`} confirmLabel="Supprimer" danger onConfirm={() => setDocument((current) => ({ ...current, entries: current.entries.filter((entry) => entry.id !== selected.id) }))}><Trash2 size={17} />Supprimer</ConfirmActionButton></div>
