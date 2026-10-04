@@ -32,7 +32,7 @@
 .issue-success .actions { justify-content: center; }
 .issue-success h3 { font-size: 26px; }
 .issue-page h1 { display: flex; align-items: center; gap: 12px; }
-.issue-page-panel { padding: 24px; }
+.issue-page-panel { min-width: 0; border: 1px solid #5b533b; border-radius: 8px; background: #101718; padding: 22px; }
 .issue-filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; margin-bottom: 18px; }
 .issue-filters > label { display: flex; flex-direction: column; gap: 7px; flex: 1 1 145px; font-size: 13px; }
 .issue-filters .issue-search { position: relative; flex: 2 1 220px; }
@@ -91,7 +91,7 @@
   .issue-tabs button { padding: 7px 9px; font-size: 12px; }
   .issue-form-footer { align-items: stretch; flex-direction: column; }
   .issue-list-row { grid-template-columns: 80px minmax(0,1fr); gap: 10px; }
-  .issue-page-panel { padding: 16px; }
+  .issue-page-panel { padding: 12px; }
   .issue-image-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .issue-context-list > div { grid-template-columns: 85px minmax(0,1fr); }
   .issue-launcher { right: 12px; bottom: 12px; }

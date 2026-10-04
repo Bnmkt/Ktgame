@@ -45,6 +45,17 @@ try {
     const page = await context.newPage(); page.on("pageerror", (error) => errors.push(error.message)); if (blocker) await blocker.enableBlockingInPage(page); return page;
   }
   const previews = path.join(root, "docs", "previews"); mkdirSync(previews, { recursive: true });
+  async function assertPageFrame(page, selector) {
+    const frame = page.locator(selector);
+    await frame.waitFor();
+    const style = await frame.evaluate((element) => {
+      const computed = getComputedStyle(element);
+      return { background: computed.backgroundColor, image: computed.backgroundImage, border: parseFloat(computed.borderTopWidth), padding: parseFloat(computed.paddingLeft), width: element.clientWidth, content: element.scrollWidth };
+    });
+    assert.ok(style.background !== "rgba(0, 0, 0, 0)" || style.image !== "none", `${selector}: opaque page surface`);
+    assert.ok(style.border >= 1 && style.padding >= 12, `${selector}: frame and inner spacing`);
+    assert.ok(style.content <= style.width + 1, `${selector}: no overflowing page content`);
+  }
   const player = await pageFor("alice"); await player.goto(`${origin}${base}/bugs`, { waitUntil: "domcontentloaded" });
   await player.getByRole("button", { name: "Signaler un bug", exact: true }).click();
   const form = player.locator(".issue-form-dialog"); await form.getByLabel("Titre", { exact: true }).fill("Le lancer reste bloqué");
@@ -84,6 +95,13 @@ try {
   await request("bob", `/api/bugs/${principal}`, "GET", undefined, 404);
   const editor = await pageFor("editor"); await editor.goto(`${origin}${base}/admin`, { waitUntil: "domcontentloaded" });
   await editor.getByRole("button", { name: "Signalements de bugs", exact: true }).click();
+  await editor.locator(".issue-admin-table tr").filter({ hasText: `BUG ${principal} ·` }).waitFor();
+  await assertPageFrame(editor, ".issue-admin");
+  await editor.screenshot({ path: path.join(previews, "bugs-admin-list-desktop.png"), fullPage: true });
+  await editor.setViewportSize({ width: 390, height: 844 });
+  await assertPageFrame(editor, ".issue-admin");
+  await editor.screenshot({ path: path.join(previews, "bugs-admin-list-mobile.png"), fullPage: true });
+  await editor.setViewportSize({ width: 1440, height: 1000 });
   await editor.locator("tr").filter({ hasText: `BUG ${principal} ·` }).getByRole("button", { name: "Ouvrir", exact: true }).click();
   const dossier = editor.locator(".issue-editor-dialog").first(); await dossier.getByRole("button", { name: "Traitement", exact: true }).click();
   await dossier.getByLabel("Statut", { exact: true }).selectOption("reproduced"); await dossier.getByLabel("Priorité", { exact: true }).selectOption("high"); await dossier.getByLabel("Note interne", { exact: true }).fill("Analyse privée CONFIDENTIAL");
@@ -121,7 +139,16 @@ try {
   assert.equal(await player.locator(".issue-form-dialog").getByLabel("Jeu", { exact: true }).inputValue(), "421"); assert.equal(await player.locator(".issue-form-dialog").getByLabel("Salon", { exact: true }).inputValue(), room.code);
   await player.screenshot({ path: path.join(previews, "bugs-report-table-fullscreen.png") });
   await player.locator(".issue-form-dialog").getByRole("button", { name: "Fermer", exact: true }).click(); await player.evaluate(() => document.exitFullscreen());
-  const visitor = await pageFor(); await visitor.goto(`${origin}${base}/bugs`); await visitor.getByText("Un bouton de lancer reste désactivé", { exact: true }).click(); await visitor.getByRole("heading", { name: "Un bouton de lancer reste désactivé", exact: true }).waitFor();
+  const visitor = await pageFor(); await visitor.goto(`${origin}${base}/bugs`);
+  await visitor.getByText("Un bouton de lancer reste désactivé", { exact: true }).waitFor();
+  await assertPageFrame(visitor, ".issue-page-panel");
+  await visitor.screenshot({ path: path.join(previews, "bugs-public-list-desktop.png"), fullPage: true });
+  await visitor.setViewportSize({ width: 390, height: 844 });
+  await assertPageFrame(visitor, ".issue-page-panel");
+  await visitor.screenshot({ path: path.join(previews, "bugs-public-list-mobile.png"), fullPage: true });
+  await visitor.setViewportSize({ width: 1440, height: 1000 });
+  await visitor.getByText("Un bouton de lancer reste désactivé", { exact: true }).click(); await visitor.getByRole("heading", { name: "Un bouton de lancer reste désactivé", exact: true }).waitFor();
+  await assertPageFrame(visitor, ".issue-page-panel");
   assert.equal(await visitor.getByRole("button", { name: "Informations privées", exact: true }).count(), 0);
   await visitor.screenshot({ path: path.join(previews, "bugs-public-desktop.png"), fullPage: true });
   await visitor.setViewportSize({ width: 390, height: 844 }); await visitor.getByRole("button", { name: "Signaler un bug", exact: true }).click(); await visitor.screenshot({ path: path.join(previews, "bugs-report-mobile.png"), fullPage: true });
