@@ -2,7 +2,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import { bugMetadata } from "./bug-reports.js";
 
-export function registerBugReportRoutes({ app, auth, requireBackOffice, store, identify, staff, version }) {
+export function registerBugReportRoutes({ app, auth, requireBackOffice, store, identify, staff, version, notifyContact = () => {} }) {
   const submissions = rateLimit({ windowMs: 3600000, limit: 12, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Trop de signalements. Réessaie dans une heure." } });
   const uploads = rateLimit({ windowMs: 900000, limit: 36, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Trop de captures. Réessaie dans 15 minutes." } });
   const comments = rateLimit({ windowMs: 60000, limit: 8, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Patiente avant d'envoyer un autre commentaire." } });
@@ -28,6 +28,7 @@ export function registerBugReportRoutes({ app, auth, requireBackOffice, store, i
   app.post("/api/bugs/uploads", uploads, express.raw({ type: "image/png", limit: "3mb" }), wrap((req, res) => res.status(201).json(store.stageImage(req.body))));
   app.post("/api/bugs", submissions, wrap((req, res) => {
     const user = viewer(req), result = store.create(req.body ?? {}, user);
+    if (result.created) notifyContact(`bug-received:${result.report.id}`, { kind: "bug-received", reference: result.report.id, at: result.report.createdAt });
     res.status(result.created ? 201 : 200).json({ ...result, anonymous: !user?.id });
   }));
   app.get("/api/bugs", wrap((req, res) => {
@@ -60,7 +61,12 @@ export function registerBugReportRoutes({ app, auth, requireBackOffice, store, i
     res.json({ ...report, suggestions: store.suggestions(report.id), resolutionPlan: store.resolutionPlan(report.id) });
   }));
   app.patch("/api/admin/bugs/:id", ...guard, wrap((req, res) => res.json(store.update(req.params.id, assigned(req.body ?? {}), req.auth.id))));
-  app.post("/api/admin/bugs/:id/publication", ...guard, wrap((req, res) => res.json(store.publish(req.params.id, req.body ?? {}, req.auth.id))));
+  app.post("/api/admin/bugs/:id/publication", ...guard, wrap((req, res) => {
+    const previous = store.get(req.params.id, { admin: true });
+    const report = store.publish(req.params.id, req.body ?? {}, req.auth.id);
+    if (report.visible && !previous?.visible) notifyContact(`bug-published:${report.id}:${report.updatedAt}`, { kind: "bug-published", reference: report.id, at: report.updatedAt });
+    res.json(report);
+  }));
   app.post("/api/admin/bugs/:id/comments", ...guard, wrap((req, res) => {
     store.addComment(req.params.id, req.body ?? {}, { id: req.auth.id }, true); res.status(201).json({ ok: true });
   }));

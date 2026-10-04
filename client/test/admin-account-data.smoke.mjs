@@ -79,7 +79,7 @@ await new Promise((resolve) => smtp.listen(0, "127.0.0.1", resolve));
 let browser;
 try {
   start(["src/index.js"], path.join(root, "server"), {
-    NODE_ENV: "test", PORT: new URL(apiOrigin).port, HOST: "127.0.0.1", JWT_SECRET: secret, CLIENT_ORIGIN: origin, CLIENT_DIST: "", APP_BASE_PATH: "", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "", SMTP_HOST: "127.0.0.1", SMTP_PORT: String(smtp.address().port), SMTP_SECURE: "false", SMTP_USER: "", SMTP_PASS: "", EMAIL_FROM: "fixture@example.com", SQLITE_PATH: path.join(temporary, "main.sqlite"),
+    NODE_ENV: "test", PORT: new URL(apiOrigin).port, HOST: "127.0.0.1", JWT_SECRET: secret, CLIENT_ORIGIN: origin, PUBLIC_APP_URL: origin, CLIENT_DIST: "", APP_BASE_PATH: "", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "", SMTP_HOST: "127.0.0.1", SMTP_PORT: String(smtp.address().port), SMTP_SECURE: "false", SMTP_USER: "", SMTP_PASS: "", EMAIL_FROM: "fixture@example.com", CONTACT_EMAIL: "contact@example.com", SQLITE_PATH: path.join(temporary, "main.sqlite"),
     ...Object.fromEntries(["PARENTAL_DB_PATH", "TRIBUNAL_DB_PATH", "CHAT_DB_PATH", "STATUS_DB_PATH", "PATCHNOTES_DB_PATH", "REQUEST_LOG_PATH"].map((key) => [key, path.join(temporary, `${key}.sqlite`)])),
     HELP_DB_PATH: path.join(temporary, "help.sqlite"), DATA_REQUEST_DB_PATH: path.join(temporary, "rights.sqlite"), PATCHNOTES_UPLOAD_DIR: path.join(temporary, "images")
   });
@@ -107,13 +107,16 @@ try {
     if (blocker) await blocker.enableBlockingInPage(page);
     return page;
   }
-  const previews = path.join(root, "docs", "previews"); mkdirSync(previews, { recursive: true });
+  const previews = process.env.PREVIEW_DIRECTORY || path.join(root, "docs", "previews"); mkdirSync(previews, { recursive: true });
   const player = await pageFor("alpha");
   const capture = await player.evaluate(() => { const canvas = document.createElement("canvas"); canvas.width = 10; canvas.height = 10; return canvas.toDataURL("image/png").split(",")[1]; });
   const uploadResponse = await fetch(`${apiOrigin}/api/bugs/uploads`, { method: "POST", headers: { Authorization: `Bearer ${token("alpha")}`, "Content-Type": "image/png" }, body: Buffer.from(capture, "base64") });
   assert.equal(uploadResponse.status, 201); const upload = await uploadResponse.json();
   const bug = await request("alpha", "/api/bugs", { submissionId: randomUUID(), title: "Export du diagnostic joueur", description: "Un signalement destiné à vérifier l'export des données personnelles.", category: "account", frequency: "once", impact: "minor", images: [upload], diagnosticConsent: true, diagnostics: { browser: "Firefox", system: "Windows" } }, 201);
   await request("beta", "/api/bugs", { submissionId: randomUUID(), title: "Dossier confidentiel autre joueur", description: "Ce signalement appartient à un autre joueur et ne doit pas être exporté.", category: "account", frequency: "once", impact: "minor" }, 201);
+  await request("editor", `/api/admin/bugs/${bug.report.id}/publication`, { visible: true, reviewed: true, title: "Problème de connexion", description: "Un problème de connexion a été confirmé et attend une correction." });
+  await waitFor(() => mails.filter((mail) => mail.includes("To: contact@example.com")).length === 3, "bug receipt and publication contact alerts");
+  assert.ok(mails.filter((mail) => mail.includes("To: contact@example.com")).every((mail) => !mail.includes("application/zip") && !mail.includes("image/png") && !mail.includes("Firefox")));
   console.log("Player data request with Ghostery...");
   await player.goto(`${origin}/profil`, { waitUntil: "domcontentloaded" });
   await player.getByRole("button", { name: "Carte et confidentialité", exact: true }).click();
@@ -123,6 +126,7 @@ try {
   await player.getByText("Approbation en attente", { exact: true }).waitFor();
   await player.screenshot({ path: path.join(previews, "account-data-request-desktop.png"), fullPage: true });
   const rights = await request("alpha", "/api/me/data-requests", undefined, 200, "GET");
+  await waitFor(() => mails.some((mail) => mail.includes("To: contact@example.com") && mail.replace(/=\r\n/g, "").includes(rights.requests[0].id)), "personal data request contact alert");
   assert.equal(rights.requests.length, 1); assert.equal(mails.filter((mail) => mail.includes("application/zip")).length, 0);
   assert.equal((await request("beta", "/api/me/data-requests", undefined, 200, "GET")).requests.length, 0);
   await request("alpha", `/api/admin/users/alpha/data-requests/${rights.requests[0].id}/approve`, undefined, 403);
@@ -197,7 +201,16 @@ try {
   assert.equal(files.get("bugs-signales.jsonl").includes("receipt_hash"), false);
   assert.equal([...files.values()].join("").includes("Dossier confidentiel autre joueur"), false);
   const { dataRequestEmail } = await import("../../server/src/services/data-request-email.js");
+  const { contactNoticeEmail } = await import("../../server/src/services/contact-notices.js");
   const emailPage = await browser.newPage({ viewport: { width: 760, height: 720 } });
+  await emailPage.setContent(contactNoticeEmail({ kind: "data-request", reference: delivery.id, at: delivery.requested_at, dueAt: delivery.due_at }, { CONTACT_EMAIL: "contact@example.com", PUBLIC_APP_URL: "https://netdis.org/ktga" }).html);
+  await emailPage.screenshot({ path: path.join(previews, "contact-data-request-email.png"), fullPage: true });
+  await emailPage.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await emailPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await emailPage.screenshot({ path: path.join(previews, "contact-data-request-email-mobile.png"), fullPage: true });
+  await emailPage.setViewportSize({ width: 760, height: 720 });
+  await emailPage.setContent(contactNoticeEmail({ kind: "bug-received", reference: bug.report.id, at: bug.report.createdAt }, { CONTACT_EMAIL: "contact@example.com", PUBLIC_APP_URL: "https://netdis.org/ktga" }).html);
+  await emailPage.screenshot({ path: path.join(previews, "contact-bug-report-email.png"), fullPage: true });
   await emailPage.setContent(dataRequestEmail({ user: { pseudo: "Alice", profile: { displayName: "Alice" } }, request: delivery, kind: "sent" }).html);
   await emailPage.screenshot({ path: path.join(previews, "data-export-email.png"), fullPage: true });
   await emailPage.close();

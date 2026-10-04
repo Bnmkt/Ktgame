@@ -50,14 +50,17 @@ test("les routes protègent l’approbation, les destinataires et n’exportent 
   const store = createDataRequestStore({ filename: ":memory:" });
   const user = { id: "alice", email: "alice@example.com", emailVerifiedAt: new Date().toISOString(), passwordHash: await bcrypt.hash("Password123!", 4) };
   const app = express(); app.use(express.json());
-  let exports = 0, failEmail = false; const emails = [];
-  registerDataRequestRoutes({ app, auth: (req, res, next) => { req.auth = { id: req.headers["x-user"] }; next(); }, requireAdmin: (req, res, next) => req.auth.id === "admin" ? next() : res.sendStatus(403), store, readDb: () => ({ users: [user] }), updateDb: (fn) => fn({ users: [user] }), paths: {}, siteName: () => "Fixture", exportArchive: async () => { exports++; return { content: Buffer.from("zip") }; }, sendEmail: async (mail) => { if (failEmail) throw new Error("Fixture SMTP indisponible"); emails.push(mail); } });
+  let exports = 0, failEmail = false; const emails = [], notices = [];
+  registerDataRequestRoutes({ app, auth: (req, res, next) => { req.auth = { id: req.headers["x-user"] }; next(); }, requireAdmin: (req, res, next) => req.auth.id === "admin" ? next() : res.sendStatus(403), store, readDb: () => ({ users: [user] }), updateDb: (fn) => fn({ users: [user] }), paths: {}, siteName: () => "Fixture", notifyContact: (key, notice) => notices.push({ key, ...notice }), exportArchive: async () => { exports++; return { content: Buffer.from("zip") }; }, sendEmail: async (mail) => { if (failEmail) throw new Error("Fixture SMTP indisponible"); emails.push(mail); } });
   const server = app.listen(0, "127.0.0.1"); await new Promise((resolve) => server.once("listening", resolve));
   const call = (id, path, body, method = "POST") => fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers: { "x-user": id, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
   try {
     assert.equal((await call("alice", "/api/me/data-requests", { password: "bad" })).status, 403);
     const response = await call("alice", "/api/me/data-requests", { password: "Password123!" }); assert.equal(response.status, 201);
     const { request } = await response.json(); assert.equal(exports, 0); assert.equal(emails.length, 1);
+    assert.equal(notices.length, 1); assert.equal(notices[0].kind, "data-request"); assert.equal(notices[0].dueAt, request.due_at);
+    assert.equal((await call("alice", "/api/me/data-requests", { password: "Password123!" })).status, 200);
+    assert.equal(notices.length, 1); assert.equal(emails.length, 1); assert.equal(exports, 0);
     failEmail = true;
     assert.equal((await call("admin", `/api/admin/users/alice/data-requests/${request.id}/extend`, { reason: "Nombreuses archives nécessitant une revue humaine." })).status, 400);
     assert.equal(store.get(request.id).due_at, request.due_at); assert.equal(store.get(request.id).extended_at, null);

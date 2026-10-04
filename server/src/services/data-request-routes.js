@@ -9,7 +9,7 @@ export function playerDataRequest(row) {
   return { id, status, requested_at, due_at, approved_at, sent_at, extension_reason, extended_at };
 }
 
-export function registerDataRequestRoutes({ app, auth, requireAdmin, store, readDb, updateDb, paths, siteName, exportArchive = generatePersonalArchive, sendEmail = sendTransactionalEmail }) {
+export function registerDataRequestRoutes({ app, auth, requireAdmin, store, readDb, updateDb, paths, siteName, notifyContact = () => {}, exportArchive = generatePersonalArchive, sendEmail = sendTransactionalEmail }) {
   const changing = new Set();
   const jobs = [];
   let running = 0;
@@ -46,6 +46,7 @@ export function registerDataRequestRoutes({ app, auth, requireAdmin, store, read
     const current = userFor(user.id);
     if (!eligible(current) || current.email !== user.email || current.passwordHash !== user.passwordHash) return res.status(409).json({ error: "Le compte a changé. Reconnecte-toi avant de confirmer." });
     const { request, created } = store.create(user.id, user.email);
+    if (created) notifyContact(`data-request:${request.id}`, { kind: "data-request", reference: request.id, at: request.requested_at, dueAt: request.due_at });
     let acknowledgmentSent = false;
     if (created && emailDeliveryConfigured()) {
       try { await sendEmail(mail(current, request, "received")); acknowledgmentSent = true; }

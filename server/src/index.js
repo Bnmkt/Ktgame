@@ -63,6 +63,7 @@ import { createDataRequestStore } from "./services/data-requests.js";
 import { registerDataRequestRoutes } from "./services/data-request-routes.js";
 import { createBugReportStore } from "./services/bug-reports.js";
 import { registerBugReportRoutes } from "./services/bug-report-routes.js";
+import { createContactNoticeQueue } from "./services/contact-notices.js";
 import { archiveDays, archiveRows } from "./storage/archives.js";
 import { ledgerPage } from "./storage/ledger.js";
 import { playerStatistics } from "./services/player-statistics.js";
@@ -677,6 +678,8 @@ const patchnotes = createPatchnoteStore({
   currentVersion: APP_VERSION
 });
 process.on("exit", () => patchnotes.close());
+const contactNotices = createContactNoticeQueue({ filename: process.env.CONTACT_NOTICE_DB_PATH ? path.resolve(process.cwd(), process.env.CONTACT_NOTICE_DB_PATH) : `${databaseFilename}.contact-notices.sqlite`, siteName: () => platformSettings().siteName });
+process.on("exit", () => contactNotices.close());
 const bugFilename = process.env.BUG_REPORT_DB_PATH ? path.resolve(process.cwd(), process.env.BUG_REPORT_DB_PATH) : `${databaseFilename}.bugs.sqlite`;
 const bugImageDirectory = process.env.BUG_REPORT_UPLOAD_DIR ? path.resolve(process.cwd(), process.env.BUG_REPORT_UPLOAD_DIR) : path.join(path.dirname(bugFilename), "bug-images");
 const bugReports = createBugReportStore({ filename: bugFilename, uploadDirectory: bugImageDirectory, version: () => patchnotes.currentVersion });
@@ -3261,6 +3264,7 @@ app.post("/api/auth/logout", (_req, res) => {
 });
 
 registerBugReportRoutes({ app, auth, requireBackOffice, store: bugReports, version: () => patchnotes.currentVersion,
+  notifyContact: (key, notice) => contactNotices.enqueue(key, notice),
   identify: (req) => {
     try {
       const claims = jwt.verify(sessionTokenFromRequest(req), JWT_SECRET);
@@ -3279,7 +3283,7 @@ registerDataRequestRoutes({ app, auth, requireAdmin, store: dataRequests, readDb
   notes: path.resolve(process.env.PATCHNOTES_DB_PATH || path.join(__dirname, "..", "data", "patchnotes.sqlite")),
   noteImages: path.resolve(process.env.PATCHNOTES_UPLOAD_DIR || path.join(__dirname, "..", "data", "patchnote-images")),
   help: helpFilename, requests: dataRequestFilename
-} });
+}, notifyContact: (key, notice) => contactNotices.enqueue(key, notice) });
 
 app.get("/api/me", auth, (req, res) => {
   const sessionUser = sessions.get(req.auth.id);

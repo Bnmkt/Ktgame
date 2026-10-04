@@ -125,7 +125,8 @@ test("public endpoints reveal private details only to verified staff or owners",
   const identify = (req) => ({ alice: { id: "alice" }, bob: { id: "bob" }, editor: { id: "editor", editor: true }, admin: { id: "admin", admin: true } })[req.get("X-Test-User")];
   const auth = (req, res, next) => { const user = identify(req); if (!user) return res.status(401).json({ error: "auth" }); req.auth = user; next(); };
   const guard = (req, res, next) => req.auth.admin || req.auth.editor ? next() : res.status(403).json({ error: "staff" });
-  registerBugReportRoutes({ app, auth, requireBackOffice: guard, store: s, identify, staff: () => [{ id: "editor", name: "Editor" }], version: () => "0.1.0" });
+  const notices = [];
+  registerBugReportRoutes({ app, auth, requireBackOffice: guard, store: s, identify, staff: () => [{ id: "editor", name: "Editor" }], version: () => "0.1.0", notifyContact: (key, notice) => notices.push({ key, ...notice }) });
   const server = app.listen(0, "127.0.0.1"); await new Promise((resolve) => server.once("listening", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve))); const origin = `http://127.0.0.1:${server.address().port}`;
   const a = s.create(input(), { id: "alice" });
@@ -137,4 +138,11 @@ test("public endpoints reveal private details only to verified staff or owners",
   s.publish(a.report.id, { visible: true, reviewed: true, title: "Version publique", description: "Description publique de ce problème sans détail privé." }, "admin");
   const publicView = await (await read()).json(); assert.equal(publicView.privateView, false); assert.equal(publicView.description, "Description publique de ce problème sans détail privé.");
   assert.equal((await (await read("admin")).json()).description, a.report.description);
+  const body = input();
+  const submit = () => fetch(`${origin}/api/bugs`, { method: "POST", headers: { "Content-Type": "application/json", "X-Test-User": "alice" }, body: JSON.stringify(body) });
+  const creation = await submit(); assert.equal(creation.status, 201); const created = (await creation.json()).report;
+  assert.equal((await submit()).status, 200); assert.equal(notices.length, 1); assert.equal(notices[0].kind, "bug-received");
+  const publish = (visible) => fetch(`${origin}/api/admin/bugs/${created.id}/publication`, { method: "POST", headers: { "Content-Type": "application/json", "X-Test-User": "editor" }, body: JSON.stringify({ visible, reviewed: true, title: "Titre public", description: "Un problème public relu avant sa publication." }) });
+  assert.equal((await publish(true)).status, 200); assert.equal(notices.length, 2); assert.equal(notices[1].kind, "bug-published");
+  assert.equal((await publish(true)).status, 200); assert.equal((await publish(false)).status, 200); assert.equal(notices.length, 2);
 });
