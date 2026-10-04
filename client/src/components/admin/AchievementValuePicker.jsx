@@ -18,7 +18,7 @@ function ChoiceIcon({ choice }) {
   return <Icon size={22} />;
 }
 
-export function AchievementValuePicker({ choices, value, multiple = false, onChange, label = "Choisir les elements", allowEmpty = false }) {
+export function AchievementValuePicker({ choices, value, multiple = false, onChange, label = "Choisir les elements", allowEmpty = false, emptyLabel = "Aucune condition" }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState([]);
   const [search, setSearch] = useState("");
@@ -53,7 +53,7 @@ export function AchievementValuePicker({ choices, value, multiple = false, onCha
         </div>
         {preview && <aside className="achievement-picker-preview">{preview.item ? <CosmeticPreview user={previewUser} item={preview.item} /> : <><ChoiceIcon choice={preview} /><h3>{preview.label}</h3><p>{preview.description}</p><small>{preview.category}</small></>}</aside>}
       </div>
-      <footer className="achievement-picker-footer"><span role="status">{draft.length} selectionne{draft.length > 1 ? "s" : ""}</span><div className="actions"><button type="button" className="secondary" onClick={() => setOpen(false)}>Annuler</button>{allowEmpty && <button type="button" className="secondary" onClick={() => setDraft([])}>Aucune condition</button>}<button type="button" disabled={!allowEmpty && !draft.length} onClick={() => { onChange(multiple ? draft : draft[0] ?? ""); setOpen(false); }}><Check size={16} /> Appliquer la selection</button></div></footer>
+      <footer className="achievement-picker-footer"><span role="status">{draft.length} selectionne{draft.length > 1 ? "s" : ""}</span><div className="actions"><button type="button" className="secondary" onClick={() => setOpen(false)}>Annuler</button>{allowEmpty && <button type="button" className="secondary" onClick={() => setDraft([])}>{emptyLabel}</button>}<button type="button" disabled={!allowEmpty && !draft.length} onClick={() => { onChange(multiple ? draft : draft[0] ?? ""); setOpen(false); }}><Check size={16} /> Appliquer la selection</button></div></footer>
     </Dialog>}
   </>;
 }

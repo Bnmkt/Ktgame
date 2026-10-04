@@ -231,7 +231,10 @@ export default function App() {
   }
 
   async function notifyAchievements(ids = []) {
-    if (ids.some(Boolean)) await loadInboxNotifications({ toastNew: true });
+    if (ids.some(Boolean)) {
+      await loadInboxNotifications({ toastNew: true });
+      api("/api/me", { background: true }).then((updated) => setUser((current) => current?.id === updated.id ? updated : current)).catch(() => {});
+    }
   }
 
   async function logout() {

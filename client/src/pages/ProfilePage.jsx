@@ -49,7 +49,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const isShop = mode === "shop";
   const [tab, setTab] = useState(isShop ? "shop" : "account");
   const [accountSaving, setAccountSaving] = useState("");
-  const [form, setForm] = useState({ login: user.login ?? user.pseudo, displayName: user.profile?.displayName ?? user.pseudo, birthDate: user.profile?.birthDate ?? "", gender: user.profile?.gender ?? "", bio: user.profile?.bio ?? "", password: "" });
+  const [form, setForm] = useState({ login: user.login ?? user.pseudo, displayName: user.profile?.displayName ?? user.pseudo, birthDate: user.profile?.birthDate ?? "", gender: user.profile?.gender ?? "", bio: user.profile?.bio ?? "", titleGameId: user.profile?.titleGameId ?? "", password: "" });
   const [statForm, setStatForm] = useState({ memberCardStats: user.profileStats?.memberCardStats ?? [user.profileStats?.memberCardStat ?? "winRate", "achievementsUnlocked"], customAchievementIds: user.profileStats?.customAchievementIds ?? [user.profileStats?.customAchievementId ?? "", ""], visibleProfileStats: user.profileStats?.visibleProfileStats ?? publicProfileStatOptions.map(([key]) => key) });
   const [statistics, setStatistics] = useState(null);
   const [ledgerRevision, setLedgerRevision] = useState(0);
@@ -143,10 +143,10 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     setError("");
     setMessage("");
     try {
-      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ displayName: form.displayName, birthDate: form.birthDate, gender: form.gender, bio: form.bio, favoriteGames: favorites, ...statForm }) });
+      const updated = await api("/api/me", { method: "PATCH", body: JSON.stringify({ displayName: form.displayName, birthDate: form.birthDate, gender: form.gender, bio: form.bio, titleGameId: form.titleGameId ?? user.profile?.titleGameId ?? "", favoriteGames: favorites, ...statForm }) });
       if (updated.sessionToken) setToken(updated.sessionToken);
       setUser(updated);
-      setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", password: "" });
+      setForm({ login: updated.login ?? updated.pseudo, displayName: updated.profile?.displayName ?? updated.pseudo, birthDate: updated.profile?.birthDate ?? "", gender: updated.profile?.gender ?? "", bio: updated.profile?.bio ?? "", titleGameId: updated.profile?.titleGameId ?? "", password: "" });
       setFavorites(updated.profile?.favoriteGames ?? []);
       setStatForm({ memberCardStats: updated.profileStats?.memberCardStats ?? ["winRate", "achievementsUnlocked"], customAchievementIds: updated.profileStats?.customAchievementIds ?? [updated.profileStats?.customAchievementId ?? "", ""], visibleProfileStats: updated.profileStats?.visibleProfileStats ?? publicProfileStatOptions.map(([key]) => key) });
       setMessage("Paramètres mis à jour.");
@@ -346,6 +346,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
                     <div>
                       <div className="achievement-title-line"><strong>{achievement.title}</strong>{achievement.milestone && <span>Milestone</span>}{achievement.secret && <span>Secret</span>}</div>
                       <p>{achievement.description}</p>
+                      {(!achievement.secret || achievement.unlocked) && ((achievement.rewards?.itemIds?.length ?? 0) + (achievement.rewards?.xp?.length ?? 0) > 0) && <p className="xp-reward-summary"><strong>Récompenses</strong>{[...(achievement.rewards.itemIds ?? []).map((id) => shop.find((item) => item.id === id)?.name ?? "Objet de collection"), ...(achievement.rewards.xp ?? []).map((row) => `${row.amount.toLocaleString("fr-FR")} XP · ${gameTitle(row.gameId)}`)].join(" · ")}</p>}
                       <div className="achievement-progress"><span style={{ width: `${ratio * 100}%` }} /></div>
                       <small><CompactNumber value={achievement.progress} label="Progression exacte" /> / <CompactNumber value={achievement.target} label="Objectif exact" />{achievement.unlockedAt ? ` · ${formatDate(achievement.unlockedAt)}` : ""}</small>
                     </div>

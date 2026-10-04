@@ -7,6 +7,12 @@ import { games } from "../../server/src/games/shared.js";
 const build = (config, entries = []) => normalizeAchievementDefinition({ id: "guided-test", title: "Défi", ...buildGuidedAchievement(config, games, entries) });
 const finish = (gameId, payload) => ({ type: "game.finished", payload: { gameId, ...payload } });
 
+test("les objectifs de niveau utilisent une métrique globale ou propre au jeu", () => {
+  assert.equal(build({ objective: "level", amount: 10 }).rule.metric, "highestGameLevel");
+  assert.equal(build({ objective: "level", gameId: "yahtzee", amount: 5 }).rule.metric, "gameLevel.yahtzee");
+  assert.throws(() => build({ objective: "level", amount: 1001 }));
+});
+
 test("les modèles proposés pour chaque jeu produisent des règles acceptées par le serveur", () => {
   for (const gameId of ["", ...games.map((game) => game.id)]) {
     for (const goal of achievementGoals(gameId).filter((item) => item.id !== "feat")) {

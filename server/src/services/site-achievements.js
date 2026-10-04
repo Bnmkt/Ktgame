@@ -21,7 +21,8 @@ export const playerContextFields = {
   "player.tokens": "Joueur : solde de jetons", "player.accountAgeDays": "Joueur : anciennete en jours",
   "player.ownedItemIds": "Inventaire : objets possedes", "player.equippedItemIds": "Inventaire : objets equipes",
   "player.inventoryCount": "Inventaire : nombre d'objets", "player.favoriteGameIds": "Joueur : jeux favoris",
-  "player.friendCount": "Joueur : nombre d'amis", "player.achievementIds": "Joueur : succes debloques"
+  "player.friendCount": "Joueur : nombre d'amis", "player.achievementIds": "Joueur : succes debloques",
+  "player.gameLevel": "Joueur : niveau dans le jeu courant", "player.gameXp": "Joueur : XP dans le jeu courant", "player.highestGameLevel": "Joueur : plus haut niveau", "player.totalGameXp": "Joueur : XP totale"
 };
 
 export function playerAchievementContext(user, shop, now = Date.now()) {

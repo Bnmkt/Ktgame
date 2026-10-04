@@ -1,4 +1,5 @@
 import { playerContextFields, sitePages, browserFamilies, tableTimeMetrics } from "./site-achievements.js";
+import { normalizeAchievementRewards } from "./game-progression.js";
 const operators = new Set(["eq", "neq", "gt", "gte", "lt", "lte", "in", "notIn", "contains", "containsAny", "containsAll", "exists", "startsWith", "endsWith"]);
 const aggregates = new Set(["match", "count", "sum", "max", "distinct", "streak"]);
 const scopes = new Set(["event", "game", "career"]);
@@ -36,6 +37,8 @@ export const achievementEventSchema = {
 const activityFields = { page: "Page visitee", browser: "Famille du navigateur", markers: "Indices dans l'URL (secret:valeur ou challenge:valeur)", seconds: "Secondes actives depuis le dernier signal", activeSeconds: "Secondes actives cumulees", visitDays: "Jours de visite (UTC)", pageCount: "Types de pages visites" };
 const tableFields = { gameId: "Jeu", roomId: "Table", phase: "Etat de la table (waiting, playing, finished)", roundNumber: "Numero de manche / main", seconds: "Secondes actives depuis le dernier signal", tableSeconds: "Temps actif sur cette table (secondes)", roundSeconds: "Temps actif dans cette manche (secondes)", tableActiveSeconds: "Temps actif cumule aux tables (secondes)", roundActiveSeconds: "Temps actif cumule en manches (secondes)" };
 Object.assign(achievementEventSchema, {
+  "game.xp": { label: "XP de jeu reçue", fields: { gameId: "Jeu", amount: "XP reçue", xp: "XP totale dans le jeu", level: "Niveau dans le jeu", previousLevel: "Niveau précédent", title: "Titre obtenu", reason: "Origine de l’XP" } },
+  "game.level": { label: "Niveau de jeu atteint", fields: { gameId: "Jeu", xp: "XP totale dans le jeu", level: "Nouveau niveau", previousLevel: "Niveau précédent", title: "Titre obtenu" } },
   "table.activity": { label: "Temps actif sur une table (facultatif)", fields: tableFields },
   "game.round.activity": { label: "Temps actif dans une manche (facultatif)", fields: tableFields },
   "site.visit": { label: "Visite d'une page (facultatif)", fields: activityFields },
@@ -51,6 +54,7 @@ export const achievementMetricSchema = {
   ...tableTimeMetrics,
   accountAgeDays: "Anciennete du compte (jours)",
   tokens: "Solde de jetons", friendCount: "Nombre d'amis",
+  highestGameLevel: "Plus haut niveau de jeu", totalGameXp: "XP totale dans tous les jeux",
   gamesPlayed: "Parties terminées",
   wins: "Victoires",
   staked: "Jetons misés",
@@ -130,7 +134,7 @@ export function normalizeAchievementRule(input = {}) {
   const source = input.source === "metric" ? "metric" : "event";
   if (source === "metric") {
     const metric = String(input.metric ?? "");
-    const valid = metric.startsWith("gameWins.") || Object.hasOwn(achievementMetricSchema, metric);
+    const valid = /^(gameWins|gameLevel|gameXp)\.[a-z0-9-]{1,60}$/.test(metric) || Object.hasOwn(achievementMetricSchema, metric);
     if (!valid) throw new Error("Métrique de succès inconnue.");
     return { source, metric };
   }
@@ -168,6 +172,7 @@ export function normalizeAchievementDefinition(input, existing = {}) {
     milestone: input.milestone === true,
     secret: input.secret === true,
     enabled: input.enabled !== false,
+    rewards: normalizeAchievementRewards(input.rewards ?? existing.rewards),
     rule: normalizeAchievementRule(input.rule ?? existing.rule)
   };
 }
@@ -202,7 +207,7 @@ export function achievementRuleSchemas(games = [], shop = [], achievements = [])
   choices.gameId = choices["player.favoriteGameIds"];
   return {
     events: Object.entries(achievementEventSchema).map(([id, value]) => ({ id, ...value, fields: Object.entries(value.fields).map(([field, label]) => ({ field, label, ...(choices[field] ? { choices: choices[field] } : {}) })) })),
-    metrics: [...Object.entries(achievementMetricSchema).map(([id, label]) => ({ id, label })), ...games.map((game) => ({ id: `gameWins.${game.id}`, label: `Victoires - ${game.name}` }))],
+    metrics: [...Object.entries(achievementMetricSchema).map(([id, label]) => ({ id, label })), ...games.flatMap((game) => [{ id: `gameWins.${game.id}`, label: `Victoires - ${game.name}` }, { id: `gameLevel.${game.id}`, label: `Niveau - ${game.name}` }, { id: `gameXp.${game.id}`, label: `XP - ${game.name}` }])],
     operators: [...operators],
     aggregates: [...aggregates],
     scopes: [...scopes]

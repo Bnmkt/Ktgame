@@ -199,7 +199,7 @@ function userIdsForHistory(row) {
 }
 
 function insertUser(user) {
-  sqlite.prepare("INSERT INTO users (id, data, pseudo, email, guest) VALUES (?, ?, ?, ?, ?)").run(
+  sqlite.prepare("INSERT INTO users (id, data, pseudo, email, guest) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, pseudo=excluded.pseudo, email=excluded.email, guest=excluded.guest").run(
     user.id,
     JSON.stringify(user),
     user.pseudo,
@@ -439,8 +439,9 @@ export function writeDb(db) {
         else if (operation.type === "append") operation.definition.insert(operation.row);
         else if (operation.type === "delete") sqlite.prepare(`DELETE FROM ${operation.definition.table} WHERE id = ?`).run(operation.id);
         else {
-          sqlite.prepare(`DELETE FROM ${operation.definition.table} WHERE id = ?`).run(operation.row.id);
+          if (operation.definition.key !== "users") sqlite.prepare(`DELETE FROM ${operation.definition.table} WHERE id = ?`).run(operation.row.id);
           operation.definition.insert(operation.row);
+          if (operation.definition.key === "users") nextCollections.get("users").set(operation.row.id, { json: JSON.stringify(operation.row), ref: operation.row });
         }
       }
       if (nextSettings !== persistedSettings) {
@@ -505,7 +506,7 @@ export function databaseHealth() {
     "users", "rooms", "history", "transactions", "community_events",
     "community_event_participants", "community_event_actions",
     "community_event_pot_entries", "community_event_rewards", "community_event_effects",
-    "achievement_catalog", "item_catalog", "user_achievements", "achievement_progress", "user_inventory", "history_members"
+    "achievement_catalog", "item_catalog", "user_achievements", "achievement_progress", "user_inventory", "user_game_xp", "achievement_reward_receipts", "history_members"
   ];
   return {
     engine: "SQLite",

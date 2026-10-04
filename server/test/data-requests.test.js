@@ -43,6 +43,10 @@ test("l’export masque les secrets et les autres mains sans retirer les donnée
   assert.deepEqual(removePersonalSecrets({ tokens: 100, tokensWon: 300, accessToken: "private", passwordHash: "private", mfa: { totpSecret: "private", emailEnabled: true }, parentEmail: "private" }), { tokens: 100, tokensWon: 300, mfa: { emailEnabled: true } });
   const game = personalGame({ players: [{ id: "alice", score: 300 }, { id: "bob", cards: ["secret"] }], winners: ["alice"] }, "alice");
   assert.equal(game.player.id, "alice"); assert.equal(game.won, true); assert.equal(JSON.stringify(game).includes("secret"), false);
+  assert.equal(Object.hasOwn(game, "xpEarned"), false);
+  const progression = personalGame({ xpAwards: { alice: 75, bob: 900 } }, "alice");
+  assert.equal(progression.xpEarned, 75);
+  assert.equal(JSON.stringify(progression).includes("900"), false);
 });
 test("les routes protègent l’approbation, les destinataires et n’exportent jamais lors de la demande", async () => {
   const previous = { SMTP_HOST: process.env.SMTP_HOST, EMAIL_FROM: process.env.EMAIL_FROM, SMTP_USER: process.env.SMTP_USER, SMTP_PASS: process.env.SMTP_PASS };

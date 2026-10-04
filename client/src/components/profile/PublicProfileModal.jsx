@@ -1,5 +1,6 @@
 import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { DailyActivityChart } from "./DailyActivityChart.jsx";
+import { GameProgression } from "./GameProgression.jsx";
 import { BadgeCheck, Eye, EyeOff, Flag, Volume2, VolumeX, X } from "lucide-react";
 import { Die, PlayingCard } from "../game/GamePieces.jsx";
 import { DisplayName, FriendCode, ProfileCosmeticEffect, ProfileCosmeticFrame, profileCosmeticClassName } from "../cosmetics/Cosmetics.jsx";
@@ -95,6 +96,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
             </div>}
           </section>}
         </div>
+        <GameProgression rows={profile.gameProgression} />
         <DailyActivityChart activity={profile.activity ?? []} /></div>
       </div>
     </ModalBackdrop>

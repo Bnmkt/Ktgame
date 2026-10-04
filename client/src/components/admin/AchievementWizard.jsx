@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Check, Coins, Dice5, Flame, Gamepad2, Gift, Save, Settings2, ShoppingBag, Target, Trophy, X } from "lucide-react";
 import { achievementGoals, buildGuidedAchievement, gameFeats } from "./achievement-guide.js";
 import { AchievementValuePicker, itemChoices } from "./AchievementValuePicker.jsx";
+import { AchievementRewards } from "./AchievementRewards.jsx";
 
 const icons = { trophy: Trophy, gamepad: Gamepad2, flame: Flame, coins: Coins, target: Target, dice: Dice5, badge: BadgeCheck, calendar: CalendarDays, gift: Gift, shop: ShoppingBag };
 
@@ -14,6 +15,7 @@ export function AchievementWizard({ games, achievements, shop = [], saving, erro
   const [secret, setSecret] = useState(false);
   const [milestone, setMilestone] = useState(false);
   const [enabled, setEnabled] = useState(true);
+  const [rewards, setRewards] = useState({ itemIds: [], xp: [] });
   const scrollRef = useRef(null);
   useLayoutEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [step]);
   const goals = achievementGoals(config.gameId).filter((goal) => goal.id !== "feat" || gameFeats(achievements, config.gameId).length);
@@ -21,7 +23,7 @@ export function AchievementWizard({ games, achievements, shop = [], saving, erro
   const feats = gameFeats(achievements, config.gameId);
   let generated, problem;
   try { generated = buildGuidedAchievement(config, games, achievements); } catch (err) { problem = err.message; }
-  const draft = { ...generated, title, description: customDescription ?? generated?.description ?? "", secret, milestone, enabled };
+  const draft = { ...generated, title, description: customDescription ?? generated?.description ?? "", secret, milestone, enabled, rewards };
   const valid = !!generated;
   const choose = (objective, gameId = config.gameId) => {
     const next = achievementGoals(gameId).find((item) => item.id === objective);
@@ -65,6 +67,7 @@ export function AchievementWizard({ games, achievements, shop = [], saving, erro
           {step === 2 && <>
             <label>Nom du succès<input autoFocus required maxLength={100} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={titleFallback} /></label>
             <label>Description pour les joueurs<textarea required maxLength={300} value={draft.description} onChange={(event) => setCustomDescription(event.target.value)} /></label>
+            <AchievementRewards value={rewards} onChange={setRewards} shop={shop} games={games} />
             <div className="achievement-publication-options">
               <label><input type="checkbox" checked={milestone} onChange={(event) => setMilestone(event.target.checked)} /><span><strong>Milestone</strong><small>Peut être affiché sur la member card.</small></span></label>
               <label><input type="checkbox" checked={secret} onChange={(event) => setSecret(event.target.checked)} /><span><strong>Succès secret</strong><small>Masqué jusqu'à son obtention.</small></span></label>

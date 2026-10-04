@@ -3,6 +3,7 @@ import { BadgeCheck, CalendarDays, Eye, KeyRound, Mail, Save, ShieldCheck, Star,
 import { PasswordField } from "../common/PasswordField.jsx";
 import { DataRequestPanel } from "./DataRequestPanel.jsx";
 import { AccountSecurity } from "./AccountSecurity.jsx";
+import { GameProgression } from "./GameProgression.jsx";
 import { localDate } from "../../utils/dates.js";
 import { publicProfileStatOptions } from "../../config/site.js";
 import { ageFromBirthDate, memberStatOptions } from "../../utils/presentation.jsx";
@@ -27,6 +28,7 @@ export function AccountWorkspace({ user, form, setForm, favorites, games, toggle
           <div className="account-workspace-row"><label htmlFor="account-gender">Genre<small>Facultatif</small></label><select id="account-gender" value={form.gender} onChange={change("gender")}>{["", "Homme", "Femme", "Non-binaire", "Autre", "Préfère ne pas dire"].map((gender) => <option value={gender} key={gender}>{gender || "Non renseigné"}</option>)}</select></div>
         </section>
         <section className="account-workspace-section"><header><Star size={19} /><h3>Mes jeux favoris</h3><span>{favorites.length} / 5</span></header><div className="favorite-game-grid">{games.map((game) => <button type="button" key={game.id} className={favorites.includes(game.id) ? "favorite-game active" : "favorite-game"} aria-pressed={favorites.includes(game.id)} onClick={() => toggleFavorite(game.id)} disabled={!favorites.includes(game.id) && favorites.length >= 5}>{game.name}</button>)}</div></section>
+        <GameProgression rows={user.gameProgression} titleGameId={form.titleGameId} onTitleChange={(value) => setForm((current) => ({ ...current, titleGameId: value }))} />
         <div className="account-workspace-actions"><button type="submit" disabled={Boolean(saving)}><Save size={17} />{saving === "profile" ? "Enregistrement…" : "Enregistrer le profil"}</button></div>
       </form>}
       {tab === "visibility" && <><form onSubmit={save} className="account-workspace-form"><section className="account-workspace-section"><header><BadgeCheck size={19} /><h3>Statistiques de la member card</h3></header>

@@ -82,12 +82,12 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
     return () => { cancelled = true; clearInterval(timer); window.removeEventListener("ktga-connections-updated", refresh); window.removeEventListener("ktga-inbox-updated", refresh); };
   }, [user.id, user.guest]);
 
-  async function createRoom(gameId) {
+  async function createRoom(gameId, limits = {}) {
     if (creating) return;
     setError("");
     setCreating(true);
     try {
-      const room = await api("/api/rooms", { method: "POST", body: JSON.stringify({ gameId, stake, isPublic, name: roomName, password: roomPassword }) });
+      const room = await api("/api/rooms", { method: "POST", body: JSON.stringify({ gameId, stake, isPublic, name: roomName, password: roomPassword, ...limits }) });
       setRoomName("");
       setRoomPassword("");
       onOpenRoom(room.code);

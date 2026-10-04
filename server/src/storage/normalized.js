@@ -6,6 +6,14 @@ export const inventoryTypes = ["icons", "nameEffects", "memberCards", "profileBa
 export function createNormalizedStorage(sqlite) {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS achievement_catalog (id TEXT PRIMARY KEY, data TEXT);
+    CREATE TABLE IF NOT EXISTS user_game_xp (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_id TEXT NOT NULL, xp INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, game_id)
+    );
+    CREATE TABLE IF NOT EXISTS achievement_reward_receipts (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      achievement_id TEXT NOT NULL, PRIMARY KEY(user_id, achievement_id)
+    );
     CREATE TABLE IF NOT EXISTS item_catalog (type TEXT NOT NULL, id TEXT NOT NULL, data TEXT, PRIMARY KEY(type, id));
     CREATE TABLE IF NOT EXISTS user_achievements (
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -73,6 +81,16 @@ export function createNormalizedStorage(sqlite) {
 
   function splitUser(user) {
     const data = { ...user };
+    if (user.gameXp) {
+      for (const [gameId, xp] of Object.entries(user.gameXp)) stmt("INSERT INTO user_game_xp VALUES (?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET xp=excluded.xp").run(user.id, gameId, Math.max(0, Math.min(1000000000000, Math.trunc(Number(xp) || 0))));
+      user.gameXp = Object.fromEntries(stmt("SELECT game_id,xp FROM user_game_xp WHERE user_id=?").all(user.id).map((row) => [row.game_id, row.xp]));
+      if (Object.keys(user.gameXp).length) delete data.gameXp;
+    }
+    if (user.achievementRewards) {
+      for (const id of user.achievementRewards) stmt("INSERT OR IGNORE INTO achievement_reward_receipts VALUES (?,?)").run(user.id, id);
+      user.achievementRewards = stmt("SELECT achievement_id FROM achievement_reward_receipts WHERE user_id=?").all(user.id).map((row) => row.achievement_id);
+      if (user.achievementRewards.length) delete data.achievementRewards;
+    }
     if (user.achievements) {
       const { unlocked = [], suppressed = [], unlockedAt = {}, ...extra } = user.achievements;
       data.achievements = extra;
@@ -112,6 +130,10 @@ export function createNormalizedStorage(sqlite) {
 
   function hydrateUser(row) {
     const user = JSON.parse(row.data);
+    const xpRows = stmt("SELECT game_id,xp FROM user_game_xp WHERE user_id=?").all(user.id);
+    if (xpRows.length) user.gameXp = Object.fromEntries(xpRows.map((entry) => [entry.game_id, entry.xp]));
+    const rewardRows = stmt("SELECT achievement_id FROM achievement_reward_receipts WHERE user_id=?").all(user.id);
+    if (rewardRows.length) user.achievementRewards = rewardRows.map((entry) => entry.achievement_id);
     if (user.achievements) {
       const rows = stmt("SELECT * FROM user_achievements WHERE user_id = ?").all(user.id);
       user.achievements = { ...user.achievements,

@@ -1,0 +1,35 @@
+.player-game-title { font: 600 10px/1.25 Arial, sans-serif; color: #f4d57f; background: #353522; border: 1px solid #7e7546; border-radius: 3px; padding: 3px 5px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+.xp-workspace { border-top: 1px solid #455045; margin-top: 22px; padding-top: 20px; min-width: 0; }
+.xp-workspace > header, .xp-game-list article > header, .xp-game-list article > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.xp-workspace h3 { font-size: 18px; display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+.xp-workspace label { font-size: 12px; color: #c8cfbf; }
+.xp-workspace select { font: inherit; margin-top: 6px; color: #f1edda; background: #111b17; border: 1px solid #596453; border-radius: 5px; padding: 10px; max-width: 100%; }
+.xp-equipped-title { display: grid; gap: 7px; margin: 16px 0; }
+.xp-game-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.xp-game-list article { padding: 14px; border: 1px solid #4a5549; border-radius: 5px; background: #15201a; min-width: 0; }
+.xp-game-list strong { font-size: 14px; overflow-wrap: anywhere; }
+.xp-game-list article > header > span { font-size: 11px; white-space: nowrap; color: #e4cc7f; }
+.xp-game-list article > div { margin: 9px 0; }
+.xp-game-list b { color: #dacf96; font-size: 12px; overflow-wrap: anywhere; }
+.xp-game-list small, .xp-empty { color: #acbdaa; font-size: 11px; }
+.xp-game-list progress { width: 100%; height: 7px; display: block; appearance: none; border: 0; margin: 8px 0; background: #354238; border-radius: 3px; }
+.xp-game-list progress::-webkit-progress-bar { background: #354238; border-radius: 3px; }
+.xp-game-list progress::-webkit-progress-value { background: #d5b35f; border-radius: 3px; }
+.xp-game-list progress::-moz-progress-bar { background: #d5b35f; border-radius: 3px; }
+.xp-settings { min-width: 0; display: grid; gap: 22px; }
+.xp-settings .settings-field-grid { margin-top: 20px; }
+.xp-settings textarea { width: 100%; min-height: 100px; resize: vertical; font-family: monospace; }
+.xp-chart-controls { display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; }
+.xp-curve { max-width: 100%; overflow-x: auto; }
+.xp-curve svg { display: block; width: 100%; min-width: 650px; min-height: 220px; }
+.xp-curve line { stroke: #38473d; }
+.xp-curve text { fill: #bec9b8; font-size: 12px; }
+.xp-curve polyline { fill: none; stroke: #d5b35f; stroke-width: 2; }
+.xp-curve circle { fill: #d5b35f; }
+.xp-title-override { display: flex; align-items: center; gap: 8px; margin: 20px 0; }
+.xp-title-override input { width: 18px; min-height: 18px; }
+.xp-title-list { display: grid; gap: 12px; margin: 20px 0; }
+.xp-title-list > div { display: grid; grid-template-columns: 110px minmax(0, 1fr) 42px; align-items: end; gap: 12px; }
+.xp-title-list .icon-toggle { height: 42px; }
+@media (max-width: 600px) { .xp-game-list { grid-template-columns: minmax(0, 1fr); } .xp-workspace > header { flex-wrap: wrap; } .xp-title-list > div { grid-template-columns: 80px minmax(0, 1fr) 38px; gap: 7px; } .player-game-title { max-width: 85px; font-size: 9px; } }
+.xp-reward-summary { display: grid; gap: 4px; color: #ead39a; font-size: 12px; overflow-wrap: anywhere; }

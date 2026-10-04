@@ -235,6 +235,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -488,6 +504,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -673,6 +705,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -797,6 +845,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -916,6 +980,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -1045,6 +1125,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -1161,6 +1257,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -1272,6 +1384,432 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
+        }
+      ]
+    },
+    {
+      "id": "game.xp",
+      "label": "XP de jeu reçue",
+      "fields": [
+        {
+          "field": "gameId",
+          "label": "Jeu",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "amount",
+          "label": "XP reçue"
+        },
+        {
+          "field": "xp",
+          "label": "XP totale dans le jeu"
+        },
+        {
+          "field": "level",
+          "label": "Niveau dans le jeu"
+        },
+        {
+          "field": "previousLevel",
+          "label": "Niveau précédent"
+        },
+        {
+          "field": "title",
+          "label": "Titre obtenu"
+        },
+        {
+          "field": "reason",
+          "label": "Origine de l’XP"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
+        }
+      ]
+    },
+    {
+      "id": "game.level",
+      "label": "Niveau de jeu atteint",
+      "fields": [
+        {
+          "field": "gameId",
+          "label": "Jeu",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "xp",
+          "label": "XP totale dans le jeu"
+        },
+        {
+          "field": "level",
+          "label": "Nouveau niveau"
+        },
+        {
+          "field": "previousLevel",
+          "label": "Niveau précédent"
+        },
+        {
+          "field": "title",
+          "label": "Titre obtenu"
+        },
+        {
+          "field": "player.tokens",
+          "label": "Joueur : solde de jetons"
+        },
+        {
+          "field": "player.accountAgeDays",
+          "label": "Joueur : anciennete en jours"
+        },
+        {
+          "field": "player.ownedItemIds",
+          "label": "Inventaire : objets possedes",
+          "choices": []
+        },
+        {
+          "field": "player.equippedItemIds",
+          "label": "Inventaire : objets equipes",
+          "choices": []
+        },
+        {
+          "field": "player.inventoryCount",
+          "label": "Inventaire : nombre d'objets"
+        },
+        {
+          "field": "player.favoriteGameIds",
+          "label": "Joueur : jeux favoris",
+          "choices": [
+            {
+              "value": "belote",
+              "label": "Belote"
+            },
+            {
+              "value": "yahtzee",
+              "label": "Yahtzee"
+            },
+            {
+              "value": "421",
+              "label": "421"
+            },
+            {
+              "value": "cul-de-chouette",
+              "label": "Cul de Chouette"
+            },
+            {
+              "value": "blackjack",
+              "label": "Blackjack"
+            },
+            {
+              "value": "texas-holdem",
+              "label": "Texas Hold'em"
+            },
+            {
+              "value": "bataille",
+              "label": "Bataille"
+            },
+            {
+              "value": "president",
+              "label": "Président"
+            },
+            {
+              "value": "farkle",
+              "label": "Farkle"
+            },
+            {
+              "value": "liars-dice",
+              "label": "Liar's Dice"
+            },
+            {
+              "value": "shut-the-box",
+              "label": "Shut the Box"
+            },
+            {
+              "value": "golf-solitaire",
+              "label": "Golf Solitaire"
+            },
+            {
+              "value": "accordion",
+              "label": "Accordion"
+            },
+            {
+              "value": "midnight-dice",
+              "label": "Dés de Minuit"
+            },
+            {
+              "value": "velvet-ruse",
+              "label": "Velours Noir"
+            }
+          ]
+        },
+        {
+          "field": "player.friendCount",
+          "label": "Joueur : nombre d'amis"
+        },
+        {
+          "field": "player.achievementIds",
+          "label": "Joueur : succes debloques",
+          "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -1473,6 +2011,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -1674,6 +2228,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -1861,6 +2431,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -2048,6 +2634,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -2155,6 +2757,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -2262,6 +2880,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -2369,6 +3003,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     },
@@ -2476,6 +3126,22 @@
           "field": "player.achievementIds",
           "label": "Joueur : succes debloques",
           "choices": []
+        },
+        {
+          "field": "player.gameLevel",
+          "label": "Joueur : niveau dans le jeu courant"
+        },
+        {
+          "field": "player.gameXp",
+          "label": "Joueur : XP dans le jeu courant"
+        },
+        {
+          "field": "player.highestGameLevel",
+          "label": "Joueur : plus haut niveau"
+        },
+        {
+          "field": "player.totalGameXp",
+          "label": "Joueur : XP totale"
         }
       ]
     }
@@ -2508,6 +3174,14 @@
     {
       "id": "friendCount",
       "label": "Nombre d'amis"
+    },
+    {
+      "id": "highestGameLevel",
+      "label": "Plus haut niveau de jeu"
+    },
+    {
+      "id": "totalGameXp",
+      "label": "XP totale dans tous les jeux"
     },
     {
       "id": "gamesPlayed",
@@ -2562,60 +3236,180 @@
       "label": "Victoires - Belote"
     },
     {
+      "id": "gameLevel.belote",
+      "label": "Niveau - Belote"
+    },
+    {
+      "id": "gameXp.belote",
+      "label": "XP - Belote"
+    },
+    {
       "id": "gameWins.yahtzee",
       "label": "Victoires - Yahtzee"
+    },
+    {
+      "id": "gameLevel.yahtzee",
+      "label": "Niveau - Yahtzee"
+    },
+    {
+      "id": "gameXp.yahtzee",
+      "label": "XP - Yahtzee"
     },
     {
       "id": "gameWins.421",
       "label": "Victoires - 421"
     },
     {
+      "id": "gameLevel.421",
+      "label": "Niveau - 421"
+    },
+    {
+      "id": "gameXp.421",
+      "label": "XP - 421"
+    },
+    {
       "id": "gameWins.cul-de-chouette",
       "label": "Victoires - Cul de Chouette"
+    },
+    {
+      "id": "gameLevel.cul-de-chouette",
+      "label": "Niveau - Cul de Chouette"
+    },
+    {
+      "id": "gameXp.cul-de-chouette",
+      "label": "XP - Cul de Chouette"
     },
     {
       "id": "gameWins.blackjack",
       "label": "Victoires - Blackjack"
     },
     {
+      "id": "gameLevel.blackjack",
+      "label": "Niveau - Blackjack"
+    },
+    {
+      "id": "gameXp.blackjack",
+      "label": "XP - Blackjack"
+    },
+    {
       "id": "gameWins.texas-holdem",
       "label": "Victoires - Texas Hold'em"
+    },
+    {
+      "id": "gameLevel.texas-holdem",
+      "label": "Niveau - Texas Hold'em"
+    },
+    {
+      "id": "gameXp.texas-holdem",
+      "label": "XP - Texas Hold'em"
     },
     {
       "id": "gameWins.bataille",
       "label": "Victoires - Bataille"
     },
     {
+      "id": "gameLevel.bataille",
+      "label": "Niveau - Bataille"
+    },
+    {
+      "id": "gameXp.bataille",
+      "label": "XP - Bataille"
+    },
+    {
       "id": "gameWins.president",
       "label": "Victoires - Président"
+    },
+    {
+      "id": "gameLevel.president",
+      "label": "Niveau - Président"
+    },
+    {
+      "id": "gameXp.president",
+      "label": "XP - Président"
     },
     {
       "id": "gameWins.farkle",
       "label": "Victoires - Farkle"
     },
     {
+      "id": "gameLevel.farkle",
+      "label": "Niveau - Farkle"
+    },
+    {
+      "id": "gameXp.farkle",
+      "label": "XP - Farkle"
+    },
+    {
       "id": "gameWins.liars-dice",
       "label": "Victoires - Liar's Dice"
+    },
+    {
+      "id": "gameLevel.liars-dice",
+      "label": "Niveau - Liar's Dice"
+    },
+    {
+      "id": "gameXp.liars-dice",
+      "label": "XP - Liar's Dice"
     },
     {
       "id": "gameWins.shut-the-box",
       "label": "Victoires - Shut the Box"
     },
     {
+      "id": "gameLevel.shut-the-box",
+      "label": "Niveau - Shut the Box"
+    },
+    {
+      "id": "gameXp.shut-the-box",
+      "label": "XP - Shut the Box"
+    },
+    {
       "id": "gameWins.golf-solitaire",
       "label": "Victoires - Golf Solitaire"
+    },
+    {
+      "id": "gameLevel.golf-solitaire",
+      "label": "Niveau - Golf Solitaire"
+    },
+    {
+      "id": "gameXp.golf-solitaire",
+      "label": "XP - Golf Solitaire"
     },
     {
       "id": "gameWins.accordion",
       "label": "Victoires - Accordion"
     },
     {
+      "id": "gameLevel.accordion",
+      "label": "Niveau - Accordion"
+    },
+    {
+      "id": "gameXp.accordion",
+      "label": "XP - Accordion"
+    },
+    {
       "id": "gameWins.midnight-dice",
       "label": "Victoires - Dés de Minuit"
     },
     {
+      "id": "gameLevel.midnight-dice",
+      "label": "Niveau - Dés de Minuit"
+    },
+    {
+      "id": "gameXp.midnight-dice",
+      "label": "XP - Dés de Minuit"
+    },
+    {
       "id": "gameWins.velvet-ruse",
       "label": "Victoires - Velours Noir"
+    },
+    {
+      "id": "gameLevel.velvet-ruse",
+      "label": "Niveau - Velours Noir"
+    },
+    {
+      "id": "gameXp.velvet-ruse",
+      "label": "XP - Velours Noir"
     }
   ],
   "operators": [

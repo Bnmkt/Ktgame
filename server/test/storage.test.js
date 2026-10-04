@@ -75,6 +75,28 @@ test("achievement event progress is normalized outside the user document", () =>
   assert.equal(JSON.parse(inspection.prepare("SELECT data FROM users WHERE id = ?").get("a").data).achievementProgress, undefined);
 });
 
+test("game XP and one-time reward receipts are normalized, durable and cascade with accounts", () => {
+  updateDb((db) => { db.users[0].gameXp = { yahtzee: 300, blackjack: 50 }; db.users[0].achievementRewards = ["reward-one"]; });
+  const compact = JSON.parse(inspection.prepare("SELECT data FROM users WHERE id='a'").get().data);
+  assert.equal(compact.gameXp, undefined); assert.equal(compact.achievementRewards, undefined);
+  assert.equal(inspection.prepare("SELECT xp FROM user_game_xp WHERE user_id='a' AND game_id='yahtzee'").get().xp, 300);
+  assert.deepEqual(readDb().users[0].gameXp, { blackjack: 50, yahtzee: 300 });
+  updateDb((db) => { db.users[0].achievementRewards = []; });
+  assert.deepEqual(readDb().users[0].achievementRewards, ["reward-one"]);
+  updateDb((db) => { db.users[0].tokens++; });
+  assert.equal(inspection.prepare("SELECT COUNT(*) AS n FROM achievement_reward_receipts WHERE user_id='a'").get().n, 1);
+  const moduleUrl = new URL("../src/db.js", import.meta.url).href;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", `const db = await import(${JSON.stringify(moduleUrl)}); console.log(JSON.stringify(db.readDb().users[0].achievementRewards)); db.closeDatabase();`], { env: { ...process.env, SQLITE_PATH: file }, encoding: "utf8" });
+  assert.equal(child.status, 0, child.stderr);
+  assert.deepEqual(JSON.parse(child.stdout.trim()), ["reward-one"]);
+  updateDb((db) => db.users.push({ id: "xp-temp", pseudo: "XpTest", gameXp: { yahtzee: 25 }, achievementRewards: ["test"] }));
+  assert.equal(inspection.prepare("SELECT COUNT(*) AS n FROM user_game_xp WHERE user_id='xp-temp'").get().n, 1);
+  updateDb((db) => { db.users = db.users.filter((user) => user.id !== "xp-temp"); });
+  assert.equal(inspection.prepare("SELECT COUNT(*) AS n FROM user_game_xp WHERE user_id='xp-temp'").get().n, 0);
+  assert.equal(inspection.prepare("SELECT COUNT(*) AS n FROM achievement_reward_receipts WHERE user_id='xp-temp'").get().n, 0);
+  assert.equal(inspection.prepare("PRAGMA foreign_key_check").get(), undefined);
+});
+
 test("pending payouts and games affect statistics before atomic commit", () => {
   const db = readDb();
   db.transactions.push({ id: "t3", userId: "a", amount: -20, balance: 30, reason: "shop-purchase", createdAt: "2026-09-03T12:00:00Z" });

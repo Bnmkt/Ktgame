@@ -4,6 +4,7 @@ export function achievementGoals(gameId = "") {
   const goals = [
     { id: "wins", label: "Gagner des parties", example: "10 victoires", icon: "trophy", amount: 10, unit: "Victoires à obtenir" },
     { id: "plays", label: "Terminer des parties", example: "50 parties terminées", icon: "gamepad", amount: 50, unit: "Parties à terminer" },
+    { id: "level", label: "Atteindre un niveau", example: gameId ? "Niveau 10 dans ce jeu" : "Niveau 10 dans au moins un jeu", icon: "target", amount: 10, unit: "Niveau à atteindre" },
     { id: "streak", label: "Gagner plusieurs fois de suite", example: "3 victoires consécutives", icon: "flame", amount: 3, unit: "Victoires consécutives" },
     { id: "gain", label: "Remporter un gros gain", example: "5 000 jetons dans une partie", icon: "coins", amount: 5000, unit: "Gain minimum, en jetons", repeatable: true },
     { id: "tableTime", label: "Passer du temps sur une table", example: "10 minutes actives sur une même table", icon: "calendar", amount: 10, unit: "Minutes actives sur une même table" },
@@ -78,6 +79,10 @@ export function buildGuidedAchievement(config, games, achievements = []) {
   } else if (objective === "wins") {
     rule = { source: "metric", metric: gameId ? `gameWins.${gameId}` : "wins" };
     description = `Gagner ${n} partie(s)${suffix}.`;
+  } else if (objective === "level") {
+    if (amount > 1000) throw new Error("Le niveau à atteindre ne peut pas dépasser 1 000.");
+    rule = { source: "metric", metric: gameId ? `gameLevel.${gameId}` : "highestGameLevel" };
+    description = `Atteindre le niveau ${n}${game ? ` à ${game.name}` : " dans au moins un jeu"}.`;
   } else if (objective === "plays") {
     rule = gameId ? finished({ field: "gameId", operator: "eq", value: gameId }) : { source: "metric", metric: "gamesPlayed" };
     description = `Terminer ${n} partie(s)${suffix}.`;

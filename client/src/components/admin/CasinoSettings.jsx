@@ -4,6 +4,7 @@ import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { CompactNumber, formatCompactNumber } from "../../utils/presentation.jsx";
 import { bonusProgression, bonusRuleEffect, normalizeBonusSettings } from "../../features/bonus/config.js";
+import { ProgressionSettings } from "./ProgressionSettings.jsx";
 
 const operationLabels = { add: "Ajouter", multiply: "Multiplier", set: "Définir" };
 
@@ -37,7 +38,7 @@ function BonusChart({ settings }) {
   </section>;
 }
 
-export function CasinoSettings({ draft, setDraft, onSubmit, saving }) {
+export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }) {
   const [section, setSection] = useState("identity");
   const config = normalizeBonusSettings(draft);
   const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
@@ -51,6 +52,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving }) {
       <button type="button" className={section === "identity" ? "active" : ""} onClick={() => setSection("identity")}><Landmark size={17} />Identité et accès</button>
       <button type="button" className={section === "economy" ? "active" : ""} onClick={() => setSection("economy")}><Coins size={17} />Économie et bonus</button>
       <button type="button" className={section === "pacing" ? "active" : ""} onClick={() => setSection("pacing")}><Clock3 size={17} />Rythme des parties</button>
+      <button type="button" className={section === "progression" ? "active" : ""} onClick={() => setSection("progression")}><TrendingUp size={17} />XP et titres</button>
     </nav>
 
     {section === "identity" && <div className="casino-settings-panel identity-access-panel">
@@ -102,6 +104,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving }) {
       <BonusChart settings={draft} />
     </div>}
 
+    {section === "progression" && <ProgressionSettings value={draft.gameProgression} onChange={(value) => update("gameProgression", value)} games={games} />}
     {section === "pacing" && <div className="casino-settings-panel pacing-settings-panel">
       <section className="settings-group pacing-settings-group">
         <div className="settings-group-heading"><Clock3 /><div><h3>Temporisations de table</h3><p>Ces durées sont copiées dans une partie lorsqu’elle démarre et restent stables jusqu’à son terme.</p></div></div>

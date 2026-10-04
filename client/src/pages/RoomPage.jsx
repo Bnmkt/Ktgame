@@ -116,6 +116,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const [pokerBlinds, setPokerBlinds] = useState({ bigBlind: 20 });
   const [battleModifiers, setBattleModifiers] = useState(defaultBattleModifiers);
   const [gameModifiers, setGameModifiers] = useState({});
+  const [levelLimits, setLevelLimits] = useState({ minLevel: 1, maxLevel: "" });
   const [selectedDice, setSelectedDice] = useState([]);
   const [selectDiceToKeep, setSelectDiceToKeep] = useState(() => window.localStorage.getItem("ktga-dice-selection-mode") === "keep");
   const [scoreConfirmation, setScoreConfirmation] = useState(null);
@@ -173,6 +174,12 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   }
 
   useEffect(() => { api(`/api/rooms/${code}`).then(commitRoom).catch((err) => setError(err.message)); }, [code, commitRoom]);
+  useEffect(() => {
+    if (!room?.finished) return;
+    let active = true;
+    api("/api/me", { background: true }).then((updated) => { if (active) setUser((current) => current?.id === updated.id ? updated : current); }).catch(() => {});
+    return () => { active = false; };
+  }, [code, room?.finished, setUser]);
   useEffect(() => {
     if (user.guest) return undefined;
     api("/api/friends").then(setFriendsData).catch(() => {});
@@ -390,6 +397,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   }
 
   function resetRoomSettingDrafts() {
+    setLevelLimits({ minLevel: room?.minLevel ?? 1, maxLevel: room?.maxLevel ?? "" });
     setPokerBlinds({ bigBlind: room?.pokerBlinds?.bigBlind ?? 20, maximumBet: room?.pokerBlinds?.maximumBet ?? room?.stake ?? 1000 });
     setBattleModifiers({ ...defaultBattleModifiers, ...(room?.battleModifiers ?? {}) });
     setGameModifiers({ ...defaultGameModifiers(room?.gameId), ...(room?.gameModifiers ?? {}) });
@@ -421,6 +429,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
       return;
     }
     try {
+      if (Number(levelLimits.minLevel) !== (room.minLevel ?? 1) || (levelLimits.maxLevel === "" ? null : Number(levelLimits.maxLevel)) !== (room.maxLevel ?? null)) commitRoom(await api(`/api/rooms/${code}/level-settings`, { method: "POST", body: JSON.stringify({ minLevel: Number(levelLimits.minLevel), maxLevel: levelLimits.maxLevel === "" ? null : Number(levelLimits.maxLevel) }) }));
       const [path, body] = room.gameId === "texas-holdem"
         ? ["poker-settings", { bigBlind, maximumBet }]
         : room.gameId === "bataille"
@@ -562,6 +571,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
         {room.gameId === "texas-holdem" && <section className="poker-settings game-modifiers-panel"><BetLimitsEditor poker disabled={!isOwner} minimum={Number(pokerBlinds.bigBlind) || 2} maximum={Number(pokerBlinds.maximumBet) || room.stake} onChange={({ minimum, maximum }) => isOwner && setPokerBlinds({ bigBlind: minimum, maximumBet: maximum })} /><div className="blind-ratio" aria-live="polite"><span>Petite blinde<strong>{Math.floor((Number(pokerBlinds.bigBlind) || 2) / 2)}</strong></span><b>½</b><span>Grosse blinde<strong>{Number(pokerBlinds.bigBlind) || 2}</strong></span><span>Plafond<strong>{Number(pokerBlinds.maximumBet) || room.stake}</strong></span></div></section>}
         {room.gameId === "blackjack" && <BetLimitsEditor disabled={!isOwner} minimum={Number(gameModifiers.minimumBet) || 50} maximum={Number(gameModifiers.maximumBet) || 100} onChange={({ minimum, maximum }) => isOwner && setGameModifiers({ ...gameModifiers, minimumBet: minimum, maximumBet: maximum })} />}
         {room.gameId === "bataille" && <BattleModifiersPanel value={battleModifiers} isOwner={isOwner} onChange={setBattleModifiers} showFooter={false} />}
+        <section className="game-modifiers-panel"><h3>Niveaux admis dans {gameTitle(room.gameId)}</h3><div className="settings-field-grid"><label>Niveau minimum<input aria-label="Niveau minimum de la table" disabled={!isOwner} type="number" min={1} max={1000} value={levelLimits.minLevel} onChange={(event) => setLevelLimits({ ...levelLimits, minLevel: event.target.value })} /></label><label>Niveau maximum<input aria-label="Niveau maximum de la table" disabled={!isOwner} type="number" min={levelLimits.minLevel} max={1000} value={levelLimits.maxLevel} placeholder="Sans limite" onChange={(event) => setLevelLimits({ ...levelLimits, maxLevel: event.target.value })} /></label></div></section>
         <GameModifiersPanel gameId={room.gameId} value={gameModifiers} isOwner={isOwner} onChange={setGameModifiers} showFooter={false} />
       </div><div className="room-settings-modal-footer"><span><Swords size={16} /> Ces paramètres seront verrouillés au lancement.</span><div className="actions">{isOwner && <button onClick={applyRoomSettings}><Save size={17} /> Appliquer les paramètres</button>}<button className="secondary" onClick={cancelRoomSettings}>{isOwner ? "Annuler" : "Fermer"}</button></div></div></div></ModalBackdrop>}
       {rulesOpen && <RulesModal gameId={room.gameId} onClose={() => setRulesOpen(false)} />}

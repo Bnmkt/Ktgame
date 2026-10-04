@@ -41,6 +41,7 @@ import { normalizeCosmeticCss, normalizeCosmeticDesign, normalizeCosmeticMotion 
 import { friendRoomPresence } from "./services/friend-presence.js";
 import { createOnlinePresence } from "./services/online-presence.js";
 import { roomCredentialsError } from "./services/room-credentials.js";
+import { awardGameXp, gameProgress, grantAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits } from "./services/game-progression.js";
 import { buildLeaderboard } from "./services/leaderboards.js";
 import {
   appendEventPotEntry,
@@ -483,6 +484,7 @@ function normalizePlatformSettings(value = {}) {
     dailyBonusDefaultMultiplier: dailyBonus.defaultMultiplier,
     dailyBonusMaxMultiplier: dailyBonus.maxMultiplier,
     dailyBonusRules: dailyBonus.rules,
+    gameProgression: normalizeProgressionConfig(value.gameProgression, games.map((game) => game.id)),
     minRoomStake: integer("minRoomStake", defaultPlatformSettings.minRoomStake, 1, 1000000),
     botThinkingSeconds: integer("botThinkingSeconds", defaultPlatformSettings.botThinkingSeconds, 0, 30),
     turnEndDelaySeconds: integer("turnEndDelaySeconds", defaultPlatformSettings.turnEndDelaySeconds, 1, 60),
@@ -495,6 +497,31 @@ function normalizePlatformSettings(value = {}) {
 
 function platformSettings(db = readDb()) {
   return normalizePlatformSettings(db.settings?.platform);
+}
+
+function progressionConfig(db) { return platformSettings(db).gameProgression; }
+function playerProgression(user, db) {
+  const config = progressionConfig(db);
+  return games.map((game) => ({ ...gameProgress(user, game.id, config), gameName: game.name }));
+}
+function playerTitle(user, db, gameId = user?.profile?.titleGameId) {
+  if (!gameId) gameId = games.map((game) => game.id).sort((left, right) => (user?.gameXp?.[right] ?? 0) - (user?.gameXp?.[left] ?? 0))[0];
+  return games.some((game) => game.id === gameId) ? gameProgress(user, gameId, progressionConfig(db)) : null;
+}
+function playerLevelContext(user, db, gameId) {
+  const rows = playerProgression(user, db), current = rows.find((row) => row.gameId === gameId);
+  return { gameLevel: current?.level ?? 1, gameXp: current?.xp ?? 0, highestGameLevel: Math.max(1, ...rows.map((row) => row.level)), totalGameXp: rows.reduce((total, row) => total + row.xp, 0) };
+}
+function xpAchievementEvents(db, user, result, room, depth = 0, reason = "achievement") {
+  if (!result) return [];
+  const events = [{ type: "game.xp", payload: { ...result, reason } }];
+  if (result.level > result.previousLevel) events.push({ type: "game.level", payload: result });
+  return events.flatMap((event) => processAchievementEvent(db, user.id, event, room, depth));
+}
+function validateAchievementRewards(entry, db) {
+  const items = new Set(configuredShop(db).map((item) => item.id)), ids = new Set(games.map((game) => game.id));
+  if (entry.rewards.itemIds.some((id) => !items.has(id)) || entry.rewards.xp.some((row) => !ids.has(row.gameId))) throw new Error("Une récompense fait référence à un objet ou un jeu introuvable.");
+  return entry;
 }
 
 function pokerBlindsFromBigBlind(value, fallback = defaultPlatformSettings.pokerDefaultBigBlind) {
@@ -1195,6 +1222,7 @@ function normalizePublicProfile(profile = {}, fallbackName = "") {
     birthDate: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : "",
     gender: String(profile.gender ?? "").slice(0, 32),
     bio: normalizePlainText(profile.bio, 180),
+    titleGameId: games.some((game) => game.id === profile.titleGameId) ? profile.titleGameId : "",
     favoriteGames: Array.isArray(profile.favoriteGames) ? [...new Set(profile.favoriteGames.map(String))].slice(0, 5) : []
   };
 }
@@ -1352,7 +1380,7 @@ function sanitizeUser(user, db = readDb()) {
   const settings = platformSettings(db);
   const moderation = activeModeration(user);
   const parentalRevocation = activeParentalRevocation(user);
-  return { id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, mfa: mfaSummary(user), minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
+  return { gameProgression: playerProgression(user, db), gameTitle: playerTitle(user, db), id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, mfa: mfaSummary(user), minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
 }
 
 function roomPlayerFor(user) {
@@ -1369,7 +1397,7 @@ function roomPlayerFor(user) {
 function sanitizeFriendUser(user, db) {
   ensureUserSocial(user);
   refreshPublicProfileStats(user, db);
-  return { id: user.id, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), age: ageFromBirthDate(user.profile.birthDate), cosmetics: normalizeCosmetics(user.cosmetics), profileStats: normalizeProfileStats(user.profileStats), profile: publicProfileFor(user) };
+  return { id: user.id, gameTitle: playerTitle(user, db), pseudo: displayNameFor(user), friendCode: friendCodeFor(user), age: ageFromBirthDate(user.profile.birthDate), cosmetics: normalizeCosmetics(user.cosmetics), profileStats: normalizeProfileStats(user.profileStats), profile: publicProfileFor(user) };
 }
 
 function publicUserPayload(user, db, viewerId = "") {
@@ -1391,6 +1419,8 @@ function publicUserPayload(user, db, viewerId = "") {
     id: user.id,
     pseudo: displayNameFor(user),
     friendCode: friendCodeFor(user),
+    gameProgression: playerProgression(user, db),
+    gameTitle: playerTitle(user, db),
     cosmetics: normalizeCosmetics(user.cosmetics),
     profileStats: normalizeProfileStats(user.profileStats),
     profile: publicProfileFor(user),
@@ -1429,7 +1459,7 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
     const fullUser = db.users.find((u) => u.id === player.id);
     const sanitized = !fullUser
       ? { ...player, profile: publicProfileFor(player), profileStats: normalizeProfileStats(player.profileStats) }
-      : { ...player, login: fullUser.pseudo, pseudo: displayNameFor(fullUser), age: ageFromBirthDate(fullUser.profile?.birthDate), cosmetics: normalizeCosmetics(fullUser.cosmetics), profileStats: normalizeProfileStats(fullUser.profileStats), profile: publicProfileFor(fullUser) };
+      : { ...player, gameTitle: playerTitle(fullUser, db, room.gameId), login: fullUser.pseudo, pseudo: displayNameFor(fullUser), age: ageFromBirthDate(fullUser.profile?.birthDate), cosmetics: normalizeCosmetics(fullUser.cosmetics), profileStats: normalizeProfileStats(fullUser.profileStats), profile: publicProfileFor(fullUser) };
     sanitizedPlayers.set(player.id, sanitized);
     return sanitized;
   };
@@ -1481,6 +1511,7 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
     players: safeRoom.players.map(sanitizeRoomPlayer),
     state: safeState,
     spectator: spectating,
+    minLevel: room.minLevel ?? 1, maxLevel: room.maxLevel ?? null,
     ...(room.gameId === "belote" ? { beloteSeats: beloteSeats(room) } : {}),
     minPlayers: game?.minPlayers ?? 1,
     maxPlayers: game?.maxPlayers ?? safeRoom.players.length,
@@ -1498,6 +1529,7 @@ function sanitizeLobbyRoom(room) {
     isPublic: room.isPublic,
     hasPassword: Boolean(room.passwordHash),
     inProgress: Boolean(room.state && !room.finished),
+    minLevel: room.minLevel ?? 1, maxLevel: room.maxLevel ?? null,
     players: (room.players ?? []).map((player) => ({ id: player.id, isBot: Boolean(player.isBot) }))
   };
 }
@@ -1737,6 +1769,10 @@ function userAchievementProgress(user, db) {
     midnightContractsCompleted: completedMidnightContractCount(resultIds)
   };
   for (const [gameId, wins] of Object.entries(statistics.gameWins)) metricValues[`gameWins.${gameId}`] = wins;
+  const progression = playerProgression(user, db);
+  metricValues.highestGameLevel = Math.max(1, ...progression.map((row) => row.level));
+  metricValues.totalGameXp = progression.reduce((total, row) => total + row.xp, 0);
+  for (const row of progression) { metricValues[`gameLevel.${row.gameId}`] = row.level; metricValues[`gameXp.${row.gameId}`] = row.xp; }
   for (const entry of achievementCatalog(db)) {
     if (entry.rule?.source === "metric" && metricValues[entry.rule.metric] !== undefined) progress[entry.id] = metricValues[entry.rule.metric];
     if (entry.rule?.legacyResultId && resultIds.includes(entry.rule.legacyResultId)) progress[entry.id] = Math.max(progress[entry.id] ?? 0, 1);
@@ -1766,12 +1802,13 @@ function achievementStatus(user, db) {
   });
 }
 
-function unlockEligibleAchievements(user, db, extraIds = []) {
+function unlockEligibleAchievements(user, db, extraIds = [], depth = 0, room = null) {
   if (!user || user.guest) return [];
   const achievements = ensureUserAchievements(user);
   const catalog = achievementCatalog(db);
   const progress = userAchievementProgress(user, db);
   const unlocked = [];
+  const rewardUnlocks = [];
   for (const entry of catalog) {
     if (achievements.suppressed.includes(entry.id)) continue;
     if (achievements.unlocked.includes(entry.id)) continue;
@@ -1784,6 +1821,9 @@ function unlockEligibleAchievements(user, db, extraIds = []) {
   for (const id of unlocked) {
     const entry = catalog.find((achievement) => achievement.id === id);
     if (entry) {
+      ensureUserCosmetics(user);
+      const rewards = grantAchievementRewards(user, entry, configuredShop(db), progressionConfig(db));
+      for (const result of rewards) rewardUnlocks.push(...xpAchievementEvents(db, user, result, room, depth + 1));
       pushNotification(user, {
         type: "achievement",
         title: `${entry.group} - ${entry.title}`,
@@ -1793,7 +1833,7 @@ function unlockEligibleAchievements(user, db, extraIds = []) {
   }
   grantAchievementCosmetics(user);
   refreshPublicProfileStats(user, db);
-  return unlocked;
+  return [...new Set([...unlocked, ...rewardUnlocks])];
 }
 
 function appendRoomAchievementUnlocks(room, userId, ids = []) {
@@ -1817,11 +1857,26 @@ function triggerRandomAchievement(db, userId, room = null) {
   return processAchievementEvent(db, userId, { type: "site.random", payload: { roll, maximum: 100000 } }, room);
 }
 
+const achievementEventQueues = new WeakMap();
 function processAchievementEvent(db, userId, event, room = null, depth = 0) {
-  if (depth > 2) return [];
+  const pending = achievementEventQueues.get(db);
+  if (pending) { pending.push({ userId, event, room, depth }); return []; }
+  // Drain reward chains iteratively. One-time unlocks bound the queue, not call-stack depth.
+  const queue = [{ userId, event, room, depth }], unlocked = [];
+  achievementEventQueues.set(db, queue);
+  try {
+    for (let index = 0; index < queue.length; index++) {
+      const next = queue[index];
+      unlocked.push(...consumePlayerAchievementEvent(db, next.userId, next.event, next.room, next.depth));
+    }
+    return [...new Set(unlocked)];
+  } finally { achievementEventQueues.delete(db); }
+}
+
+function consumePlayerAchievementEvent(db, userId, event, room, depth) {
   const user = db.users.find((entry) => entry.id === userId && !entry.guest);
   if (!user) return [];
-  event = { ...event, payload: { ...event.payload, player: playerAchievementContext(user, configuredShop(db)) } };
+  event = { ...event, payload: { ...event.payload, player: { ...playerAchievementContext(user, configuredShop(db)), ...playerLevelContext(user, db, event.payload?.gameId) } } };
   user.achievementProgress ??= {};
   if (room) room.achievementRuleProgress ??= {};
   const gameProgress = room ? (room.achievementRuleProgress[userId] ??= {}) : {};
@@ -1835,7 +1890,7 @@ function processAchievementEvent(db, userId, event, room = null, depth = 0) {
     if (entry.rule.scope !== "event") bucket[entry.id] = result.progress;
     if ((Number(result.progress.value) || 0) >= entry.target) reached.push(entry.id);
   }
-  const unlocked = unlockEligibleAchievements(user, db, reached);
+  const unlocked = unlockEligibleAchievements(user, db, reached, depth, room);
   if (room) appendRoomAchievementUnlocks(room, userId, unlocked);
   for (const id of unlocked) {
     const entry = achievementCatalog(db).find((candidate) => candidate.id === id);
@@ -2176,9 +2231,10 @@ function resolveChatChannel(db, user, input = {}) {
 
 function decorateChatMessage(message, db = readDb()) {
   const sender = db.users.find((entry) => entry.id === message.senderId);
+  const room = message.channelType === "room" ? db.rooms.find((entry) => entry.id === message.channelId) : null;
   return {
     ...message,
-    sender: sender ? sanitizeFriendUser(sender, db) : { id: message.senderId, pseudo: "Compte supprimé", cosmetics: structuredClone(defaultCosmetics) }
+    sender: sender ? { ...sanitizeFriendUser(sender, db), gameTitle: playerTitle(sender, db, room?.gameId ?? sender.profile?.titleGameId) } : { id: message.senderId, pseudo: "Compte supprimé", cosmetics: structuredClone(defaultCosmetics) }
   };
 }
 
@@ -2476,6 +2532,13 @@ function finishRoomIfNeeded(room, db) {
   db.history.push(historyRow);
   for (const player of room.players.filter((p) => !p.isBot)) {
     const user = db.users.find((u) => u.id === player.id);
+    const config = progressionConfig(db), xpRules = config.games[room.gameId] ?? config;
+    const amount = xpRules.completionXp + (winners.includes(player.id) ? xpRules.victoryXp : 0);
+    const xp = awardGameXp(user, room.gameId, amount, config);
+    if (xp) {
+      (historyRow.xpAwards ??= {})[player.id] = xp.amount;
+      appendRoomAchievementUnlocks(room, player.id, xpAchievementEvents(db, user, xp, room, 0, winners.includes(player.id) ? "game-victory" : "game-completed"));
+    }
     processAchievementEvent(db, player.id, gameFinishedAchievementEvent(room, player, achievementEvents, roomPayouts, pot), room);
     appendRoomAchievementUnlocks(room, player.id, unlockEligibleAchievements(user, db));
     triggerRandomAchievement(db, player.id, room);
@@ -2701,6 +2764,8 @@ function startRoomRound(room, db) {
   const settings = platformSettings(db);
   room.stake = Math.max(room.gameId === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(room.stake) || 0);
   for (const player of room.players.filter((p) => !p.isBot)) {
+    const levelError = roomLevelError(db.users.find((user) => user.id === player.id) ?? player, room, settings.gameProgression);
+    if (levelError) return `${player.pseudo} : ${levelError}`;
     if (getTokenBalance(db, player.id) < room.stake) return `${player.pseudo} n'a pas assez de jetons.`;
   }
   for (const player of room.players.filter((p) => !p.isBot)) {
@@ -5118,7 +5183,7 @@ app.post("/api/admin/achievements", auth, requireAdmin, (req, res) => {
     const created = updateDb((db) => {
       db.settings ??= {};
       db.settings.customAchievements ??= [];
-      const candidate = normalizeAchievementDefinition({ ...req.body, id: req.body.id || `custom-achievement-${randomUUID()}` });
+      const candidate = validateAchievementRewards(normalizeAchievementDefinition({ ...req.body, id: req.body.id || `custom-achievement-${randomUUID()}` }), db);
       if (achievementCatalog(db, { includeDisabled: true }).some((entry) => entry.id === candidate.id)) return null;
       const achievement = { ...candidate, builtIn: false, createdAt: new Date().toISOString(), createdById: req.auth.id };
       db.settings.customAchievements.push(achievement);
@@ -5134,12 +5199,12 @@ app.patch("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
     const result = updateDb((db) => {
       const current = achievementCatalog(db, { includeDisabled: true }).find((entry) => entry.id === req.params.id);
       if (!current) return null;
-      const next = normalizeAchievementDefinition({ ...current, ...req.body, id: current.id, rule: req.body.rule ?? current.rule }, current);
+      const next = validateAchievementRewards(normalizeAchievementDefinition({ ...current, ...req.body, id: current.id, rule: req.body.rule ?? current.rule }, current), db);
       next.updatedAt = new Date().toISOString();
       if (current.builtIn) {
         db.settings ??= {};
         db.settings.achievementOverrides ??= {};
-        db.settings.achievementOverrides[current.id] = { title: next.title, description: next.description, group: next.group, type: next.type, target: next.target, gameId: next.gameId, milestone: next.milestone, secret: next.secret, enabled: next.enabled, rule: next.rule, updatedAt: next.updatedAt };
+        db.settings.achievementOverrides[current.id] = { title: next.title, description: next.description, group: next.group, type: next.type, target: next.target, gameId: next.gameId, milestone: next.milestone, secret: next.secret, enabled: next.enabled, rule: next.rule, rewards: next.rewards, updatedAt: next.updatedAt };
       } else {
         const index = db.settings.customAchievements.findIndex((entry) => entry.id === current.id);
         db.settings.customAchievements[index] = { ...db.settings.customAchievements[index], ...next, builtIn: false };
@@ -5187,6 +5252,8 @@ app.delete("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
+  try { if (req.body.gameProgression !== undefined) normalizeProgressionConfig(req.body.gameProgression, games.map((game) => game.id)); }
+  catch (error) { return res.status(400).json({ error: error.message }); }
   if (req.body.emailVerificationRequired === true && !emailDeliveryConfigured()) return res.status(400).json({ error: "Configure SMTP_HOST et EMAIL_FROM avant d'activer la validation des emails." });
   const settings = updateDb((db) => {
     db.settings ??= {};
@@ -5194,6 +5261,13 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
     return db.settings.platform;
   });
   res.json({ ...settings, emailVerificationAvailable: emailDeliveryConfigured() });
+});
+
+app.post("/api/admin/progression/preview", auth, requireAdmin, (req, res) => {
+  try {
+    const config = normalizeProgressionConfig(req.body, games.map((game) => game.id));
+    res.json({ config, rows: progressionCurve(config) });
+  } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
@@ -5329,6 +5403,10 @@ app.patch("/api/admin/users/:id/achievements", auth, requireAdmin, (req, res) =>
       }
     }
     grantAchievementCosmetics(target);
+    for (const [id, unlocked] of Object.entries(states)) if (unlocked && allowedIds.has(id)) {
+      const entry = achievementCatalog(db).find((row) => row.id === id);
+      for (const result of grantAchievementRewards(target, entry, configuredShop(db), progressionConfig(db))) xpAchievementEvents(db, target, result, null);
+    }
     refreshPublicProfileStats(target, db);
     return achievementStatus(target, db);
   });
@@ -5525,6 +5603,7 @@ app.patch("/api/me", auth, async (req, res) => {
   const publicStatOptions = ["age", "gender", "friends", "gamesPlayed", "wins", "winRate", "achievements"];
   if (login && !validEmail(login)) return res.status(400).json({ error: "Adresse email invalide." });
   const currentAccount = readDb().users.find((entry) => entry.id === req.auth.id);
+  if (req.body.titleGameId && !games.some((game) => game.id === req.body.titleGameId)) return res.status(400).json({ error: "Jeu du titre invalide." });
   if (login && normalizeEmail(currentAccount?.email) !== login) return res.status(400).json({ error: "Modifie l'adresse email depuis l'écran de sécurité du compte." });
   if (displayName && displayName.length < 3) return res.status(400).json({ error: "Pseudo en jeu trop court." });
   const allowedGenders = ["", "Homme", "Femme", "Non-binaire", "Autre", "Préfère ne pas dire"];
@@ -5557,6 +5636,9 @@ app.patch("/api/me", auth, async (req, res) => {
     if (req.body.gender !== undefined) found.profile.gender = gender;
     if (req.body.bio !== undefined) found.profile.bio = bio.slice(0, 180);
     if (favoriteGames) found.profile.favoriteGames = favoriteGames;
+    if (req.body.titleGameId !== undefined) {
+      found.profile.titleGameId = req.body.titleGameId;
+    }
     found.profile = normalizePublicProfile(found.profile, found.pseudo);
     if (passwordHash) {
       found.passwordHash = passwordHash;
@@ -5754,6 +5836,11 @@ app.post("/api/rooms", auth, async (req, res) => {
   if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
   const settings = platformSettings();
   const name = String(req.body.name ?? "").trim();
+  let limits;
+  try { limits = roomLevelLimits(req.body); }
+  catch (error) { return res.status(400).json({ error: error.message }); }
+  const levelError = roomLevelError(user, { gameId: game.id, ...limits }, settings.gameProgression);
+  if (levelError) return res.status(400).json({ error: levelError });
   const password = String(req.body.password ?? "");
   const credentialsError = await roomCredentialsError({ name, password, user }, bcrypt.compare);
   if (credentialsError) return res.status(400).json({ error: credentialsError });
@@ -5766,6 +5853,7 @@ app.post("/api/rooms", auth, async (req, res) => {
     code: roomCode(),
     gameId: game.id,
     name: name || (displayNameFor(user).includes("@") ? game.name : `${game.name} de ${displayNameFor(user)}`),
+    ...limits,
     passwordHash,
     isPublic: req.body.isPublic !== false,
     stake,
@@ -5803,6 +5891,8 @@ app.post("/api/rooms/:code/join", auth, async (req, res) => {
   }
   if (room.players.length >= game.maxPlayers) return res.status(400).json({ error: "Table complète." });
   if (user.tokens < room.stake) return res.status(400).json({ error: "Jetons insuffisants." });
+  const levelError = roomLevelError(user, room, progressionConfig(db));
+  if (levelError) return res.status(403).json({ error: levelError });
   room.players.push(roomPlayerFor(user));
   if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
   writeDb(db);
@@ -5905,6 +5995,8 @@ app.post("/api/room-invites/:id/accept", auth, (req, res) => {
   }
   if (room.players.length >= game.maxPlayers) return res.status(400).json({ error: "Table complète." });
   if (user.tokens < room.stake) return res.status(400).json({ error: "Jetons insuffisants." });
+  const levelError = roomLevelError(user, room, progressionConfig(db));
+  if (levelError) return res.status(403).json({ error: levelError });
   room.players.push(roomPlayerFor(user));
   user.roomInvites = user.roomInvites.filter((row) => row.id !== inviteId);
   writeDb(db);
@@ -6028,6 +6120,22 @@ app.post("/api/rooms/:code/game-settings", auth, (req, res) => {
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   res.json(safeRoom);
+});
+
+app.post("/api/rooms/:code/level-settings", auth, (req, res) => {
+  try {
+    const db = readDb(), room = db.rooms.find((row) => row.code === req.params.code.toUpperCase() && row.ownerId === req.auth.id && !row.state);
+    if (!room) return res.status(404).json({ error: "Table en attente introuvable." });
+    const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+    if (!access.allowed) return rejectFeature(res, access);
+    const limits = roomLevelLimits(req.body), config = progressionConfig(db);
+    for (const player of room.players.filter((row) => !row.isBot)) {
+      const error = roomLevelError(db.users.find((user) => user.id === player.id) ?? player, { ...room, ...limits }, config);
+      if (error) return res.status(400).json({ error: `${player.pseudo} : ${error}` });
+    }
+    Object.assign(room, limits); writeDb(db); emitRoomUpdate(room); broadcastRooms();
+    res.json(sanitizeRoom(room, req.auth.id, db));
+  } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 app.post("/api/rooms/:code/leave", auth, (req, res) => {

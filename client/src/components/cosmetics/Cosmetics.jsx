@@ -5,6 +5,7 @@ import { Die, PlayingCard } from "../game/GamePieces.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { memberCardOptions } from "../../config/site.js";
 import { copyText } from "../../utils/presentation.jsx";
+import "../profile/game-progression.css";
 
 export let cosmeticCatalogItems = [];
 
@@ -159,6 +160,7 @@ export function DisplayName({ user, interactive = true }) {
   return (
     <span className={`display-name name-${effect}`} role={interactive && user?.id && !user.isBot ? "button" : undefined} tabIndex={interactive && user?.id && !user.isBot ? 0 : undefined} onClick={interactive ? openProfile : undefined} onKeyDown={interactive ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openProfile(); } } : undefined}>
       <CosmeticIcon value={user?.cosmetics?.equipped?.icon} />
+      {user?.gameTitle?.title && <span className="player-game-title" title={`${user.gameTitle.title} · niveau ${user.gameTitle.level} · ${user.gameTitle.gameId}`}>{user.gameTitle.title}</span>}
       <span className="display-name-text">{user?.pseudo}</span>
     </span>
   );

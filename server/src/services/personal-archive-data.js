@@ -10,6 +10,7 @@ export function personalGame(row, userId) {
   return {
     id: row.id, roomId: row.roomId, gameId: row.gameId, name: row.name, code: row.code,
     finishedAt: row.finishedAt, pot: row.pot, won: row.winners?.includes(userId) ?? false,
+    ...(Object.hasOwn(row.xpAwards ?? {}, userId) ? { xpEarned: row.xpAwards[userId] } : {}),
     participantCount: row.participantCount ?? row.players?.length ?? 0,
     player: removePersonalSecrets(row.players?.find((entry) => entry.id === userId) ?? null)
   };
