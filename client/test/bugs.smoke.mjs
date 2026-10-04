@@ -211,7 +211,21 @@ try {
   await anonymous.getByRole("heading", { name: "Un email reçu ne fonctionne pas", exact: true }).waitFor();
   assert.match(await anonymous.locator(".issue-page-panel").innerText(), /Le lien de mon email/);
   assert.equal(await anonymous.locator(".issue-form-dialog").count(), 0);
-  assert.deepEqual(errors, []); console.log("Passed bug reports: consent, images, modal gestures, staff privacy, publication, batch, relations, mobile/fullscreen and Ghostery.");
+  const admin = await pageFor("admin"); await admin.goto(`${origin}${base}/admin`);
+  await admin.getByRole("button", { name: "Signalements de bugs", exact: true }).click();
+  await admin.locator("tr").filter({ hasText: `BUG ${principal} ·` }).getByRole("button", { name: "Ouvrir", exact: true }).click();
+  const adminDossier = admin.locator(".issue-editor-dialog").first(); await adminDossier.getByRole("button", { name: "Supprimer", exact: true }).click();
+  const confirmation = admin.getByRole("dialog", { name: `Supprimer BUG ${principal} ?`, exact: true });
+  await admin.screenshot({ path: path.join(previews, "bugs-delete-confirmation-desktop.png") });
+  await confirmation.getByRole("button", { name: "Supprimer le dossier", exact: true }).click(); await confirmation.waitFor({ state: "hidden" });
+  assert.equal((await request("admin", `/api/admin/bugs/${principal}`)).status, "deleted");
+  await request("alice", `/api/bugs/${principal}`, "GET", undefined, 404);
+  assert.equal((await fetch(`${apiOrigin}${base}/api/bugs/images/${publicReport.images[0].id}`)).status, 404);
+  await request("editor", `/api/admin/bugs/${principal}`, "DELETE", {}, 403);
+  await request("editor", `/api/admin/bugs/${principal}`, "PATCH", { status: "received" }, 403);
+  await request("admin", `/api/admin/bugs/${principal}`, "PATCH", { status: "received" });
+  assert.equal((await request("admin", `/api/admin/bugs/${principal}`)).visible, false);
+  assert.deepEqual(errors, []); console.log("Passed bug reports: consent, images, modal gestures, staff privacy, individual publication, admin-only deletion/restoration, batch, relations, mobile/fullscreen and Ghostery.");
 } catch (error) {
   console.error(output.slice(-3500)); for (const context of browser?.contexts() ?? []) for (const page of context.pages()) console.error(page.url(), (await page.locator("body").innerText().catch(() => "")).slice(-6000)); throw error;
 } finally {

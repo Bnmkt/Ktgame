@@ -23,6 +23,14 @@ export function registerBugReportRoutes({ app, auth, requireBackOffice, store, i
     if (input.assignee && !staff().some((user) => user.id === input.assignee)) throw new Error("Choisis un administrateur ou un éditeur pour l'assignation.");
     return input;
   };
+  const canDelete = (req) => viewer(req)?.admin === true;
+  const checkDeletion = (req, res, ids, changes) => {
+    if (!canDelete(req) && (changes.status === "deleted" || ids.some((id) => store.get(id, { admin: true })?.status === "deleted"))) {
+      res.status(403).json({ error: "La suppression et la restauration sont réservées aux administrateurs." });
+      return false;
+    }
+    return true;
+  };
   app.get("/api/bugs/metadata", (_req, res) => res.json({ ...bugMetadata, limits: { images: 6, imageBytes: 3145728, totalImageBytes: 12582912 } }));
   app.get("/api/bugs/diagnostic-version", (_req, res) => res.json({ version: version() }));
   app.post("/api/bugs/uploads", uploads, express.raw({ type: "image/png", limit: "3mb" }), wrap((req, res) => res.status(201).json(store.stageImage(req.body))));
@@ -51,16 +59,26 @@ export function registerBugReportRoutes({ app, auth, requireBackOffice, store, i
     res.status(201).json({ ok: true, message: "Commentaire reçu. Il sera publié après relecture." });
   }));
   const guard = [auth, requireBackOffice];
-  app.get("/api/admin/bugs/metadata", ...guard, (_req, res) => res.json({ ...bugMetadata, groups: store.groups(), staff: staff(), summary: store.summary() }));
+  app.get("/api/admin/bugs/metadata", ...guard, (req, res) => res.json({ ...bugMetadata, canDelete: canDelete(req), groups: store.groups(), staff: staff(), summary: store.summary() }));
   app.get("/api/admin/bugs", ...guard, wrap((req, res) => res.json(store.list(req.query, { admin: true }))));
   app.post("/api/admin/bugs/groups", ...guard, wrap((req, res) => res.status(201).json(store.createGroup(req.body.name, req.auth.id))));
-  app.post("/api/admin/bugs/batch", ...guard, wrap((req, res) => res.json(store.batch(req.body.ids, assigned(req.body.changes ?? {}), req.auth.id))));
+  app.post("/api/admin/bugs/batch", ...guard, wrap((req, res) => {
+    if (!checkDeletion(req, res, Array.isArray(req.body.ids) ? req.body.ids : [], req.body.changes ?? {})) return;
+    res.json(store.batch(req.body.ids, assigned(req.body.changes ?? {}), req.auth.id));
+  }));
   app.get("/api/admin/bugs/:id", ...guard, wrap((req, res) => {
     const report = store.get(req.params.id, { admin: true });
     if (!report) return res.status(404).json({ error: "Bug introuvable." });
     res.json({ ...report, suggestions: store.suggestions(report.id), resolutionPlan: store.resolutionPlan(report.id) });
   }));
-  app.patch("/api/admin/bugs/:id", ...guard, wrap((req, res) => res.json(store.update(req.params.id, assigned(req.body ?? {}), req.auth.id))));
+  app.patch("/api/admin/bugs/:id", ...guard, wrap((req, res) => {
+    if (!checkDeletion(req, res, [req.params.id], req.body ?? {})) return;
+    res.json(store.update(req.params.id, assigned(req.body ?? {}), req.auth.id));
+  }));
+  app.delete("/api/admin/bugs/:id", ...guard, wrap((req, res) => {
+    if (!canDelete(req)) return res.status(403).json({ error: "La suppression est réservée aux administrateurs." });
+    res.json(store.update(req.params.id, { status: "deleted", internalNote: req.body?.reason || "Dossier supprimé par un administrateur." }, req.auth.id));
+  }));
   app.post("/api/admin/bugs/:id/publication", ...guard, wrap((req, res) => {
     const previous = store.get(req.params.id, { admin: true });
     const report = store.publish(req.params.id, req.body ?? {}, req.auth.id);

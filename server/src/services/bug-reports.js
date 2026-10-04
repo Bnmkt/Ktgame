@@ -6,7 +6,7 @@ import { redactBugPublicText, sanitizeBugDiagnostics } from "./bug-diagnostics.j
 import { sanitizeBugImage } from "./bug-images.js";
 
 export const bugMetadata = {
-  statuses: { received: "Reçu", analyzing: "En analyse", reproduced: "Reproduit", planned: "Correction prévue", fixed: "Corrigé", closed: "Fermé" },
+  statuses: { received: "Reçu", analyzing: "En analyse", reproduced: "Reproduit", planned: "Correction prévue", fixed: "Corrigé", closed: "Fermé", deleted: "Supprimé" },
   priorities: { low: "Basse", normal: "Normale", high: "Haute", critical: "Critique" },
   categories: { interface: "Interface", game: "Jeu", account: "Compte / connexion", email: "Email", shop: "Boutique", community: "Communauté", performance: "Performance", other: "Autre" },
   frequencies: { once: "Une seule fois", intermittent: "Parfois", often: "Souvent", always: "À chaque fois", unknown: "Je ne sais pas" },
@@ -86,7 +86,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
   const owns = (row, viewer, receipt) => Boolean(row && (viewer?.id && row.reporter_id === viewer.id || equalHash(row.receipt_hash, receipt)));
   function get(id, { viewer, receipt, admin = false } = {}) {
     const row = rowFor(id);
-    if (!row) return null;
+    if (!row || row.status === "deleted" && !admin) return null;
     const privateView = admin || owns(row, viewer, receipt);
     const report = {
       id: row.id, code: `BUG ${row.id}`, title: privateView ? row.title : row.visible ? row.public_title : "Signalement en attente de relecture", category: row.category,
@@ -106,6 +106,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
   }
   function list(input = {}, { admin = false, viewer, mine = false } = {}) {
     const clauses = [], params = [];
+    if (!admin) clauses.push("status!='deleted'");
     if (mine) { clauses.push("reporter_id=?"); params.push(viewer?.id ?? ""); }
     const titleColumn = admin || mine ? "title" : "CASE WHEN visible=1 THEN public_title ELSE 'Signalement en attente de relecture' END";
     for (const [field, values] of [["status", bugMetadata.statuses], ["priority", bugMetadata.priorities], ["category", bugMetadata.categories]]) {
@@ -174,6 +175,10 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     if (group && !db.prepare("SELECT 1 FROM bug_groups WHERE id=?").get(group)) throw new Error("Groupe introuvable.");
     transaction(() => {
       db.prepare("UPDATE bug_reports SET status=?,priority=?,category=?,assignee=?,group_id=?,updated_at=? WHERE id=?").run(status, priority, category, clean(input.assignee ?? row.assignee, 80), group, timestamp(), row.id);
+      if (status === "deleted") {
+        db.prepare("UPDATE bug_reports SET visible=0 WHERE id=?").run(row.id);
+        db.prepare("UPDATE bug_images SET visible=0 WHERE bug_id=?").run(row.id);
+      }
       if (clean(input.internalNote)) addComment(row.id, { body: input.internalNote, kind: "internal" }, { id: actor }, true);
       if (clean(input.response)) addComment(row.id, { body: input.response, kind: "staff", visible: input.responsePublic === true }, { id: actor }, true);
       audit(row.id, actor, "updated", `${bugMetadata.statuses[row.status]} → ${bugMetadata.statuses[status]} · ${bugMetadata.priorities[priority]} · assignation : ${clean(input.assignee ?? row.assignee, 80) || "aucune"}`);
@@ -183,6 +188,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
   function publish(id, input, actor) {
     const row = rowFor(id);
     if (!row) throw new Error("Bug introuvable.");
+    if (row.status === "deleted") throw new Error("Restaure le dossier avant de le publier.");
     const visible = input.visible === true;
     const title = redactBugPublicText(input.title, 160), description = redactBugPublicText(input.description, 6000);
     const expected = redactBugPublicText(input.expected ?? row.public_expected, 3000), actual = redactBugPublicText(input.actual ?? row.public_actual, 3000), steps = redactBugPublicText(input.steps ?? row.public_steps, 5000);
@@ -257,7 +263,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
       const other = row.source_id === parent ? row.target_id : row.source_id;
       if (other === root.id) continue;
       const candidate = rowFor(other);
-      if (!terminal(candidate.status)) related.set(other, { id: other, title: candidate.title, status: candidate.status, type: duplicates.has(other) ? "duplicate" : row.type, suggested: duplicates.has(other) });
+      if (!terminal(candidate.status) && candidate.status !== "deleted") related.set(other, { id: other, title: candidate.title, status: candidate.status, type: duplicates.has(other) ? "duplicate" : row.type, suggested: duplicates.has(other) });
     }
     return { principal: root.id, rows: [...related.values()].slice(0, 100) };
   }
@@ -266,6 +272,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     if (!Array.isArray(linkedIds) || linkedIds.length > 100) throw new Error("Au maximum 100 bugs liés.");
     const plan = resolutionPlan(id), allowed = new Set(plan.rows.map((row) => row.id));
     const ids = [...new Set([bugId(id), ...linkedIds.map(bugId)])];
+    if (ids.some((entry) => rowFor(entry)?.status === "deleted")) throw new Error("Restaure les dossiers supprimés avant leur résolution.");
     if (ids.some((entry) => entry !== bugId(id) && !allowed.has(entry))) throw new Error("Un bug sélectionné n'appartient pas à ce plan de résolution.");
     return transaction(() => {
       for (const entry of ids) {
@@ -309,7 +316,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     for (const row of rows) { fs.rmSync(path.join(uploadDirectory, row.filename), { force: true }); db.prepare("DELETE FROM bug_images WHERE id=?").run(row.id); }
     db.prepare("UPDATE bug_reports SET diagnostics=NULL WHERE diagnostics IS NOT NULL AND consent_at<?").run(new Date(now() - 90 * 86400000).toISOString());
   }
-  function summary() { return db.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(status NOT IN ('fixed','closed')),0) AS pending,COALESCE(SUM(visible=0),0) AS private FROM bug_reports").get(); }
+  function summary() { return db.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(status NOT IN ('fixed','closed')),0) AS pending,COALESCE(SUM(visible=0),0) AS private FROM bug_reports WHERE status!='deleted'").get(); }
   function deleteForUser(userId) {
     const files = db.prepare("SELECT i.filename FROM bug_images i JOIN bug_reports b ON b.id=i.bug_id WHERE b.reporter_id=?").all(userId);
     transaction(() => {

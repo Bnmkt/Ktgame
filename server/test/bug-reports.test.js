@@ -174,4 +174,17 @@ test("public endpoints reveal private details only to verified staff or owners",
   const publish = (visible) => fetch(`${origin}/api/admin/bugs/${created.id}/publication`, { method: "POST", headers: { "Content-Type": "application/json", "X-Test-User": "editor" }, body: JSON.stringify({ visible, reviewed: true, title: "Titre public", description: "Un problème public relu avant sa publication." }) });
   assert.equal((await publish(true)).status, 200); assert.equal(notices.length, 2); assert.equal(notices[1].kind, "bug-published");
   assert.equal((await publish(true)).status, 200); assert.equal((await publish(false)).status, 200); assert.equal(notices.length, 2);
+  const change = (who, method, payload, suffix = "") => fetch(`${origin}/api/admin/bugs/${created.id}${suffix}`, { method, headers: { "Content-Type": "application/json", "X-Test-User": who }, body: JSON.stringify(payload) });
+  assert.equal((await change("editor", "DELETE", {})).status, 403);
+  assert.equal((await change("editor", "PATCH", { status: "deleted" })).status, 403);
+  const batch = await fetch(`${origin}/api/admin/bugs/batch`, { method: "POST", headers: { "Content-Type": "application/json", "X-Test-User": "editor" }, body: JSON.stringify({ ids: [created.id], changes: { status: "deleted" } }) });
+  assert.equal(batch.status, 403);
+  assert.equal((await change("admin", "DELETE", { reason: "Test supprimé" })).status, 200);
+  assert.equal(s.get(created.id), null); assert.equal(s.get(created.id, { viewer: { id: "alice" } }), null);
+  assert.equal(s.list().rows.some((row) => row.id === created.id), false);
+  assert.equal(s.list({}, { admin: true }).rows.find((row) => row.id === created.id).status, "deleted");
+  assert.equal((await change("editor", "PATCH", { status: "received" })).status, 403);
+  assert.throws(() => s.resolve(created.id, {}, "editor"), /Restaure/);
+  assert.equal((await change("admin", "PATCH", { status: "received" })).status, 200);
+  assert.equal(s.get(created.id).visible, false);
 });
