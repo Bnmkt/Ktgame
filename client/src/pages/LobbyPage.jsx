@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import { bugDiagnostics } from "../features/bugs/diagnostics.js";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
@@ -62,10 +63,11 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
     api("/api/games").then(setGames);
     api("/api/rooms").then(setRooms);
     const socket = io(SOCKET_URL, { path: SOCKET_PATH });
+    const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     socket.on("rooms", setRooms);
     api("/api/community-events/carousel").then((result) => { setEventCarousel(result); setEventIndex(result.focusIndex ?? 0); }).catch(() => {});
     socket.on("community-event-update", () => api("/api/community-events/carousel").then((result) => { setEventCarousel(result); setEventIndex((index) => Math.min(index, Math.max(0, result.events.length - 1))); }).catch(() => {}));
-    return () => socket.disconnect();
+    return () => { disposeDiagnostics(); socket.disconnect(); };
   }, []);
   useEffect(() => { setStake((current) => Math.max(current, settings.minRoomStake)); }, [settings.minRoomStake]);
   useEffect(() => {

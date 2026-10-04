@@ -1,3 +1,6 @@
+import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
+import { BugReportsAdmin } from "../features/bugs/BugReportsAdmin.jsx";
+import { Bug } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, Copy, Gamepad2, HeartPulse, LayoutDashboard, Lock, Newspaper, Plus, RefreshCw, Save, Scale, Search, Settings, Shield, ShieldCheck, ShoppingBag, Spade, Sparkles, Trophy, Users, X } from "lucide-react";
 import { api } from "../api.js";
@@ -209,7 +212,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
   const adminNavigationGroups = isAdministrator ? [
     { label: "Pilotage", items: [
       { value: "overview", label: "Vue d’ensemble", icon: LayoutDashboard },
-      { value: "health", label: "Supervision", icon: HeartPulse }
+      { value: "health", label: "Supervision", icon: HeartPulse },
+      { value: "bugs", label: "Signalements de bugs", icon: Bug }
     ] },
     { label: "Contenu", items: [
       { value: "events", label: "Événements", icon: Sparkles },
@@ -226,6 +230,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
       { value: "settings", label: "Paramètres", icon: Settings }
     ] }
   ] : [{ label: "Édition", items: [
+    { value: "bugs", label: "Signalements de bugs", icon: Bug },
     { value: "shop", label: "Studio boutique", icon: ShoppingBag, count: data.shop.length },
     { value: "events", label: "Événements", icon: Sparkles },
     { value: "patchnotes", label: "Patchnotes", icon: Newspaper },
@@ -257,6 +262,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
 
 
         {isAdministrator && tab === "health" && <ServerHealth reportError={setError} />}
+        {tab === "bugs" && <BugReportsAdmin />}
 
         {data.permissions?.manageCommunityEvents && tab === "events" && <CommunityEventsAdmin shop={data.shop} canOperate={Boolean(data.permissions?.operateCommunityEvents)} reportError={setError} />}
 
@@ -297,7 +303,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
       </div>
 
       {editing?.kind === "user" && <UserEditor row={editing.item} currentUser={user} games={data.games} settings={settingsDraft} onClose={() => setEditing(null)} onSaved={() => load(false)} notifySuccess={notifySuccess} reportError={setError} />}
-      {editing && editing.kind !== "user" && <div className="modal-backdrop" onClick={() => setEditing(null)}>
+      {editing && editing.kind !== "user" && <ModalBackdrop className="modal-backdrop" onClick={() => setEditing(null)}>
         <form className={`modal admin-editor ${editing.kind.includes("shop") ? "shop-admin-editor" : ""}`} onSubmit={(event) => { event.preventDefault(); save(); }} onClick={(event) => event.stopPropagation()}>
           <div className="modal-title-row"><div><span className="eyebrow">Édition</span><h2>{editorTitle}</h2><small>{editing.item.id}</small></div><button type="button" className="secondary icon-toggle" onClick={() => setEditing(null)} aria-label="Fermer"><X size={18} /></button></div>
           {isShopEditor ? <ShopStudio
@@ -326,7 +332,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
           </div>}
           {!isShopEditor && <div className="actions admin-editor-actions"><button type="submit" disabled={saving === "editor"}><Save size={18} /> {saving === "editor" ? "Enregistrement…" : "Enregistrer"}</button><button type="button" className="secondary" onClick={() => setEditing(null)}>Annuler</button></div>}
         </form>
-      </div>}
+      </ModalBackdrop>}
       {confirmAction && <ConfirmDialog title={confirmAction.title} message={confirmAction.message} confirmLabel={confirmAction.label} danger={confirmAction.danger} onConfirm={confirmAction.run} onClose={() => setConfirmAction(null)} />}
     </main>
   );

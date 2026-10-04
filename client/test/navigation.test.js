@@ -29,6 +29,13 @@ test("public FAQ and guide routes work at root and under an absolute deployment 
     assert.ok(pathname.startsWith("/"));
   }
 });
+test("bug tracking supports public lists and direct dossier routes with an absolute base", () => {
+  for (const base of ["/", "/ktga/"]) {
+    assert.deepEqual(readRoute({ pathname: appPath("bugs", "", base), search: "" }, base), { view: "bugs" });
+    assert.deepEqual(readRoute({ pathname: appPath("bugs", "1842", base), search: "" }, base), { view: "bugs", id: "1842" });
+    assert.equal(readRoute({ pathname: appPath("bugs", "invalid", base), search: "" }, base).view, "not-found");
+  }
+});
 
 test("les routes inconnues, hors base et mal encodees sont rejetees", () => {
   for (const path of ["/autre/shop", "/ktgashop", "/ktga/table", "/ktga/table/%", "/ktga/table/a%2Fb", "/ktga/profil/autre", "/ktga/inconnue"]) {

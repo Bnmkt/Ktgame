@@ -87,6 +87,21 @@ try {
   });
   rows("lecture-guide", help, "SELECT revision,dismissed_at FROM help_reads WHERE user_id=?");
   rows("demandes-de-donnees", requests, "SELECT id,email,status,requested_at,due_at,approved_at,sent_at,extension_reason,extended_at,attempts FROM data_requests WHERE user_id=?");
+  if (paths.bugs) {
+    const bugs = open("bugs");
+    rows("bugs-signales", bugs, "SELECT id,title,category,description,expected,actual,steps,frequency,impact,status,priority,context,diagnostics,consent_at,created_at,updated_at FROM bug_reports WHERE reporter_id=?", [userId], (row) => ({ ...row, context: JSON.parse(row.context), diagnostics: row.diagnostics ? JSON.parse(row.diagnostics) : null }));
+    rows("bugs-commentaires-envoyes", bugs, "SELECT bug_id,body,visible,created_at FROM bug_comments WHERE author_id=? AND kind!='internal'");
+    rows("bugs-reponses-equipe", bugs, "SELECT c.bug_id,c.body,c.created_at FROM bug_comments c JOIN bug_reports b ON b.id=c.bug_id WHERE b.reporter_id=? AND c.kind='staff'");
+    if (paths.bugImages) {
+      const attachments = bugs.prepare("SELECT i.filename FROM bug_images i JOIN bug_reports b ON b.id=i.bug_id WHERE b.reporter_id=?");
+      for (const attachment of attachments.iterate(userId)) {
+        if (path.basename(attachment.filename) !== attachment.filename) throw new Error("Capture invalide : revue manuelle nécessaire.");
+        const filename = path.join(paths.bugImages, attachment.filename);
+        if (!fs.existsSync(filename)) throw new Error("Capture personnelle manquante : revue manuelle nécessaire.");
+        zip.addFile(filename, `captures-bugs/${attachment.filename}`);
+      }
+    }
+  }
   json("informations.json", { generatedAt: new Date().toISOString(), requestId, userId, contactEmail, format: "JSON et JSONL : une entrée JSON par ligne", purposes: ["Gestion du compte et protections liées à l’âge", "Fonctionnement des jeux et économie exclusivement virtuelle", "Personnalisation et succès", "Communications demandées et modération", "Sécurité et diagnostic des services"], excluded: ["Secrets d’authentification, codes, empreintes de mots de passe et liens d’accès", "Données privées des autres joueurs, identité des jurés et des auteurs de signalements, coordonnées parentales", "Données déjà supprimées selon les durées de conservation"], manualReview: ["Journaux d’hébergement, correspondance externe et documents de vérification", "Copies de sauvegarde non restaurées et données mixtes nécessitant une revue des droits des tiers"], contact: "Pour compléter ou contester cette copie, contactez le responsable via l’adresse indiquée." });
   zip.addBuffer(Buffer.from("TES DONNEES PERSONNELLES\n\nOuvre compte.json pour ton profil. Les fichiers .jsonl contiennent une entrée JSON par ligne : aucun historique n’est limité aux dernières pages affichées sur le site.\n\nLes secrets de connexion et les données privées des tiers sont exclus. La génération se fait sur des instantanés en lecture seule des bases, au moment de l’approbation.\n\nPour le détail des finalités, de tes droits, des durées et du contact, consulte informations.json et la page Confidentialité du site.\n\nConserve cette archive dans un endroit privé.\n"), "LIRE-MOI.txt");
   const chunks = [];

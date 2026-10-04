@@ -61,6 +61,8 @@ import {
 import { databaseFilename, databaseHealth, readDb, setCatalogSource, updateDb, writeDb } from "./db.js";
 import { createDataRequestStore } from "./services/data-requests.js";
 import { registerDataRequestRoutes } from "./services/data-request-routes.js";
+import { createBugReportStore } from "./services/bug-reports.js";
+import { registerBugReportRoutes } from "./services/bug-report-routes.js";
 import { archiveDays, archiveRows } from "./storage/archives.js";
 import { ledgerPage } from "./storage/ledger.js";
 import { playerStatistics } from "./services/player-statistics.js";
@@ -675,6 +677,12 @@ const patchnotes = createPatchnoteStore({
   currentVersion: APP_VERSION
 });
 process.on("exit", () => patchnotes.close());
+const bugFilename = process.env.BUG_REPORT_DB_PATH ? path.resolve(process.cwd(), process.env.BUG_REPORT_DB_PATH) : `${databaseFilename}.bugs.sqlite`;
+const bugImageDirectory = process.env.BUG_REPORT_UPLOAD_DIR ? path.resolve(process.cwd(), process.env.BUG_REPORT_UPLOAD_DIR) : path.join(path.dirname(bugFilename), "bug-images");
+const bugReports = createBugReportStore({ filename: bugFilename, uploadDirectory: bugImageDirectory, version: () => patchnotes.currentVersion });
+const bugRetentionTimer = setInterval(() => bugReports.prune(), 3600000);
+bugRetentionTimer.unref();
+process.on("exit", () => { clearInterval(bugRetentionTimer); bugReports.close(); });
 const helpFilename = process.env.HELP_DB_PATH ? path.resolve(process.cwd(), process.env.HELP_DB_PATH) : `${process.env.SQLITE_PATH ? path.resolve(process.cwd(), process.env.SQLITE_PATH) : path.join(__dirname, "..", "data", "ktga.sqlite")}.help.sqlite`;
 const playerHelp = createHelpStore({ filename: helpFilename, uploadDirectory: path.join(path.dirname(helpFilename), "help-images") });
 process.on("exit", () => playerHelp.close());
@@ -3252,8 +3260,21 @@ app.post("/api/auth/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
+registerBugReportRoutes({ app, auth, requireBackOffice, store: bugReports, version: () => patchnotes.currentVersion,
+  identify: (req) => {
+    try {
+      const claims = jwt.verify(sessionTokenFromRequest(req), JWT_SECRET);
+      const user = readDb().users.find((entry) => entry.id === claims.id);
+      if (!user || user.active === false || activeModeration(user)?.type === "hard" || activeParentalRevocation(user) || (Number(claims.sessionVersion) || 0) !== (Number(user.sessionVersion) || 0)) return null;
+      const completedAccount = validEmail(user.email) && (!platformSettings().emailVerificationRequired || user.emailVerifiedAt);
+      return { id: user.id, guest: Boolean(user.guest), admin: Boolean(user.admin && completedAccount), editor: Boolean(user.editor && completedAccount) };
+    } catch { return null; }
+  },
+  staff: () => readDb().users.filter((user) => user.active !== false && (user.admin || user.editor)).map((user) => ({ id: user.id, name: displayNameFor(user) }))
+});
 registerDataRequestRoutes({ app, auth, requireAdmin, store: dataRequests, readDb, updateDb, siteName: () => platformSettings().siteName, paths: {
   main: databaseFilename, chat: CHAT_DB_PATH, parental: PARENTAL_DB_PATH, tribunal: TRIBUNAL_DB_PATH,
+  bugs: bugFilename, bugImages: bugImageDirectory,
   logs: path.resolve(process.env.REQUEST_LOG_PATH || path.join(__dirname, "..", "data", "request-logs.sqlite")),
   notes: path.resolve(process.env.PATCHNOTES_DB_PATH || path.join(__dirname, "..", "data", "patchnotes.sqlite")),
   noteImages: path.resolve(process.env.PATCHNOTES_UPLOAD_DIR || path.join(__dirname, "..", "data", "patchnote-images")),
@@ -5381,6 +5402,7 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
     parentalControls.deleteForUser(req.params.id);
     tribunal.deleteForUser(req.params.id);
     chat.deleteForUser(req.params.id);
+    bugReports.deleteForUser(req.params.id);
   }
   res.json({ ok: true });
 });

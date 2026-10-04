@@ -189,7 +189,7 @@ try {
   assert.equal(await mandateDialog.evaluate((element) => element.parentElement?.parentElement === document.body), true, "the selector is portaled outside the game table");
   assert.equal(await page.locator(".midnight-table .midnight-codex-panel").count(), 0);
   assert.equal(await page.locator(".midnight-contract-dialog-layer").evaluate((element) => getComputedStyle(element).position), "fixed");
-  assert.equal(await page.locator(".game-log-center").evaluate((element) => getComputedStyle(element).visibility), "hidden");
+  assert.equal(await page.locator(".game-log-center").count(), 0);
   assert.equal(await mandatePanel.locator(".midnight-codex-groups article").count(), 12);
   assert.equal(await mandatePanel.getByRole("button", { name: "Choisir", exact: true }).count(), 4);
   await page.screenshot({ path: path.join(folder, "midnight-contracts-page-desktop.png") });

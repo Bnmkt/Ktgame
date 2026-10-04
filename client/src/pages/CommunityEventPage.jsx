@@ -1,5 +1,8 @@
+import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
+import { bugDiagnostics } from "../features/bugs/diagnostics.js";
+import { useBugGameContext } from "../features/bugs/BugReportProvider.jsx";
 import { Activity, ArrowLeft, CheckCircle2, Clock3, Coins, Crown, Dice5, Gift, HelpCircle, LogOut, Minus, Plus, ShieldCheck, Sparkles, Swords, Ticket, Trophy, Users, X, Zap } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { EventEffectRules } from "../components/game/EventEffectRules.jsx";
@@ -45,6 +48,7 @@ function EventResult({ action, game, user }) {
 
 export function CommunityEventPage({ slug, user, setUser, onBack, onLogout }) {
   const [data, setData] = useState(null);
+  useBugGameContext("event", slug, data?.event?.game?.id, data?.event?.id);
   const [lastAction, setLastAction] = useState(null);
   const [ranking, setRanking] = useState("contribution");
   const [now, setNow] = useState(Date.now());
@@ -65,13 +69,14 @@ export function CommunityEventPage({ slug, user, setUser, onBack, onLogout }) {
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     const socket = io(SOCKET_URL, { path: SOCKET_PATH });
+    const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     let refreshTimer;
     socket.on("community-event-update", (update) => {
       if (update.slug !== slug && update.id !== data?.event?.id) return;
       clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => load(true), 180);
     });
-    return () => { clearInterval(timer); clearTimeout(refreshTimer); socket.disconnect(); };
+    return () => { clearInterval(timer); clearTimeout(refreshTimer); disposeDiagnostics(); socket.disconnect(); };
   }, [slug, data?.event?.id, load]);
 
   useEffect(() => {
@@ -216,22 +221,22 @@ export function CommunityEventPage({ slug, user, setUser, onBack, onLogout }) {
       <details><summary>Voir mes {data.personalActions.length} action(s)</summary>{data.personalActions.map((action) => <div key={action.id}><span>{new Date(action.createdAt).toLocaleString("fr-BE")}</span><strong><CompactNumber value={action.result.damage} suffix=" dégâts" /></strong><b><CompactNumber value={action.result.contribution} prefix="+" suffix=" pts" /></b></div>)}</details>
     </section>}
 
-    {milestonesOpen && <div className="modal-backdrop" onClick={() => setMilestonesOpen(false)}><div className="modal event-information-modal" onClick={(eventClick) => eventClick.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Progression communautaire</span><h2>{user.admin ? "Tous les paliers configurés" : "Paliers débloqués"}</h2><p>{user.admin ? "Vue administrateur : seuils, états et effets de toute la progression." : "Ces paliers dépendent de l’avancée globale de toute la communauté."}</p></div><button className="secondary icon-toggle" onClick={() => setMilestonesOpen(false)}><X size={18} /></button></div><div className="event-modal-list">{visibleMilestones.map((milestone) => {
+    {milestonesOpen && <ModalBackdrop className="modal-backdrop" onClick={() => setMilestonesOpen(false)}><div className="modal event-information-modal" onClick={(eventClick) => eventClick.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Progression communautaire</span><h2>{user.admin ? "Tous les paliers configurés" : "Paliers débloqués"}</h2><p>{user.admin ? "Vue administrateur : seuils, états et effets de toute la progression." : "Ces paliers dépendent de l’avancée globale de toute la communauté."}</p></div><button className="secondary icon-toggle" onClick={() => setMilestonesOpen(false)}><X size={18} /></button></div><div className="event-modal-list">{visibleMilestones.map((milestone) => {
       const reached = reachedMilestoneIds.has(milestone.id);
       const activeMilestoneEffects = effectsForMilestone(milestone);
       return <article className={reached ? "is-reached" : "is-locked"} key={milestone.id}><header>{reached ? <CheckCircle2 /> : <Trophy />}<span><strong>{milestone.label}</strong><small>{reached ? "Débloqué" : "À débloquer"} à {milestone.percent} % de progression communautaire</small></span></header>{milestone.effects?.length ? <div className="event-milestone-effects">{milestone.effects.map((effect) => {
         const active = activeMilestoneEffects.find((entry) => entry.sourceEffectId === effect.id || entry.id === effect.id);
         return <div key={effect.id}><Sparkles /><span><strong>{effect.label || effect.type}</strong><small>{eventEffectDescription(effect)}</small></span><b>{!reached ? "Configuré" : active?.expiresAt ? formatCountdown(new Date(active.expiresAt).getTime() - now) : active || !effect.duration ? "Appliqué" : "Terminé"}</b></div>;
       })}</div> : <p>Ce palier est honorifique et ne déclenche aucun effet automatique.</p>}</article>;
-    })}</div><div className="modal-action-bar"><button onClick={() => setMilestonesOpen(false)}>Fermer</button></div></div></div>}
+    })}</div><div className="modal-action-bar"><button onClick={() => setMilestonesOpen(false)}>Fermer</button></div></div></ModalBackdrop>}
 
-    {calculationOpen && <div className="modal-backdrop" onClick={() => setCalculationOpen(false)}><div className="modal event-information-modal event-calculation-modal" onClick={(eventClick) => eventClick.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Transparence</span><h2>Règles de calcul</h2><p>Ordre exact utilisé par le serveur pour résoudre une action et les récompenses.</p></div><button className="secondary icon-toggle" onClick={() => setCalculationOpen(false)}><X size={18} /></button></div><div className="event-calculation-steps">
+    {calculationOpen && <ModalBackdrop className="modal-backdrop" onClick={() => setCalculationOpen(false)}><div className="modal event-information-modal event-calculation-modal" onClick={(eventClick) => eventClick.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Transparence</span><h2>Règles de calcul</h2><p>Ordre exact utilisé par le serveur pour résoudre une action et les récompenses.</p></div><button className="secondary icon-toggle" onClick={() => setCalculationOpen(false)}><X size={18} /></button></div><div className="event-calculation-steps">
       <section><b>01</b><div><h3>{event.game.type === "dice" ? "Lancer des dés" : "Pioche des cartes"}</h3><p>{event.game.type === "dice" ? `${event.game.dice.count} dé(s) à ${event.game.dice.faces} faces. Dégâts de base : ${event.game.dice.baseDamageMode === "sum" ? "somme des dés" : event.game.dice.baseDamageMode === "count" ? "nombre de dés" : "aucun"}, multipliés par ${event.game.dice.baseDamageMultiplier}.` : `${event.game.cards.cardsPerAction} carte(s), depuis ${event.game.cards.decks} paquet(s). Dégâts de base : ${event.game.cards.baseDamageMode === "values" ? "somme des valeurs" : event.game.cards.baseDamageMode === "count" ? "nombre de cartes" : "aucun"}, multipliés par ${event.game.cards.baseDamageMultiplier}.`}</p></div></section>
       <section><b>02</b><div><h3>Effets et combinaisons</h3><p>{event.game.type === "dice" ? `Les effets de face sont appliqués pour chaque dé concerné, puis les ${event.game.dice.combinations?.length ?? 0} combinaison(s) configurée(s) sont évaluées.` : "Les effets d’enseigne, de valeur et de carte précise sont cumulés lorsqu’ils sont activés."} Les bonus fixes précèdent les multiplicateurs.</p><EventEffectRules game={event.game} /></div></section>
       <section><b>03</b><div><h3>Action critique</h3><p>{event.game.critical.enabled ? `${event.game.critical.chancePercent} % de chance : ${event.game.critical.extraDraws} tirage(s) supplémentaire(s), dégâts ×${event.game.critical.damageMultiplier} et +${event.game.critical.contributionBonus} contribution.` : "Les actions critiques sont désactivées pour cet événement."}</p></div></section>
       <section><b>04</b><div><h3>Contribution personnelle</h3><p>Contribution de l’action = effets de contribution + dégâts finaux × {event.contribution.damageRatio}{event.contribution.dailyParticipation ? ` + ${event.contribution.dailyParticipation} pour la première action du jour` : ""}{event.contribution.communityEffect ? ` + ${event.contribution.communityEffect} par effet communautaire` : ""}{event.contribution.rareEvent ? ` + ${event.contribution.rareEvent} par effet rare` : ""}. Cette valeur est ajoutée uniquement au total personnel du joueur.</p></div></section>
       <section><b>05</b><div><h3>Progression communautaire</h3><p>Progression = (maximum − valeur actuelle) ÷ (maximum − minimum) × 100. Si « Fin à zéro » est désactivé et « Continuer après réussite » activé, les actions continuent à augmenter la progression au-delà de 100 % jusqu’à l’échéance. Les paliers communautaires sont franchis par les dégâts cumulés de tous les participants.</p></div></section>
       <section><b>06</b><div><h3>Paliers individuels et gain</h3><p>Si l'événement se termine sous 100 %, seuls les frais d'entrée réellement payés sont remboursés, sans les achats d'actions. À partir de 100 %, les participants éligibles reçoivent la base, les bonus de palier, leurs multiplicateurs et les parts de cagnotte. Chaque palier individuel dépend de ta contribution personnelle.</p><div className="event-tier-scale">{individualTiers.map((tier) => <span className={tier.score <= personalContribution ? "reached" : ""} key={tier.id}><strong>{tier.name}</strong><small><CompactNumber value={tier.score} suffix=" pts personnels" label="Contribution requise exacte" /></small></span>)}</div></div></section>
-    </div><div className="modal-action-bar"><button onClick={() => setCalculationOpen(false)}>J’ai compris</button></div></div></div>}
+    </div><div className="modal-action-bar"><button onClick={() => setCalculationOpen(false)}>J’ai compris</button></div></div></ModalBackdrop>}
   </main>;
 }

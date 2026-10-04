@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { appPath } from "../navigation/routes.js";
@@ -9,7 +10,9 @@ import { AnimatedDealerHand, RulesModal, StepperBet, accordionPlayable, blackjac
 import { BattleBoard, FarkleBoard, LiarsDiceBoard, MidnightDiceBoard, ShutTheBoxBoard, VelvetRuseBoard } from "../components/game/GameBoards.jsx";
 import { BeloteBoard } from "../components/game/BeloteBoard.jsx";
 import { BeloteTeams } from "../components/room/BeloteTeams.jsx";
-import { ActionLog, BattleModifiersPanel, BlackjackScoresTable, FinishedLeaderboard, GameModifiersPanel, OtherPlayerRolls, RoomStatusPanel, ScorePanel, WagerPanel } from "../components/room/RoomPanels.jsx";
+import { BattleModifiersPanel, BlackjackScoresTable, FinishedLeaderboard, GameModifiersPanel, OtherPlayerRolls, RoomStatusPanel, ScorePanel, WagerPanel } from "../components/room/RoomPanels.jsx";
+import { bugDiagnostics } from "../features/bugs/diagnostics.js";
+import { useBugGameContext } from "../features/bugs/BugReportProvider.jsx";
 import { defaultBattleModifiers, defaultGameModifiers, gameTitle, playerName, scoreCategories, suits } from "../features/games/config.js";
 import { CompactNumber, copyText } from "../utils/presentation.jsx";
 import { hasPlayablePresidentSet } from "../features/games/president.js";
@@ -106,6 +109,7 @@ function BetLimitsEditor({ minimum, maximum, maxAllowed = 100000000, disabled, o
 
 export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }) {
   const [room, setRoom] = useState(null);
+  useBugGameContext("room", code, room?.gameId, room?.activityMatchId);
   const [error, setError] = useState("");
   const [bet, setBet] = useState(10);
   const [pokerRaise, setPokerRaise] = useState(40);
@@ -177,6 +181,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   useEffect(() => {
     if (!room?.id) return undefined;
     const socket = io(SOCKET_URL, { path: SOCKET_PATH, withCredentials: true });
+    const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     const watch = () => socket.emit("watch-room", { roomId: room.id, token: getToken() });
     socket.on("connect", watch);
     socket.on("room", (nextRoom) => {
@@ -191,7 +196,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
       if (payload?.code === code && payload?.playerId === user.id) onExcluded(payload);
     });
     socket.on("room-error", (payload) => setError(payload?.error ?? "Connexion temps réel interrompue."));
-    return () => socket.disconnect();
+    return () => { disposeDiagnostics(); socket.disconnect(); };
   }, [code, room?.id, user.id, onBack, onExcluded, commitRoom]);
 
   async function action(body, { background = false } = {}) {
@@ -550,16 +555,15 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
           <WagerPanel room={room} state={state} />
           {state?.gameId === "yahtzee" && <section className="card"><h2>Scores</h2><ScorePanel state={state} userId={user.id} /></section>}
           {state?.gameId !== "yahtzee" && <section className="card"><h2>{state?.gameId === "blackjack" ? "Scores des mains" : "Scores"}</h2><ScorePanel state={state} userId={user.id} /></section>}
-          {state && <ActionLog logs={room.gameId === "blackjack" && state.finished && !showFinishedResult ? state.logs.filter((log) => log.type !== "result" && log.actorId !== "dealer") : state.logs} />}
         </aside>
       </div>
-      {scoreConfirmation && <div className="modal-backdrop score-confirm-layer" onClick={() => setScoreConfirmation(null)}><div className={`modal score-confirm-modal ${scoreConfirmation.points === 0 ? "zero-score-confirm" : ""}`} onClick={(event) => event.stopPropagation()}><div className="score-confirm-icon">{scoreConfirmation.points === 0 ? <AlertTriangle /> : <CheckCircle2 />}</div><span className="eyebrow">Feuille de score</span><h2>{scoreConfirmation.points === 0 ? "Attention : score nul" : "Valider ce score ?"}</h2><p>{scoreConfirmation.points === 0 ? <>La case <strong>{scoreConfirmation.label}</strong> sera définitivement utilisée pour <strong>0 point</strong>. Cette action ne peut pas être annulée.</> : <>Inscrire <strong>+{scoreConfirmation.points} points</strong> dans la case <strong>{scoreConfirmation.label}</strong> ?</>}</p><div className="actions"><button className={scoreConfirmation.points === 0 ? "danger-button" : ""} onClick={() => { const choice = scoreConfirmation; setScoreConfirmation(null); action({ type: "score", category: choice.category }); }}>{scoreConfirmation.points === 0 ? "Valider malgré tout" : `Valider +${scoreConfirmation.points}`}</button><button className="secondary" onClick={() => setScoreConfirmation(null)}>Annuler</button></div></div></div>}
-      {roomSettingsOpen && !state && <div className="modal-backdrop" onClick={cancelRoomSettings}><div className="modal room-settings-modal" onClick={(event) => event.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Salle d’attente</span><h2><Settings size={22} /> Paramètres de la table</h2><p>{isOwner ? "Configure les variantes avant de lancer la partie." : "Réglages choisis par le maître de table."}</p></div><button className="secondary icon-toggle" onClick={cancelRoomSettings} aria-label="Fermer"><X size={18} /></button></div><div className="room-settings-modal-body">
+      {scoreConfirmation && <ModalBackdrop className="modal-backdrop score-confirm-layer" onClick={() => setScoreConfirmation(null)}><div className={`modal score-confirm-modal ${scoreConfirmation.points === 0 ? "zero-score-confirm" : ""}`} onClick={(event) => event.stopPropagation()}><div className="score-confirm-icon">{scoreConfirmation.points === 0 ? <AlertTriangle /> : <CheckCircle2 />}</div><span className="eyebrow">Feuille de score</span><h2>{scoreConfirmation.points === 0 ? "Attention : score nul" : "Valider ce score ?"}</h2><p>{scoreConfirmation.points === 0 ? <>La case <strong>{scoreConfirmation.label}</strong> sera définitivement utilisée pour <strong>0 point</strong>. Cette action ne peut pas être annulée.</> : <>Inscrire <strong>+{scoreConfirmation.points} points</strong> dans la case <strong>{scoreConfirmation.label}</strong> ?</>}</p><div className="actions"><button className={scoreConfirmation.points === 0 ? "danger-button" : ""} onClick={() => { const choice = scoreConfirmation; setScoreConfirmation(null); action({ type: "score", category: choice.category }); }}>{scoreConfirmation.points === 0 ? "Valider malgré tout" : `Valider +${scoreConfirmation.points}`}</button><button className="secondary" onClick={() => setScoreConfirmation(null)}>Annuler</button></div></div></ModalBackdrop>}
+      {roomSettingsOpen && !state && <ModalBackdrop className="modal-backdrop" onClick={cancelRoomSettings}><div className="modal room-settings-modal" onClick={(event) => event.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Salle d’attente</span><h2><Settings size={22} /> Paramètres de la table</h2><p>{isOwner ? "Configure les variantes avant de lancer la partie." : "Réglages choisis par le maître de table."}</p></div><button className="secondary icon-toggle" onClick={cancelRoomSettings} aria-label="Fermer"><X size={18} /></button></div><div className="room-settings-modal-body">
         {room.gameId === "texas-holdem" && <section className="poker-settings game-modifiers-panel"><BetLimitsEditor poker disabled={!isOwner} minimum={Number(pokerBlinds.bigBlind) || 2} maximum={Number(pokerBlinds.maximumBet) || room.stake} onChange={({ minimum, maximum }) => isOwner && setPokerBlinds({ bigBlind: minimum, maximumBet: maximum })} /><div className="blind-ratio" aria-live="polite"><span>Petite blinde<strong>{Math.floor((Number(pokerBlinds.bigBlind) || 2) / 2)}</strong></span><b>½</b><span>Grosse blinde<strong>{Number(pokerBlinds.bigBlind) || 2}</strong></span><span>Plafond<strong>{Number(pokerBlinds.maximumBet) || room.stake}</strong></span></div></section>}
         {room.gameId === "blackjack" && <BetLimitsEditor disabled={!isOwner} minimum={Number(gameModifiers.minimumBet) || 50} maximum={Number(gameModifiers.maximumBet) || 100} onChange={({ minimum, maximum }) => isOwner && setGameModifiers({ ...gameModifiers, minimumBet: minimum, maximumBet: maximum })} />}
         {room.gameId === "bataille" && <BattleModifiersPanel value={battleModifiers} isOwner={isOwner} onChange={setBattleModifiers} showFooter={false} />}
         <GameModifiersPanel gameId={room.gameId} value={gameModifiers} isOwner={isOwner} onChange={setGameModifiers} showFooter={false} />
-      </div><div className="room-settings-modal-footer"><span><Swords size={16} /> Ces paramètres seront verrouillés au lancement.</span><div className="actions">{isOwner && <button onClick={applyRoomSettings}><Save size={17} /> Appliquer les paramètres</button>}<button className="secondary" onClick={cancelRoomSettings}>{isOwner ? "Annuler" : "Fermer"}</button></div></div></div></div>}
+      </div><div className="room-settings-modal-footer"><span><Swords size={16} /> Ces paramètres seront verrouillés au lancement.</span><div className="actions">{isOwner && <button onClick={applyRoomSettings}><Save size={17} /> Appliquer les paramètres</button>}<button className="secondary" onClick={cancelRoomSettings}>{isOwner ? "Annuler" : "Fermer"}</button></div></div></div></ModalBackdrop>}
       {rulesOpen && <RulesModal gameId={room.gameId} onClose={() => setRulesOpen(false)} />}
       {pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && <RoundResultsOverlay pacing={pacing} players={room.players} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
     </main>

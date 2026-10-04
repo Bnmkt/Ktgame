@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -109,6 +109,11 @@ try {
   }
   const previews = path.join(root, "docs", "previews"); mkdirSync(previews, { recursive: true });
   const player = await pageFor("alpha");
+  const capture = await player.evaluate(() => { const canvas = document.createElement("canvas"); canvas.width = 10; canvas.height = 10; return canvas.toDataURL("image/png").split(",")[1]; });
+  const uploadResponse = await fetch(`${apiOrigin}/api/bugs/uploads`, { method: "POST", headers: { Authorization: `Bearer ${token("alpha")}`, "Content-Type": "image/png" }, body: Buffer.from(capture, "base64") });
+  assert.equal(uploadResponse.status, 201); const upload = await uploadResponse.json();
+  const bug = await request("alpha", "/api/bugs", { submissionId: randomUUID(), title: "Export du diagnostic joueur", description: "Un signalement destiné à vérifier l'export des données personnelles.", category: "account", frequency: "once", impact: "minor", images: [upload], diagnosticConsent: true, diagnostics: { browser: "Firefox", system: "Windows" } }, 201);
+  await request("beta", "/api/bugs", { submissionId: randomUUID(), title: "Dossier confidentiel autre joueur", description: "Ce signalement appartient à un autre joueur et ne doit pas être exporté.", category: "account", frequency: "once", impact: "minor" }, 201);
   console.log("Player data request with Ghostery...");
   await player.goto(`${origin}/profil`, { waitUntil: "domcontentloaded" });
   await player.getByRole("button", { name: "Carte et confidentialité", exact: true }).click();
@@ -187,6 +192,10 @@ try {
   assert.equal([...files.values()].join("").includes(passwordHash), false);
   assert.equal([...files.values()].join("").includes("beta@example.com"), false);
   assert.ok(files.has("contributions-catalogue.json"));
+  assert.equal(JSON.parse(files.get("bugs-signales.jsonl").trim()).id, bug.report.id);
+  assert.ok(files.has(`captures-bugs/${upload.id}.png`));
+  assert.equal(files.get("bugs-signales.jsonl").includes("receipt_hash"), false);
+  assert.equal([...files.values()].join("").includes("Dossier confidentiel autre joueur"), false);
   const { dataRequestEmail } = await import("../../server/src/services/data-request-email.js");
   const emailPage = await browser.newPage({ viewport: { width: 760, height: 720 } });
   await emailPage.setContent(dataRequestEmail({ user: { pseudo: "Alice", profile: { displayName: "Alice" } }, request: delivery, kind: "sent" }).html);

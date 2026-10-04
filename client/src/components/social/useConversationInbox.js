@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import { bugDiagnostics } from "../../features/bugs/diagnostics.js";
 import { api, getToken, SOCKET_PATH, SOCKET_URL } from "../../api.js";
 import { createNotificationSound } from "../../utils/notification-sound.js";
 
@@ -49,6 +50,7 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
     const sound = createNotificationSound();
     const seen = new Set();
     const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { token: getToken() }, transports: ["websocket", "polling"], withCredentials: true });
+    const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     socketRef.current = socket;
     const subscribe = () => {
       socket.emit("chat-subscribe", { token: getToken(), roomCode: current.current.roomCode });
@@ -92,7 +94,7 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("ktga-connections-updated", onConnections);
       document.removeEventListener("visibilitychange", onFocus);
-      socket.disconnect();
+      disposeDiagnostics(); socket.disconnect();
       socketRef.current = null;
       sound.close();
     };

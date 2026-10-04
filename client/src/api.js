@@ -1,3 +1,5 @@
+import { bugDiagnostics } from "./features/bugs/diagnostics.js";
+
 function normalizeBasePath(path) {
   const normalized = `/${String(path || "").replace(/^\/+|\/+$/g, "")}`;
   return normalized === "/" ? "" : normalized;
@@ -113,10 +115,10 @@ export function setToken(token) {
 }
 
 export function api(path, options = {}) {
-  const { background = false, ...fetchOptions } = options;
+  const { background = false, deduplicate = true, ...fetchOptions } = options;
   const method = String(options.method ?? "GET").toUpperCase();
   const mutation = !["GET", "HEAD", "OPTIONS"].includes(method);
-  const requestKey = `${method}:${path}:${String(options.body ?? "")}`;
+  const requestKey = deduplicate ? `${method}:${path}:${String(options.body ?? "")}` : Symbol("request");
   const cacheable = method === "GET" && cacheableGetPattern.test(path);
   const cached = cacheable ? responseCache.get(path) : null;
   if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.data);
@@ -125,6 +127,7 @@ export function api(path, options = {}) {
 
   const finishButtonFeedback = mutation && !background ? startButtonFeedback(activeActionButton()) : () => {};
   const request = (async () => {
+    let status = 0;
     try {
       const res = await fetch(`${API_URL}${path}`, {
         ...fetchOptions,
@@ -135,6 +138,7 @@ export function api(path, options = {}) {
           ...options.headers
         }
       });
+      status = res.status;
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         const error = new Error(data?.error ?? "Erreur serveur");
@@ -146,6 +150,7 @@ export function api(path, options = {}) {
       finishButtonFeedback(true);
       return data;
     } catch (error) {
+      bugDiagnostics.recordApiFailure(path, method, status);
       finishButtonFeedback(false);
       throw error;
     } finally {

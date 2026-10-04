@@ -17,6 +17,7 @@ import { Lobby } from "./pages/LobbyPage.jsx";
 import { PublicProfileModal } from "./components/profile/PublicProfileModal.jsx";
 import { ReportPlayerDialog } from "./components/profile/ReportPlayerDialog.jsx";
 import { PrivacyProvider, legalLinks, useSiteActivity } from "./privacy/Privacy.jsx";
+import { BugReportProvider, useBugReportLocation } from "./features/bugs/BugReportProvider.jsx";
 import "./styles.css";
 import "./navigation/casino.css";
 import "./components/social/social.css";
@@ -31,6 +32,7 @@ const FriendsModal = lazy(() => import("./components/profile/FriendsModal.jsx").
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage.jsx").then((module) => ({ default: module.LeaderboardPage })));
 const StatusPage = lazy(() => import("./pages/StatusPage.jsx").then((module) => ({ default: module.StatusPage })));
 const PatchnotesPage = lazy(() => import("./pages/PatchnotesPage.jsx").then((module) => ({ default: module.PatchnotesPage })));
+const BugReportsPage = lazy(() => import("./features/bugs/BugReportsPage.jsx").then((module) => ({ default: module.BugReportsPage })));
 const ParentalPortalPage = lazy(() => import("./privacy/ParentalPortalPage.jsx").then((module) => ({ default: module.ParentalPortalPage })));
 const TribunalPage = lazy(() => import("./pages/TribunalPage.jsx").then((module) => ({ default: module.TribunalPage })));
 const SocialPanel = lazy(() => import("./components/social/SocialPanel.jsx").then((module) => ({ default: module.SocialPanel })));
@@ -44,6 +46,7 @@ export default function App() {
   const [roomCode, setRoomCode] = useState(null);
   const [route, goTo] = useCasinoRoute();
   const view = route.view;
+  useBugReportLocation(route, user);
   useSiteActivity(user, route);
   useEffect(() => {
     if (!user?.minor?.restricted) return undefined;
@@ -293,6 +296,7 @@ export default function App() {
   }
 
   const parentAccess = view === "parents" && (new URL(window.location.href).searchParams.has("parental-verify") || new URL(window.location.href).searchParams.has("parental-access"));
+  if (view === "bugs") return <Suspense fallback={<main className="app-shell" role="status">Chargement des signalements…</main>}><BugReportsPage id={route.id} user={user} onBack={() => goTo("lobby")} onNavigate={(id) => goTo("bugs", id)} /></Suspense>;
   if (["faq", "guide"].includes(view)) return <Suspense fallback={<main className="app-shell" role="status">Chargement de l’aide…</main>}><HelpPage key={view} mode={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
   if (parentAccess) return <Suspense fallback={<main className="legal-page" role="status">Chargement de l’espace parent…</main>}><ParentalPortalPage siteName={publicSettings.siteName} /></Suspense>;
   if (Object.hasOwn(legalLinks, view)) return <Suspense fallback={<main className="legal-page" role="status">Chargement…</main>}><LegalPage view={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
@@ -339,7 +343,7 @@ export default function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<PrivacyProvider><App /></PrivacyProvider>);
+createRoot(document.getElementById("root")).render(<PrivacyProvider><BugReportProvider><App /></BugReportProvider></PrivacyProvider>);
 
 function RestrictedFeature({ onBack }) {
   return <main className="app-shell"><section className="panel restricted-feature"><ShieldAlert size={34} /><span className="eyebrow">Accès adapté</span><h1>Cette fonctionnalité n’est pas disponible</h1><p>La restriction est appliquée au compte par les règles de protection ou de modération du casino.</p><button type="button" onClick={onBack}>Retour au casino</button></section></main>;
