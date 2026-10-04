@@ -27,8 +27,11 @@
 .catalog-visual { height: 108px; display: flex; align-items: center; justify-content: center; gap: 8px; overflow: hidden; padding: 12px; }
 .catalog-visual-icons > .cosmetic-icon { width: 50px; height: 50px; font-size: 34px; }
 .catalog-visual-icons svg { width: 29px; height: 29px; }
-.catalog-visual .die { width: 38px; height: 38px; min-width: 38px; min-height: 38px; padding: 4px; flex-shrink: 0; }
-.catalog-visual .playing-card { width: 44px; height: 64px; min-width: 44px; flex-shrink: 0; font-size: 15px; }
+.catalog-visual .die { width: 46px; height: 46px; min-width: 46px; min-height: 46px; padding: 5px; flex-shrink: 0; --custom-pip-size: 7px; --custom-pip-glow: 2px; --custom-border-width: 1px; --custom-shadow-y: 3px; --custom-shadow-blur: 6px; --custom-glow: 3px; }
+.catalog-visual .die .pip { width: 7px; height: 7px; place-self: center; }
+.catalog-visual .playing-card { width: 48px; height: 70px; min-width: 48px; min-height: 70px; flex-shrink: 0; padding: 5px; font-size: 15px; --custom-border-width: 1px; --custom-shadow-y: 3px; --custom-shadow-blur: 6px; --custom-glow: 3px; }
+.catalog-visual .playing-card strong { font-size: 18px; line-height: 1; }
+.catalog-visual .playing-card span { font-size: 25px; line-height: 1; }
 .catalog-visual .display-name { font-size: 15px; min-width: 0; }
 .catalog-visual .display-name-text { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 130px; }
 .catalog-swatch-shell { width: 100%; min-width: 0; padding: 4px; }
