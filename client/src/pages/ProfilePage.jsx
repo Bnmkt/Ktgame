@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { useEffect, useState } from "react";
 import { PublicProfileModal } from "../components/profile/PublicProfileModal.jsx";
 export { DailyActivityChart } from "../components/profile/DailyActivityChart.jsx";
@@ -374,20 +375,20 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
           </div>
         </section>
       </div>
-      {purchaseConfirmation && <div className="modal-backdrop shop-confirmation-layer" onClick={() => { if (!purchasePending) setPurchaseConfirmation(null); }}><div className="modal shop-confirmation-modal" onClick={(event) => event.stopPropagation()}>
+      {purchaseConfirmation && <ModalBackdrop className="modal-backdrop shop-confirmation-layer" onClick={() => { if (!purchasePending) setPurchaseConfirmation(null); }}><div className="modal shop-confirmation-modal" onClick={(event) => event.stopPropagation()}>
         <div className="shop-confirmation-icon"><ShoppingBag size={28} /></div>
         <span className="eyebrow">Confirmation d’achat</span>
         <h2>{purchaseConfirmation.kind === "item" ? purchaseConfirmation.item.name : purchaseConfirmation.pack.name}</h2>
         <p>{purchaseConfirmation.kind === "item" ? <>Débloquer et équiper cet élément pour <strong><CompactNumber value={purchaseConfirmation.item.price} label="Prix exact" /> jetons</strong> ?</> : <>Acheter les <strong>{purchaseConfirmation.pack.count} éléments</strong> sélectionnés pour <strong><CompactNumber value={purchaseConfirmation.pack.total} label="Prix exact" /> jetons</strong>{purchaseConfirmation.pack.discount ? ` avec ${purchaseConfirmation.pack.discount}% de réduction` : ""} ?</>}</p>
         <div className="shop-confirmation-balance"><span>Solde actuel<strong><CompactNumber value={user.tokens} label="Solde exact" /></strong></span><span>Après achat<strong><CompactNumber value={Math.max(0, Number(user.tokens) - (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) : purchaseConfirmation.pack.total))} label="Solde prévisionnel exact" /></strong></span></div>
         <div className="actions"><button type="button" disabled={purchasePending || (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) > Number(user.tokens) : purchaseConfirmation.pack.total > Number(user.tokens))} onClick={confirmPurchase}><Coins size={18} /> {purchasePending ? "Achat en cours…" : "Confirmer l’achat"}</button><button type="button" className="secondary" disabled={purchasePending} onClick={() => setPurchaseConfirmation(null)}>Annuler</button></div>
-      </div></div>}
-      {smallRockOpen && <div className="modal-backdrop secret-rock-backdrop" onClick={() => setSmallRockOpen(false)}><div className="modal secret-rock-modal" onClick={(event) => event.stopPropagation()}>
+      </div></ModalBackdrop>}
+      {smallRockOpen && <ModalBackdrop className="modal-backdrop secret-rock-backdrop" onClick={() => setSmallRockOpen(false)}><div className="modal secret-rock-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-title-row"><div><small>Anomalie temporelle</small><h2>Une petite pierre</h2></div><button className="secondary icon-toggle" onClick={() => setSmallRockOpen(false)} aria-label="Fermer"><X size={18} /></button></div>
         <div className="secret-rock-scene"><div className={smallRockUnlocked ? "secret-rock unlocked" : "secret-rock"}><Gem size={54} /></div><time>{smallRockStartedAt ? smallRockClock : "--:--"}</time><p>{smallRockUnlocked ? "Tu as déjà découvert ce que cette pierre attendait." : "Le temps s’écoule, mais la pierre semble attendre un instant très précis."}</p></div>
         {smallRockMessage && <div className={smallRockUnlocked ? "success" : "error"}>{smallRockMessage}</div>}
         <button className="secret-rock-action" type="button" onClick={touchSmallRock} disabled={!smallRockStartedAt || smallRockUnlocked}><Gem size={18} /> {smallRockUnlocked ? "Secret découvert" : "Toucher la pierre"}</button>
-      </div></div>}
+      </div></ModalBackdrop>}
       {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromProfileModal} onReport={setReportTarget} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} onClose={() => setReportTarget(null)} />}
     </main>

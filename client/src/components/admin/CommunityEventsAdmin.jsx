@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CalendarClock, CircleDollarSign, Clock3, Coins, Copy, Dice5, Eye, Gift, Layers3, Plus, Save, Search, Sparkles, Swords, Trash2, Users, X } from "lucide-react";
 import { api } from "../../api.js";
@@ -148,7 +149,7 @@ function EventEditor({ detail, shop, onClose, onSaved, reportError }) {
     set("game.dice.faceEffects", next);
   }
 
-  return <div className="modal-backdrop" onClick={onClose}><div className="modal community-event-editor" onClick={(event) => event.stopPropagation()}>
+  return <ModalBackdrop className="modal-backdrop" onClick={onClose}><div className="modal community-event-editor" onClick={(event) => event.stopPropagation()}>
     <header className="event-editor-header"><div><span className="eyebrow">Moteur événementiel</span><h2>{draft.internalName}</h2><div><span className={`event-status status-${draft.status}`}>{labels[draft.status]}</span>{draft.status === "active" && <small>Les changements s’appliquent immédiatement ; l’adresse et la date de début restent fixes.</small>}{finished && <small>Événement clôturé : configuration archivée en lecture seule.</small>}</div></div><button className="secondary icon-toggle" onClick={onClose}><X /></button></header>
     <nav className="event-editor-tabs">{editorTabs.map(([value, label]) => <button type="button" key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</nav>
     <div className="event-editor-layout"><fieldset className="event-editor-form" disabled={finished}>
@@ -259,7 +260,7 @@ function EventEditor({ detail, shop, onClose, onSaved, reportError }) {
       </>}
     </fieldset><EventPreview event={draft} action={previewAction} onSimulate={simulate} busy={busy === "preview"} /></div>
     <footer className="event-editor-footer"><div><small>{finished ? "Configuration archivée après clôture" : draft.status === "active" ? "Les changements enregistrés s’appliquent immédiatement à l’événement actif" : "Les changements restent en brouillon jusqu’à la planification"}</small></div><button className="secondary" onClick={onClose}>Fermer</button><button onClick={save} disabled={finished || busy === "save"}><Save /> {busy === "save" ? "Enregistrement…" : "Enregistrer"}</button></footer>
-  </div></div>;
+  </div></ModalBackdrop>;
 }
 
 export function CommunityEventsAdmin({ shop = [], canOperate = false, reportError = () => {} }) {
@@ -294,7 +295,7 @@ export function CommunityEventsAdmin({ shop = [], canOperate = false, reportErro
     </article>)}</div>
     {!visible.length && <div className="empty-state"><Sparkles /><strong>Aucun événement dans cette vue.</strong><span>Crée un brouillon ou modifie les filtres.</span></div>}
     {editing && <EventEditor detail={editing} shop={shop} onClose={() => setEditing(null)} onSaved={async () => { const refreshed = await api(`/api/admin/community-events/${editing.event.id}`); setEditing(refreshed); await load(); }} reportError={reportError} />}
-    {potAdjust && <div className="modal-backdrop admin-confirm-layer" onClick={() => setPotAdjust(null)}><form className="modal event-pot-modal" onSubmit={adjustPot} onClick={(event) => event.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Journal de cagnotte</span><h2>Ajuster le pot</h2><small>{potAdjust.name}</small></div><button type="button" className="secondary icon-toggle" onClick={() => setPotAdjust(null)}><X /></button></div><Field label="Montant"><input autoFocus type="number" value={potAdjust.amount} onChange={(event) => setPotAdjust({ ...potAdjust, amount: event.target.value })} placeholder="Ex. 500 ou -100" /></Field><Field label="Motif obligatoire"><textarea required maxLength="160" value={potAdjust.note} onChange={(event) => setPotAdjust({ ...potAdjust, note: event.target.value })} placeholder="Pourquoi cette correction est-elle effectuée ?" /></Field><div className="actions"><button type="submit" disabled={busy === "pot"}><CircleDollarSign /> {busy === "pot" ? "Écriture…" : "Inscrire le mouvement"}</button><button type="button" className="secondary" onClick={() => setPotAdjust(null)}>Annuler</button></div></form></div>}
+    {potAdjust && <ModalBackdrop className="modal-backdrop admin-confirm-layer" onClick={() => setPotAdjust(null)}><form className="modal event-pot-modal" onSubmit={adjustPot} onClick={(event) => event.stopPropagation()}><div className="modal-title-row"><div><span className="eyebrow">Journal de cagnotte</span><h2>Ajuster le pot</h2><small>{potAdjust.name}</small></div><button type="button" className="secondary icon-toggle" onClick={() => setPotAdjust(null)}><X /></button></div><Field label="Montant"><input autoFocus type="number" value={potAdjust.amount} onChange={(event) => setPotAdjust({ ...potAdjust, amount: event.target.value })} placeholder="Ex. 500 ou -100" /></Field><Field label="Motif obligatoire"><textarea required maxLength="160" value={potAdjust.note} onChange={(event) => setPotAdjust({ ...potAdjust, note: event.target.value })} placeholder="Pourquoi cette correction est-elle effectuée ?" /></Field><div className="actions"><button type="submit" disabled={busy === "pot"}><CircleDollarSign /> {busy === "pot" ? "Écriture…" : "Inscrire le mouvement"}</button><button type="button" className="secondary" onClick={() => setPotAdjust(null)}>Annuler</button></div></form></ModalBackdrop>}
     {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel={confirm.remove ? "Supprimer l’événement" : "Confirmer"} danger={confirm.status === "finished" || confirm.remove} onConfirm={() => confirm.remove ? remove(confirm.id) : changeStatus(confirm.id, confirm.status)} onClose={() => setConfirm(null)} />}
   </section>;
 }

@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, BadgeCheck, Check, Coins, History, KeyRound, LogOut, Mail, Package, Save, Scale, Search, Shield, ShieldCheck, Trash2, User, UserCheck, Users, WalletCards, X } from "lucide-react";
 import { api } from "../../api.js";
@@ -197,7 +198,7 @@ export function UserEditor({ row, currentUser, games, settings, onClose, onSaved
     ["history", "Historique", History], ["transactions", "Transactions", WalletCards], ["achievements", "Succès", BadgeCheck], ["bonus", "Bonus", Activity]
   ];
 
-  return <div className="modal-backdrop" onClick={closeEditor}>
+  return <ModalBackdrop className="modal-backdrop" onClick={closeEditor}>
     <section className="modal admin-user-editor" onClick={(event) => event.stopPropagation()}>
       <div className="modal-title-row admin-user-editor-title">
         <div><span className="eyebrow">Fiche joueur complète</span><h2>{draft?.displayName ?? row.displayName}</h2><small>{draft?.login ?? row.login} · {row.id}</small></div>
@@ -282,5 +283,5 @@ export function UserEditor({ row, currentUser, games, settings, onClose, onSaved
       <footer className="admin-user-editor-footer"><small role="status">{dirty ? "Modifications non enregistrées" : "Fiche à jour"}</small><div className="actions">{dirty && <ConfirmActionButton className="secondary" disabled={Boolean(saving)} dialogTitle="Annuler les modifications ?" message="Les modifications non enregistrées de cette fiche seront abandonnées." confirmLabel="Annuler les modifications" onConfirm={loadDetail}>Annuler les modifications</ConfirmActionButton>}<button type="button" disabled={Boolean(saving) || loading || !dirty} onClick={saveAll}><Save size={17} />{saving === "all" ? "Enregistrement…" : "Enregistrer la fiche"}</button><button type="button" className="secondary" disabled={Boolean(saving)} onClick={closeEditor}>Fermer</button></div></footer>
     </section>
     {closing && <ConfirmDialog title="Fermer sans enregistrer ?" message="Les modifications de cette fiche seront abandonnées." confirmLabel="Fermer sans enregistrer" onClose={() => setClosing(false)} onConfirm={onClose} />}
-  </div>;
+  </ModalBackdrop>;
 }

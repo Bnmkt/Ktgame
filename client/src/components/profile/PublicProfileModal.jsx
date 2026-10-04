@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { DailyActivityChart } from "./DailyActivityChart.jsx";
 import { BadgeCheck, Eye, EyeOff, Flag, Volume2, VolumeX, X } from "lucide-react";
 import { Die, PlayingCard } from "../game/GamePieces.jsx";
@@ -51,7 +52,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
     finally { setConnectionBusy(""); }
   }
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <ModalBackdrop className="modal-backdrop" onClick={onClose}>
       <div className={profileCosmeticClassName(profile, "modal public-profile-modal")} onClick={(e) => e.stopPropagation()}>
         <ProfileCosmeticEffect user={profile} />
         <ProfileCosmeticFrame user={profile} />
@@ -96,6 +97,6 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
         </div>
         <DailyActivityChart activity={profile.activity ?? []} /></div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }

@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { useEffect, useRef, useState } from "react";
 import { Coins, Dice5, Landmark, Spade, Swords, Trophy, X } from "lucide-react";
 import { Die, PlayingCard } from "./GamePieces.jsx";
@@ -181,7 +182,7 @@ export function RulesModal({ gameId, onClose }) {
   const examples = ruleDiceExamples[gameId] ?? [];
   const isCardGame = examples.some((example) => example.cards);
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <ModalBackdrop className="modal-backdrop" onClick={onClose}>
       <div className="modal rules-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title-row"><div><span className="eyebrow">Guide de jeu</span><h2>{gameTitle(gameId)}</h2></div><button className="secondary icon-toggle" onClick={onClose}><X size={18} /></button></div>
         <div className="rule-goal"><span>{isCardGame ? <Spade size={22} /> : <Dice5 size={22} />}</span><div><small>Objectif de la partie</small><strong>{rules.goal}</strong></div><b>{rules.sections.length} chapitres</b></div>
@@ -200,6 +201,6 @@ export function RulesModal({ gameId, onClose }) {
         </div>
         <div className="rules-footer"><span><Landmark size={16} /> Guide de table KTGA.ME</span><button onClick={onClose}>Fermer</button></div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }

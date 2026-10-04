@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { useMemo, useState } from "react";
 import { BadgeCheck, Braces, Copy, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { api } from "../../api.js";
@@ -171,7 +172,7 @@ export function AchievementsAdmin({ achievements = [], schemas, games = [], shop
     </section>
 
     {editing && guided && <AchievementWizard games={games} shop={shop} achievements={achievements} saving={saving} error={editorError} onSave={(draft) => save(null, draft)} onClose={() => setEditing(null)} onAdvanced={(draft) => { setEditing({ ...draft, id: "" }); setGuided(false); setEditorError(""); }} />}
-    {editing && !guided && <div className="modal-backdrop" onClick={() => !saving && setEditing(null)}><form className="modal admin-editor achievement-rule-editor" onSubmit={save} onClick={(event) => event.stopPropagation()}>
+    {editing && !guided && <ModalBackdrop className="modal-backdrop" onClick={() => !saving && setEditing(null)}><form className="modal admin-editor achievement-rule-editor" onSubmit={save} onClick={(event) => event.stopPropagation()}>
       <div className="modal-title-row"><div><span className="eyebrow">Éditeur de succès</span><h2>{editing.title || "Nouveau succès"}</h2><small>{editing.id || "L'identifiant sera créé à l'enregistrement"}</small></div><button type="button" className="secondary icon-toggle" onClick={() => setEditing(null)} aria-label="Fermer"><X size={18} /></button></div>
       <div className="achievement-editor-scroll">
         <div className="achievement-readable-rule"><strong>Condition d'obtention</strong><p>{describeAchievementRule(editing, schemas, games, achievements)}</p></div>
@@ -190,6 +191,6 @@ export function AchievementsAdmin({ achievements = [], schemas, games = [], shop
         </section>
       </div>
       <footer className="admin-user-editor-footer"><small>Les changements sont appliqués aux prochains événements. Les succès déjà obtenus ne sont jamais retirés automatiquement.</small><div className="actions"><button type="submit" disabled={saving}><Save size={17} />{saving ? "Enregistrement…" : "Enregistrer"}</button><button type="button" className="secondary" onClick={() => setEditing(null)}>Annuler</button></div></footer>
-    </form></div>}
+    </form></ModalBackdrop>}
   </>;
 }

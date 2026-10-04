@@ -1,3 +1,4 @@
+import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Check, Coins, Dice5, Flame, Gamepad2, Gift, Save, Settings2, ShoppingBag, Target, Trophy, X } from "lucide-react";
 import { achievementGoals, buildGuidedAchievement, gameFeats } from "./achievement-guide.js";
@@ -29,7 +30,7 @@ export function AchievementWizard({ games, achievements, shop = [], saving, erro
   const change = (field, value) => setConfig((current) => ({ ...current, [field]: value }));
   const titleFallback = goal?.label ?? "Nouveau succès";
 
-  return <div className="modal-backdrop" onClick={() => !saving && onClose()}><form className="modal admin-editor achievement-rule-editor achievement-wizard" role="dialog" aria-modal="true" aria-labelledby="achievement-wizard-title" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === "Escape" && !saving) onClose(); }} onSubmit={(event) => { event.preventDefault(); if (step < 2) { if (valid) setStep(step + 1); } else if (valid && title.trim()) onSave(draft); }}>
+  return <ModalBackdrop className="modal-backdrop" onClick={() => !saving && onClose()}><form className="modal admin-editor achievement-rule-editor achievement-wizard" role="dialog" aria-modal="true" aria-labelledby="achievement-wizard-title" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === "Escape" && !saving) onClose(); }} onSubmit={(event) => { event.preventDefault(); if (step < 2) { if (valid) setStep(step + 1); } else if (valid && title.trim()) onSave(draft); }}>
     <div className="modal-title-row"><div><span className="eyebrow">Nouveau succès</span><h2 id="achievement-wizard-title">{["Quel défi proposer ?", "Définir le défi", "Prêt à être débloqué"][step]}</h2></div><button type="button" className="secondary icon-toggle" disabled={saving} onClick={onClose} aria-label="Fermer"><X size={18} /></button></div>
     <div className="achievement-editor-scroll" ref={scrollRef}>
       <nav className="achievement-wizard-steps" aria-label="Étapes de création">{["Objectif", "Conditions", "Présentation"].map((label, index) => <button type="button" key={label} aria-current={step === index ? "step" : undefined} disabled={saving || (index > step && !valid)} onClick={() => setStep(index)}><span>{index < step ? <Check size={15} /> : index + 1}</span>{label}</button>)}</nav>
@@ -81,5 +82,5 @@ export function AchievementWizard({ games, achievements, shop = [], saving, erro
       {error && <p className="error" role="alert">{error}</p>}
     </div>
     <footer className="achievement-wizard-footer"><button type="button" className="secondary" disabled={!valid || saving} onClick={() => onAdvanced({ ...draft, title: title || titleFallback })} title="Ouvrir toutes les conditions et comparaisons"><Settings2 size={16} /><span>Personnaliser la règle</span></button><div className="actions">{step > 0 && <button type="button" className="secondary" disabled={saving} onClick={() => setStep(step - 1)}><ArrowLeft size={16} />Retour</button>}<button type="submit" disabled={!valid || saving || (step === 2 && !title.trim())}>{step === 2 ? <Save size={17} /> : <ArrowRight size={17} />}{saving ? "Enregistrement…" : step === 2 ? "Enregistrer" : "Continuer"}</button></div></footer>
-  </form></div>;
+  </form></ModalBackdrop>;
 }
