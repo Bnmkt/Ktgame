@@ -8,13 +8,13 @@ const battleFields = [
   { key: "hiddenDeck", type: "toggle", label: "Pioche cachee", defaultValue: false }
 ];
 
-export function GameDefaults({ game, onChange }) {
+export function GameDefaults({ game, onChange, competitive = false }) {
   const fields = game.id === "bataille" ? battleFields : gameModifierDefinitions[game.id] ?? [];
   if (!fields.length) return null;
   const value = game.defaultModifiers ?? {};
   const change = (key, next) => onChange({ ...value, [key]: next });
   return <section className="admin-form-section game-default-settings">
-    <div className="admin-form-section-title"><Settings /><div><h3>Parametres par defaut des tables</h3><p>Appliques aux nouvelles tables. Leurs maitres peuvent ensuite les ajuster en salle d'attente.</p></div></div>
+    <div className="admin-form-section-title"><Settings /><div><h3>{competitive ? "Preset des parties classées" : "Parametres par defaut des tables"}</h3><p>{competitive ? "Règles communes imposées par le serveur, non modifiables par les joueurs." : "Appliques aux nouvelles tables. Leurs maitres peuvent ensuite les ajuster en salle d'attente."}</p></div></div>
     <div className="admin-field-grid">{fields.filter((field) => field.type !== "toggle").map((field) => <label key={field.key}>{field.label}
       {field.type === "select" ? <select aria-label={field.label} value={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.value)}>{field.options.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select> : <input aria-label={field.label} required type="number" min={field.min} max={field.max} step="1" value={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.value === "" ? "" : Number(event.target.value))} />}
       {field.help && <small className="field-help">{field.help}</small>}

@@ -7,9 +7,11 @@ import { JoinRoomDialog } from "./JoinRoomDialog.jsx";
 import { CompactNumber } from "../../utils/presentation.jsx";
 import { defaultPublicSettings } from "../../config/site.js";
 import "./game-rooms.css";
+import { RankedQueue, rankedGames } from "../../features/games/RankedPlay.jsx";
 
 export function GameRoomsModal({ game, rooms, user, initialTab = "create", stake, setStake, isPublic, setIsPublic, roomName, setRoomName, roomPassword, setRoomPassword, onCreate, onOpenRoom, onEnterRoom, onRules, onClose, canJoin = true, settings = defaultPublicSettings, error = "", busy = false }) {
   const [tab, setTab] = useState(canJoin ? initialTab : "create");
+  const [mode,setMode]=useState("classic");
   const [joinCode, setJoinCode] = useState(null);
   const [protectedTable, setProtectedTable] = useState(false);
   const [titleEditable, setTitleEditable] = useState(false);
@@ -25,6 +27,8 @@ export function GameRoomsModal({ game, rooms, user, initialTab = "create", stake
   const defaultName = displayName.includes("@") ? game.name : `${game.name} de ${displayName}`;
   const insufficientTokens = actualStake > (Number(user.tokens) || 0);
   return <Dialog title={game.name} className="game-table-dialog" onClose={onClose} dismissible={!busy}>
+    {rankedGames.includes(game.id) && <div className="ranked-mode-tabs" role="group" aria-label="Mode de jeu"><button type="button" className={mode==="classic"?"active":"secondary"} aria-pressed={mode==="classic"} onClick={()=>setMode("classic")}>Classique</button><button type="button" className={mode==="ranked"?"active":"secondary"} aria-pressed={mode==="ranked"} onClick={()=>setMode("ranked")}>Classé</button></div>}
+    {mode==="ranked" ? <RankedQueue game={game} user={user}/> : <>
     <div className="game-table-toolbar">
       <div className="game-table-tabs" role="tablist" aria-label="Accéder à une table">
         {canJoin && <button type="button" role="tab" disabled={busy} id={`${id}-browse-tab`} aria-selected={tab === "browse"} aria-controls={`${id}-browse`} className={tab === "browse" ? "active" : ""} onClick={() => setTab("browse")}><DoorOpen size={18} />Tables publiques <span>{filteredRooms.length}</span></button>}
@@ -65,6 +69,7 @@ export function GameRoomsModal({ game, rooms, user, initialTab = "create", stake
         <button type="submit" data-request-feedback="state" disabled={busy || insufficientTokens || invalidLevels || (protectedTable && roomPassword.length < 4)}><Plus size={18} />{busy ? "Création…" : "Créer la table"}</button>
       </footer>
     </form>}
+    </>}
     <div className="game-table-bottom"><button type="button" className="secondary" onClick={() => onRules(game.id)}><HelpCircle size={16} />Règles du jeu</button></div>
     {joinCode !== null && <JoinRoomDialog initialCode={joinCode} userId={user.id} onJoined={onOpenRoom} onClose={() => setJoinCode(null)} />}
   </Dialog>;

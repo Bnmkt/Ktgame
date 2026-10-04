@@ -97,6 +97,34 @@ test("game XP and one-time reward receipts are normalized, durable and cascade w
   assert.equal(inspection.prepare("PRAGMA foreign_key_check").get(), undefined);
 });
 
+test("ranked Elo is normalized, survives restart and duplicate awards roll back atomically", () => {
+  const result = { userId: "a", before: 1000, delta: 16, after: 1016, position: 1, penalty: 0 };
+  const row = { ...original.history[0], id: "ranked-history", ranked: { matchId: "ranked-once", results: [result], participants: [{ id: "a" }] } };
+  updateDb((db) => {
+    db.users.push({ id: "elo-test", pseudo: "EloTest", tokens: 50, gameElo: { yahtzee: { elo: 1016, games: 1, wins: 1 } } });
+    db.history.push({ ...row, players: [{ id: "elo-test", pseudo: "EloTest" }], winners: ["elo-test"], ranked: { ...row.ranked, results: [{ ...result, userId: "elo-test" }], participants: [{ id: "elo-test" }] } });
+  });
+  assert.equal(JSON.parse(inspection.prepare("SELECT data FROM users WHERE id='a'").get().data).gameElo, undefined);
+  assert.equal(inspection.prepare("SELECT elo FROM user_game_elo WHERE user_id='elo-test'").get().elo, 1016);
+  assert.equal(inspection.prepare("SELECT count(*) n FROM ranked_results WHERE match_id='ranked-once'").get().n, 1);
+  const moduleUrl = new URL("../src/db.js", import.meta.url).href;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", `const db = await import(${JSON.stringify(moduleUrl)}); console.log(JSON.stringify(db.readDb().users.find(u=>u.id==='elo-test').gameElo)); db.closeDatabase();`], { env: { ...process.env, SQLITE_PATH: file }, encoding: "utf8" });
+  assert.equal(child.status, 0, child.stderr);
+  assert.deepEqual(JSON.parse(child.stdout.trim()), { yahtzee: { elo: 1016, games: 1, wins: 1 } });
+  assert.throws(() => updateDb((db) => {
+    const user = db.users.find((u)=>u.id === "elo-test");
+    user.gameElo.yahtzee.elo = 1032;
+    user.gameElo.yahtzee.games++;
+    user.tokens += 100;
+    db.history.push({ ...row, id: "ranked-duplicate", ranked: { ...row.ranked, results: [{ ...result, userId: "elo-test" }] } });
+  }), /UNIQUE/);
+  assert.equal(readDb().users.find((u)=>u.id==="elo-test").gameElo.yahtzee.elo, 1016);
+  assert.equal(readDb().users.find((u)=>u.id==="elo-test").gameElo.yahtzee.games, 1);
+  assert.equal(inspection.prepare("SELECT id FROM history WHERE id='ranked-duplicate'").get(), undefined);
+  assert.equal(inspection.prepare("PRAGMA foreign_key_check").get(), undefined);
+  updateDb((db)=> {db.users=db.users.filter((u)=>u.id!=="elo-test");});
+});
+
 test("pending payouts and games affect statistics before atomic commit", () => {
   const db = readDb();
   db.transactions.push({ id: "t3", userId: "a", amount: -20, balance: 30, reason: "shop-purchase", createdAt: "2026-09-03T12:00:00Z" });

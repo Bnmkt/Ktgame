@@ -32,6 +32,7 @@ export function applyLiarsDiceAction(state, actorId, action) {
     const challengerWins = count < state.bid.quantity;
     const loserId = challengerWins ? state.lastBidderId : actorId;
     state.diceCounts[loserId] -= 1;
+    if (state.diceCounts[loserId] === 0) (state.eliminationOrder ??= []).push(loserId);
     state.lastReveal = { ...state.bid, actual: count, loserId, challengerWins, hands: state.hands };
     appendLog(state, actorId, `conteste: ${count} dé(s) de ${state.bid.face} révélé(s), ${playerLabel(state, loserId)} perd un dé.`, "result");
     const alive = state.players.filter((player) => state.diceCounts[player.id] > 0);

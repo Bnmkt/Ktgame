@@ -10,6 +10,18 @@ export function createNormalizedStorage(sqlite) {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       game_id TEXT NOT NULL, xp INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id, game_id)
     );
+    CREATE TABLE IF NOT EXISTS user_game_elo (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_id TEXT NOT NULL, elo REAL NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL,
+      PRIMARY KEY(user_id,game_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_game_elo_ranking ON user_game_elo(game_id,elo DESC,games DESC,user_id);
+    CREATE TABLE IF NOT EXISTS ranked_results (
+      history_id TEXT NOT NULL REFERENCES history(id) ON DELETE CASCADE, match_id TEXT NOT NULL,
+      user_id TEXT NOT NULL, game_id TEXT NOT NULL, finished_at TEXT NOT NULL, data TEXT NOT NULL,
+      PRIMARY KEY(history_id,user_id), UNIQUE(match_id,user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ranked_result_user ON ranked_results(user_id,finished_at DESC);
     CREATE TABLE IF NOT EXISTS achievement_reward_receipts (
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       achievement_id TEXT NOT NULL, PRIMARY KEY(user_id, achievement_id)
@@ -81,6 +93,10 @@ export function createNormalizedStorage(sqlite) {
 
   function splitUser(user) {
     const data = { ...user };
+    if (user.gameElo) {
+      for (const [gameId,row] of Object.entries(user.gameElo)) stmt("INSERT INTO user_game_elo VALUES (?,?,?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET elo=excluded.elo,games=excluded.games,wins=excluded.wins").run(user.id,gameId,row.elo,row.games,row.wins);
+      delete data.gameElo;
+    }
     if (user.gameXp) {
       for (const [gameId, xp] of Object.entries(user.gameXp)) stmt("INSERT INTO user_game_xp VALUES (?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET xp=excluded.xp").run(user.id, gameId, Math.max(0, Math.min(1000000000000, Math.trunc(Number(xp) || 0))));
       user.gameXp = Object.fromEntries(stmt("SELECT game_id,xp FROM user_game_xp WHERE user_id=?").all(user.id).map((row) => [row.game_id, row.xp]));
@@ -130,6 +146,8 @@ export function createNormalizedStorage(sqlite) {
 
   function hydrateUser(row) {
     const user = JSON.parse(row.data);
+    const eloRows = stmt("SELECT game_id,elo,games,wins FROM user_game_elo WHERE user_id=?").all(user.id);
+    if (eloRows.length) user.gameElo = Object.fromEntries(eloRows.map((r)=>[r.game_id,{elo:r.elo,games:r.games,wins:r.wins}]));
     const xpRows = stmt("SELECT game_id,xp FROM user_game_xp WHERE user_id=?").all(user.id);
     if (xpRows.length) user.gameXp = Object.fromEntries(xpRows.map((entry) => [entry.game_id, entry.xp]));
     const rewardRows = stmt("SELECT achievement_id FROM achievement_reward_receipts WHERE user_id=?").all(user.id);
@@ -173,6 +191,7 @@ export function createNormalizedStorage(sqlite) {
   }
 
   function indexHistory(row) {
+    for (const result of row.ranked?.results ?? []) stmt("INSERT INTO ranked_results VALUES (?,?,?,?,?,?) ON CONFLICT(history_id,user_id) DO UPDATE SET data=excluded.data").run(row.id,row.ranked.matchId,result.userId,row.gameId,row.finishedAt,JSON.stringify({ ...result, participants:row.ranked.participants, roomId:row.roomId }));
     stmt("UPDATE history SET day = ? WHERE id = ?").run(casinoDateKey(row.finishedAt), row.id);
     stmt("DELETE FROM history_members WHERE history_id = ?").run(row.id);
     const ids = new Set([...(row.players ?? []).map((player) => player.id), ...(row.winners ?? [])]);

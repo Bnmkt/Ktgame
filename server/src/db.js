@@ -405,6 +405,12 @@ let persistedSettings = JSON.stringify(cachedDb.settings ?? {});
 export function readDb() {
   return cachedDb;
 }
+export function rankedRows(gameId, minimumGames, limit = 100) {
+  return sqlite.prepare("SELECT e.user_id AS id,e.elo,e.games,e.wins FROM user_game_elo e JOIN users u ON u.id=e.user_id WHERE e.game_id=? AND e.games>=? AND u.guest=0 AND json_extract(u.data,'$.active') IS NOT 0 ORDER BY e.elo DESC,e.games DESC,e.user_id LIMIT ?").all(gameId,minimumGames,limit);
+}
+export function rankedRecent(userId, limit = 30) {
+  return sqlite.prepare("SELECT history_id AS historyId,match_id AS matchId,game_id AS gameId,finished_at AS finishedAt,data FROM ranked_results WHERE user_id=? ORDER BY finished_at DESC LIMIT ?").all(userId,limit).map(({data,...row})=>({...row,...JSON.parse(data)}));
+}
 
 export function writeDb(db) {
   const normalized = normalizeDb(db);

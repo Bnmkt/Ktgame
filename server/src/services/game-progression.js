@@ -68,7 +68,7 @@ function titles(input) {
 export function normalizeProgressionConfig(input = {}, gameIds = []) {
   const config = {
     formula: String(input.formula ?? DEFAULT_XP_FORMULA).trim(),
-    maxLevel: Math.max(1, integer(input.maxLevel, 100, 1000)),
+    maxLevel: Math.max(1, integer(input.maxLevel, 101, 101)),
     completionXp: integer(input.completionXp, 50, 1000000), victoryXp: integer(input.victoryXp, 25, 1000000),
     titles: titles(input.titles ?? [{ level: 1, label: "Débutant" }, { level: 5, label: "Habitué" }, { level: 10, label: "Confirmé" }, { level: 25, label: "Expert" }, { level: 50, label: "Maître" }]), games: {}
   };
@@ -95,12 +95,32 @@ export function progressionCurve(config) {
 }
 export function gameProgress(user, gameId, config) {
   const xp = Math.max(0, Math.min(MAX_XP, Math.trunc(Number(user?.gameXp?.[gameId]) || 0)));
-  const curve = progressionCurve(config);
+  const curve = progressionCurve(config.maxLevel >= 101 ? { ...config, maxLevel: 101 } : config);
+  const cycleXp = config.maxLevel >= 101 ? curve.at(-1).totalXp : 0;
+  let mastery = cycleXp ? Math.floor((Math.sqrt(1 + 8 * xp / cycleXp) - 1) / 2) : 0;
+  const cycleStart = (m) => cycleXp * m * (m + 1) / 2;
+  if (cycleXp) {
+    while (cycleStart(mastery) > xp) mastery--;
+    while (cycleStart(mastery + 1) <= xp) mastery++;
+  }
+  const cycleTotal = cycleXp ? xp - cycleStart(mastery) : xp;
+  const multiplier = mastery + 1;
   let lo = 0, hi = curve.length - 1;
-  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (curve[mid].totalXp <= xp) lo = mid; else hi = mid - 1; }
+  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (curve[mid].totalXp * multiplier <= cycleTotal) lo = mid; else hi = mid - 1; }
   const row = curve[lo], title = unlockedGameTitles(config, gameId, row.level).at(-1);
-  return { gameId, xp, level: row.level, title: title?.label ?? "", titleLevel: title?.level ?? 0, levelXp: xp - row.totalXp, nextXp: row.nextXp, capped: row.nextXp === 0 };
+  return { gameId, xp, mastery, masteryLabel: romanMastery(mastery), highestLevel: mastery > 0 ? 101 : row.level, level: row.level,
+    title: masteredTitle(title?.label ?? "", mastery), titleLevel: title?.level ?? 0,
+    levelXp: cycleTotal - row.totalXp * multiplier, nextXp: row.nextXp * multiplier, capped: row.nextXp === 0 };
 }
+export function romanMastery(value) {
+  const number = Math.max(0, Math.trunc(value));
+  if (!number) return "";
+  if (number >= 4000) return `(${romanMastery(Math.floor(number / 1000))})${romanMastery(number % 1000)}`;
+  let rest = number, result = "";
+  for (const [amount, symbol] of [[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]]) while (rest >= amount) { result += symbol; rest -= amount; }
+  return result;
+}
+export function masteredTitle(label, mastery) { return label ? `${label}${mastery ? ` ${romanMastery(mastery)}` : ""}` : ""; }
 export function unlockedGameTitles(config, gameId, level) {
   return (config.games?.[gameId]?.titles ?? config.titles).filter((entry) => entry.level <= level);
 }
@@ -111,15 +131,15 @@ export function equippedGameTitle(user, config, gameIds) {
   if (user?.profile?.titleHidden || !gameIds.length) return null;
   const gameId = gameIds.includes(user?.profile?.titleGameId) ? user.profile.titleGameId : [...gameIds].sort((a, b) => (user?.gameXp?.[b] ?? 0) - (user?.gameXp?.[a] ?? 0))[0];
   const progress = gameProgress(user, gameId, config);
-  const chosen = unlockedGameTitles(config, gameId, progress.level).find((row) => row.level === user?.profile?.titleLevel);
-  return chosen ? { ...progress, title: chosen.label, titleLevel: chosen.level } : progress;
+  const chosen = unlockedGameTitles(config, gameId, progress.highestLevel).find((row) => row.level === user?.profile?.titleLevel);
+  return chosen ? { ...progress, title: masteredTitle(chosen.label, progress.mastery), titleLevel: chosen.level } : progress;
 }
 export function awardGameXp(user, gameId, amount, config) {
   if (!user || user.guest || user.isBot || !Number.isSafeInteger(amount) || amount <= 0) return null;
   const before = gameProgress(user, gameId, config);
   user.gameXp ??= {};
   user.gameXp[gameId] = Math.min(MAX_XP, before.xp + amount);
-  return { ...gameProgress(user, gameId, config), amount: user.gameXp[gameId] - before.xp, previousLevel: before.level };
+  return { ...gameProgress(user, gameId, config), amount: user.gameXp[gameId] - before.xp, previousLevel: before.level, previousMastery: before.mastery };
 }
 export function normalizeAchievementRewards(input = {}) {
   if (!Array.isArray(input.itemIds ?? []) || !Array.isArray(input.xp ?? []) || (input.itemIds?.length ?? 0) > 30 || (input.xp?.length ?? 0) > 15) throw new Error("Trop de récompenses pour ce succès.");

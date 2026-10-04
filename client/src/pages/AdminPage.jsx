@@ -23,6 +23,7 @@ import { AdminOverview } from "../components/admin/AdminOverview.jsx";
 import { TribunalAdmin } from "../components/admin/TribunalAdmin.jsx";
 import { shopPackName } from "../utils/shop-packs.js";
 import { HelpAdmin } from "../components/admin/HelpAdmin.jsx";
+import { RankedAdmin } from "../components/admin/RankedAdmin.jsx";
 
 export function Admin({ user, onBack, onSettingsChange }) {
   const isAdministrator = Boolean(user.admin);
@@ -218,6 +219,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
     { label: "Contenu", items: [
       { value: "events", label: "Événements", icon: Sparkles },
       { value: "games", label: "Jeux", icon: Gamepad2, count: data.games.length },
+      { value: "ranked", label: "Mode classé", icon: Trophy },
       { value: "achievements", label: "Succès", icon: Trophy, count: data.achievements?.length ?? 0 },
       { value: "shop", label: "Boutique", icon: ShoppingBag, count: data.shop.length },
       { value: "patchnotes", label: "Patchnotes", icon: Newspaper },
@@ -297,6 +299,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
 
         {isAdministrator && tab === "parental" && <ParentalApprovals onSettingsChange={(settings) => { setSettingsDraft(settings); setData((current) => ({ ...current, settings })); onSettingsChange?.(settings); }} />}
         {isAdministrator && tab === "tribunal" && <TribunalAdmin reportError={setError} notifySuccess={notifySuccess} />}
+        {isAdministrator && tab === "ranked" && <RankedAdmin/>}
         {isAdministrator && tab === "settings" && <CasinoSettings draft={settingsDraft} setDraft={setSettingsDraft} onSubmit={saveSettings} saving={saving === "settings"} games={data.games} />}
       </>}
         </section>

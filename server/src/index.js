@@ -59,7 +59,9 @@ import {
   purchaseCommunityEventActions,
   validateCommunityEvent
 } from "./services/community-events.js";
-import { databaseFilename, databaseHealth, readDb, setCatalogSource, updateDb, writeDb } from "./db.js";
+import { databaseFilename, databaseHealth, rankedRows, rankedRecent, readDb, setCatalogSource, updateDb, writeDb } from "./db.js";
+import { RANKED_GAMES, eloFor, normalizeRankedConfig, settleRanked, validateRankedAction } from "./services/ranked.js";
+import { createRankedRuntime } from "./services/ranked-runtime.js";
 import { createDataRequestStore } from "./services/data-requests.js";
 import { registerDataRequestRoutes } from "./services/data-request-routes.js";
 import { createBugReportStore } from "./services/bug-reports.js";
@@ -502,9 +504,10 @@ function platformSettings(db = readDb()) {
 function progressionConfig(db) { return platformSettings(db).gameProgression; }
 function playerProgression(user, db, includeTitles = false) {
   const config = progressionConfig(db);
+  const ranked = normalizeRankedConfig(db.settings?.ranked, configuredGames(db), platformSettings(db));
   return games.map((game) => {
     const progress = gameProgress(user, game.id, config);
-    return { ...progress, gameName: game.name, ...(includeTitles ? { unlockedTitles: unlockedGameTitles(config, game.id, progress.level) } : {}) };
+    return { ...progress, gameName: game.name, ...(RANKED_GAMES.includes(game.id) ? { competitive: eloFor(user,game.id,ranked.games[game.id]) } : {}), ...(includeTitles ? { unlockedTitles: unlockedGameTitles(config, game.id, progress.highestLevel) } : {}) };
   });
 }
 function playerTitle(user, db) {
@@ -512,12 +515,12 @@ function playerTitle(user, db) {
 }
 function playerLevelContext(user, db, gameId) {
   const rows = playerProgression(user, db), current = rows.find((row) => row.gameId === gameId);
-  return { gameLevel: current?.level ?? 1, gameXp: current?.xp ?? 0, highestGameLevel: Math.max(1, ...rows.map((row) => row.level)), totalGameXp: rows.reduce((total, row) => total + row.xp, 0) };
+  return { gameLevel: current?.level ?? 1, gameMastery: current?.mastery ?? 0, gameXp: current?.xp ?? 0, highestGameLevel: Math.max(1, ...rows.map((row) => row.highestLevel)), totalGameXp: rows.reduce((total, row) => total + row.xp, 0) };
 }
 function xpAchievementEvents(db, user, result, room, depth = 0, reason = "achievement") {
   if (!result) return [];
   const events = [{ type: "game.xp", payload: { ...result, reason } }];
-  if (result.level > result.previousLevel) events.push({ type: "game.level", payload: result });
+  if (result.level > result.previousLevel || result.mastery > result.previousMastery) events.push({ type: "game.level", payload: result });
   return events.flatMap((event) => processAchievementEvent(db, user.id, event, room, depth));
 }
 function validateAchievementRewards(entry, db) {
@@ -901,6 +904,7 @@ function grantSpectatorAccess(room, userId) {
   spectatorAccess.set(`${room.id}:${userId}`, Date.now() + 24 * 60 * 60 * 1000);
 }
 function maySpectate(room, userId) {
+  if (room?.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===userId)) return false;
   return room.players.some((player) => player.id === userId) || (room.isPublic && !room.passwordHash) || (spectatorAccess.get(`${room.id}:${userId}`) ?? 0) > Date.now();
 }
 const battleBotTimers = new Map();
@@ -1423,6 +1427,7 @@ function publicUserPayload(user, db, viewerId = "") {
     id: user.id,
     pseudo: displayNameFor(user),
     friendCode: friendCodeFor(user),
+    ranked: RANKED_GAMES.map((gameId)=>({gameId, ...eloFor(user,gameId,rankedRuntime.config(db).games[gameId])})),
     gameProgression: playerProgression(user, db),
     gameTitle: playerTitle(user, db),
     cosmetics: normalizeCosmetics(user.cosmetics),
@@ -1774,9 +1779,9 @@ function userAchievementProgress(user, db) {
   };
   for (const [gameId, wins] of Object.entries(statistics.gameWins)) metricValues[`gameWins.${gameId}`] = wins;
   const progression = playerProgression(user, db);
-  metricValues.highestGameLevel = Math.max(1, ...progression.map((row) => row.level));
+  metricValues.highestGameLevel = Math.max(1, ...progression.map((row) => row.highestLevel));
   metricValues.totalGameXp = progression.reduce((total, row) => total + row.xp, 0);
-  for (const row of progression) { metricValues[`gameLevel.${row.gameId}`] = row.level; metricValues[`gameXp.${row.gameId}`] = row.xp; }
+  for (const row of progression) { metricValues[`gameLevel.${row.gameId}`] = row.highestLevel; metricValues[`gameCurrentLevel.${row.gameId}`] = row.level; metricValues[`gameMastery.${row.gameId}`] = row.mastery; metricValues[`gameXp.${row.gameId}`] = row.xp; }
   for (const entry of achievementCatalog(db)) {
     if (entry.rule?.source === "metric" && metricValues[entry.rule.metric] !== undefined) progress[entry.id] = metricValues[entry.rule.metric];
     if (entry.rule?.legacyResultId && resultIds.includes(entry.rule.legacyResultId)) progress[entry.id] = Math.max(progress[entry.id] ?? 0, 1);
@@ -2499,8 +2504,12 @@ function cleanupEmptyRooms(db) {
 function finishRoomIfNeeded(room, db) {
   if (!room.state?.finished || room.finished) return;
   room.finished = true;
+  if (room.ranked?.cancelled) {
+    db.history.push({id:randomUUID(),roomId:room.id,code:room.code,name:room.name,gameId:room.gameId,players:room.ranked.roster.map((p)=>({id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? "Joueur",isBot:false})),winners:[],ranking:[],pot:0,finishedAt:new Date().toISOString(),ranked:{matchId:room.ranked.matchId,cancelled:room.ranked.cancelled}});
+    return;
+  }
   const paidPlayers = room.players.filter((p) => !p.isBot);
-  const pot = room.stake * paidPlayers.length;
+  const pot = room.stake * (room.ranked ? room.ranked.roster.length : paidPlayers.length);
   const winners = room.state.winners ?? [];
   const achievementEvents = roomAchievementEvents(room);
   if (room.state.gameId === "blackjack") {
@@ -2530,10 +2539,12 @@ function finishRoomIfNeeded(room, db) {
   room.state.ranking = roomRanking(room);
   room.state.roomPayouts = roomPayouts;
   syncRoomPlayerTokens(room, db);
-  const historyRow = { id: randomUUID(), roomId: room.id, code: room.code, name: room.name, gameId: room.gameId, players: room.players.map((p) => ({ id: p.id, pseudo: p.pseudo, isBot: p.isBot })), winners, ranking: room.state.ranking, payouts: roomPayouts, blackjackPayouts: room.state.gameId === "blackjack" ? room.state.payouts ?? {} : {}, pot, achievementEvents, finishedAt: new Date().toISOString() };
+  const historyPlayers=room.ranked ? room.ranked.roster.map((p)=>room.players.find((player)=>player.id===p.id) ?? {id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? p.pseudo ?? "Joueur",isBot:false}) : room.players;
+  const historyRow = { id: randomUUID(), roomId: room.id, code: room.code, name: room.name, gameId: room.gameId, players: historyPlayers.map((p) => ({ id: p.id, pseudo: p.pseudo, isBot: p.isBot })), winners, ranking: room.state.ranking, payouts: roomPayouts, blackjackPayouts: room.state.gameId === "blackjack" ? room.state.payouts ?? {} : {}, pot, achievementEvents, finishedAt: new Date().toISOString() };
   if (room.gameId === "belote") historyRow.leaderboardScores = Object.fromEntries(room.state.players.map((player, index) => [player.id, room.state.teamScores[index % 2]]));
   db.history.push(historyRow);
-  for (const player of room.players.filter((p) => !p.isBot)) {
+  settleRanked(room, db.users, historyRow);
+  for (const player of room.players.filter((p) => !p.isBot && !room.ranked?.forfeits?.[p.id])) {
     const user = db.users.find((u) => u.id === player.id);
     const config = progressionConfig(db), xpRules = gameXpRules(config, room.gameId);
     const amount = xpRules.completionXp + (winners.includes(player.id) ? xpRules.victoryXp : 0);
@@ -2765,7 +2776,9 @@ function startRoomRound(room, db) {
   if (room.players.length < game.minPlayers) return `Minimum ${game.minPlayers} joueur(s).`;
   if (room.gameId === "belote" && room.players.length !== 4) return "La belote exige exactement quatre joueurs, IA comprises.";
   const settings = platformSettings(db);
-  room.stake = Math.max(room.gameId === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(room.stake) || 0);
+  if (room.players.some((player)=>db.rooms.some((other)=>other.id!==room.id && other.ranked && !other.finished && other.ranked.roster.some((p)=>p.id===player.id && !other.ranked.forfeits[p.id])))) return "Un joueur participe déjà à une partie classée.";
+  if (!room.ranked) room.stake = Math.max(room.gameId === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(room.stake) || 0);
+  if (room.ranked && room.players.some((p)=>p.guest || p.isBot)) return "Bots et invités interdits en classé.";
   for (const player of room.players.filter((p) => !p.isBot)) {
     const levelError = roomLevelError(db.users.find((user) => user.id === player.id) ?? player, room, settings.gameProgression);
     if (levelError) return `${player.pseudo} : ${levelError}`;
@@ -5612,7 +5625,7 @@ app.patch("/api/me", auth, async (req, res) => {
   if (req.body.titleLevel > 0) {
     const gameId = req.body.titleGameId ?? currentAccount?.profile?.titleGameId;
     const config = progressionConfig(readDb());
-    if (!gameId || !unlockedGameTitles(config, gameId, gameProgress(currentAccount, gameId, config).level).some((row) => row.level === req.body.titleLevel)) return res.status(403).json({ error: "Ce titre n'est pas encore debloque." });
+    if (!gameId || !unlockedGameTitles(config, gameId, gameProgress(currentAccount, gameId, config).highestLevel).some((row) => row.level === req.body.titleLevel)) return res.status(403).json({ error: "Ce titre n'est pas encore debloque." });
   }
   if (login && normalizeEmail(currentAccount?.email) !== login) return res.status(400).json({ error: "Modifie l'adresse email depuis l'écran de sécurité du compte." });
   if (displayName && displayName.length < 3) return res.status(400).json({ error: "Pseudo en jeu trop court." });
@@ -5839,7 +5852,20 @@ app.get("/api/rooms", (_req, res) => {
   res.json(sanitizeRooms(db.rooms.filter((room) => room.isPublic && !room.finished)));
 });
 
+const rankedRuntime = createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb, rankedRows, rankedRecent, games: configuredGames, platformSettings,
+  userFeatureAccess, roomCode, roomPlayerFor, startRoomRound, finishRoomIfNeeded, removePlayerFromRoomState, cashOutPokerPlayer,
+  addTokens, sanitizeFriendUser, emitRoomUpdate, broadcastRooms, io,
+  isWatching: (roomId,userId)=>[...(roomPresence.get(roomId) ?? [])].some((id)=>io.sockets.sockets.get(id)?.data.userId === userId && !io.sockets.sockets.get(id)?.data.spectator)
+});
+setInterval(()=>{try{rankedRuntime.tick();}catch(error){console.error("Ranked tick failed",error.message);}},2000).unref();
+app.use("/api/rooms/:code",auth,(req,res,next)=> {
+  const room=readDb().rooms.find((r)=>r.code===req.params.code.toUpperCase());
+  if(room?.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===req.auth.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});
+  next();
+});
+
 app.post("/api/rooms", auth, async (req, res) => {
+  if (req.body.ranked || req.body.mode === "ranked") return res.status(403).json({ error: "Le classé passe exclusivement par la file d'attente." });
   const user = getUser(req.auth.id);
   const game = configuredGames().find((g) => g.id === req.body.gameId);
   if (!user || !game || game.enabled === false) return res.status(400).json({ error: "Création impossible." });
@@ -5891,6 +5917,7 @@ app.post("/api/rooms/:code/join", auth, async (req, res) => {
   const db = readDb();
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
   const game = room && games.find((g) => g.id === room.gameId);
+  if (room?.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===req.auth.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});
   if (!user || !room || !game) return res.status(404).json({ error: "Table introuvable." });
   const roomAccess = userFeatureAccess(user, "rooms:join", db);
   if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
@@ -5997,6 +6024,7 @@ app.post("/api/room-invites/:id/accept", auth, (req, res) => {
   const room = invite && db.rooms.find((row) => row.code === invite.code && !row.finished);
   const game = room && games.find((g) => g.id === room.gameId);
   if (!invite || !room || !game) return res.status(404).json({ error: "Invitation expirée." });
+  if (room.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===user.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});
   const tableAccess = tableFeatureAccess(user, room, db);
   if (!tableAccess.allowed) return rejectFeature(res, tableAccess);
   if (room.players.some((p) => p.id === user.id)) return res.json(sanitizeRoom(room, req.auth.id));
@@ -6155,6 +6183,9 @@ app.post("/api/rooms/:code/leave", auth, (req, res) => {
   const db = readDb();
   const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && !entry.finished);
   if (!room || !room.players.some((entry) => entry.id === req.auth.id)) return res.status(404).json({ error: "Table introuvable." });
+  if (room.ranked) {
+    rankedRuntime.forfeit(room,db,req.auth.id);writeDb(db);emitRoomUpdate(room);broadcastRooms();return res.json({ok:true});
+  }
   if (room.state?.gameId === "texas-holdem") cashOutPokerPlayer(room, db, req.auth.id);
   else {
     room.players = room.players.filter((entry) => entry.id !== req.auth.id);
@@ -6273,6 +6304,7 @@ app.post("/api/rooms/:code/action", auth, (req, res) => {
     return res.status(409).json({ error: pacingError });
   }
   try {
+    if (room.ranked) validateRankedAction(room.state, req.auth.id, req.body);
     const actionPlayer = room.state.players?.find((player) => player.id === req.auth.id);
     const turnBeforeActionPlayerId = room.state.players?.[room.state.currentPlayerIndex]?.id ?? "";
     const achievementSnapshot = actionAchievementSnapshot(room.state, req.auth.id);
@@ -6317,6 +6349,7 @@ app.post("/api/rooms/:code/action", auth, (req, res) => {
       syncRoomPlayerTokens(room, db);
     }
     room.state = applyAction(room.state, req.auth.id, req.body);
+    if (room.ranked && !["show","auto-check-fold"].includes(req.body.type)) rankedRuntime.action(room);
     processAchievementEvent(db, req.auth.id, gameActionAchievementEvent(room, req.auth.id, req.body, achievementSnapshot), room);
     if (req.body.type === "roll" && !actionPlayer?.isBot) room.state.rollAvailableAt = { ...(room.state.rollAvailableAt ?? {}), [req.auth.id]: Date.now() + 700 };
     const showingRoundResults = startRoundResultsIfNeeded(room, roundBeforeAction, actionPlayer);
@@ -6439,7 +6472,7 @@ setInterval(() => {
     const showingResults = roomChanged && startRoundResultsIfNeeded(room, roundBeforeTick);
     if (roomChanged && !showingResults) runBotTurns(room, db);
     const current = room.state.currentPlayerIndex >= 0 ? room.state.players[room.state.currentPlayerIndex] : null;
-    if (current && !current.isBot && room.state.turnDeadline && now >= room.state.turnDeadline) {
+    if (!room.ranked && current && !current.isBot && room.state.turnDeadline && now >= room.state.turnDeadline) {
       cashOutPokerPlayer(room, db, current.id, "poker-timeout-cash-out");
       finishRoomIfNeeded(room, db);
       io.to(room.id).emit("room-player-kicked", { code: room.code, playerId: current.id, reason: "timeout" });

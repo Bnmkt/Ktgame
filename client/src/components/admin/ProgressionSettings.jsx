@@ -8,6 +8,7 @@ export function ProgressionSettings({ value, onChange, games = [] }) {
   const [gameId, setGameId] = useState("");
   const [preview, setPreview] = useState(null), [error, setError] = useState("");
   const [range, setRange] = useState(25), [measure, setMeasure] = useState("nextXp");
+  const [mastery,setMastery]=useState(0);
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => api("/api/admin/progression/preview", { method: "POST", body: JSON.stringify(value), background: true }).then((data) => { if (!cancelled) { setPreview(data.rows); setError(""); } }).catch((reason) => { if (!cancelled) { setError(reason.message); setPreview(null); } }), 450);
@@ -22,14 +23,14 @@ export function ProgressionSettings({ value, onChange, games = [] }) {
     onChange({ ...value, games: { ...value.games, [gameId]: { ...override, [key]: next } } });
   };
   const titleRows = override?.titles ?? value.titles;
-  const rows = (preview ?? []).filter((row) => row.level <= range && (measure !== "nextXp" || row.nextXp > 0));
+  const rows = (preview ?? []).filter((row) => row.level <= range && (measure !== "nextXp" || row.nextXp > 0)).map((row)=>({...row,nextXp:row.nextXp*(mastery+1),totalXp:row.totalXp*(mastery+1)}));
   const max = Math.max(1, ...rows.map((row) => row[measure]));
   const x = (i) => 64 + i * 820 / Math.max(1, rows.length - 1), y = (row) => 220 - row[measure] / max * 190;
   return <div className="xp-settings">
-    <section className="settings-group"><div className="settings-group-heading"><TrendingUp /><div><h3>Niveaux par jeu</h3><p>La formule donne le coût pour passer du niveau N au niveau N + 1. Le niveau 1 commence à 0 XP.</p></div></div>
-      <div className="settings-field-grid"><label className="settings-field-wide">Formule XP<textarea aria-label="Formule XP" rows={3} maxLength={500} value={value.formula} onChange={(event) => update("formula", event.target.value)} /></label><label>Niveau maximal<input aria-label="Niveau maximal" type="number" min={1} max={1000} value={value.maxLevel} onChange={(event) => update("maxLevel", Number(event.target.value))} /></label></div>
+    <section className="settings-group"><div className="settings-group-heading"><TrendingUp /><div><h3>Niveaux et maîtrise par jeu</h3><p>La formule donne le coût du niveau suivant, multiplié par maîtrise + 1. Au seuil 101 : retour au niveau 1 et une maîtrise supplémentaire. L’XP totale reste conservée.</p></div></div>
+      <div className="settings-field-grid"><label className="settings-field-wide">Formule XP<textarea aria-label="Formule XP" rows={3} maxLength={500} value={value.formula} onChange={(event) => update("formula", event.target.value)} /></label><label>Niveau plafond (101 active la maîtrise)<input aria-label="Niveau plafond" type="number" min={1} max={101} value={value.maxLevel} onChange={(event) => update("maxLevel", Number(event.target.value))} /></label><label>Maîtrise de la projection<input type="number" min={0} max={100} value={mastery} onChange={(event)=>setMastery(Number(event.target.value))}/></label></div>
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="xp-chart-controls"><label>Projection<select aria-label="Projection XP" value={range} onChange={(event) => setRange(Number(event.target.value))}>{[10, 25, 50, 100, 1000].map((n) => <option key={n} value={n}>{n} niveaux</option>)}</select></label><label>Valeur<select value={measure} onChange={(event) => setMeasure(event.target.value)}><option value="nextXp">XP du niveau suivant</option><option value="totalXp">XP cumulée</option></select></label></div>
+      <div className="xp-chart-controls"><label>Projection<select aria-label="Projection XP" value={range} onChange={(event) => setRange(Number(event.target.value))}>{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n} niveaux</option>)}</select></label><label>Valeur<select value={measure} onChange={(event) => setMeasure(event.target.value)}><option value="nextXp">XP du niveau suivant</option><option value="totalXp">XP cumulée du cycle</option></select></label></div>
       {rows.length > 0 && <div className="xp-curve"><svg viewBox="0 0 910 260" role="img" aria-label="Courbe des niveaux XP">{[0, .25, .5, .75, 1].map((ratio) => <g key={ratio}><line x1={64} x2={884} y1={30 + 190 * ratio} y2={30 + 190 * ratio} /><text x={56} y={34 + 190 * ratio} textAnchor="end">{Math.round(max * (1 - ratio)).toLocaleString("fr-FR")}</text></g>)}<polyline points={rows.map((row, i) => `${x(i)},${y(row)}`).join(" ")} />{rows.map((row, i) => <circle key={row.level} cx={x(i)} cy={y(row)} r={3}><title>Niveau {row.level} : {row.nextXp.toLocaleString("fr-FR")} XP pour monter ; {row.totalXp.toLocaleString("fr-FR")} XP cumulée</title></circle>)}<text x={64} y={250}>Niveau 1</text><text x={884} y={250} textAnchor="end">Niveau {rows.at(-1).level}</text></svg></div>}
     </section>
     <section className="settings-group"><div className="settings-group-heading"><TrendingUp /><div><h3>XP gagnée et titres</h3><p>Les montants sont attribués une fois à la fin d’une partie. La victoire s’ajoute à la participation.</p></div></div>

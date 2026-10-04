@@ -1,4 +1,6 @@
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
+import { ConfirmDialog } from "../components/common/ConfirmAction.jsx";
+import "../features/games/ranked.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { appPath } from "../navigation/routes.js";
@@ -111,6 +113,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const [room, setRoom] = useState(null);
   useBugGameContext("room", code, room?.gameId, room?.activityMatchId);
   const [error, setError] = useState("");
+  const [rankedLeave,setRankedLeave]=useState(false);
   const [bet, setBet] = useState(10);
   const [pokerRaise, setPokerRaise] = useState(40);
   const [pokerBlinds, setPokerBlinds] = useState({ bigBlind: 20 });
@@ -389,9 +392,12 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   useEffect(() => { setScoreConfirmation(null); }, [state?.currentPlayerIndex, state?.finished]);
   useEffect(() => { setSelectedPresidentCards([]); }, [state?.currentPlayerIndex, state?.finished, myHand.length]);
 
-  async function leaveTable() {
-    if (room?.gameId === "texas-holdem" && state && !state.finished) {
-      try { await api(`/api/rooms/${code}/leave`, { method: "POST" }); } catch { /* Le timer serveur reste l'autorité si la requête échoue. */ }
+  async function leaveTable(confirmed=false) {
+    if (room?.ranked && state && !state.finished && confirmed!==true) {setRankedLeave(true);return;}
+    if ((room?.gameId === "texas-holdem" || room?.ranked) && state && !state.finished) {
+      try { await api(`/api/rooms/${code}/leave`, { method: "POST" }); } catch (error) {
+        if (room?.ranked) throw error;
+      }
     }
     onBack();
   }
@@ -452,6 +458,8 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
         {tableFullscreen && state && <aside className="fullscreen-player-rail" aria-label="Joueurs de la table"><div><span className="eyebrow">Table</span><h2>Joueurs</h2><small>{state.players.length} participant{state.players.length > 1 ? "s" : ""}</small></div><div className="fullscreen-player-list">{state.players.map((player, index) => { const active = room.gameId === "blackjack" ? !state.completedPlayerIds?.includes(player.id) : room.gameId === "bataille" ? !state.submittedPlayerIds?.includes(player.id) : index === state.currentPlayerIndex; return <article className={`${active && !state.finished ? "active" : ""} ${player.id === user.id ? "self" : ""}`} key={player.id}><i aria-hidden="true" /><DisplayName user={player} />{player.isBot && <small>IA</small>}{player.id === room.ownerId && <small>Maître</small>}</article>; })}</div></aside>}
         <section>
           <RoomStatusPanel room={room} state={state} current={current} userId={user.id} isOwner={isOwner} onAddBot={() => roomPost("bot")} onStart={() => roomPost("start")} onReady={() => roomPost("ready")} onKick={kickPlayer} onSettings={openRoomSettings} />
+          {room.ranked && <section className="ranked-match-heading"><Swords size={18}/><strong>Partie classée</strong>{room.ranked.results?.map((row)=><span key={row.userId}>{room.players.find((p)=>p.id===row.userId)?.pseudo ?? "Joueur"} : {row.delta>0?"+":""}{Math.round(row.delta*100)/100} Elo ({row.after})</span>)}</section>}
+          {rankedLeave && <ConfirmDialog title="Abandonner la partie classée ?" message={`Un abandon entraîne le classement en dernière position et une pénalité supplémentaire de ${room.ranked.config.abandonPenalty} Elo.`} danger confirmLabel="Abandonner" onConfirm={()=>leaveTable(true)} onClose={()=>setRankedLeave(false)}/>}
           {!state && room.gameId === "belote" && <BeloteTeams room={room} userId={user.id} onChange={changeBeloteTeam} />}
           {showFinishedResult && <FinishedLeaderboard room={room} state={state} />}
           <TurnPacingBanner pacing={pacing} players={room.players} canSkip={isSeatedPlayer} onSkip={skipPacing} />

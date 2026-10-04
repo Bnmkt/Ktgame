@@ -71,7 +71,8 @@ export function applyYahtzeeAction(state, actorId, action) {
     const allComplete = state.players.every((player) => Object.keys(state.scores[player.id] ?? {}).length >= YAHTZEE_CATEGORIES.length);
     if (allComplete) {
       const totals = Object.entries(state.scores).map(([id, scores]) => [id, totalYahtzee(scores)]);
-      state.winners = [totals.sort((left, right) => right[1] - left[1])[0][0]];
+      const best = Math.max(...totals.map(([,score])=>score));
+      state.winners = totals.filter(([,score])=>score===best).map(([id])=>id);
       state.finished = true;
     } else nextTurn(state);
   }

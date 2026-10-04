@@ -1,0 +1,33 @@
+import { useEffect, useState } from "react";
+import { Save, Swords } from "lucide-react";
+import { api } from "../../api.js";
+import { GameDefaults } from "./GameDefaults.jsx";
+import { Dialog } from "../common/Dialog.jsx";
+
+const fields = {
+  elo: [["initialElo","Elo initial",100,5000],["k","Coefficient K",1,128],["minimumGames","Parties avant publication au classement",0,1000],["abandonPenalty","Pénalité d’abandon / déconnexion prolongée",0,500],["afkPenalty","Pénalité AFK",0,500]],
+  search: [["initialRange","Plage initiale (± Elo)",0,2000],["rangeStep","Élargissement (Elo)",1,1000],["wideningSeconds","Intervalle d’élargissement (s)",5,600],["maximumRange","Plage maximale (± Elo)",0,3000],["queueSeconds","Attente maximale (s, 0 = illimitée)",0,7200],["reconnectSeconds","Délai de reconnexion (s)",15,1800],["afkSeconds","Inactivité pendant son tour (s)",30,1800]]
+};
+export function RankedAdmin() {
+  const [data,setData]=useState(null),[draft,setDraft]=useState(null),[gameId,setGameId]=useState(""),[tab,setTab]=useState("elo"),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+  const [cancel,setCancel]=useState(null),[reason,setReason]=useState("");
+  const load=()=>api("/api/admin/ranked").then((result)=>{setData(result);setDraft(result.settings);}).catch((err)=>setError(err.message));
+  useEffect(()=>{load();},[]);
+  if(!draft)return <section className="panel"><h2>Mode classé</h2><p role={error?"alert":"status"}>{error || "Chargement…"}</p></section>;
+  const current=gameId ? draft.games[gameId] : draft;
+  function change(key,value) {
+    setDraft((prev)=>gameId ? {...prev,games:{...prev.games,[gameId]:{...prev.games[gameId],[key]:value}}} : {...prev,[key]:value,games:Object.fromEntries(Object.entries(prev.games).map(([id,row])=>[id,{...row,...(row[key]===prev[key] ? {[key]:value} : {})}]))});
+  }
+  function preset(key,value) {change("preset",{...current.preset,[key]:value});}
+  async function save(event) {event.preventDefault();setBusy(true);setError("");setMessage("");try{setDraft(await api("/api/admin/ranked",{method:"PUT",body:JSON.stringify(draft)}));setMessage("Paramètres classés enregistrés. Les parties en cours conservent leurs règles.");}catch(err){setError(err.message);}finally{setBusy(false);}}
+  async function cancelMatch(event) {event.preventDefault();setBusy(true);setError("");try{await api(`/api/admin/ranked/${cancel.code}/cancel`,{method:"POST",body:JSON.stringify({reason})});setCancel(null);await load();}catch(err){setError(err.message);}finally{setBusy(false);}}
+  return <section className="card ranked-admin"><form onSubmit={save}><header className="admin-section-heading"><div><span className="eyebrow">Compétition</span><h2><Swords/>Mode classé</h2></div><button disabled={busy}><Save size={17}/>Enregistrer</button></header>
+    <div className="admin-field-grid"><label>Configuration<select aria-label="Configuration classée" value={gameId} onChange={(event)=>setGameId(event.target.value)}><option value="">Valeurs communes</option>{Object.keys(draft.games).map((id)=><option key={id} value={id}>{data.games.find((g)=>g.id===id)?.name ?? id}</option>)}</select></label><label className="xp-title-override"><input type="checkbox" checked={current.enabled} onChange={(event)=>change("enabled",event.target.checked)}/>Classé activé{gameId?" pour ce jeu":" sur le site"}</label><label className="xp-title-override"><input type="checkbox" checked={current.spectators} onChange={(event)=>change("spectators",event.target.checked)}/>Autoriser les spectateurs</label></div>
+    <div className="ranked-mode-tabs" role="group" aria-label="Paramètres classés">{[["elo","Elo et sanctions"],["search","Matchmaking"],["preset","Règles de partie"]].map(([id,label])=><button key={id} type="button" aria-pressed={tab===id} className={tab===id?"active":"secondary"} onClick={()=>setTab(id)}>{label}</button>)}</div>
+    {fields[tab] && <div className="admin-field-grid">{fields[tab].map(([key,label,min,max])=><label key={key}>{label}<input type="number" min={min} max={max} required value={current[key]} onChange={(event)=>change(key,Number(event.target.value))}/></label>)}</div>}
+    {tab==="preset" && (gameId ? <><div className="admin-field-grid"><label>Joueurs minimum<input type="number" min={Math.max(2,data.games.find((g)=>g.id===gameId).minPlayers)} max={data.games.find((g)=>g.id===gameId).maxPlayers} value={current.players} onChange={(event)=>change("players",Number(event.target.value))}/></label><label>Joueurs maximum<input type="number" min={current.players} max={data.games.find((g)=>g.id===gameId).maxPlayers} value={current.maximumPlayers} onChange={(event)=>change("maximumPlayers",Number(event.target.value))}/></label><label>{gameId==="texas-holdem"?"Cave fixe":"Mise fixe"}<input type="number" min={gameId==="texas-holdem"?1000:1} max={10000000} value={current.preset.stake} onChange={(event)=>preset("stake",Number(event.target.value))}/></label>{gameId==="texas-holdem" && [["bigBlind","Grosse blinde",2,current.preset.stake],["maximumBet","Plafond de mise",current.preset.bigBlind,current.preset.stake],["turnSeconds","Temps par tour (s)",30,600]].map(([key,label,min,max])=><label key={key}>{label}<input type="number" min={min} max={max} value={current.preset[key]} onChange={(event)=>preset(key,Number(event.target.value))}/></label>)}</div><GameDefaults competitive game={{id:gameId,defaultModifiers:current.preset.gameModifiers}} onChange={(value)=>preset("gameModifiers",value)}/></> : <p>Sélectionne un jeu pour définir son preset et sa taille de partie. Minimum et maximum identiques donnent une taille fixe.</p>)}
+    {error && <p className="error" role="alert">{error}</p>}{message && <p role="status">{message}</p>}
+  </form><section className="ranked-profile"><h3>Parties classées en cours</h3>{data.matches.length===0 ? <p>Aucune partie.</p> : data.matches.map((match)=><div key={match.code}><strong>{match.name} · {match.code}</strong><button type="button" className="danger-button" onClick={()=>{setCancel(match);setReason("");}}>Annuler pour incident technique</button></div>)}</section>
+    {cancel && <Dialog title="Annuler cette partie classée ?" onClose={()=>!busy && setCancel(null)} dismissible={!busy}><form onSubmit={cancelMatch}><p>Aucun Elo ni XP ne sera attribué. Les mises seront remboursées et le motif sera conservé.</p><label>Motif technique<textarea required value={reason} maxLength={1000} onChange={(event)=>setReason(event.target.value)}/></label>{error && <p className="error">{error}</p>}<button className="danger-button" disabled={busy || !reason.trim()}>Confirmer l’annulation</button></form></Dialog>}
+  </section>;
+}

@@ -159,6 +159,9 @@ function resolveAutoCheckFold(state, now = Date.now()) {
 }
 
 function startNextHand(state) {
+  const recorded = new Set((state.eliminationGroups ?? []).flat());
+  const eliminated = state.players.filter((player)=>(state.stacks[player.id] ?? 0) <= 0 && !recorded.has(player.id)).map((player)=>player.id);
+  if (eliminated.length) (state.eliminationGroups ??= []).push(eliminated);
   const eligibleIndexes = state.players.map((player, index) => (state.stacks[player.id] ?? 0) > 0 ? index : -1).filter((index) => index >= 0);
   if (eligibleIndexes.length < 2) {
     state.winners = eligibleIndexes.length ? [state.players[eligibleIndexes[0]].id] : state.lastHandWinners ?? [];

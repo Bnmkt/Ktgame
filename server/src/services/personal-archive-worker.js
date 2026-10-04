@@ -39,6 +39,9 @@ try {
   rows("succes", main, "SELECT a.achievement_id,a.unlocked,a.suppressed,a.unlocked_at,c.data AS definition FROM user_achievements a LEFT JOIN achievement_catalog c ON c.id=a.achievement_id WHERE a.user_id=?", [userId], (row) => ({ ...row, definition: row.definition ? JSON.parse(row.definition) : null }));
   rows("progression-succes", main, "SELECT achievement_id,value,data,updated_at FROM achievement_progress WHERE user_id=?", [userId], (row) => ({ ...row, data: row.data ? JSON.parse(row.data) : null }));
   rows("progression-jeux", main, "SELECT game_id,xp FROM user_game_xp WHERE user_id=? ORDER BY game_id", [userId]);
+  for (const [name,table,sql] of [["classements-elo","user_game_elo","SELECT game_id,elo,games,wins FROM user_game_elo WHERE user_id=? ORDER BY game_id"],["historique-elo","ranked_results","SELECT history_id,match_id,game_id,finished_at,data FROM ranked_results WHERE user_id=? ORDER BY finished_at"]]) {
+    if (main.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)) rows(name,main,sql,[userId],(row)=>({...row,...(row.data ? {data:JSON.parse(row.data)} : {})}));
+  }
   rows("recompenses-succes", main, "SELECT achievement_id FROM achievement_reward_receipts WHERE user_id=? ORDER BY achievement_id", [userId]);
   rows("parties", main, "SELECT h.data,m.player,m.score,m.gain,m.won,(SELECT COUNT(*) FROM history_members all_members WHERE all_members.history_id=h.id) AS participantCount FROM history h JOIN history_members m ON m.history_id=h.id WHERE m.user_id=? ORDER BY h.finished_at", [userId], (row) => ({ ...personalGame({ ...JSON.parse(row.data), players: row.player ? [JSON.parse(row.player)] : [], participantCount: row.participantCount }, userId), score: row.score, gain: row.gain, won: Boolean(row.won) }));
   rows("transactions", main, "SELECT data FROM transactions WHERE user_id=? ORDER BY created_at", [userId], (row) => JSON.parse(row.data));

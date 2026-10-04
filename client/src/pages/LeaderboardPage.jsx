@@ -6,6 +6,7 @@ import { CompactNumber } from "../utils/presentation.jsx";
 import { Pagination } from "../components/feedback/Feedback.jsx";
 import { usePagination } from "../components/common/usePagination.js";
 import "./leaderboard.css";
+import { RankedLeaderboard } from "../features/games/RankedLeaderboard.jsx";
 
 const metrics = [
   ["balance", "Jetons", Coins], ["wins", "Victoires", Trophy],
@@ -15,6 +16,7 @@ const seasonLabel = (value) => { const [year, quarter] = value.split("-Q"); retu
 const dateLabel = (value) => new Intl.DateTimeFormat("fr-BE", { dateStyle: "medium", timeZone: "Europe/Brussels" }).format(new Date(value));
 
 export function LeaderboardPage({ user }) {
+  const [ranked,setRanked]=useState(()=>new URLSearchParams(window.location.search).has("elo"));
   const [filters, setFilters] = useState({ game: "all", metric: "balance", period: "season", season: "", date: "" });
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(true);
@@ -22,13 +24,14 @@ export function LeaderboardPage({ user }) {
   const [revision, setRevision] = useState(0);
   const pages = usePagination(data?.rows ?? [], JSON.stringify([user.id, filters]));
   useEffect(() => {
+    if(ranked)return undefined;
     let cancelled = false;
     setBusy(true); setError("");
     const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value));
     api(`/api/leaderboards?${params}`).then((result) => { if (!cancelled) setData(result); })
       .catch((err) => { if (!cancelled) setError(err.message); }).finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
-  }, [filters, revision, user.id]);
+  }, [filters, revision, user.id,ranked]);
   const available = metrics.filter(([key]) => filters.game === "all" ? key !== "score" : key !== "balance");
   const metricName = metrics.find(([key]) => key === filters.metric)[1];
   const monetary = ["gains", "record", "balance"].includes(filters.metric);
@@ -44,9 +47,11 @@ export function LeaderboardPage({ user }) {
       <td className="leaderboard-value"><span><CompactNumber value={entry.value} label="Valeur exacte" />{monetary && <Coins size={16} />}</span>{entry.achievedAt && <small>{dateLabel(entry.achievedAt)}</small>}</td>
     </tr>;
   }
+  if(ranked)return <RankedLeaderboard initialGame={new URLSearchParams(window.location.search).get("elo")} onClassic={()=>setRanked(false)}/>;
   return <main className="app-shell leaderboard-page">
     <header className="page-heading"><div><span className="eyebrow"><Trophy size={16} /> Top 100</span><h1>Classements</h1></div><button type="button" className="secondary icon-toggle" title="Actualiser les classements" aria-label="Actualiser les classements" disabled={busy} onClick={() => setRevision((value) => value + 1)}><RefreshCw size={18} /></button></header>
     <div className="leaderboard-page-panel" ref={pages.anchor}>
+    <div className="ranked-mode-tabs"><button type="button" className="active" aria-pressed="true">Classique</button><button type="button" className="secondary" onClick={()=>setRanked(true)}>Classé</button></div>
     <div className="leaderboard-filters">
       <label>Jeu<select aria-label="Jeu" value={filters.game} onChange={(event) => chooseGame(event.target.value)}><option value="all">Tous les jeux</option>{data?.games.map((game) => <option key={game.id} value={game.id}>{game.name}</option>)}</select></label>
       <div className="leaderboard-periods" role="group" aria-label="Période du classement">{[["day", "Jour"], ["season", "Saison"], ["all", "Global"]].map(([key, label]) => <button key={key} type="button" className={filters.period === key ? "active" : "secondary"} aria-pressed={filters.period === key} onClick={() => update("period", key)}>{label}</button>)}</div>
