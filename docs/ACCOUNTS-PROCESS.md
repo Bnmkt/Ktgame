@@ -1,5 +1,10 @@
 # Deux processus Node
 
+Ce document decrit le processus Comptes optionnel. Pour la nouvelle separation
+Gateway / Game Workers, voir [GAME-PROCESSES.md](GAME-PROCESSES.md). Lorsque ce
+mode est active, les moteurs et les rooms autoritaires ne sont plus dans le
+processus principal ; le processus Comptes demeure independant et optionnel.
+
 ## Repartition
 
 Le processus principal reste le point d'entree HTTP et Socket.IO. Il possede

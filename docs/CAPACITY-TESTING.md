@@ -431,10 +431,11 @@ ne contient que le fuseau du casino, pas les secrets du serveur.
 
 `READING_WORKERS` permet de choisir de 1 a 4 threads pour tout ce pool, pas par
 fonctionnalite. Sur le VPS a deux vCPU, conserver la valeur par defaut avant
-d'augmenter ce nombre. Le pool bcrypt reste distinct. Les moteurs de table,
-l'attribution des recompenses, l'Elo et les ecritures restent synchrones sous une
-autorite unique. Leur instrumentation permet d'identifier les prochains candidats
-a isoler; elle ne signifie pas qu'ils sont deja executes dans un worker.
+d'augmenter ce nombre. Le pool bcrypt reste distinct. En mode historique,
+les moteurs de table, l'attribution des recompenses, l'Elo et les ecritures restent
+synchrones sous une autorite unique. Le mode Game Workers optionnel decrit dans
+[GAME-PROCESSES.md](GAME-PROCESSES.md) deplace les moteurs, mais pas encore
+les ecritures ni le calcul transactionnel des recompenses.
 
 La supervision distingue neuf services, leur mode d'execution, les compteurs,
 files, echecs, annulations, expirations et durees. Les durees incluent le temps
@@ -523,3 +524,32 @@ Le superviseur et la CLI acceptent maintenant jusqu'a 2000 comptes, sans
 relachement des protections. Un rapport absent ou incomplet reste un echec;
 les donnees partielles et diagnostics de processus sont conserves pour analyse.
 Cette limite de configuration ne constitue pas une capacite serveur certifiee.
+
+## Comparer Gateway et Game Workers
+
+Le champ `Processus jeux` du test admin et l'option CLI `--game-workers 0..4`
+permettent d'exercer le mode historique (0) ou le nouveau registre de rooms.
+La commande suivante cree des instances et bases fictives consecutives, avec
+le meme scenario et le meme facteur de hash des comptes :
+
+```sh
+cd server
+npm run capacity:compare -- --workers 0,1 --clients 60 --seconds 30 --output ../docs/previews/game-processes
+```
+
+`--guard-db /var/lib/ktga/ktga.sqlite` refuse le test si une vraie room est
+ouverte et interrompt les fixtures si une room reelle apparait ensuite. Cette
+base de garde est ouverte en lecture seule. Les bases de test ne sont pas des
+copies des comptes reels. Le runner ferme les processus enfants et supprime
+uniquement les repertoires temporaires dont il a valide le chemin.
+
+Le rapport inclut l'architecture, CPU par processus, boucle, latence IPC et
+attente en file, nombre de rooms, actions et echecs des Game Workers. Le P95
+mesure inclut le traitement IPC, pas seulement le transfert d'un message.
+
+Essais VPS du 10 octobre : 500 joueurs historiques passent (HTTP P95 485 ms),
+mais sans marge CPU sur le Gateway. Le dernier essai multiprocessus a 1000
+echoue (1194 erreurs, HTTP P95 8005 ms, arret de securite). Tous les audits
+financiers passent. Le mode reste desactive par defaut et non deploye. Les
+chiffres complets, fichiers, limites et etapes suivantes sont dans
+[GAME-PROCESSES.md](GAME-PROCESSES.md).

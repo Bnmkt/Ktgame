@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-10T11:25:07.931Z",
+  "node": "v24.21.0",
+  "cpus": 2,
+  "note": "Sequential isolated runs; generator shares the host. No production, public TLS or OVH network measurement.",
+  "results": [
+    {
+      "workers": 1,
+      "passed": false,
+      "clients": 1000,
+      "requests": 14237,
+      "errors": 1194,
+      "actions": 1624,
+      "latency": {
+        "count": 14237,
+        "meanMs": 1023,
+        "p50Ms": 125,
+        "p95Ms": 8005,
+        "p99Ms": 8060,
+        "maxMs": 8286
+      },
+      "gatewayCpu": 96.23,
+      "totalCpu": 105.52,
+      "gatewayLoopP95": 82.03,
+      "integrity": {
+        "integrity": true,
+        "foreignKeys": true,
+        "uniqueRankedResults": true,
+        "uniqueSettlements": true,
+        "uniqueGameHistories": true,
+        "uniqueAchievementRewards": true,
+        "uniqueEventActions": true,
+        "nonnegativeXp": true,
+        "xpMatchesRecordedAwards": true,
+        "balancesMatchTransactions": true,
+        "validBalances": true,
+        "fictitiousAccounts": true
+      },
+      "report": "workers-1.json"
+    }
+  ]
+}
