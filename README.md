@@ -100,7 +100,7 @@ Pour rattraper l'XP des parties historiques d'un compte, lancer depuis `server` 
 
 L'administration propose recherche, filtres, assignation, notes internes, groupes, traitement en série et relations entre dossiers. La résolution d'un dossier propose ses doublons ; les dépendances et les autres liens exigent une sélection explicite. Le stockage normalisé utilise une base SQLite séparée (`BUG_REPORT_DB_PATH`, sinon `SQLITE_PATH` suivi de `.bugs.sqlite`) et un dossier `bug-images` (`BUG_REPORT_UPLOAD_DIR`). Sauvegarder les deux ensemble. Les signalements et captures du compte sont inclus dans son export de données personnelles.
 
-Les nouveaux signalements, leur passage en publication publique et les nouvelles demandes de données personnelles déclenchent une alerte vers `CONTACT_EMAIL` (par défaut `contact@netdis.org`). Les messages indiquent la référence, la date, le lien de consultation et, pour les demandes de données, l'échéance de réponse. Ils ne contiennent ni diagnostic, ni capture, ni archive personnelle. La file SQLite persistante (`CONTACT_NOTICE_DB_PATH`, sinon `SQLITE_PATH` suivi de `.contact-notices.sqlite`) évite les doublons et réessaie les échecs SMTP avec un délai progressif de 1 à 60 minutes. Inclure cette base dans les sauvegardes ; les confirmations d'envoi y sont conservées 90 jours.
+Les nouveaux signalements, leur passage en publication publique et les nouvelles demandes de données personnelles déclenchent une alerte vers l'email de contact défini dans Administration > Paramètres > Identité et accès (`CONTACT_EMAIL` sert de valeur initiale, par défaut `contact@netdis.org`). Les messages indiquent la référence, la date, le lien de consultation et, pour les demandes de données, l'échéance de réponse. Ils ne contiennent ni diagnostic, ni capture, ni archive personnelle. La file SQLite persistante (`CONTACT_NOTICE_DB_PATH`, sinon `SQLITE_PATH` suivi de `.contact-notices.sqlite`) évite les doublons et réessaie les échecs SMTP avec un délai progressif de 1 à 60 minutes, en utilisant l'adresse de contact actuelle. Inclure cette base dans les sauvegardes ; les confirmations d'envoi y sont conservées 90 jours.
 
 Les onglets de services, les filtres de gravité et d'état et la sélection par page permettent de modifier jusqu'à 100 dossiers en série. Le classement sans suite exige un justificatif libre ou prédéfini (prestataire externe, refus SMTP, anomalie ponctuelle, maintenance, doublon). Les notes sont ajoutées par défaut, sans remplacer celles de chaque dossier ; toutes les modifications sont historisées. Ces dossiers ne sont pas publiés dans l'historique public. Un clic sur leur segment anormal affiche « En investigation » et rouvre le suivi privé, sans exposer ses notes ou son justificatif et sans changer la disponibilité mesurée. Les clics répétés ne créent pas de nouvelles entrées de suivi tant que le dossier est déjà en investigation.
 
@@ -134,9 +134,33 @@ Les anciens relevés conservés sont repris au premier démarrage de cette versi
 
 ## ⚙️ Technologies
 
+### Deploiement Linux
+
+Le guide complet pour un VPS Debian 13 est disponible dans
+[docs/DEPLOYMENT-DEBIAN-13.md](docs/DEPLOYMENT-DEBIAN-13.md), avec les fichiers
+Nginx, systemd, HTTPS, sauvegarde et configuration privee dans `deploy/debian`.
+Le site cible `https://www.ktga.me` et l'API `https://api.ktga.me`, sans port
+public 4000 ni prefixe `/ktga`. L'adresse de contact est modifiable dans
+Administration > Parametres > Identite et acces ; les identifiants SMTP restent
+dans la configuration privee du serveur.
+
 Client : React, Vite et Socket.IO.
 
 Serveur : Node.js, Express, Socket.IO et SQLite.
+
+### Processus serveur
+
+Le serveur HTTP coordonne les tables, jeux, chat, sessions et toutes les
+écritures en base. Un processus Comptes distinct traite les mots de passe,
+profils, statistiques, historiques, notifications et catalogues en lecture
+seule. Il reste sous le même service systemd, sans port public supplémentaire.
+
+La supervision affiche séparément les deux processus et leur charge lorsque
+la séparation expérimentale est activée avec `ACCOUNTS_PROCESS_ENABLED=1`.
+Elle est désactivée par défaut : `ACCOUNTS_PROCESS_ENABLED=0` conserve les
+lectures locales et les workers précédents. Les tests de capacité doivent
+valider cette séparation sur la machine cible avant son activation en production. Détails :
+[docs/ACCOUNTS-PROCESS.md](docs/ACCOUNTS-PROCESS.md).
 
 Authentification : JWT.
 

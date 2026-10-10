@@ -1,0 +1,10 @@
+[Unit]
+Description=Check pending KTGA root-domain DNS
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=ktga-domain.service
+
+[Install]
+WantedBy=timers.target

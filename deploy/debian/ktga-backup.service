@@ -1,0 +1,7 @@
+[Unit]
+Description=Consistent KTGA.ME maintenance backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ktga-backup
+UMask=0077

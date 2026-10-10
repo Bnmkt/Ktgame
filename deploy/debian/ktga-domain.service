@@ -1,0 +1,10 @@
+[Unit]
+Description=Complete KTGA root-domain HTTPS after DNS propagation
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/ktga/network.env
+ExecStart=/usr/bin/bash /opt/ktga/deploy/debian/complete-domain.sh
+TimeoutStartSec=5min
