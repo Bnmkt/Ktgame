@@ -17,6 +17,7 @@ import { battleBotAction } from "../games/engines/bataille.js";
 import { roomLevelError } from "./game-progression.js";
 
 export function createRoomRuntime(dependencies) {
+  const scheduleBot = dependencies.scheduleBot ?? setTimeout;
   const { DEFAULT_BOT_THINKING_MS, DEFAULT_ROUND_RESULTS_MS, DEFAULT_TURN_END_DELAY_MS, addTokens, appendRoomAchievementUnlocks, applyAction, battleBotTimers, configuredGames, emitRoomUpdate, finishRoomIfNeeded, getTokenBalance, platformSettings, pokerBlindsFromBigBlind, readDb, serviceExecution, syncRoomPlayerTokens, triggerRandomAchievement, unlockEligibleAchievements, writeDb } = dependencies;
   function actionAchievementSnapshot(state, actorId) {
     const player = state.players?.find((entry) => entry.id === actorId);
@@ -362,7 +363,7 @@ export function createRoomRuntime(dependencies) {
         const configuredDelay = roomTiming(room).botThinkingMs;
         const delay = configuredDelay > 0 ? configuredDelay : 50;
         room.state.botThinking[bot.id] = { phase, until: Date.now() + delay };
-        const timer = setTimeout(() => {
+        const timer = scheduleBot(() => {
           battleBotTimers.delete(timerKey);
           const currentDb = readDb();
           const currentRoom = currentDb.rooms.find((entry) => entry.id === room.id && !entry.finished && entry.state?.gameId === "bataille");
