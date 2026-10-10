@@ -49,7 +49,8 @@ try {
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }]]) {
     const ctx = await context({ viewport }); const page = await ctx.newPage(); page.on("pageerror", (error) => errors.push(error.message));
     await blocker.enableBlockingInPage(page); await installFixtures(page); await page.goto(`${origin}/mentions-legales`);
-    await page.getByRole("heading", { name: "Mentions légales", exact: true }).waitFor();
+    try { await page.getByRole("heading", { name: "Mentions légales", exact: true }).waitFor(); }
+    catch (error) { await page.screenshot({ path: path.join(previews, `${name}-startup-error.png`) }); console.error(JSON.stringify({ url: page.url(), body: (await page.locator("body").innerText()).slice(0, 900), errors })); throw error; }
     await page.waitForFunction(async () => Boolean((await navigator.serviceWorker.getRegistration())?.active));
     await offer(page);
     const notice = page.getByRole("status", { name: "Installation de KTGA.ME" }); await notice.waitFor();
