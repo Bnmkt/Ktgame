@@ -1,5 +1,6 @@
 import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
+import { registerGameImageRoutes } from "./services/game-images.js";
 import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
 import { createRoomRuntime } from "./services/room-runtime.js";
@@ -5061,6 +5062,7 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
 app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
   for (const field of ["descriptiveImage", "coverImage"]) {
     if (Object.hasOwn(req.body, field) && String(req.body[field] ?? "").trim() && !/^n\/?a$/i.test(String(req.body[field]).trim()) && !gameImageUrl(req.body[field])) return res.status(400).json({ error: "L’image doit utiliser une URL HTTPS ou un chemin absolu (/images/…)." });

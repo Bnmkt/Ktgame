@@ -8,10 +8,13 @@ exec 9>/run/ktga-deployment.lock
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 files=(
   server/src/index.js server/src/services/public-pages.js server/src/services/room-entry.js
+  server/src/services/game-images.js
   client/src/App.jsx client/src/config/site.js client/src/seo/render.jsx
   client/src/pages/AdminPage.jsx client/src/pages/AuthPage.jsx client/src/pages/LobbyPage.jsx
   client/src/pages/PublicGamesPage.jsx client/src/pages/public-games.css
   client/src/components/admin/CasinoSettings.jsx client/src/components/game/GameArtwork.jsx
+  client/src/components/admin/GameImageEditor.jsx client/src/components/admin/game-image-editor.css
+  client/src/features/games/artwork-crop.js
   client/src/components/game/game-artwork.css client/src/features/games/presentation.js
   deploy/debian/update-game-presentation.sh
 )

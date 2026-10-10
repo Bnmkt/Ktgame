@@ -1,0 +1,29 @@
+.game-art-layer.casino-dialog-layer { z-index: 1020; }
+.game-art-editor.casino-dialog { width: min(1000px, calc(100vw - 32px)); max-width: 1000px; max-height: 90dvh; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 20px; }
+.game-art-editor > .modal-title-row { margin: 0; }
+.game-art-editor-body { overflow-y: auto; min-height: 0; }
+.game-art-file { display: none; }
+.game-art-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.game-art-tools span { color: #b9c6bc; font-size: 13px; }
+.game-art-workspace { display: grid; grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr); gap: 24px; align-items: start; }
+.game-art-crop, .game-art-preview > div { position: relative; overflow: hidden; background: #101b17; border: 1px solid #626d5f; border-radius: 4px; }
+.game-art-crop { cursor: grab; touch-action: none; user-select: none; }
+.game-art-crop:active { cursor: grabbing; }
+.game-art-crop::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent 33.1%, #ffffff44 33.1%, #ffffff44 33.4%, transparent 33.4%, transparent 66.5%, #ffffff44 66.5%, #ffffff44 66.8%, transparent 66.8%), linear-gradient(transparent 33.1%, #ffffff44 33.1%, #ffffff44 33.4%, transparent 33.4%, transparent 66.5%, #ffffff44 66.5%, #ffffff44 66.8%, transparent 66.8%); }
+.game-art-crop img, .game-art-preview img { position: absolute; display: block; max-width: none; object-fit: fill; pointer-events: none; }
+.game-art-zoom { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; margin: 18px 0; }
+.game-art-zoom input { grid-column: 1 / -1; width: 100%; }
+.game-art-preview { display: grid; gap: 10px; min-width: 0; }
+.game-art-empty { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 14px; color: #b5c4bc; border: 1px dashed #566b60; border-radius: 4px; }
+.game-art-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 10px; border-top: 1px solid #42493e; padding-top: 16px; }
+.game-media-field { display: grid; gap: 10px; min-width: 0; align-content: start; }
+.game-media-field > strong { font-size: 14px; }
+.game-media-field small { color: var(--muted); }
+.game-media-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.game-media-actions button { flex: 1; }
+@media (max-width: 700px) {
+  .game-art-workspace { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .game-art-preview { max-width: 260px; width: 100%; margin-inline: auto; }
+  .game-art-editor.casino-dialog { padding: 16px; gap: 14px; }
+  .game-art-actions button { flex: 1; }
+}
