@@ -22,7 +22,7 @@ export function createGameGateway(dependencies) {
   const relatedMatches = (roomId, ids) => directory.related(ids).filter((other) => other.id !== roomId && other.ranked && !other.finished && other.ranked.roster.some((player) => ids.has(player.id) && !other.ranked.forfeits?.[player.id]));
   const activeTables = (roomId, ids) => directory.related(ids).filter((other) => other.id !== roomId && other.state && !other.finished && other.players.some((player) => ids.has(player.id))).map(({ id }) => id).sort().join("|");
   const tickPending = new Set();
-  const pool = createGameWorkers({ size: dependencies.size, configuration, snapshot,
+  const pool = createGameWorkers({ size: dependencies.size, transportFactory: dependencies.transportFactory, configuration, snapshot,
     context(roomId, input) {
       const db = readDb(), room = snapshot(roomId) ?? input.template;
       const ids = new Set([input.actor?.id, input.body?.playerId, room?.ownerId,
@@ -109,7 +109,7 @@ export function createGameGateway(dependencies) {
     let result;
     for (let attempt = 0; ; attempt++) {
       try { result = await pool.execute(id, command, input); break; }
-      catch (error) { if (!error.gameRetryable || attempt >= 2 || !["activity", "tick", "expire"].includes(command)) throw error; }
+      catch (error) { if (!error.gameRetryable || attempt >= 2) throw error; }
     }
     const room = snapshot(id);
     if (result.duplicate) return { status: 200, response: room ? sanitizeRoom(room, input.actor?.id) : { ok: true } };
