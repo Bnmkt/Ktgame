@@ -17,8 +17,8 @@ $output = Join-Path $root 'dist'
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $arguments = @('-std=c++20','-O2','-Wall','-Wextra','-Wpedantic','-municode','-mwindows','-static','-s',
     '-DUNICODE','-D_UNICODE','-DNOMINMAX','-DWIN32_LEAN_AND_MEAN','-D_WIN32_WINNT=0x0A00',
-    '-I', (Join-Path $root '.deps'), (Join-Path $root 'src/main.cpp'), (Join-Path $root 'src/api.cpp'), (Join-Path $root 'src/model.cpp'),
-    '-o', (Join-Path $output 'KtgaConsole.exe'), '-lwinhttp','-lgdi32','-luser32','-lcomctl32','-lcomdlg32','-lshell32','-ldwmapi','-lole32')
+    '-I', (Join-Path $root '.deps'), (Join-Path $root 'src/main.cpp'), (Join-Path $root 'src/api.cpp'), (Join-Path $root 'src/model.cpp'), (Join-Path $root 'src/session.cpp'),
+    '-o', (Join-Path $output 'KtgaConsole.exe'), '-lwinhttp','-lgdi32','-luser32','-lcomctl32','-lcomdlg32','-lshell32','-ldwmapi','-lole32','-ladvapi32','-luxtheme')
 & $Compiler @arguments
 if ($LASTEXITCODE -ne 0) { throw 'C++ build failed.' }
 Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination (Join-Path $output 'README.md')

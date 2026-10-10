@@ -22,10 +22,14 @@ L'application ne permet pas de modifier le serveur ou les comptes.
 ## Securite
 
 L'API utilise HTTPS avec verification des certificats. Le serveur controle les
-permissions a chaque requete. Le mot de passe et la session ne sont pas
-enregistres ; seuls la frequence et la periode d'affichage sont sauvegardees dans
-`%LOCALAPPDATA%\KTGA Console\settings.json`. Fermer ou deconnecter l'application
-efface sa session en memoire. Les donnees consultees sont des agregats : pas de
+permissions a chaque requete. Le mot de passe n'est jamais enregistre. La case
+**Rester connecte**, decochee par defaut, conserve uniquement la session dans le
+Gestionnaire d'identification Windows, pour cet utilisateur et cette API.
+Elle est verifiee au demarrage et reste soumise a son expiration serveur.
+**Deconnexion** supprime la session conservee ; une session expiree ou un acces
+retire demande une nouvelle connexion. Sans cette option, fermer l'application
+efface sa session. La frequence et la periode d'affichage sont sauvegardees dans
+`%LOCALAPPDATA%\KTGA Console\settings.json`. Les donnees consultees sont des agregats : pas de
 conversations, adresses email, secrets, notes privees ou listes de joueurs.
 
 L'acces depend des nouvelles routes `/api/desktop/overview`, `/metrics` et

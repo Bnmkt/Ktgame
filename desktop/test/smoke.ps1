@@ -17,6 +17,7 @@ public static class ConsoleNative {
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out Rect rect);
  [DllImport("user32.dll")] public static extern int GetScrollPos(IntPtr h,int bar);
  [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h,int x,int y,int w,int height,bool repaint);
+ [DllImport("advapi32.dll",CharSet=CharSet.Unicode,SetLastError=true)] public static extern bool CredDelete(string target,uint type,uint flags);
  public struct Rect { public int Left,Top,Right,Bottom; }
 }
 '@
@@ -30,6 +31,16 @@ function Visible($id) { return ([ConsoleNative]::GetWindowLong([ConsoleNative]::
 function Click($id) { [ConsoleNative]::SendMessage($script:window,0x111,[IntPtr]$id,[IntPtr]::Zero) | Out-Null }
 function Fill($id,$value) {[ConsoleNative]::SendText([ConsoleNative]::GetDlgItem($script:window,$id),0xC,[IntPtr]::Zero,$value) | Out-Null}
 function WaitFor($condition,$label) {for($i=0;$i -lt 100;$i++){if((& $condition)){return};Start-Sleep -Milliseconds 100};throw "Timed out: $label"}
+function StartConsole {
+ $script:app=Start-Process (Join-Path $root 'desktop/dist/KtgaConsole.exe') -ArgumentList $arguments -WindowStyle $style -PassThru
+ WaitFor {$script:window=[ConsoleNative]::FindWindow('KtgaConsoleWindow','KTGA.ME - Console de supervision');$script:window -ne [IntPtr]::Zero} 'native window'
+ Start-Sleep -Milliseconds 500
+}
+function StopConsole {
+ [ConsoleNative]::PostMessage($script:window,0x10,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null
+ Check ($script:app.WaitForExit(12000)) 'Console did not exit'
+ $script:window=[IntPtr]::Zero
+}
 function Capture($name) {
  [ConsoleNative+Rect]$bounds=New-Object ConsoleNative+Rect
  [ConsoleNative]::GetWindowRect($script:window,[ref]$bounds) | Out-Null
@@ -44,9 +55,7 @@ try {
  $port=Get-Content (Join-Path $work 'port.txt');$endpoint="http://127.0.0.1:$port"
  $style=if($Visual){'Normal'}else{'Hidden'}
  $arguments=if($Fixture){@('--fixture',('"'+(Resolve-Path -LiteralPath $Fixture).Path+'"'))}else{@('--server',$endpoint)}
- $app=Start-Process (Join-Path $root 'desktop/dist/KtgaConsole.exe') -ArgumentList $arguments -WindowStyle $style -PassThru
- WaitFor {$script:window=[ConsoleNative]::FindWindow('KtgaConsoleWindow','KTGA.ME - Console de supervision');$script:window -ne [IntPtr]::Zero} 'native window'
- Start-Sleep -Milliseconds 500
+ StartConsole
  if($Fixture){
    Capture 'production-vue-ensemble'
    Click 301;Start-Sleep -Milliseconds 300;Capture 'production-services'
@@ -55,12 +64,23 @@ try {
    return
  }
  Capture 'connexion'
+ Check ([ConsoleNative]::SendMessage([ConsoleNative]::GetDlgItem($window,109),0xF0,[IntPtr]::Zero,[IntPtr]::Zero) -eq [IntPtr]::Zero) 'Remember session must default to off'
  Fill 100 'player@example.test';Fill 101 'FixturePassword!';Click 102
  Start-Sleep -Milliseconds 800
  Check (Visible 102) 'Player must not enter supervision';Check (!(Visible 202)) 'Player must not receive authenticated interface'
  Capture 'acces-joueur-refuse'
  Fill 100 'editor@example.test';Fill 101 'FixturePassword!';Click 102
  WaitFor {Visible 202} 'editor authentication';Start-Sleep -Milliseconds 800
+ StopConsole;StartConsole
+ Check (Visible 102) 'Closing without opting in must require login'
+ [ConsoleNative]::SendMessage([ConsoleNative]::GetDlgItem($window,109),0xF1,[IntPtr]1,[IntPtr]::Zero) | Out-Null
+ Fill 100 'editor@example.test';Fill 101 'FixturePassword!';Click 102
+ WaitFor {Visible 202} 'remembered editor authentication'
+ $logins=(Invoke-RestMethod "$endpoint/test/counts").'/api/auth/login'
+ StopConsole;StartConsole
+ WaitFor {Visible 202} 'editor session restoration'
+ Check ((Invoke-RestMethod "$endpoint/test/counts").'/api/auth/login' -eq $logins) 'Restoration must not resend a password'
+ Start-Sleep -Milliseconds 800
  Capture 'vue-ensemble'
  Click 301;Start-Sleep -Milliseconds 300;Capture 'services'
  [ConsoleNative]::SendMessage($window,0x115,[IntPtr]3,[IntPtr]::Zero) | Out-Null
@@ -73,18 +93,34 @@ try {
  [ConsoleNative]::MoveWindow($window,20,20,1000,700,$true) | Out-Null
  Click 300;Start-Sleep -Milliseconds 300;Capture 'vue-compacte'
  Click 202;WaitFor {Visible 102} 'logout'
+ StopConsole;StartConsole
+ Check (Visible 102) 'Logout must remove the saved session'
+ [ConsoleNative]::SendMessage([ConsoleNative]::GetDlgItem($window,109),0xF1,[IntPtr]1,[IntPtr]::Zero) | Out-Null
  Fill 100 'admin@example.test';Fill 101 'FixturePassword!';Click 102
  WaitFor {Visible 105} 'administrator MFA';Capture 'double-authentification'
  Fill 104 '000000';Click 105;Start-Sleep -Milliseconds 700;Check (Visible 105) 'Wrong code must not authenticate'
  Fill 104 '123456';Click 105;WaitFor {Visible 202} 'verified administrator'
+ StopConsole;StartConsole
+ WaitFor {Visible 202} 'administrator session restoration after MFA'
  Start-Sleep -Milliseconds 700
  Invoke-RestMethod "$endpoint/test/revoke" | Out-Null
  Click 200;WaitFor {Visible 102} 'revoked session';Capture 'session-retiree'
+ StopConsole;StartConsole
+ Check (Visible 102) 'Revocation must remove the saved session'
+ Fill 100 'editor@example.test';Fill 101 'FixturePassword!'
+ [ConsoleNative]::SendMessage([ConsoleNative]::GetDlgItem($window,109),0xF1,[IntPtr]1,[IntPtr]::Zero) | Out-Null
+ Click 102;WaitFor {Visible 202} 'session before expiry at startup'
+ StopConsole
+ Invoke-RestMethod "$endpoint/test/revoke" | Out-Null
+ StartConsole;WaitFor {Visible 102} 'reject revoked session at startup'
+ Check (!(Visible 202)) 'Invalid saved session must not expose supervision'
+ StopConsole;StartConsole
+ Check (Visible 102) 'Invalid saved session must be forgotten'
  $counts=Invoke-RestMethod "$endpoint/test/counts"
  Check ($counts.'/api/desktop/overview' -ge 3) 'Native requests missing'
  Check ($counts.'/api/auth/mfa/verify' -eq 2) 'MFA checks missing'
  $counts | ConvertTo-Json | Set-Content (Join-Path $output 'requests.json')
- Write-Output 'PASS: native player refusal, editor access, administrator MFA, revocation, scrolling and 10 screenshots.'
+ Write-Output 'PASS: native access, MFA, scrolling, opt-in persistence, session restoration without password, logout and revocation.'
 } catch {
  if($window){Capture 'echec'}
  if($endpoint){Invoke-RestMethod "$endpoint/test/counts" | ConvertTo-Json | Write-Output}
@@ -92,4 +128,5 @@ try {
 } finally {
  if($app -and !$app.HasExited){[ConsoleNative]::PostMessage($window,0x10,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null;if(!$app.WaitForExit(12000)){$app.Kill();$app.WaitForExit()}}
  if($server -and !$server.HasExited){$server.Kill();$server.WaitForExit()}
+ if($endpoint){[ConsoleNative]::CredDelete("KTGA Console/session/$endpoint",1,0) | Out-Null}
 }

@@ -1,10 +1,12 @@
 #include "api.h"
+#include "session.h"
 #include <windows.h>
 #include <windowsx.h>
 #include <commctrl.h>
 #include <commdlg.h>
 #include <dwmapi.h>
 #include <shellapi.h>
+#include <uxtheme.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -21,7 +23,7 @@ namespace {
 constexpr UINT RESPONSE = WM_APP + 1;
 constexpr COLORREF background = RGB(12, 19, 17), surface = RGB(21, 31, 28), border = RGB(49, 66, 58);
 constexpr COLORREF ink = RGB(240, 235, 219), muted = RGB(158, 176, 165), gold = RGB(225, 187, 83), green = RGB(110, 211, 166), red = RGB(232, 126, 137), blue = RGB(116, 188, 236);
-enum Id { Login = 100, Password, SignIn, ShowPassword, Code, Verify, Method, EmailCode, Back,
+enum Id { Login = 100, Password, SignIn, ShowPassword, Code, Verify, Method, EmailCode, Back, Remember,
     Refresh = 200, Pause, Logout, Interval, Period, Export, Website,
     Overview = 300, Services, Metrics, Incidents, Preferences };
 struct JobResult { unsigned epoch; std::wstring kind; Response response; Json extra; };
@@ -62,7 +64,7 @@ class Console {
     Api api;
     std::jthread worker;
     unsigned epoch = 1;
-    bool authenticated = false, mfa = false, busy = false, paused = false, preview = false;
+    bool authenticated = false, mfa = false, busy = false, paused = false, preview = false, remember = false;
     int width = 1260, height = 800, view = Overview, scroll = 0, extent = 0, refreshSeconds = 5, days = 30;
     float dpi = 1;
     std::string token;
@@ -114,6 +116,8 @@ private:
         SendMessageW(controls[Password],EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(L"Mot de passe"));
         SendMessageW(controls[Login],EM_SETLIMITTEXT,254,0); SendMessageW(controls[Password],EM_SETLIMITTEXT,256,0);
         create(L"BUTTON",L"Se connecter",SignIn,BS_OWNERDRAW); create(L"BUTTON",L"Afficher",ShowPassword,BS_OWNERDRAW);
+        create(L"BUTTON",L"Rester connecté",Remember,BS_AUTOCHECKBOX);
+        SetWindowTheme(controls[Remember],L"",L"");
         create(L"EDIT",L"",Code,ES_AUTOHSCROLL); SendMessageW(controls[Code],EM_SETLIMITTEXT,64,0);
         create(L"BUTTON",L"Valider le code",Verify,BS_OWNERDRAW); create(L"BUTTON",L"Envoyer un code par email",EmailCode,BS_OWNERDRAW); create(L"BUTTON",L"Retour",Back,BS_OWNERDRAW);
         create(L"COMBOBOX",L"",Method,CBS_DROPDOWNLIST|WS_VSCROLL);
@@ -131,18 +135,26 @@ private:
         for (const auto* value : {L"30 jours",L"90 jours",L"365 jours"}) SendMessageW(controls[Period],CB_ADDSTRING,0,reinterpret_cast<LPARAM>(value));
         SendMessageW(controls[Period],CB_SETCURSEL,days == 30 ? 0 : days == 90 ? 1 : 2,0);
         SetFocus(controls[Login]); layout();
+        if (!preview) {
+            token = rememberedSession(endpoint);
+            if (!token.empty()) {
+                remember = true; SendMessageW(controls[Remember],BM_SETCHECK,BST_CHECKED,0);
+                message = L"Vérification de la session…";
+                launch(L"resume",[this](std::stop_token stop) { JobResult result{}; result.response = api.request(L"/api/desktop/overview?points=360",L"GET",Json(),token,stop); return result; });
+            }
+        }
     }
     void move(int id, int x, int y, int w, int h) { MoveWindow(controls[id],px(x),px(y),px(w),px(h),TRUE); }
     void layout() {
         if (!window) return;
         RECT area{}; GetClientRect(window,&area); width = static_cast<int>((area.right-area.left)/dpi); height = static_cast<int>((area.bottom-area.top)/dpi);
         for (auto [id,control] : controls) {
-            bool shown = authenticated ? id >= Refresh : mfa ? (id == Code || id == Verify || id == Method || id == Back || (id == EmailCode && std::find(mfaMethods.begin(),mfaMethods.end(),Json("email")) != mfaMethods.end())) : (id >= Login && id <= ShowPassword);
+            bool shown = authenticated ? id >= Refresh : mfa ? (id == Code || id == Verify || id == Method || id == Back || (id == EmailCode && std::find(mfaMethods.begin(),mfaMethods.end(),Json("email")) != mfaMethods.end())) : ((id >= Login && id <= ShowPassword) || id == Remember);
             ShowWindow(control,shown ? SW_SHOW : SW_HIDE);
             if (id == Refresh || id == Export || id == SignIn || id == Verify || id == EmailCode) EnableWindow(control,!busy && !preview);
         }
         int x = std::max(24,(width-420)/2), y = std::max(155,(height-430)/2);
-        move(Login,x,y+115,420,40); move(Password,x,y+188,318,40); move(ShowPassword,x+328,y+188,92,40); move(SignIn,x,y+252,420,44);
+        move(Login,x,y+115,420,40); move(Password,x,y+188,318,40); move(ShowPassword,x+328,y+188,92,40); move(Remember,x,y+240,420,28); move(SignIn,x,y+284,420,44);
         move(Method,x,y+105,420,240); move(Code,x,y+167,420,42); move(Verify,x,y+226,420,44); move(EmailCode,x,y+281,314,40); move(Back,x+326,y+281,94,40);
         for (int id = Overview; id <= Preferences; ++id) move(id,16,130+(id-Overview)*52,176,44);
         move(Website,16,std::max(410,height-74),176,40);
@@ -150,6 +162,7 @@ private:
         move(Logout,right-42,24,42,36); move(Export,right-92,24,42,36); move(Pause,right-142,24,42,36); move(Refresh,right-192,24,42,36);
         move(Interval,234,103,140,240); move(Period,390,103,124,240);
         EnableWindow(controls[Login],!busy); EnableWindow(controls[Password],!busy); EnableWindow(controls[Code],!busy);
+        EnableWindow(controls[Remember],!busy);
         EnableWindow(controls[Period],!busy && !preview);
         SetWindowTextW(controls[Pause],paused ? L"Reprendre" : L"Pause");
         updateScroll(); InvalidateRect(window,nullptr,FALSE);
@@ -176,6 +189,7 @@ private:
         if (busy) return;
         login = input(controls[Login]); auto password = input(controls[Password]);
         if (login.empty() || password.empty()) { message = L"Indique ton email et ton mot de passe."; InvalidateRect(window,nullptr,FALSE); return; }
+        remember = SendMessageW(controls[Remember],BM_GETCHECK,0,0) == BST_CHECKED;
         Json body{{"login",utf8(login)},{"password",utf8(password)}};
         SecureZeroMemory(password.data(),password.size()*sizeof(wchar_t)); password.clear(); SetWindowTextW(controls[Password],L""); message.clear();
         launch(L"login",[this,body=std::move(body)](std::stop_token stop) mutable { JobResult result{}; result.response = api.request(L"/api/auth/login",L"POST",body,{},stop); clearSecret(body["password"].get_ref<std::string&>()); return result; });
@@ -213,15 +227,18 @@ private:
         });
     }
     void signedOut(const std::wstring& explanation = {}) {
-        ++epoch; if (worker.joinable()) worker.request_stop(); busy = false; authenticated = false; mfa = false; clearSecret(token);
+        ++epoch; if (worker.joinable()) { worker.request_stop(); worker.join(); } busy = false; authenticated = false; mfa = false; clearSecret(token);
         snapshot = metrics = status = Json::object(); account.clear(); role.clear(); challenge.clear(); scroll = 0; message = explanation;
+        if (!preview && !forgetSession(endpoint)) message += L" La session enregistrée n'a pas pu être supprimée du coffre Windows.";
+        remember = false; SendMessageW(controls[Remember],BM_SETCHECK,BST_UNCHECKED,0);
         SetWindowTextW(controls[Password],L""); SetWindowTextW(controls[Code],L""); layout(); SetFocus(controls[Login]);
     }
     void receive(std::unique_ptr<JobResult> result) {
         if (result->epoch != epoch) return;
         busy = false;
         if (!result->response.error.empty()) {
-            if (result->kind == L"refresh" && (result->response.status == 401 || result->response.status == 403)) { signedOut(L"Session expirée ou accès retiré. Reconnecte-toi."); return; }
+            if ((result->kind == L"refresh" || result->kind == L"resume") && (result->response.status == 401 || result->response.status == 403)) { signedOut(L"Session expirée ou accès retiré. Reconnecte-toi."); return; }
+            if (result->kind == L"resume") clearSecret(token);
             message = result->response.error.substr(0,600); layout(); return;
         }
         auto& data = result->response.data;
@@ -236,12 +253,21 @@ private:
             if (!user.value("admin",false) && !user.value("editor",false)) { if(data.contains("token") && data["token"].is_string()) clearSecret(data["token"].get_ref<std::string&>()); signedOut(L"Un compte administrateur ou éditeur est nécessaire."); return; }
             token = data.value("token",std::string()); if (token.empty()) { message = L"Le serveur n'a pas renvoyé de session."; layout(); return; }
             clearSecret(data["token"].get_ref<std::string&>());
-            authenticated = true; mfa = false; account = text(user,"pseudo"); role = user.value("admin",false) ? L"admin" : L"editor"; message.clear(); view = Overview; scroll = 0; layout(); refresh(true);
+            message.clear();
+            if (remember) { if (!rememberSession(endpoint,token)) { remember = false; forgetSession(endpoint); message = L"La session n'a pas pu être enregistrée dans le coffre Windows."; } }
+            else if (!forgetSession(endpoint)) message = L"La session précédente n'a pas pu être supprimée du coffre Windows.";
+            authenticated = true; mfa = false; account = text(user,"pseudo"); role = user.value("admin",false) ? L"admin" : L"editor"; view = Overview; scroll = 0; layout(); refresh(true);
         } else if (result->kind == L"email") { message = L"Un code a été envoyé par email."; layout(); }
         else {
             if (numeric(data,"schemaVersion") != 1 || !data.contains("health") || !data["health"].is_object() || !data["health"].contains("process")) { message = L"La version du serveur n'est pas compatible avec cette console."; layout(); return; }
+            if (result->kind == L"resume") {
+                const auto restoredRole = text(child(data,"viewer"),"role");
+                if (restoredRole != L"admin" && restoredRole != L"editor") { signedOut(L"Un compte administrateur ou éditeur est nécessaire."); return; }
+                authenticated = true;
+            }
             snapshot = std::move(data); if (result->extra.contains("metrics")) metrics = std::move(result->extra["metrics"]); if (result->extra.contains("status")) status = std::move(result->extra["status"]);
             account = text(child(snapshot,"viewer"),"name",account); role = text(child(snapshot,"viewer"),"role",role); message = text(result->extra,"warning",L""); layout();
+            if (result->kind == L"resume") refresh(true);
         }
     }
     void exportData() {
@@ -374,7 +400,7 @@ private:
             if(previous.empty()) { label(dc,L"Aucun incident terminé dans cette période.",rect(x,y,contentWidth,28),14,muted); y+=40; }
         } else {
             label(dc,L"Connexion et affichage",rect(x,y,contentWidth,28),20,ink,true); y+=48;
-            std::vector<std::pair<std::wstring,std::wstring>> settings{{L"API",endpoint},{L"Compte",account},{L"Rôle",role==L"admin"?L"Administrateur":L"Éditeur"},{L"Actualisation",std::to_wstring(refreshSeconds)+L" secondes"},{L"Métriques d'activité",std::to_wstring(days)+L" jours"},{L"Mesures techniques",L"Jusqu'à 30 minutes, échantillons de 5 secondes"},{L"Horaires",L"Heure locale de ce PC"},{L"Session",L"En mémoire uniquement, non conservée à la fermeture"},{L"Mot de passe",L"Jamais enregistré"},{L"Transport",preview?L"Aperçu local":endpoint.starts_with(L"https:")?L"HTTPS, certificats vérifiés":L"Instance locale de test"},{L"Permissions",L"Consultation uniquement"}};
+            std::vector<std::pair<std::wstring,std::wstring>> settings{{L"API",endpoint},{L"Compte",account},{L"Rôle",role==L"admin"?L"Administrateur":L"Éditeur"},{L"Actualisation",std::to_wstring(refreshSeconds)+L" secondes"},{L"Métriques d'activité",std::to_wstring(days)+L" jours"},{L"Mesures techniques",L"Jusqu'à 30 minutes, échantillons de 5 secondes"},{L"Horaires",L"Heure locale de ce PC"},{L"Session",remember?L"Conservée dans le coffre Windows jusqu'à expiration ou déconnexion":L"En mémoire uniquement, non conservée à la fermeture"},{L"Mot de passe",L"Jamais enregistré"},{L"Transport",preview?L"Aperçu local":endpoint.starts_with(L"https:")?L"HTTPS, certificats vérifiés":L"Instance locale de test"},{L"Permissions",L"Consultation uniquement"}};
             for(const auto& [name,value]:settings) { fill(dc,rect(x,y,contentWidth,1),border); label(dc,name,rect(x,y+13,210,24),14,muted); label(dc,value,rect(x+224,y+13,contentWidth-224,34),14,ink); y+=56; }
             y+=20; label(dc,L"La fréquence et la période se règlent dans la barre supérieure. Les métriques d'activité et l'état des services sont rafraîchis au plus une fois par minute. Aucun fichier personnel ou secret du serveur n'est accessible depuis cette console.",rect(x,y,contentWidth,100),14,muted,false,DT_WORDBREAK|DT_NOPREFIX); y+=110;
         }
@@ -392,7 +418,7 @@ private:
             label(dc,L"Administrateurs et éditeurs",rect(x,y+49,420,24),14,muted);
             if(mfa) { label(dc,L"Méthode de vérification",rect(x,y+80,420,20),13,muted); label(dc,L"Code de connexion",rect(x,y+142,420,20),13,muted); }
             else { label(dc,L"Adresse email",rect(x,y+90,420,20),13,muted); label(dc,L"Mot de passe",rect(x,y+163,420,20),13,muted); }
-            if(!message.empty()) label(dc,message,rect(x,y+(mfa?340:320),420,110),14,red,false,DT_WORDBREAK|DT_NOPREFIX);
+            if(!message.empty()) label(dc,message,rect(x,y+(mfa?340:352),420,110),14,red,false,DT_WORDBREAK|DT_NOPREFIX);
             label(dc,endpoint,rect(x,height-65,420,22),12,muted); extent=0;
         } else {
             fill(dc,rect(208,96,1,height-96),border); fill(dc,rect(0,92,width,1),border);
@@ -430,7 +456,7 @@ private:
             case WM_PRINTCLIENT: self->paint(reinterpret_cast<HDC>(w)); return 0;
             case WM_ERASEBKGND: return 1;
             case WM_DRAWITEM: self->drawButton(reinterpret_cast<DRAWITEMSTRUCT*>(l)); return TRUE;
-            case WM_CTLCOLOREDIT: case WM_CTLCOLORSTATIC: { auto dc=reinterpret_cast<HDC>(w); SetTextColor(dc,ink); SetBkColor(dc,RGB(29,41,35)); return reinterpret_cast<LRESULT>(self->editBrush); }
+            case WM_CTLCOLOREDIT: case WM_CTLCOLORSTATIC: case WM_CTLCOLORBTN: { auto dc=reinterpret_cast<HDC>(w); SetTextColor(dc,ink); SetBkColor(dc,RGB(29,41,35)); return reinterpret_cast<LRESULT>(self->editBrush); }
             case WM_COMMAND: self->command(LOWORD(w),HIWORD(w)); return 0;
             case RESPONSE: self->receive(std::unique_ptr<JobResult>(reinterpret_cast<JobResult*>(l))); return 0;
             case WM_TIMER: if(self->authenticated && !self->paused && !self->busy && std::chrono::steady_clock::now()>=self->nextPoll) self->refresh(); return 0;
