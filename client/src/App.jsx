@@ -330,7 +330,7 @@ export default function App() {
     currentUser={user}
     pendingRoomCode={pendingRoomCode}
     settings={publicSettings}
-  />{view === "lobby" && !accountRecovery && <PublicGamesOverview games={publicGames} siteName={publicSettings.siteName} compact />}</>;
+  />{view === "lobby" && !accountRecovery && <PublicGamesOverview games={publicGames} siteName={publicSettings.siteName} featuredGameId={publicSettings.featuredGameId} compact />}</>;
   const accountRestrictions = user.minor?.restrictions ?? [];
   const blockedView = view === "shop" && accountRestrictions.includes("shop") || view === "event" && (accountRestrictions.includes("community-events") || user.moderation?.type === "soft");
   return (

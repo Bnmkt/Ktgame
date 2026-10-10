@@ -2,17 +2,21 @@ import { ArrowLeft, ArrowRight, BookOpen, Dice5, Spade, Users } from "lucide-rea
 import { gameRules } from "../config/site.js";
 import { Die, PlayingCard } from "../components/game/GamePieces.jsx";
 import { appPath } from "../navigation/routes.js";
+import { GameArtwork } from "../components/game/GameArtwork.jsx";
+import { featuredGame, gameImageUrl } from "../features/games/presentation.js";
 import "./public-games.css";
 
 function GameVisual({ game }) {
-  return <div className={`public-game-pieces pieces-${game.type}`} aria-hidden="true">{game.type === "dice" ? [4, 2, 1].map((value, index) => <Die key={index} value={value} animate={false} />) : [{ rank: "A", suit: "S" }, { rank: "K", suit: "H" }].map((card) => <PlayingCard key={card.suit} card={card} animate={false} />)}</div>;
+  return <GameArtwork source={game.coverImage} fallback={<div className={`public-game-pieces pieces-${game.type}`} aria-hidden="true">{game.type === "dice" ? [4, 2, 1].map((value, index) => <Die key={index} value={value} animate={false} />) : [{ rank: "A", suit: "S" }, { rank: "K", suit: "H" }].map((card) => <PlayingCard key={card.suit} card={card} animate={false} />)}</div>} />;
 }
 
-export function PublicGamesOverview({ games = [], siteName = "KTGA.ME", compact = false }) {
+export function PublicGamesOverview({ games = [], siteName = "KTGA.ME", compact = false, featuredGameId = "" }) {
+  const selected = featuredGame(games, featuredGameId);
+  const entries = compact ? (selected ? [selected] : []) : games.filter((game) => game.enabled !== false);
   return <section className={`public-games-overview ${compact ? "app-shell" : ""}`}>
-    <header className="public-games-heading"><div><h2>{compact ? `Les jeux de ${siteName}` : "Choisir un jeu"}</h2><p>Cartes, dés et parties entre amis. Gratuit, avec des jetons exclusivement virtuels.</p></div><a href={appPath("guide")}><BookOpen size={18} />Guide du joueur</a></header>
-    <div className="public-games-grid">{games.filter((game) => game.enabled !== false).map((game) => <a className="public-game-entry" key={game.id} href={appPath("games", game.id)}>
-      <GameVisual game={game} /><div><span className="public-game-type">{game.type === "dice" ? <Dice5 size={15} /> : <Spade size={15} />}{game.type === "dice" ? "Dés" : "Cartes"}<Users size={15} />{game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`} joueurs</span><h3>{game.name}</h3><p>{game.description || gameRules[game.id]?.goal}</p><span className="public-game-action">Découvrir les règles<ArrowRight size={17} /></span></div>
+    <header className="public-games-heading"><div><h2>{compact ? "À l’affiche" : "Choisir un jeu"}</h2><p>Cartes, dés et parties entre amis. Gratuit, avec des jetons exclusivement virtuels.</p></div>{compact ? <a className="secondary game-catalog-toggle" href={appPath("games")}>Tous les jeux<ArrowRight size={18} /></a> : <a href={appPath("guide")}><BookOpen size={18} />Guide du joueur</a>}</header>
+    <div className={`public-games-grid ${compact ? "public-games-featured" : ""}`}>{entries.map((game) => <a className={`public-game-entry ${compact && gameImageUrl(game.coverImage) ? "public-game-spotlight" : ""}`} key={game.id} href={appPath("games", game.id)}>
+      {compact && gameImageUrl(game.coverImage) ? <GameArtwork source={game.coverImage} backdrop eager fallback={<GameVisual game={{ ...game, coverImage: "" }} />} /> : <GameVisual game={game} />}<div><span className="public-game-type">{game.type === "dice" ? <Dice5 size={15} /> : <Spade size={15} />}{game.type === "dice" ? "Dés" : "Cartes"}<Users size={15} />{game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`} joueurs</span><h3>{game.name}</h3><p>{game.description || gameRules[game.id]?.goal}</p><span className="public-game-action">Découvrir les règles<ArrowRight size={17} /></span></div>
     </a>)}</div>
   </section>;
 }

@@ -11,7 +11,7 @@ export function renderPublicPage(data) {
   const { meta, settings, games, help, catalog, note } = data;
   const onBack = undefined;
   let page;
-  if (meta.view === "lobby") page = <><Auth settings={settings} onAuth={() => {}} /><PublicGamesOverview games={games} siteName={settings.siteName} compact /></>;
+  if (meta.view === "lobby") page = <><Auth settings={settings} onAuth={() => {}} /><PublicGamesOverview games={games} siteName={settings.siteName} featuredGameId={settings.featuredGameId} compact /></>;
   else if (meta.view === "games") page = <PublicGamesPage games={games} id={meta.id} siteName={settings.siteName} />;
   else if (["faq", "guide"].includes(meta.view)) page = <HelpPage mode={meta.view} siteName={settings.siteName} onBack={onBack} initialDocument={help} />;
   else if (meta.view === "patchnotes") page = <PatchnotesPage siteName={settings.siteName} initialCatalog={catalog} initialNote={note} initialVersion={note?.version || meta.id} />;

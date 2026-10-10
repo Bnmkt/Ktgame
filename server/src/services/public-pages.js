@@ -4,8 +4,8 @@ import { pageMetadata } from "../../../client/src/seo/metadata.js";
 
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 const json = (value) => JSON.stringify(value).replace(/[<>&\u2028\u2029]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
-const publicSettings = (settings) => Object.fromEntries(["siteName", "siteIcon", "siteSubtitle", "registrationsEnabled", "guestAccessEnabled", "supportEmail"].map((key) => [key, settings[key]]));
-const publicGames = (games) => games.filter((game) => game.enabled !== false).map(({ id, name, type, minPlayers, maxPlayers, description }) => ({ id, name, type, minPlayers, maxPlayers, description }));
+const publicSettings = (settings) => Object.fromEntries(["siteName", "siteIcon", "siteSubtitle", "featuredGameId", "registrationsEnabled", "guestAccessEnabled", "supportEmail"].map((key) => [key, settings[key]]));
+const publicGames = (games) => games.filter((game) => game.enabled !== false).map(({ id, name, type, minPlayers, maxPlayers, description, descriptiveImage, coverImage }) => ({ id, name, type, minPlayers, maxPlayers, description, descriptiveImage, coverImage }));
 const publicNotes = (notes) => notes.filter((note) => note.status === "published").map(({ id, version, versionGroup, title, summary, status, publishedAt, updatedAt }) => ({ id, version, versionGroup, title, summary, status, publishedAt, updatedAt }));
 
 export function createPublicPageService({ template, render, styles = [], settings, games, help, catalog, note, origin = "https://www.ktga.me", basePath = "", now = Date.now }) {

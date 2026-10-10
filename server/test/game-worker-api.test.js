@@ -46,6 +46,32 @@ after(async () => {
   assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir())); assert.ok(path.basename(directory).startsWith("ktga-game-worker-api-"));
   fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
+test("game images and featured choice persist and invitation preview cannot bypass protected tables", async () => {
+  const game = (await request(null, "/api/games")).data.find((entry) => entry.id === "yahtzee");
+  for (const actor of [null, "player"]) assert.equal((await request(actor, "/api/admin/games/yahtzee", "PATCH", { ...game, coverImage: "/images/test.webp" })).status, actor ? 403 : 401);
+  assert.equal((await request("admin", "/api/admin/games/yahtzee", "PATCH", { ...game, coverImage: "javascript:alert(1)" })).status, 400);
+  assert.equal((await request("admin", "/api/admin/games/yahtzee", "PATCH", { ...game, coverImage: "/images/cover.webp", descriptiveImage: "https://example.com/dice.webp" })).status, 200);
+  let updated = (await request(null, "/api/games")).data.find((entry) => entry.id === game.id);
+  assert.equal(updated.coverImage, "/images/cover.webp"); assert.equal(updated.descriptiveImage, "https://example.com/dice.webp");
+  assert.equal((await request("admin", "/api/admin/games/yahtzee", "PATCH", { ...updated, coverImage: "N/A" })).status, 200);
+  updated = (await request(null, "/api/games")).data.find((entry) => entry.id === game.id);
+  assert.equal(updated.coverImage, "");
+  assert.equal((await request("admin", "/api/admin/settings", "PATCH", { featuredGameId: "yahtzee" })).status, 200);
+  assert.equal((await request(null, "/api/config")).data.featuredGameId, "yahtzee");
+  const created = await request("player", "/api/rooms", "POST", { gameId: "yahtzee", stake: 10, name: "Private invitation", isPublic: false, password: "table-code" });
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  const code = created.data.code;
+  try {
+    const preview = await request(null, `/api/table-entry/${code}`);
+    assert.equal(preview.status, 200);
+    assert.deepEqual(preview.data, { code, hostName: "player", requiresPassword: true, ranked: false });
+    assert.equal((await request(null, `/api/rooms/${code}/join`, "POST")).status, 401);
+    assert.equal((await request("friend", `/api/rooms/${code}/join`, "POST", {})).status, 403);
+    assert.equal((await request("friend", `/api/rooms/${code}/join`, "POST", { password: "table-code" })).status, 200);
+  } finally { await request("player", `/api/rooms/${code}`, "DELETE"); }
+  assert.equal((await request(null, `/api/table-entry/${code}`)).status, 404);
+});
+
 test("existing room API runs through two Game Workers without exposing worker metadata", async () => {
   const create = async (name) => {
     const result = await request("player", "/api/rooms", "POST", { gameId: "yahtzee", name, stake: 10 });

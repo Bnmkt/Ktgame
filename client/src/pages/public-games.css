@@ -5,6 +5,14 @@
 .public-games-heading p { color: var(--muted); margin: 0; line-height: 1.6; }
 .public-games-heading a, .public-game-action, .public-game-bottom a { display: inline-flex; align-items: center; gap: 8px; color: #e6c56c; text-decoration: none; }
 .public-games-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.public-games-grid.public-games-featured { grid-template-columns: minmax(0, 1fr); }
+.public-games-featured .public-game-entry { max-width: 620px; }
+.public-games-featured .public-game-spotlight { max-width: none; min-height: 300px; position: relative; justify-content: end; }
+.public-game-spotlight > div { position: relative; z-index: 1; max-width: 700px; }
+.public-game-spotlight h3 { font-size: 28px; }
+.public-game-spotlight p { color: #f2e8d4; }
+.public-games-heading > .game-catalog-toggle { padding: 10px 14px; border: 1px solid #57523b; border-radius: 6px; }
+.public-game-intro > .game-artwork-media { aspect-ratio: 12 / 11; border-radius: 6px; }
 .public-game-entry { display: flex; flex-direction: column; overflow: hidden; border: 1px solid #41463c; border-radius: 8px; color: #f7efd9; background: #111b19; text-decoration: none; }
 .public-game-entry:hover, .public-game-entry:focus-visible { border-color: #d7b652; }
 .public-game-entry > div:last-child { padding: 18px; }

@@ -17,6 +17,16 @@ const sources = {
 const template = '<html lang="fr"><head><title>KTGA.ME</title></head><body><div id="root"></div></body></html>';
 const fixture = (extra = {}) => createPublicPageService({ ...sources, template, render: (data) => `<main>${data.meta.title}</main>`, ...extra });
 
+test("public bootstrap includes the featured choice and game artwork but no private configuration", () => {
+  let bootstrap;
+  fixture({ settings: () => ({ siteName: "KTGA.ME", featuredGameId: "yahtzee", smtpPassword: "private" }), games: () => [{ ...game, descriptiveImage: "/images/dice.webp", coverImage: "/images/cover.webp" }], render: (data) => { bootstrap = data; return "<main>Games</main>"; } }).document("/");
+  assert.equal(bootstrap.settings.featuredGameId, "yahtzee");
+  assert.equal(bootstrap.games[0].coverImage, "/images/cover.webp");
+  assert.equal(bootstrap.games[0].descriptiveImage, "/images/dice.webp");
+  assert.equal(bootstrap.settings.smtpPassword, undefined);
+  assert.equal(bootstrap.games[0].privateRule, undefined);
+});
+
 test("public metadata is specific, canonical, and does not index private or sensitive routes", () => {
   for (const route of ["/", "/jeux", "/faq", "/guide", "/conditions", "/parents"]) assert.equal(fixture().metadata(route).indexable, true, route);
   for (const route of ["/admin", "/profil", "/table/ABC123", "/shop", "/bugs/1842", "/parents?parental-access=private", "/?reset-password=private", "/?room=ABC123"]) assert.equal(fixture().metadata(route).indexable, false, route);

@@ -1,4 +1,6 @@
 import { createRoomCommands } from "./services/room-commands.js";
+import { registerRoomEntry } from "./services/room-entry.js";
+import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
 import { createRoomRuntime } from "./services/room-runtime.js";
 import "dotenv/config";
@@ -495,6 +497,7 @@ function normalizePlatformSettings(value = {}) {
     contactEmail: siteContactEmail(value),
     siteIcon: String(value.siteIcon ?? defaultPlatformSettings.siteIcon).trim().slice(0, 6000) || defaultPlatformSettings.siteIcon,
     siteSubtitle: String(value.siteSubtitle ?? defaultPlatformSettings.siteSubtitle).trim().slice(0, 120) || defaultPlatformSettings.siteSubtitle,
+    featuredGameId: games.some((game) => game.id === value.featuredGameId) ? value.featuredGameId : "",
     registrationsEnabled: value.registrationsEnabled !== false,
     guestAccessEnabled: value.guestAccessEnabled !== false,
     emailVerificationRequired: value.emailVerificationRequired === true,
@@ -581,7 +584,7 @@ function battleDeckOverview(state, viewerId) {
 
 function configuredGames(db = readDb()) {
   const overrides = db.settings?.games ?? {};
-  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
+  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), descriptiveImage: gameImageUrl(overrides[game.id]?.descriptiveImage), coverImage: gameImageUrl(overrides[game.id]?.coverImage), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
 }
 
 function configuredShop(db = readDb()) {
@@ -5059,6 +5062,9 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
+  for (const field of ["descriptiveImage", "coverImage"]) {
+    if (Object.hasOwn(req.body, field) && String(req.body[field] ?? "").trim() && !/^n\/?a$/i.test(String(req.body[field]).trim()) && !gameImageUrl(req.body[field])) return res.status(400).json({ error: "L’image doit utiliser une URL HTTPS ou un chemin absolu (/images/…)." });
+  }
   if (Object.hasOwn(req.body, "defaultModifiers") && (!req.body.defaultModifiers || typeof req.body.defaultModifiers !== "object" || Array.isArray(req.body.defaultModifiers))) return res.status(400).json({ error: "Parametres par defaut invalides." });
   if (req.params.id === "texas-holdem" && Number(req.body.pokerDefaultBigBlind) % 2) return res.status(400).json({ error: "La grosse blinde par défaut doit être paire." });
   const updated = updateDb((db) => {
@@ -5067,6 +5073,7 @@ app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
     db.settings.games ??= {};
     db.settings.games[req.params.id] = {
       ...(db.settings.games[req.params.id] ?? {}),
+      ...Object.fromEntries(["descriptiveImage", "coverImage"].filter((field) => Object.hasOwn(req.body, field)).map((field) => [field, gameImageUrl(req.body[field])])),
       ...(Object.hasOwn(req.body, "defaultModifiers") ? { defaultModifiers: req.params.id === "bataille" ? normalizeBattleModifiers(req.body.defaultModifiers) : normalizeGameModifiers(req.params.id, req.body.defaultModifiers) } : {}),
       name: String(req.body.name ?? "").trim().slice(0, 60),
       description: String(req.body.description ?? "").trim().slice(0, 240),
@@ -5459,6 +5466,7 @@ const rankedRuntime = createRankedRuntime({ app, auth, requireAdmin, readDb, upd
   isWatching: (roomId,userId)=>[...(roomPresence.get(roomId) ?? [])].some((id)=>io.sockets.sockets.get(id)?.data.userId === userId && !io.sockets.sockets.get(id)?.data.spectator)
 });
 setInterval(()=>{try{rankedRuntime.tick();}catch(error){console.error("Ranked tick failed",error.message);}},2000).unref();
+registerRoomEntry({ app, readDb, displayNameFor, limiter: rateLimit({ windowMs: 60000, limit: 20, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Trop de consultations de tables. Réessaie dans une minute." } }) });
 app.use("/api/rooms/:code",auth,(req,res,next)=> {
   const room=readDb().rooms.find((r)=>r.code===req.params.code.toUpperCase());
   if(room?.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===req.auth.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});

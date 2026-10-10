@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
+import { GameArtwork } from "../components/game/GameArtwork.jsx";
+import { featuredGame } from "../features/games/presentation.js";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
@@ -48,6 +50,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const [gameComplexityFilter, setGameComplexityFilter] = useState("all");
   const [gameSearch, setGameSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [allGames, setAllGames] = useState(false);
   const [playMode,setPlayMode]=useState("classic");
   const [rankedStatus,setRankedStatus]=useState(null);
   const [rulesGame, setRulesGame] = useState(null);
@@ -145,6 +148,10 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
     setGameComplexityFilter("all");
   }
 
+  const showCatalog = allGames || Boolean(activeFilterCount || normalizedGameSearch);
+  const spotlight = featuredGame(visibleGames, settings.featuredGameId);
+  const displayedGames = showCatalog ? visibleGames : spotlight ? [spotlight] : [];
+
   return (
     <main className="app-shell">
       <div className="page-heading lobby-heading"><div><span className="eyebrow">Le casino</span><h1>À quelle table joues-tu ?</h1></div></div>
@@ -171,7 +178,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       {!joiningRestricted && liveFriendTables.length > 0 && <section className="live-room-section"><h2>Parties en cours</h2><div className="live-room-list">{liveFriendTables.map((room) => <button className="secondary" key={room.code} onClick={() => onEnterRoom(room.code)}><Eye size={18} /><span>{room.name}</span></button>)}</div></section>}
       <div className="single-layout">
         <section>
-          <div className="section-title"><h2>Jeux disponibles</h2><span>{visibleGames.length} jeu{visibleGames.length > 1 ? "x" : ""}</span></div>
+          <div className="section-title"><h2>{showCatalog ? "Jeux disponibles" : "À l’affiche"}</h2><button type="button" className="secondary game-catalog-toggle" aria-expanded={showCatalog} onClick={() => { if (showCatalog) { resetGameFilters(); setFiltersOpen(false); } setAllGames(!showCatalog); }}>{showCatalog ? "À l’affiche" : "Tous les jeux"}</button></div>
           <div className="game-filter-panel">
             <div className="game-filter-toolbar">
               <label className="game-search-field"><Search size={18} /><span className="sr-only">Rechercher un jeu</span><input type="search" value={gameSearch} onChange={(event) => setGameSearch(event.target.value)} placeholder="Rechercher un jeu…" /></label>
@@ -187,11 +194,12 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
             </div>}
             {(activeFilterCount > 0 || normalizedGameSearch) && <div className="active-filter-summary" aria-live="polite"><span>{visibleGames.length} résultat{visibleGames.length > 1 ? "s" : ""}</span>{gameTypeFilter !== "all" && <b>{gameTypeFilter === "dice" ? "Dés" : "Cartes"}</b>}{gameCategoryFilter !== "all" && <b>{gameCategoryLabel(gameCategoryFilter)}</b>}{gameAudienceFilter !== "all" && <b>{gameAudienceLabel(gameAudienceFilter)}</b>}{gameComplexityFilter !== "all" && <b>{gameComplexityLabel(gameComplexityFilter)}</b>}</div>}
           </div>
-          <div className="game-grid">
-            {visibleGames.map((game) => (
+          <div className={`game-grid ${showCatalog ? "" : "game-grid-featured"}`}>
+            {displayedGames.map((game) => (
               <article key={game.id} className={`game-card premium-card ${game.type} ${playMode==="ranked"?"ranked-game-card":""}`}>
+                <GameArtwork source={showCatalog ? game.descriptiveImage : game.coverImage} backdrop eager={!showCatalog} />
                 <span className="player-badge">{playMode==="ranked"?`${rankedStatus?.games.find((row)=>row.id===game.id)?.players ?? "…"} joueurs`:`${game.minPlayers}-${game.maxPlayers}`}</span>
-                <div className="game-icon">{game.type === "dice" ? <Dice5 /> : <PlayingCard card={{ rank: "A", suit: "S" }} />}</div>
+                <GameArtwork source={showCatalog ? game.coverImage : ""} fallback={<div className="game-icon">{game.type === "dice" ? <Dice5 /> : <PlayingCard card={{ rank: "A", suit: "S" }} />}</div>} />
                 <h3>{game.name}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label="Favori" fill="currentColor" />}</h3>
                 <p>{game.description || gameRules[game.id]?.goal}</p>
                 <div className="card-meta"><span>{gameCategoryLabel(game.category)}</span><span>{gameComplexityLabel(game.complexity)}</span>{playMode==="ranked"?<RankBadge rank={rankedStatus?.games.find((row)=>row.id===game.id)?.rank}/>:<span>{rooms.filter((room) => room.gameId === game.id && !room.ranked).length} tables publiques</span>}</div>
