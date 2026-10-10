@@ -1,24 +1,35 @@
 import { Archive } from "../storage/archives.js";
 import { casinoDateKey } from "./time.js";
 import { prepared } from "../storage/statements.js";
+import { CacheTelemetry } from "./cache-telemetry.js";
 
 const stakeReasons = new Set(["room-stake", "blackjack-bet", "blackjack-double", "421-paid-reroll"]);
 const shopReasons = new Set(["shop-purchase", "shop-pack-purchase"]);
 const caches = new WeakMap();
 
+export function playerStatisticsCacheHealth(db) {
+  const cache = caches.get(db.history);
+  return cache?.transactions === db.transactions
+    ? cache.telemetry.snapshot(cache.users.size, 2048)
+    : new CacheTelemetry().snapshot(0, 2048);
+}
+
 // Indexed aggregates, not hydrated match/ledger documents. The bounded cache is
-// invalidated by journal revisions, including inserts not yet committed.
+// invalidated only for affected users, including inserts not yet committed.
 export function playerStatistics(db, userId) {
   const indexed = db.history instanceof Archive && db.transactions instanceof Archive;
-  const revision = indexed ? `${db.history.revision}:${db.transactions.revision}` : null;
+  const revision = indexed ? `${db.history.revisionFor(userId)}:${db.transactions.revisionFor(userId)}` : null;
   let cache;
   if (indexed) {
     cache = caches.get(db.history);
-    if (!cache || cache.transactions !== db.transactions || cache.revision !== revision) {
-      cache = { transactions: db.transactions, revision, users: new Map() };
+    if (!cache || cache.transactions !== db.transactions) {
+      cache = { transactions: db.transactions, users: new Map(), telemetry: new CacheTelemetry() };
       caches.set(db.history, cache);
     }
-    if (cache.users.has(userId)) return cache.users.get(userId);
+    const prior = cache.users.get(userId);
+    if (prior?.revision === revision) { cache.telemetry.hits++; return prior.stats; }
+    cache.telemetry.misses++;
+    if (prior) cache.telemetry.invalidations++;
   }
   const stats = { gamesPlayed: 0, wins: 0, gameWins: {}, activity: {}, gameIds: [], transactionGameIds: [], transactionReasons: [], transactions: 0, credits: 0, debits: 0, staked: 0, shopSpent: 0, shopPurchases: 0, dailyClaims: 0, claimDates: [], resultIds: [] };
   const resultIds = new Set(), dates = new Set(), gameIds = new Set(), transactionGames = new Set(), reasons = new Set();
@@ -60,8 +71,8 @@ export function playerStatistics(db, userId) {
   stats.transactionGameIds = [...transactionGames].sort();
   stats.transactionReasons = [...reasons].sort();
   if (cache) {
-    if (cache.users.size >= 256) cache.users.delete(cache.users.keys().next().value);
-    cache.users.set(userId, stats);
+    if (!cache.users.has(userId) && cache.users.size >= 2048) { cache.users.delete(cache.users.keys().next().value); cache.telemetry.evictions++; }
+    cache.users.set(userId, { revision, stats });
   }
   return stats;
 }

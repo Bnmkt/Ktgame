@@ -54,6 +54,7 @@ export function normalizeGameModifiers(gameId, modifiers = {}) {
     rounds: integer("rounds", 5, 3, 8),
     marketExtra: integer("marketExtra", 2, 0, 6),
     discardsPerRound: integer("discardsPerRound", 1, 0, 3),
+    individualContracts: modifiers.individualContracts !== false,
     uniqueContracts: modifiers.uniqueContracts !== false
   };
   if (gameId === "velvet-ruse") return {

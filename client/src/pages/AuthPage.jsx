@@ -38,7 +38,7 @@ function registrationDeviceId() {
 }
 
 export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, pendingRoomCode, settings = defaultPublicSettings }) {
-  const [passwordResetToken, setPasswordResetToken] = useState(() => new URL(window.location.href).searchParams.get("reset-password") ?? "");
+  const [passwordResetToken, setPasswordResetToken] = useState(() => typeof window === "undefined" ? "" : new URL(window.location.href).searchParams.get("reset-password") ?? "");
   const [mode, setMode] = useState(passwordResetToken ? "reset-password" : "login");
   const [login, setLogin] = useState({ identifier: "", password: "" });
   const [register, setRegister] = useState({ email: "", pseudo: "", password: "", passwordConfirm: "" });
@@ -212,7 +212,7 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
   }
 
   const accountSetup = currentUser?.requiresEmailUpgrade || currentUser?.requiresEmailVerification;
-  return <main className="auth-screen"><div className={`auth-panel ${accountSetup ? "auth-account-setup" : ""}`}>
+  return <main className="auth-screen" id="connexion"><div className={`auth-panel ${accountSetup ? "auth-account-setup" : ""}`}>
     <div><h1 className="auth-brand"><CosmeticIcon value="site" source={settings.siteIcon} /><span>{settings.siteName}</span></h1><p>{settings.siteSubtitle}</p></div>
     {serverStatus === "checking" && <div className="invite-banner"><Landmark size={18} /> Vérification de la disponibilité du casino...</div>}
     {serverStatus === "down" && <div className="error">Le casino est actuellement indisponible. Le serveur de jeu ne répond pas.</div>}

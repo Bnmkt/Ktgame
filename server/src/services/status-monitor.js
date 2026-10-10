@@ -125,11 +125,15 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
     );
   `);
 
+  if (!db.prepare("PRAGMA table_info(status_slots)").all().some((column) => column.name === "latency_count")) {
+    db.exec("ALTER TABLE status_slots ADD COLUMN latency_count INTEGER NOT NULL DEFAULT 0; UPDATE status_slots SET latency_count=sample_count WHERE latency_sum>0;");
+  }
+
   const detections = createStatusDetections(db, publicStatusComponents, now);
   const readSlot = db.prepare("SELECT * FROM status_slots WHERE bucket_at = ? AND component_id = ?");
-  const upsertSlot = db.prepare(`INSERT INTO status_slots(bucket_at,component_id,latest_status,worst_status,sample_count,latency_sum,latency_max,message,updated_at)
-    VALUES(?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(bucket_at,component_id) DO UPDATE SET latest_status=excluded.latest_status,worst_status=excluded.worst_status,sample_count=excluded.sample_count,latency_sum=excluded.latency_sum,latency_max=excluded.latency_max,message=excluded.message,updated_at=excluded.updated_at`);
+  const upsertSlot = db.prepare(`INSERT INTO status_slots(bucket_at,component_id,latest_status,worst_status,sample_count,latency_sum,latency_max,message,updated_at,latency_count)
+    VALUES(?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(bucket_at,component_id) DO UPDATE SET latest_status=excluded.latest_status,worst_status=excluded.worst_status,sample_count=excluded.sample_count,latency_sum=excluded.latency_sum,latency_max=excluded.latency_max,message=excluded.message,updated_at=excluded.updated_at,latency_count=excluded.latency_count`);
 
   function statusSettings() {
     const values = Object.fromEntries(db.prepare("SELECT key,value FROM status_settings").all().map((row) => [row.key, Number(row.value)]));
@@ -163,6 +167,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
     const current = readSlot.get(bucket, component.id);
     const status = probeStatuses.has(component.status) ? component.status : "unknown";
     const latency = Math.max(0, Number(component.latencyMs) || 0);
+    const measured = typeof component.latencyMs === "number" && Number.isFinite(component.latencyMs) && component.latencyMs >= 0;
     upsertSlot.run(
       bucket,
       component.id,
@@ -172,7 +177,8 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
       Number(current?.latency_sum || 0) + latency,
       Math.max(Number(current?.latency_max || 0), latency),
       clean(component.message, 300),
-      new Date(timestamp).toISOString()
+      new Date(timestamp).toISOString(),
+      Number(current?.latency_count || 0) + (measured ? 1 : 0)
     );
     detections.observe(component, timestamp);
   }
@@ -358,7 +364,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
         const known = dayRows.filter((row) => row.worst_status !== "unknown");
         const outages = known.filter((row) => row.worst_status === "outage").length;
         const degraded = known.filter((row) => row.worst_status === "degraded").length;
-        const samples = dayRows.reduce((sum, row) => sum + Number(row.sample_count || 0), 0);
+        const samples = dayRows.reduce((sum, row) => sum + Number(row.latency_count || 0), 0);
         return {
           date,
           status: outages ? "outage" : degraded ? "degraded" : known.length ? "operational" : "no_data",
@@ -369,7 +375,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
       });
       const knownRows = componentRows.filter((row) => row.worst_status !== "unknown");
       const outageRows = knownRows.filter((row) => row.worst_status === "outage");
-      const latencySamples = componentRows.reduce((sum, row) => sum + Number(row.sample_count || 0), 0);
+      const latencySamples = componentRows.reduce((sum, row) => sum + Number(row.latency_count || 0), 0);
       const timelineRows = new Map();
       for (const row of componentRows) {
         const at = Math.floor(Date.parse(row.bucket_at) / intervalMs) * intervalMs;
@@ -384,11 +390,12 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
         const outages = known.filter((row) => row.worst_status === "outage").length;
         const degraded = known.filter((row) => row.worst_status === "degraded").length;
         const samples = slotRows.reduce((sum, row) => sum + Number(row.sample_count || 0), 0);
+        const measuredSamples = slotRows.reduce((sum, row) => sum + Number(row.latency_count || 0), 0);
         point.components[definition.id] = {
           status: outages ? "outage" : degraded ? "degraded" : known.length ? "operational" : "no_data",
           uptime: known.length ? (known.length - outages) / known.length * 100 : null,
           samples,
-          latencyMs: samples ? slotRows.reduce((sum, row) => sum + Number(row.latency_sum || 0), 0) / samples : null,
+          latencyMs: measuredSamples ? slotRows.reduce((sum, row) => sum + Number(row.latency_sum || 0), 0) / measuredSamples : null,
           investigation: Boolean(outages || degraded) && investigationRanges.some((entry) => entry.component_id === definition.id && Date.parse(entry.first_at) < Date.parse(point.at) + intervalMs && Date.parse(entry.last_at) >= Date.parse(point.at)),
           incidentIds: timelineIncidents.filter((entry) => {
             if (!entry.components.includes(definition.id)) return false;
@@ -404,7 +411,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
         status: currentStatus,
         message: currentMessage,
         updatedAt: latest?.updated_at ?? null,
-        latencyMs: latest?.sample_count ? Number(latest.latency_sum) / Number(latest.sample_count) : null,
+        latencyMs: latest?.latency_count ? Number(latest.latency_sum) / Number(latest.latency_count) : null,
         uptime: knownRows.length ? (knownRows.length - outageRows.length) / knownRows.length * 100 : null,
         averageLatencyMs: latencySamples ? componentRows.reduce((sum, row) => sum + Number(row.latency_sum || 0), 0) / latencySamples : null,
         days: daily

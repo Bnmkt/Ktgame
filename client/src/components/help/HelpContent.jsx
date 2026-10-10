@@ -40,8 +40,8 @@ export function WelcomeGuide({ document, onClose }) {
 }
 
 
-export function HelpPage({ mode = "faq", siteName, onBack }) {
-  const [document, setDocument] = useState(null);
+export function HelpPage({ mode = "faq", siteName, onBack, initialDocument = null }) {
+  const [document, setDocument] = useState(initialDocument);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");

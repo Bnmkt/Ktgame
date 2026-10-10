@@ -6,8 +6,8 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "build:prod": "vite build --mode production",
+    "build": "node scripts/build.mjs",
+    "build:prod": "node scripts/build.mjs --production",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -144,6 +144,14 @@ test("la sonde SMTP retente les échecs après une minute et garde les succès q
   assert.equal((await inactive()).status, "unknown");
 });
 
+test("un refus SMTP transitoire doit etre confirme avant une panne", async () => {
+  let attempts = 0;
+  const probe = createEmailStatusProbe({ verify: async () => (++attempts < 3 ? { configured: true, ok: false, code: "ETIMEDOUT" } : { configured: true, ok: true }) });
+  assert.equal((await probe(0)).status, "unknown");
+  assert.equal((await probe(60000)).status, "outage");
+  assert.equal((await probe(120000)).status, "operational");
+});
+
 test("les filtres par service, gravité et état conservent des comptes cohérents", () => {
   const timestamp = Date.parse("2026-10-04T08:30:00Z");
   const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });

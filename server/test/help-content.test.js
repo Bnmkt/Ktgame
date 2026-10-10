@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHelpStore, normalizeHelpDocument } from "../src/services/help-content.js";
 import { defaultHelpEntries, legacyHelpEntries, upgradeDefaultGuides } from "../src/content/help-defaults.js";
 import { guideIntroduction } from "../src/content/help-guide.js";
+import { progressionGuideEntries, rankedFaqEntries, withProgressionHelp } from "../src/content/help-ranked.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -114,4 +115,44 @@ test("help validation bounds content and rejects tracking images, invalid identi
     assert.throws(() => store.upload(Buffer.from("not-an-image"), "image/png"));
     assert.equal(store.image("../../passwords"), null);
   } finally { store.close(); }
+});
+
+test("ranked help adds a dedicated topic and illustrated interactive progression chapters", () => {
+  const store = createHelpStore({ filename: ":memory:" });
+  try {
+    const entries = store.read(true).entries;
+    assert.equal(entries.filter((entry) => rankedFaqEntries.some((ranked) => ranked.id === entry.id)).length, 17);
+    for (const guide of progressionGuideEntries) {
+      const saved = entries.find((entry) => entry.id === guide.id);
+      assert.ok(saved.published);
+      assert.match(saved.image, /^\/guides\/[a-z-]+\.png$/);
+      assert.ok(saved.imageAlt);
+      assert.equal(saved.challenge.options.length, 3);
+      assert.ok(saved.challenge.options.some((option) => option.id === saved.challenge.answerId));
+    }
+    const content = JSON.stringify([...rankedFaqEntries, ...progressionGuideEntries]);
+    assert.ok(!/\belo\b|chiffres? priv[ée]|classement chiffr[ée]/i.test(content));
+    assert.ok(content.includes("I → II → III"));
+    assert.ok(content.includes("niveau 101"));
+  } finally { store.close(); }
+});
+
+test("ranked additions preserve custom text, hidden entries, images, settings and previous ordering", () => {
+  const customized = { ...rankedFaqEntries[0], body: "Ma réponse personnelle.", published: false, image: "/guides/account.png" };
+  const guide = { ...progressionGuideEntries[0], title: "Mon chapitre", body: "Mon contenu." };
+  const document = { title: "Mon guide", intro: "Mon introduction", welcomeEnabled: false, entries: [legacyHelpEntries[0], customized, guide, { ...legacyHelpEntries.find((entry) => entry.id === "faq-join"), body: "Ma réponse sur les tables." }] };
+  const before = structuredClone(document);
+  const added = withProgressionHelp(document);
+  assert.deepEqual(document, before);
+  for (const entry of document.entries) assert.deepEqual(added.entries.find((row) => row.id === entry.id), entry);
+  assert.deepEqual(added.entries.filter((entry) => document.entries.some((old) => old.id === entry.id)), document.entries);
+  assert.equal(added.welcomeEnabled, false);
+  assert.deepEqual(withProgressionHelp(added), added, "reapplying cannot duplicate chapters or questions");
+});
+
+test("an existing equivalent question with an admin-generated identifier is not duplicated", () => {
+  const question = { ...rankedFaqEntries[0], id: "custom-question", title: `  ${rankedFaqEntries[0].title.toLocaleUpperCase("fr")}  `, body: "Texte modifié." };
+  const document = withProgressionHelp({ entries: [question] });
+  assert.equal(document.entries.filter((entry) => entry.id === rankedFaqEntries[0].id).length, 0);
+  assert.deepEqual(document.entries.find((entry) => entry.id === "custom-question"), question);
 });

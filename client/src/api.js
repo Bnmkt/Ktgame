@@ -142,6 +142,7 @@ export function api(path, options = {}) {
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         const error = new Error(data?.error ?? "Erreur serveur");
+        error.status = res.status;
         error.code = data?.code ?? "";
         error.data = data;
         throw error;

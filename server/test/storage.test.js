@@ -6,10 +6,12 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { spawnSync } from "node:child_process";
 import { Archive, archiveRows } from "../src/storage/archives.js";
-import { playerStatistics } from "../src/services/player-statistics.js";
+import { playerStatistics, playerStatisticsCacheHealth } from "../src/services/player-statistics.js";
 import { buildLeaderboard } from "../src/services/leaderboards.js";
 import { ledgerPage } from "../src/storage/ledger.js";
 import { eventActionUsage } from "../src/storage/event-usage.js";
+import { createReadingWork } from "../src/services/reading-work.js";
+import { createReadingTasks } from "../src/services/reading-tasks.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ktga-storage-"));
 const file = path.join(dir, "test.sqlite");
@@ -25,9 +27,33 @@ for (const user of original.users) old.prepare("INSERT INTO users VALUES (?, ?, 
 for (const row of original.history) old.prepare("INSERT INTO history VALUES (?, ?, ?, ?)").run(row.id, JSON.stringify(["a", "bot"]), row.finishedAt, JSON.stringify(row));
 for (const row of original.transactions) old.prepare("INSERT INTO transactions VALUES (?, ?, ?, NULL, NULL, ?, ?)").run(row.id, row.userId, row.gameId ?? null, row.createdAt, JSON.stringify(row));
 old.close();
-const { readDb, writeDb, updateDb, databaseHealth, syncCatalogs, closeDatabase } = await import("../src/db.js");
+const { readDb, writeDb, updateDb, databaseHealth, databaseSettingsRevision, databaseSettingsReadRevision, syncCatalogs, closeDatabase, rankedSettlement } = await import("../src/db.js");
 const inspection = new DatabaseSync(file);
+
+test("statistics cache telemetry counts reuse and invalidation without returning user IDs", () => {
+  const db = readDb(), before = playerStatisticsCacheHealth(db);
+  playerStatistics(db, "metrics-user"); playerStatistics(db, "metrics-user");
+  const after = playerStatisticsCacheHealth(db);
+  assert.equal(after.hits - before.hits, 1); assert.equal(after.misses - before.misses, 1);
+  assert.equal(after.entries - before.entries, 1); assert.equal(after.capacity, 2048);
+  assert.ok(!JSON.stringify(after).includes("metrics-user"));
+});
 after(() => { inspection.close(); closeDatabase(); fs.rmSync(dir, { recursive: true, force: true }); });
+
+test("account configuration revision changes only after committed settings or rollback", () => {
+  const before = databaseSettingsRevision();
+  assert.equal(databaseSettingsReadRevision(), before);
+  writeDb(readDb()); assert.equal(databaseSettingsRevision(), before);
+  updateDb((db) => { assert.equal(databaseSettingsReadRevision(), undefined); db.settings.accountProjectionTest = "committed"; });
+  assert.equal(databaseSettingsRevision(), before + 1);
+  updateDb((db) => { db.users[0].tokens++; });
+  assert.equal(databaseSettingsRevision(), before + 1);
+  assert.throws(() => updateDb((db) => { db.settings.accountProjectionTest = "uncommitted"; throw new Error("rollback"); }));
+  assert.equal(databaseSettingsRevision(), before + 2);
+  assert.equal(databaseSettingsReadRevision(), before + 2);
+  assert.equal(readDb().settings.accountProjectionTest, "committed");
+  updateDb((db) => { db.users[0].tokens--; delete db.settings.accountProjectionTest; });
+});
 
 test("legacy migration is backed up, lossless, relational and idempotent", () => {
   assert.deepEqual(readDb().users, original.users);
@@ -56,6 +82,40 @@ test("indexed statistics equal the legacy calculation including casino midnight"
   assert.equal(playerStatistics(readDb(), "a").activity["2026-09-02"], 1);
   assert.deepEqual(archiveRows(readDb().history, { memberId: "a" }), original.history);
   assert.deepEqual(archiveRows(readDb().transactions, { userId: "a", reason: "daily-claim" }), [original.transactions[1]]);
+});
+
+test("real read worker preserves pagination, hydration and statistics without writes", async () => {
+  const work = createReadingWork(file);
+  try {
+    const history = await work.run("history", { userId: "a", query: { game: "yahtzee", limit: "1" } });
+    assert.deepEqual(history, ledgerPage(readDb().history, "a", { game: "yahtzee", limit: "1" }));
+    const transactions = await work.run("transactions", { userId: "a", query: { direction: "debit" } });
+    assert.deepEqual(transactions, ledgerPage(readDb().transactions, "a", { direction: "debit" }));
+    assert.deepEqual(await work.run("statistics", { userId: "a" }), playerStatistics(readDb(), "a"));
+    assert.equal((await work.run("history", { userId: "unrelated" })).total, 0);
+    assert.equal(work.health().services.history.completed, 2);
+    const tasks = createReadingTasks(file);
+    try { assert.throws(() => tasks.run("write", { userId: "a" })); }
+    finally { tasks.close(); }
+  } finally { await work.close(); }
+});
+
+test("read worker cache observes committed changes from another connection", async () => {
+  const work = createReadingWork(file);
+  try {
+    const before = await work.run("statistics", { userId: "a" });
+    const row = { id: "worker-cache-check", userId: "a", amount: 1, reason: "test-credit", createdAt: new Date().toISOString() };
+    readDb().transactions.push(row); writeDb(readDb());
+    const after = await work.run("statistics", { userId: "a" });
+    assert.equal(after.transactions, before.transactions + 1);
+    assert.equal(after.credits, before.credits + 1);
+    assert.deepEqual(after, playerStatistics(readDb(), "a"));
+  } finally {
+    await work.close();
+    inspection.prepare("DELETE FROM transactions WHERE id='worker-cache-check'").run();
+    readDb().transactions.persistedCount--;
+    readDb().transactions.touchUsers([{ userId: "a" }]);
+  }
 });
 
 test("catalogue definitions are shared and unknown owned IDs survive", () => {
@@ -117,12 +177,27 @@ test("ranked Elo is normalized, survives restart and duplicate awards roll back 
     user.gameElo.yahtzee.games++;
     user.tokens += 100;
     db.history.push({ ...row, id: "ranked-duplicate", ranked: { ...row.ranked, results: [{ ...result, userId: "elo-test" }] } });
-  }), /UNIQUE/);
+  }), /déjà attribué son Elo/);
   assert.equal(readDb().users.find((u)=>u.id==="elo-test").gameElo.yahtzee.elo, 1016);
   assert.equal(readDb().users.find((u)=>u.id==="elo-test").gameElo.yahtzee.games, 1);
   assert.equal(inspection.prepare("SELECT id FROM history WHERE id='ranked-duplicate'").get(), undefined);
   assert.equal(inspection.prepare("PRAGMA foreign_key_check").get(), undefined);
+  assert.equal(rankedSettlement("ranked-once").results[0].after,1016);
+  inspection.prepare("DELETE FROM history WHERE id='ranked-history'").run();
+  assert.deepEqual(rankedSettlement("ranked-once"),{results:[]});
   updateDb((db)=> {db.users=db.users.filter((u)=>u.id!=="elo-test");});
+});
+
+test("placement evidence is normalized, durable and removed with its account", () => {
+  const placement={games:4,score:2.5,opponentElo:5200,wins:2,losses:1,draws:1,completed:false};
+  updateDb((db)=>db.users.push({id:'placement-test',pseudo:'PlacementTest',tokens:0,gameElo:{yahtzee:{elo:1000,games:4,wins:2,placement}}}));
+  assert.deepEqual(JSON.parse(inspection.prepare('SELECT data FROM user_ranked_placements WHERE user_id=?').get('placement-test').data),placement);
+  assert.equal(JSON.parse(inspection.prepare('SELECT data FROM users WHERE id=?').get('placement-test').data).gameElo,undefined);
+  const moduleUrl=new URL('../src/db.js',import.meta.url).href;
+  const child=spawnSync(process.execPath,['--input-type=module','-e',`const db=await import(${JSON.stringify(moduleUrl)});console.log(JSON.stringify(db.readDb().users.find(u=>u.id==='placement-test').gameElo.yahtzee.placement));db.closeDatabase();`],{env:{...process.env,SQLITE_PATH:file},encoding:'utf8'});
+  assert.equal(child.status,0,child.stderr);assert.deepEqual(JSON.parse(child.stdout.trim()),placement);
+  updateDb((db)=>{db.users=db.users.filter((user)=>user.id!=='placement-test');});
+  assert.equal(inspection.prepare('SELECT COUNT(*) n FROM user_ranked_placements WHERE user_id=?').get('placement-test').n,0);
 });
 
 test("pending payouts and games affect statistics before atomic commit", () => {
@@ -153,6 +228,69 @@ test("constraint failures roll back ledger, inventory and cached balances", () =
   assert.equal(readDb().transactions.pending.length, 0);
   assert.throws(() => updateDb((db) => { db.users[0].tokens = 0; throw new Error("abort"); }), /abort/);
   assert.deepEqual(readDb().users, before);
+});
+
+test("statistics caches survive unrelated activity and invalidate pending and committed changes", () => {
+  const db = readDb(), before = playerStatistics(db, "a");
+  db.transactions.push({ id: "stats-other", userId: "bot", amount: 1, reason: "adjustment", createdAt: "2026-09-03T12:00:00Z" });
+  assert.equal(playerStatistics(db, "a"), before);
+  assert.equal(playerStatistics(db, "bot").transactions, 1);
+  writeDb(db, { users: [], rooms: [] });
+  assert.equal(playerStatistics(readDb(), "a"), before);
+  assert.equal(playerStatistics(readDb(), "bot").transactions, 1);
+  // Restore the shared fixture, including its cache revision.
+  inspection.prepare("DELETE FROM transactions WHERE id='stats-other'").run();
+  readDb().transactions.persistedCount--;
+  readDb().transactions.touchUsers([{ userId: "bot" }]);
+  assert.equal(playerStatistics(readDb(), "bot").transactions, 0);
+});
+
+test("scoped commits do not serialize unrelated accounts and still commit the ledger atomically", () => {
+  updateDb((db) => db.users.push({ id: "scope-other", pseudo: "ScopeOther", tokens: 10 }));
+  const db = readDb(), other = db.users.find((user) => user.id === "scope-other");
+  other.toJSON = () => { throw new Error("Unrelated serialization"); };
+  const before = db.users[0].tokens;
+  db.users[0].tokens += 3;
+  db.transactions.push({ id: "scoped-ledger", userId: "a", amount: 3, balance: before + 3, reason: "adjustment", createdAt: "2026-09-03T12:00:00Z" });
+  writeDb(db, { users: ["a"], rooms: [] });
+  delete other.toJSON;
+  assert.equal(JSON.parse(inspection.prepare("SELECT data FROM users WHERE id='a'").get().data).tokens, before + 3);
+  assert.equal(inspection.prepare("SELECT count(*) n FROM transactions WHERE id='scoped-ledger'").get().n, 1);
+  assert.throws(() => updateDb((state) => {
+    state.users[0].tokens = 999;
+    state.transactions.push({ id: "scoped-ledger", userId: "a", amount: 3 });
+  }, { users: ["a"], rooms: [] }), /UNIQUE/);
+  assert.equal(readDb().users[0].tokens, before + 3);
+  // Keep later fixture assertions unchanged.
+  inspection.prepare("DELETE FROM transactions WHERE id='scoped-ledger'").run();
+  readDb().transactions.persistedCount--;
+  updateDb((state) => { state.users = state.users.filter((user) => user.id !== "scope-other"); state.users[0].tokens = before; });
+});
+
+test("balance-only updates do not rewrite inventory, achievements, progression or Elo", () => {
+  for (const table of ["user_inventory", "user_achievements", "achievement_progress", "user_game_xp", "user_game_elo"]) {
+    for (const operation of ["DELETE", "INSERT", "UPDATE"]) inspection.exec(`CREATE TRIGGER no_${table}_${operation} BEFORE ${operation} ON ${table} BEGIN SELECT RAISE(ABORT, 'unrelated child write'); END`);
+  }
+  try { updateDb((db) => { db.users[0].tokens++; }, { users: ["a"], rooms: [] }); }
+  finally {
+    for (const table of ["user_inventory", "user_achievements", "achievement_progress", "user_game_xp", "user_game_elo"]) for (const operation of ["DELETE", "INSERT", "UPDATE"]) inspection.exec(`DROP TRIGGER no_${table}_${operation}`);
+  }
+});
+
+test("existing accounts are updated once and room upserts do not delete the room", () => {
+  inspection.exec("CREATE TABLE user_write_count(n INTEGER); INSERT INTO user_write_count VALUES(0); CREATE TRIGGER count_user_updates AFTER UPDATE ON users BEGIN UPDATE user_write_count SET n=n+1; END");
+  const before = readDb().users[0].tokens;
+  try {
+    updateDb((db) => { db.users[0].tokens++; }, { users: ["a"], rooms: [] });
+    assert.equal(inspection.prepare("SELECT n FROM user_write_count").get().n, 1);
+    updateDb((db) => { db.rooms.push({ id: "upsert-test", code: "UPSERT", gameId: "yahtzee", players: [] }); }, { users: [], rooms: ["upsert-test"] });
+    inspection.exec("CREATE TRIGGER no_room_delete BEFORE DELETE ON rooms WHEN old.id='upsert-test' BEGIN SELECT RAISE(ABORT,'room rewrite'); END");
+    updateDb((db) => { db.rooms.find((room) => room.id === "upsert-test").name = "Updated"; }, { users: [], rooms: ["upsert-test"] });
+    assert.equal(JSON.parse(inspection.prepare("SELECT data FROM rooms WHERE id='upsert-test'").get().data).name, "Updated");
+  } finally {
+    inspection.exec("DROP TRIGGER count_user_updates; DROP TABLE user_write_count; DROP TRIGGER IF EXISTS no_room_delete");
+    updateDb((db) => { db.users[0].tokens = before; db.rooms = db.rooms.filter((room) => room.id !== "upsert-test"); }, { users: ["a"], rooms: ["upsert-test"] });
+  }
 });
 
 test("large archives are not retained or rewritten on unrelated writes", () => {

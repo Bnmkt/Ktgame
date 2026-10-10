@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeGameModifiers } from "../src/games/modifiers.js";
-import { applyMidnightDiceAction, createMidnightDiceState, evaluateMidnightContract, MIDNIGHT_CONTRACT_DEFINITIONS, MIDNIGHT_CONTRACTS, scoreMidnightContract } from "../src/games/engines/midnight-dice.js";
+import { applyMidnightDiceAction, createMidnightDiceState, evaluateMidnightContract, MIDNIGHT_CONTRACT_DEFINITIONS, MIDNIGHT_CONTRACTS, midnightContractOffers, midnightDiceBotAction, scoreMidnightContract } from "../src/games/engines/midnight-dice.js";
 import { applyVelvetRuseAction, createVelvetRuseState } from "../src/games/engines/velvet-ruse.js";
 import { normalizeCosmeticCss, normalizeCosmeticDesign, normalizeCosmeticMotion, normalizeCustomKeyframes } from "../src/services/cosmetic-validation.js";
 import { applyYahtzeeAction, createYahtzeeState, scoreYahtzee, totalYahtzee, yahtzeeBotAction } from "../src/games/engines/yahtzee.js";
@@ -17,6 +17,7 @@ import { canGolfPlay, createGolfSolitaireState } from "../src/games/engines/golf
 import { canAccordionMove, createAccordionState, hasAccordionMove } from "../src/games/engines/accordion.js";
 import { applyTexasHoldemAction, bestPokerHand, comparePokerRanks, createTexasHoldemState, currentPokerHand, pokerFiveRank, pokerHandPreview, texasHoldemBotAction, tickPokerState } from "../src/games/engines/texas-holdem.js";
 import { applyBattleAction, battleBotAction, battleScoreFor, createBattleState } from "../src/games/engines/bataille.js";
+import { spectatorState } from "../src/games/spectator-state.js";
 
 const players = [
   { id: "p1", pseudo: "Joueur 1" },
@@ -28,6 +29,7 @@ test("les modificateurs sont bornés et complétés par leurs valeurs par défau
     rounds: 8,
     marketExtra: 0,
     discardsPerRound: 1,
+    individualContracts: true,
     uniqueContracts: true
   });
   assert.deepEqual(normalizeGameModifiers("velvet-ruse", { targetPrestige: 2, claimRule: "inconnue", openDiscardDraw: false }), {
@@ -322,8 +324,8 @@ test("Dés de Minuit enchaîne le choix des mandats, le draft et la résolution"
   assert.equal(state.phase, "contract");
   assert.equal(state.contractOffers.length, 4);
 
-  applyMidnightDiceAction(state, "p1", { type: "choose-contract", contract: state.contractOffers[0] });
-  applyMidnightDiceAction(state, "p2", { type: "choose-contract", contract: state.contractOffers[1] });
+  applyMidnightDiceAction(state, "p1", { type: "choose-contract", contract: midnightContractOffers(state,"p1")[0] });
+  applyMidnightDiceAction(state, "p2", { type: "choose-contract", contract: midnightContractOffers(state,"p2")[1] });
   assert.equal(state.phase, "draft");
   assert.equal(state.market.length, 6);
 
@@ -338,6 +340,33 @@ test("Dés de Minuit enchaîne le choix des mandats, le draft et la résolution"
   assert.equal(state.phase, "contract");
 });
 
+test("Midnight gives eight distinct personal offers, validates ownership and rotates without repetition",()=> {
+  const roster=Array.from({length:8},(_,i)=>({id:`p${i}`,pseudo:`Player ${i}`}));
+  const state=createMidnightDiceState(roster,{gameModifiers:{rounds:5}});
+  const previous=structuredClone(state.privateContractOffers);
+  const observer=spectatorState(state);assert.equal(observer.privateContractOffers,undefined);assert.deepEqual(observer.contractOffers,[]);
+  assert.equal(new Set(Object.values(previous).map((offers)=>[...offers].sort().join("|"))).size,8);
+  assert.ok(Object.values(previous).every((offers)=>offers.length===4 && new Set(offers).size===4 && offers.every((id)=>MIDNIGHT_CONTRACTS.includes(id))));
+  const foreign=previous.p1.find((id)=>!previous.p0.includes(id));
+  assert.throws(()=>applyMidnightDiceAction(state,"p0",{type:"choose-contract",contract:foreign}),/pas proposé/);
+  let guard=0;
+  while(state.round<5 && guard++<200) {
+    const player=state.players[state.currentPlayerIndex];
+    applyMidnightDiceAction(state,player.id,state.phase==="contract"?midnightDiceBotAction(state,player):{type:"draft",index:0});
+  }
+  assert.equal(state.round,5);assert.equal(state.phase,"contract");
+  assert.ok(Object.keys(previous).every((id)=>state.privateContractOffers[id].every((contract)=>!previous[id].includes(contract))));
+  assert.ok(Object.values(state.usedContracts).every((ids)=>ids.length===0));
+  assert.deepEqual(state.lastRound.contractOffers,[]);
+});
+test("Midnight shared mode remains available and legacy live states keep their shared offers",()=> {
+  const state=createMidnightDiceState(players,{gameModifiers:{individualContracts:false}});
+  assert.equal(state.privateContractOffers,undefined);
+  assert.deepEqual(midnightContractOffers(state,"p1"),midnightContractOffers(state,"p2"));
+  delete state.modifiers.individualContracts;
+  applyMidnightDiceAction(state,"p1",{type:"choose-contract",contract:state.contractOffers[0]});
+  assert.equal(state.secretContracts.p1,state.contractOffers[0]);
+});
 test("Velours Noir conserve son cycle pioche, déclaration et verdict", () => {
   const state = createVelvetRuseState(players, { gameModifiers: { handSize: 3, dossierSize: 3 } });
   const initialHandSize = state.hands.p1.length;

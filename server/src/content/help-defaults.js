@@ -1,4 +1,5 @@
 import { guideContent, guideIntroduction } from "./help-guide.js";
+import { withProgressionHelp } from "./help-ranked.js";
 
 const entry = (id, kind, category, title, body, image = "", imageAlt = "") => ({ id, kind, category, title, body, image, imageAlt, published: true });
 export const legacyHelpEntries = [
@@ -30,7 +31,7 @@ export const legacyHelpEntries = [
   entry("faq-updates", "faq", "Assistance", "Où lire les nouveautés ou revoir ce guide ?", "Les **Patchnotes** présentent les versions et leurs changements. La page **Guide du joueur** rassemble les tutos et permet de rouvrir le guide d’accueil. La FAQ et les liens utiles restent accessibles dans le bas de page.")
 ];
 
-export const defaultHelpEntries = legacyHelpEntries.map((entry) => ({ ...entry, ...(guideContent[entry.id] ?? {}) }));
+export const defaultHelpEntries = withProgressionHelp({ entries: legacyHelpEntries.map((entry) => ({ ...entry, ...(guideContent[entry.id] ?? {}) })) }).entries;
 
 export function upgradeDefaultGuides(document) {
   const oldEntries = new Map(legacyHelpEntries.filter((entry) => entry.kind === "guide").map((entry) => [entry.id, entry]));

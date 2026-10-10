@@ -1,23 +1,24 @@
 import React from "react";
 import { suits } from "../../features/games/config.js";
 
-export function PlayingCard({ card, hidden = false, skin = "default", style, animate = true }) {
-  if (!card || hidden) return <div className={`playing-card card-back ${animate ? "deal-card" : ""} card-skin-${skin}`} style={style}><span>?</span></div>;
+export function PlayingCard({ card, hidden = false, skin = "default", style, animate = true, inline = false }) {
+  const CardElement = inline ? "span" : "div";
+  if (!card || hidden) return <CardElement className={`playing-card card-back ${animate ? "deal-card" : ""} card-skin-${skin}`} style={style}><span>?</span></CardElement>;
   const suit = suits[card.suit] ?? suits.S;
   return (
-    <div className={`playing-card ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={style} title={`${card.rank} de ${suit.name}`}>
+    <CardElement className={`playing-card ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={style} title={`${card.rank} de ${suit.name}`}>
       <strong>{card.rank}</strong>
       <span>{suit.symbol}</span>
-    </div>
+    </CardElement>
   );
 }
 
-export function Die({ value, kept, onClick, skin = "default", animate = true, selectionLabel = "Gardé", style }) {
+export function Die({ value, kept, onClick, skin = "default", animate = true, selectionLabel = "Gardé", style, inline = false }) {
   const faces = {
     1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9]
   };
   const pips = faces[value] ?? [];
-  const DieElement = onClick ? "button" : "div";
+  const DieElement = onClick ? "button" : inline ? "span" : "div";
   return (
     <DieElement className={`die die-skin-${skin} ${value && animate ? "roll-in" : ""} ${kept ? "kept" : ""} ${kept && selectionLabel === "À relancer" ? "selected-reroll" : ""}`} style={style} onClick={onClick} disabled={onClick ? !value : undefined} title={onClick ? (kept ? selectionLabel : `Cliquer pour marquer comme « ${selectionLabel.toLowerCase()} »`) : undefined}>
       {pips.map((dot) => <span key={dot} className="pip" data-pip={dot} />)}

@@ -49,3 +49,17 @@ test("SMTP failures remain persisted across restarts and retry with backoff; mis
     second.close(); assert.equal(path.dirname(path.resolve(directory)), path.resolve(tmpdir())); assert.ok(path.basename(directory).startsWith("ktga-contact-notices-")); rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("pending alerts resolve the current administrator contact on each retry without changing SMTP identity", async () => {
+  let contact = "first@example.com", available = false;
+  const sent = [];
+  const queue = createContactNoticeQueue({ filename: ":memory:", environment, intervalMs: 0, configured: () => available, contactEmail: () => contact, sendEmail: async (mail, smtp) => sent.push({ mail, smtp }) });
+  try {
+    queue.enqueue("received:1842", notice);
+    await queue.flush(); assert.equal(sent.length, 0);
+    contact = "updated@example.com"; available = true;
+    await queue.flush(); assert.equal(sent[0].mail.to, contact);
+    assert.equal(sent[0].smtp, environment);
+    assert.equal(environment.CONTACT_EMAIL, "contact@example.com");
+  } finally { queue.close(); }
+});

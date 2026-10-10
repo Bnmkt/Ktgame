@@ -28,6 +28,17 @@ function validVersion(value) {
   return /^[0-9A-Za-z][0-9A-Za-z._+-]{0,39}$/.test(value);
 }
 
+function publicationDate(value) {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) {
+    throw new Error("La date de publication doit être une date et heure valide avec son fuseau horaire.");
+  }
+  if (new Date(`${value.slice(0, 10)}T00:00:00Z`).toISOString().slice(0, 10) !== value.slice(0, 10)) {
+    throw new Error("La date de publication contient un jour inexistant.");
+  }
+  return new Date(value).toISOString();
+}
+
 function compareVersions(left, right) {
   const parts = (value) => String(value).match(/\d+|[A-Za-z]+/g)?.map((entry) => /^\d+$/.test(entry) ? Number(entry) : entry.toLowerCase()) ?? [];
   const a = parts(left), b = parts(right);
@@ -184,7 +195,8 @@ export function createPatchnoteStore({ filename, uploadDirectory, currentVersion
     const attachmentIds = new Set(db.prepare("SELECT id FROM patchnote_attachments WHERE patchnote_id=?").all(id).map((row) => row.id));
     if (blocks.some((block) => block.type === "image" && !attachmentIds.has(block.metadata.attachmentId))) throw new Error("Une image n’appartient pas à cette patchnote.");
     const at = new Date(now()).toISOString();
-    const publishedAt = status === "published" ? existing.published_at || at : existing.published_at;
+    const selectedDate = input.publishedAt === undefined ? existing.published_at : publicationDate(input.publishedAt);
+    const publishedAt = selectedDate || (status === "published" ? at : null);
     db.exec("BEGIN IMMEDIATE");
     try {
       db.prepare("UPDATE patchnotes SET version=?,version_group=?,title=?,summary=?,status=?,published_at=?,updated_at=? WHERE id=?").run(version, versionGroup, title, summary, status, publishedAt, at, id);

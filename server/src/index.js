@@ -1,9 +1,10 @@
 import "dotenv/config";
+import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
 import { activeModeration, activeParentalRevocation, createParentalControlStore, defaultMinorRestrictions, exactAge, featureAccess, isUnder13, minorRestrictionOptions, normalizeMinorRestrictions, registrationMarker, turnsThirteenAt } from "./services/parental-controls.js";
 import { sendParentBirthdayReminder, sendParentDailySummary, sendParentalActionNotice, sendParentalAdminNotice, sendParentalDecision, sendParentVerification } from "./services/parental-email.js";
 import { PRIVACY_VERSION, allowedUrlMarkers, createSiteActivityTracker, playerAchievementContext, setActivityConsent, validActivityConsent, tableActivityContext, tableTimeMetrics } from "./services/site-achievements.js";
-import bcrypt from "bcryptjs";
+import { passwordWork } from "./services/password-work.js";
 import compression from "compression";
 import cors from "cors";
 import express from "express";
@@ -13,7 +14,7 @@ import jwt from "jsonwebtoken";
 import fs from "node:fs";
 import { createServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createSecretKey, randomBytes, randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { monitorEventLoopDelay, performance } from "node:perf_hooks";
@@ -21,9 +22,9 @@ import v8 from "node:v8";
 import { fileURLToPath } from "node:url";
 import { Server } from "socket.io";
 import { games } from "./games/shared.js";
-import { applyAction, createGameState, pokerHandLabel, pokerHandPreview, tickBattleState, tickPokerState } from "./games/engines.js";
+import { applyAction as applyGameAction, createGameState, pokerHandLabel, pokerHandPreview, tickBattleState, tickPokerState } from "./games/engines.js";
 import { normalizeBattleModifiers, normalizeGameModifiers } from "./games/modifiers.js";
-import { midnightDiceBotAction } from "./games/engines/midnight-dice.js";
+import { midnightDiceBotAction, midnightContractOffers, resumeMidnightAfterDeparture } from "./games/engines/midnight-dice.js";
 import { velvetRuseBotAction } from "./games/engines/velvet-ruse.js";
 import { yahtzeeBotAction } from "./games/engines/yahtzee.js";
 import { fourTwentyOneBotAction, paidRerollPrice421 } from "./games/engines/four-twenty-one.js";
@@ -41,8 +42,8 @@ import { normalizeCosmeticCss, normalizeCosmeticDesign, normalizeCosmeticMotion 
 import { friendRoomPresence } from "./services/friend-presence.js";
 import { createOnlinePresence } from "./services/online-presence.js";
 import { roomCredentialsError } from "./services/room-credentials.js";
-import { awardGameXp, equippedGameTitle, gameProgress, gameXpRules, grantAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "./services/game-progression.js";
-import { buildLeaderboard } from "./services/leaderboards.js";
+import { MAX_XP, awardGameXp, equippedGameTitle, gameProgress, gameXpRules, grantAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "./services/game-progression.js";
+import { buildLeaderboard as calculateLeaderboard } from "./services/leaderboards.js";
 import {
   appendEventPotEntry,
   calculateCommunityEventRewards,
@@ -59,17 +60,29 @@ import {
   purchaseCommunityEventActions,
   validateCommunityEvent
 } from "./services/community-events.js";
-import { databaseFilename, databaseHealth, rankedRows, rankedRecent, readDb, setCatalogSource, updateDb, writeDb } from "./db.js";
-import { RANKED_GAMES, eloFor, normalizeRankedConfig, settleRanked, validateRankedAction } from "./services/ranked.js";
+import { databaseFilename, databaseHealth, databaseSettingsRevision, databaseSettingsReadRevision, rankedRows, rankedRecent, rankedMetrics, rankedSettlement, readDb, setCatalogSource, updateDb as mutateDb, writeDb as persistDb } from "./db.js";
+import { RANKED_GAMES, competitiveFor, eloFor, equippedRankedBadge, normalizeRankedConfig, publicRanked, rankedResultFor, settleRanked as applyRankedSettlement, validateRankedAction } from "./services/ranked.js";
 import { createRankedRuntime } from "./services/ranked-runtime.js";
+import { registerRankInsigniaRoutes } from "./services/rank-insignia-images.js";
 import { createDataRequestStore } from "./services/data-requests.js";
 import { registerDataRequestRoutes } from "./services/data-request-routes.js";
 import { createBugReportStore } from "./services/bug-reports.js";
 import { registerBugReportRoutes } from "./services/bug-report-routes.js";
 import { createContactNoticeQueue } from "./services/contact-notices.js";
+import { normalizeContactEmail, siteContactEmail } from "./services/site-contact.js";
 import { archiveDays, archiveRows } from "./storage/archives.js";
-import { ledgerPage } from "./storage/ledger.js";
-import { playerStatistics } from "./services/player-statistics.js";
+import { playerStatistics as calculatePlayerStatistics, playerStatisticsCacheHealth } from "./services/player-statistics.js";
+import { createServiceExecution } from "./services/service-execution.js";
+import { createReadingWork } from "./services/reading-work.js";
+import { createAccountsWork } from "./services/accounts-work.js";
+import { accountsProcessHealth } from "./services/process-health.js";
+import { createExecutionHistory } from "./services/execution-history.js";
+import { createCapacityTests, registerCapacityTestRoutes } from "./services/capacity-tests.js";
+import { registerDesktopSupervision } from "./services/desktop-supervision.js";
+import { roomWriteScope } from "./storage/room-write-scope.js";
+import { ConfigurationCache } from "./services/configuration-cache.js";
+import { createAccountDomain, defaultCosmetics, achievementThresholds, achievementCompletionId, shopTypes } from "./services/account-domain.js";
+import { createLobbyBroadcast } from "./services/lobby-broadcast.js";
 import { completedMidnightContractCount, gameResultAchievementIds } from "./services/result-achievements.js";
 import {
   achievementRuleSchemas,
@@ -113,6 +126,8 @@ import {
 } from "./services/account-security.js";
 import { createStatusMonitor } from "./services/status-monitor.js";
 import { createEmailStatusProbe, smtpDiagnostic } from "./services/email-status-probe.js";
+import { describeChatLinks, detectChatLinks } from "./services/chat-links.js";
+import { apiHealthProbe } from "./services/api-status-probe.js";
 import { createPatchnoteStore } from "./services/patchnotes.js";
 import { createHelpStore } from "./services/help-content.js";
 import { createTribunalStore, tribunalCategories } from "./services/tribunal.js";
@@ -124,6 +139,23 @@ const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const JWT_SECRET = process.env.JWT_SECRET || (NODE_ENV === "production" ? "" : "dev-secret-change-me");
+const JWT_KEY = createSecretKey(Buffer.from(JWT_SECRET));
+const configurationCache = new ConfigurationCache({ revision: databaseSettingsReadRevision });
+const serviceExecution = createServiceExecution();
+const accountsWork = process.env.ACCOUNTS_PROCESS_ENABLED === "1" ? createAccountsWork(databaseFilename) : null;
+const bcrypt = accountsWork?.passwords ?? passwordWork;
+const readingWork = accountsWork?.reading ?? createReadingWork(databaseFilename, { size: Number(process.env.READING_WORKERS || 1) });
+const executionHistory = createExecutionHistory(process.env.EXECUTION_DB_PATH || path.join(path.dirname(databaseFilename), "execution.sqlite"));
+const capacityTests = createCapacityTests(path.join(path.dirname(databaseFilename), "tests.sqlite"), {
+  guard: () => ({ rooms: readDb().rooms.filter((room) => !room.finished).length, loopP95: latestServerHealth?.eventLoopP95 ?? 0 }),
+  version: () => patchnotes.currentVersion
+});
+const applyAction = (...args) => serviceExecution.measure("rooms", () => applyGameAction(...args));
+const settleRanked = (...args) => serviceExecution.measure("ranked", () => applyRankedSettlement(...args));
+const writeDb = (...args) => serviceExecution.measure("persistence", () => persistDb(...args));
+const updateDb = (...args) => serviceExecution.measure("persistence", () => mutateDb(...args));
+const buildLeaderboard = (...args) => serviceExecution.measure("information", () => calculateLeaderboard(...args));
+const playerStatistics = (...args) => serviceExecution.measure("information", () => calculatePlayerStatistics(...args));
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 const allowedOrigins = CLIENT_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean);
@@ -169,25 +201,6 @@ const ROOM_PAYOUT_RATES = [0.6, 0.3, 0.1];
 const DEFAULT_BOT_THINKING_MS = 1000;
 const DEFAULT_TURN_END_DELAY_MS = 5000;
 const DEFAULT_ROUND_RESULTS_MS = 30000;
-const achievementThresholds = {
-  gamesPlayed: [1, 5, 50, 200, 1000, 5000, 10000],
-  wins: [1, 10, 100, 500, 1000, 5000, 10000],
-  staked: [100, 1000, 2000, 5000, 15000, 50000, 100000, 1000000, 10000000],
-  dailyClaims: [1, 7, 50, 100, 500],
-  dailyStreak: [7, 30, 365],
-  gameWins: [1, 10, 50, 100, 500, 1000]
-};
-const defaultCosmetics = {
-  icons: ["chip"],
-  nameEffects: ["none"],
-  memberCards: ["default"],
-  profileBanners: ["default"],
-  profileFrames: ["none"],
-  profileEffects: ["none"],
-  diceSkins: ["default"],
-  cardSkins: ["default"],
-  equipped: { icon: "chip", nameEffect: "none", memberCard: "default", profileBanner: "default", profileFrame: "none", profileEffect: "none", diceSkin: "default", cardSkin: "default" }
-};
 
 const parentalControls = createParentalControlStore({ filename: PARENTAL_DB_PATH, secret: JWT_SECRET });
 const tribunal = createTribunalStore({ filename: TRIBUNAL_DB_PATH });
@@ -475,6 +488,7 @@ function normalizePlatformSettings(value = {}) {
   });
   return {
     siteName: String(value.siteName ?? defaultPlatformSettings.siteName).trim().slice(0, 36) || defaultPlatformSettings.siteName,
+    contactEmail: siteContactEmail(value),
     siteIcon: String(value.siteIcon ?? defaultPlatformSettings.siteIcon).trim().slice(0, 6000) || defaultPlatformSettings.siteIcon,
     siteSubtitle: String(value.siteSubtitle ?? defaultPlatformSettings.siteSubtitle).trim().slice(0, 120) || defaultPlatformSettings.siteSubtitle,
     registrationsEnabled: value.registrationsEnabled !== false,
@@ -498,23 +512,21 @@ function normalizePlatformSettings(value = {}) {
 }
 
 function platformSettings(db = readDb()) {
-  return normalizePlatformSettings(db.settings?.platform);
-}
-
-function progressionConfig(db) { return platformSettings(db).gameProgression; }
-function playerProgression(user, db, includeTitles = false) {
-  const config = progressionConfig(db);
-  const ranked = normalizeRankedConfig(db.settings?.ranked, configuredGames(db), platformSettings(db));
-  return games.map((game) => {
-    const progress = gameProgress(user, game.id, config);
-    return { ...progress, gameName: game.name, ...(RANKED_GAMES.includes(game.id) ? { competitive: eloFor(user,game.id,ranked.games[game.id]) } : {}), ...(includeTitles ? { unlockedTitles: unlockedGameTitles(config, game.id, progress.highestLevel) } : {}) };
+  return configurationCache.get("platform", db.settings?.platform, () => {
+    const settings = normalizePlatformSettings(db.settings?.platform);
+    return { ...settings, supportEmail: settings.contactEmail };
   });
 }
-function playerTitle(user, db) {
-  return equippedGameTitle(user, progressionConfig(db), games.map((game) => game.id));
+
+function rankedConfig(db = readDb()) {
+  return configurationCache.get("ranked", [db.settings?.ranked, db.settings?.games, db.settings?.platform], () => normalizeRankedConfig(db.settings?.ranked, configuredGames(db), platformSettings(db)));
 }
+
+function contactEmail() { return siteContactEmail(readDb().settings?.platform); }
+
+function progressionConfig(db) { return platformSettings(db).gameProgression; }
 function playerLevelContext(user, db, gameId) {
-  const rows = playerProgression(user, db), current = rows.find((row) => row.gameId === gameId);
+  const config = progressionConfig(db), rows = games.map((game) => gameProgress(user, game.id, config)), current = rows.find((row) => row.gameId === gameId);
   return { gameLevel: current?.level ?? 1, gameMastery: current?.mastery ?? 0, gameXp: current?.xp ?? 0, highestGameLevel: Math.max(1, ...rows.map((row) => row.highestLevel)), totalGameXp: rows.reduce((total, row) => total + row.xp, 0) };
 }
 function xpAchievementEvents(db, user, result, room, depth = 0, reason = "achievement") {
@@ -565,19 +577,18 @@ function battleDeckOverview(state, viewerId) {
 
 function configuredGames(db = readDb()) {
   const overrides = db.settings?.games ?? {};
-  return games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999));
+  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
 }
 
 function configuredShop(db = readDb()) {
   const overrides = db.settings?.shopOverrides ?? {};
   const removed = new Set(db.settings?.removedShopItems ?? []);
-  return [...shopCatalog, ...(db.settings?.customShopItems ?? [])].filter((item) => !removed.has(item.id)).map((item) => {
+  return configurationCache.get("shop", [overrides, db.settings?.removedShopItems, db.settings?.customShopItems], () => [...shopCatalog, ...(db.settings?.customShopItems ?? [])].filter((item) => !removed.has(item.id)).map((item) => {
     const merged = { ...item, ...(overrides[item.id] ?? {}) };
     return { ...merged, css: normalizeCosmeticCss(merged.css, { allowUrls: true }) };
-  });
+  }));
 }
 
-const shopTypes = ["icons", "nameEffects", "memberCards", "profileBanners", "profileFrames", "profileEffects", "diceSkins", "cardSkins"];
 const shopCategories = ["classic", "premium", "premiumShape", "premiumAnimated"];
 const cosmeticEquippedKeys = { icons: "icon", nameEffects: "nameEffect", memberCards: "memberCard", profileBanners: "profileBanner", profileFrames: "profileFrame", profileEffects: "profileEffect", diceSkins: "diceSkin", cardSkins: "cardSkin" };
 const builtInPackNames = { "japanese-traditional": "Japon traditionnel", "japanese-sakura": "Sakura", neon: "Néon" };
@@ -697,7 +708,16 @@ const resultAchievementCatalog = [
 const achievementCollectionCatalog = [
   { id: "achievement-collector-50", type: "site", milestone: true, group: "Jeux", title: "Galerie d'honneur", description: "Débloquer 50 succès.", target: 50 }
 ];
-const achievementCompletionId = "achievement-visible-complete";
+
+const accountDomain = createAccountDomain({ configurationCache, platformSettings, rankedConfig, achievementCatalog, playerStatistics });
+const {
+  normalizePublicProfile, normalizePlainText, ageFromBirthDate, ensureUserSocial, displayNameFor,
+  friendCodeFor, maskedEmail, publicProfileFor, playerRankedBadge, playerProgression, playerTitle,
+  serializeUserInternal, sanitizeFriendUser, publicUserPayload, normalizeCosmetics, normalizeAchievements,
+  refreshPublicProfileStats, normalizeProfileStats, publicMemberStats, calculateMemberStats,
+  dailyBonusStatus, longestDateStreak, cosmeticCount, userAchievementProgress,
+  calculateAchievementProgress, achievementStatus, sanitizeNotification, achievementProgressCache, memberStatsCache
+} = accountDomain;
 
 const app = express();
 const requestLogs = createRequestLogStore({ filename: process.env.REQUEST_LOG_PATH || path.join(__dirname, "..", "data", "request-logs.sqlite") });
@@ -710,7 +730,7 @@ const patchnotes = createPatchnoteStore({
   currentVersion: APP_VERSION
 });
 process.on("exit", () => patchnotes.close());
-const contactNotices = createContactNoticeQueue({ filename: process.env.CONTACT_NOTICE_DB_PATH ? path.resolve(process.cwd(), process.env.CONTACT_NOTICE_DB_PATH) : `${databaseFilename}.contact-notices.sqlite`, siteName: () => platformSettings().siteName });
+const contactNotices = createContactNoticeQueue({ filename: process.env.CONTACT_NOTICE_DB_PATH ? path.resolve(process.cwd(), process.env.CONTACT_NOTICE_DB_PATH) : `${databaseFilename}.contact-notices.sqlite`, siteName: () => platformSettings().siteName, contactEmail });
 process.on("exit", () => contactNotices.close());
 const bugFilename = process.env.BUG_REPORT_DB_PATH ? path.resolve(process.cwd(), process.env.BUG_REPORT_DB_PATH) : `${databaseFilename}.bugs.sqlite`;
 const bugImageDirectory = process.env.BUG_REPORT_UPLOAD_DIR ? path.resolve(process.cwd(), process.env.BUG_REPORT_UPLOAD_DIR) : path.join(path.dirname(bugFilename), "bug-images");
@@ -728,6 +748,7 @@ const requestTelemetry = {
   errors: 0,
   periodCount: 0,
   periodErrors: 0,
+  periodServerErrors: 0,
   periodDurationMs: 0,
   periodMaxDurationMs: 0,
   endpoints: new Map()
@@ -778,7 +799,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(cors(corsOptions));
-app.use(compression({ threshold: 1024 }));
+app.use(compression({ threshold: 1024, level: 1 }));
 if (APP_BASE_PATH) {
   app.use((req, res, next) => {
     if (req.url === APP_BASE_PATH) {
@@ -807,16 +828,18 @@ app.use((req, res, next) => {
       .replace(/\/\d+(?=\/|$)/g, "/:id");
     const key = `${req.method} ${routePath}`;
     // Le rafraîchissement de la page de santé ne doit pas masquer l'activité utile.
-    if (["GET /api/admin/health", "GET /api/status"].includes(key)) return;
+    if (["GET /api/admin/health", "GET /api/admin/execution-history", "GET /api/status", "GET /api/desktop/overview", "GET /api/desktop/metrics", "GET /api/desktop/status"].includes(key)) return;
     const failed = res.statusCode >= 400;
     requestTelemetry.total += 1;
     requestTelemetry.periodCount += 1;
     requestTelemetry.periodDurationMs += durationMs;
+    serviceExecution.record("interface", durationMs, !failed);
     requestTelemetry.periodMaxDurationMs = Math.max(requestTelemetry.periodMaxDurationMs, durationMs);
     if (failed) {
       requestTelemetry.errors += 1;
       requestTelemetry.periodErrors += 1;
     }
+    if (res.statusCode >= 500) requestTelemetry.periodServerErrors += 1;
     const endpoint = requestTelemetry.endpoints.get(key) ?? { route: key, requests: 0, errors: 0, durationMs: 0, maxDurationMs: 0, lastStatus: 0, lastSeenAt: null };
     endpoint.requests += 1;
     endpoint.durationMs += durationMs;
@@ -834,6 +857,12 @@ app.use("/api/admin/help", express.json({ limit: "2mb" }));
 app.use(express.json());
 app.use("/api", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
 app.use("/api/auth", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: AUTH_RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
+app.use((req, _res, next) => {
+  // Public/player handlers cannot edit casino configuration. Async continuations
+  // exit this synchronous scope and revalidate configuration when they resume.
+  if (req.path.startsWith("/api/") && !/^\/api\/admin(?:\/|$)/.test(req.path)) return configurationCache.read(next);
+  next();
+});
 
 function createAppServer() {
   if (HTTPS_PFX_PATH) {
@@ -970,9 +999,21 @@ function collectServerHealthSample() {
   const seatedBots = activeRooms.reduce((sum, room) => sum + (room.players ?? []).filter((player) => player.isBot).length, 0);
   const watchedConnections = [...roomPresence.values()].reduce((sum, sockets) => sum + sockets.size, 0);
   const periodCount = requestTelemetry.periodCount;
+  const passwordWorkers = bcrypt.health();
+  const readingWorkers = readingWork.health();
+  const accounts = accountsProcessHealth(accountsWork);
+  const services = serviceExecution.health(readingWorkers);
+  try { executionHistory.sample(services); } catch { console.error("Execution metrics could not be stored."); }
+  const caches = { configuration: configurationCache.health(), statistics: playerStatisticsCacheHealth(db), achievements: achievementProgressCache.health(), memberStats: memberStatsCache.health() };
   const sample = {
     at: new Date().toISOString(),
     cpuProcess: Number(processCpuPercent.toFixed(3)),
+    accountsCpu: accounts.cpuPercent ?? null,
+    accountsRss: accounts.memoryRss ?? null,
+    accountsLoopP95: accounts.eventLoopP95 ?? null,
+    accountsLoopMax: accounts.eventLoopMax ?? null,
+    accountsBusy: accounts.busy,
+    accountsQueued: accounts.queued,
     cpuSystem: Number(systemCpuPercent.toFixed(3)),
     memoryRss: memory.rss,
     memoryHeap: memory.heapUsed,
@@ -986,6 +1027,8 @@ function collectServerHealthSample() {
     requestLatencyAverage: Number((periodCount ? requestTelemetry.periodDurationMs / periodCount : 0).toFixed(3)),
     requestLatencyMax: Number(requestTelemetry.periodMaxDurationMs.toFixed(3)),
     requestErrors: requestTelemetry.periodErrors,
+    requestServerErrors: requestTelemetry.periodServerErrors,
+    requestCount: periodCount,
     sockets: io.engine.clientsCount,
     watchedConnections,
     activeRooms: activeRooms.length,
@@ -994,10 +1037,27 @@ function collectServerHealthSample() {
     seatedHumans,
     seatedBots,
     databaseBytes: database.fileBytes,
-    walBytes: database.walBytes
+    walBytes: database.walBytes,
+    workerBusy: passwordWorkers.busy,
+    workerQueued: passwordWorkers.queued,
+    workerOldestWaitMs: passwordWorkers.oldestWaitMs,
+    workerWaitP95: passwordWorkers.wait.p95Ms,
+    workerProcessingP95: passwordWorkers.processing.p95Ms,
+    workerCompleted: passwordWorkers.completed,
+    workerRejected: passwordWorkers.rejected,
+    readingWorkerBusy: readingWorkers.busy,
+    readingWorkerQueued: readingWorkers.queued,
+    services: Object.fromEntries(Object.entries(services).map(([key, row]) => [key, {
+      completed: row.completed, failed: row.failed, queued: row.queued, busy: row.busy,
+      processingP95: row.processing.p95Ms, waitP95: row.wait?.p95Ms ?? null
+    }])),
+    cacheConfigurationHitRate: caches.configuration.hitRate,
+    cacheStatisticsHitRate: caches.statistics.hitRate,
+    cacheAchievementsHitRate: caches.achievements.hitRate
   };
   requestTelemetry.periodCount = 0;
   requestTelemetry.periodErrors = 0;
+  requestTelemetry.periodServerErrors = 0;
   requestTelemetry.periodDurationMs = 0;
   requestTelemetry.periodMaxDurationMs = 0;
   latestServerHealth = sample;
@@ -1016,10 +1076,22 @@ function serverHealthPayload(requestedPoints = 360) {
     .map((entry) => ({ ...entry, averageDurationMs: entry.requests ? entry.durationMs / entry.requests : 0, errorRate: entry.requests ? entry.errors / entry.requests : 0 }))
     .sort((left, right) => right.durationMs - left.durationMs)
     .slice(0, 30);
+  const passwordWorkers = bcrypt.health();
+  const readingWorkers = readingWork.health();
+  const accounts = accountsProcessHealth(accountsWork);
+  const caches = { configuration: configurationCache.health(), statistics: playerStatisticsCacheHealth(readDb()), achievements: achievementProgressCache.health(), memberStats: memberStatsCache.health() };
   return {
     generatedAt: new Date().toISOString(),
     sampleIntervalSeconds: 5,
-    status: sample.eventLoopP95 > 150 || sample.cpuProcess > 90 || memory.heapUsed / Math.max(1, heap.heap_size_limit) > .9 ? "warning" : "healthy",
+    status: accounts.status === "warning" || passwordWorkers.status !== "healthy" || readingWorkers.status !== "healthy" || sample.eventLoopP95 > 150 || sample.cpuProcess > 90 || memory.heapUsed / Math.max(1, heap.heap_size_limit) > .9 ? "warning" : "healthy",
+    processes: { site: { role: "site", status: sample.eventLoopP95 > 150 || sample.cpuProcess > 90 ? "warning" : "healthy",
+      pid: process.pid, cpuPercent: sample.cpuProcess, memoryRss: memory.rss, memoryHeap: memory.heapUsed,
+      eventLoopP95: sample.eventLoopP95, eventLoopMax: sample.eventLoopMax, uptimeSeconds: process.uptime() }, accounts },
+    processTotals: { cpuPercent: sample.cpuProcess + (accounts.cpuPercent ?? 0), memoryRss: memory.rss + (accounts.memoryRss ?? 0) },
+    workers: { password: passwordWorkers, reading: readingWorkers },
+    services: serviceExecution.health(readingWorkers),
+    executionHistory: executionHistory.health(),
+    caches,
     process: {
       pid: process.pid,
       nodeVersion: process.version,
@@ -1102,14 +1174,7 @@ async function websiteStatusProbe() {
 
 function apiStatusProbe() {
   const rows = serverHealthHistory.slice(-12).filter((row) => Date.parse(row.at) - serverStartedAt >= 30000);
-  const latest = rows.at(-1) ?? latestServerHealth ?? {};
-  const p95 = Math.max(0, ...rows.map((row) => Number(row.eventLoopP95) || 0));
-  const latency = rows.length ? rows.reduce((sum, row) => sum + (Number(row.requestLatencyAverage) || 0), 0) / rows.length : 0;
-  const errors = rows.reduce((sum, row) => sum + (Number(row.requestErrors) || 0), 0);
-  const warmingUp = !rows.length;
-  const outage = !server.listening;
-  const degraded = errors >= 5 || (!warmingUp && (p95 > 150 || latency > 750 || Number(latest.cpuProcess) > 90 || Number(latest.eventLoopUtilization) > 99));
-  return { id: "api", status: outage ? "outage" : degraded ? "degraded" : "operational", latencyMs: latency, message: outage ? "L’API ne traite plus les requêtes dans des délais acceptables." : degraded ? "L’API connaît des ralentissements ou des erreurs." : "L’API répond normalement." };
+  return apiHealthProbe({ rows, listening: server.listening });
 }
 
 function realtimeStatusProbe() {
@@ -1164,7 +1229,7 @@ async function collectPublicStatus() {
 }
 
 function makeToken(user) {
-  return jwt.sign({ id: user.id, guest: user.guest, sessionVersion: Math.max(0, Number(user.sessionVersion) || 0) }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign({ id: user.id, guest: user.guest, sessionVersion: Math.max(0, Number(user.sessionVersion) || 0) }, JWT_KEY, { expiresIn: JWT_EXPIRES_IN });
 }
 
 const SESSION_COOKIE = "ktga_session";
@@ -1215,54 +1280,15 @@ function completeAccountLogin(db, user, method, failureKey = "", res = null) {
   user.lastLoginAt = new Date().toISOString();
   if (isUnder13(user)) parentalControls.recordActivity(user.id, { day: casinoDateKey(), category: "session", label: "Connexion", count: 1 });
   refreshPublicProfileStats(user, db);
-  writeDb(db);
+  writeDb(db, { users: [user.id], rooms: [] });
   const token = makeToken(user);
   if (res) setSessionCookie(res, token);
   return { token, user: sanitizeUser(user) };
 }
 
-function normalizePublicProfile(profile = {}, fallbackName = "") {
-  const birthDate = String(profile.birthDate ?? "").slice(0, 10);
-  return {
-    displayName: String(profile.displayName ?? fallbackName ?? "").slice(0, 32),
-    birthDate: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : "",
-    gender: String(profile.gender ?? "").slice(0, 32),
-    bio: normalizePlainText(profile.bio, 180),
-    titleGameId: games.some((game) => game.id === profile.titleGameId) ? profile.titleGameId : "",
-    titleLevel: Number.isSafeInteger(profile.titleLevel) && profile.titleLevel >= 0 && profile.titleLevel <= 1000 ? profile.titleLevel : 0,
-    titleHidden: Boolean(profile.titleHidden),
-    favoriteGames: Array.isArray(profile.favoriteGames) ? [...new Set(profile.favoriteGames.map(String))].slice(0, 5) : []
-  };
-}
 
-function normalizePlainText(value, maxLength = 180) {
-  return String(value ?? "").replace(/<[^>]*>/g, "").replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n").slice(0, maxLength);
-}
 
-function ageFromBirthDate(birthDate) {
-  if (!birthDate) return "";
-  const born = new Date(`${birthDate}T00:00:00.000Z`);
-  if (Number.isNaN(born.getTime())) return "";
-  const now = new Date();
-  let age = now.getUTCFullYear() - born.getUTCFullYear();
-  const beforeBirthday = now.getUTCMonth() < born.getUTCMonth() || (now.getUTCMonth() === born.getUTCMonth() && now.getUTCDate() < born.getUTCDate());
-  if (beforeBirthday) age -= 1;
-  return age >= 0 && age <= 120 ? age : "";
-}
 
-function ensureUserSocial(user) {
-  user.profile = normalizePublicProfile(user.profile, user.pseudo);
-  user.friends = Array.isArray(user.friends) ? [...new Set(user.friends)] : [];
-  user.friendRequests = {
-    incoming: Array.isArray(user.friendRequests?.incoming) ? [...new Set(user.friendRequests.incoming)] : [],
-    outgoing: Array.isArray(user.friendRequests?.outgoing) ? [...new Set(user.friendRequests.outgoing)] : []
-  };
-  user.roomInvites = Array.isArray(user.roomInvites) ? user.roomInvites : [];
-  user.notifications = Array.isArray(user.notifications) ? user.notifications : [];
-  user.blockedUsers = Array.isArray(user.blockedUsers) ? [...new Set(user.blockedUsers.map(String))] : [];
-  user.mutedUsers = Array.isArray(user.mutedUsers) ? [...new Set(user.mutedUsers.map(String))] : [];
-  return user;
-}
 
 function connectionBlocked(left, right) {
   if (!left || !right) return false;
@@ -1273,8 +1299,8 @@ function connectionBlocked(left, right) {
 
 function messageHiddenFor(viewer, sender) {
   if (!viewer || !sender || viewer.id === sender.id) return false;
-  ensureUserSocial(viewer);
-  return viewer.mutedUsers.includes(sender.id) || connectionBlocked(viewer, sender);
+  const contains = (ids, id) => Array.isArray(ids) && ids.some((value) => String(value) === id);
+  return contains(viewer.mutedUsers, sender.id) || contains(viewer.blockedUsers, sender.id) || contains(sender.blockedUsers, viewer.id);
 }
 
 function pushNotification(user, notification) {
@@ -1294,33 +1320,6 @@ function pushNotification(user, notification) {
   return user.notifications[0];
 }
 
-function sanitizeNotification(notification, user = null) {
-  const roomInvite = notification.type === "room-invite"
-    ? user?.roomInvites?.find((invite) => invite.code === notification.roomCode && (!notification.actorId || invite.fromId === notification.actorId))
-    : null;
-  let title = notification.title ?? "Notification";
-  let message = notification.message ?? "";
-  if (notification.type === "room-invite") {
-    title = "Invitation à une table";
-    message = message.replace(" t'invite sur ", " t'invite à la table ");
-  }
-  if (notification.type === "achievement" && title === "Succès débloqué") {
-    const [achievementTitle, ...descriptionParts] = message.split(" · ");
-    const entry = achievementCatalog().find((achievement) => achievement.title === achievementTitle);
-    title = `${entry?.group ?? "Casino"} - ${achievementTitle}`;
-    message = descriptionParts.join(" · ") || entry?.description || "";
-  }
-  return {
-    id: notification.id,
-    type: notification.type ?? "info",
-    title,
-    message,
-    actorId: notification.actorId ?? "",
-    roomCode: notification.roomCode ?? "",
-    inviteId: roomInvite?.id ?? "",
-    createdAt: notification.createdAt
-  };
-}
 
 function removeFriendRequestBetween(user, otherId) {
   ensureUserSocial(user);
@@ -1337,59 +1336,51 @@ function addFriendship(user, friend) {
   removeFriendRequestBetween(friend, user.id);
 }
 
-function normalizeFriendGraph(db) {
-  const usersById = new Map(db.users.map((user) => [user.id, ensureUserSocial(user)]));
+function normalizeFriendGraph(db, userId) {
+  const usersById = new Map(db.users.map((user) => [user.id, user]));
   const existingUserIds = new Set(usersById.keys());
-  for (const user of db.users) {
+  const focus = userId ? [usersById.get(userId)].filter(Boolean) : db.users;
+  const touched = new Set();
+  for (const user of focus) {
+    ensureUserSocial(user);
+    touched.add(user.id);
+    for (const id of [...user.friends, ...user.friendRequests.incoming, ...user.friendRequests.outgoing, ...user.blockedUsers, ...user.mutedUsers, ...user.roomInvites.map((invite) => invite.fromId)]) if (existingUserIds.has(id)) touched.add(id);
     user.friends = user.friends.filter((id) => existingUserIds.has(id) && id !== user.id);
     user.friendRequests.incoming = user.friendRequests.incoming.filter((id) => existingUserIds.has(id) && id !== user.id);
     user.friendRequests.outgoing = user.friendRequests.outgoing.filter((id) => existingUserIds.has(id) && id !== user.id);
     user.blockedUsers = user.blockedUsers.filter((id) => existingUserIds.has(id) && id !== user.id);
     user.mutedUsers = user.mutedUsers.filter((id) => existingUserIds.has(id) && id !== user.id);
   }
-  for (const user of db.users) {
+  for (const user of focus) {
     for (const otherId of [...user.friendRequests.outgoing]) {
       const other = usersById.get(otherId);
       if (!other) continue;
+      ensureUserSocial(other);
       if (other.friendRequests.outgoing.includes(user.id) || user.friendRequests.incoming.includes(other.id)) addFriendship(user, other);
       else if (!other.friendRequests.incoming.includes(user.id)) other.friendRequests.incoming.push(user.id);
     }
     for (const otherId of [...user.friendRequests.incoming]) {
       const other = usersById.get(otherId);
       if (!other) continue;
+      ensureUserSocial(other);
       if (!other.friendRequests.outgoing.includes(user.id)) user.friendRequests.incoming = user.friendRequests.incoming.filter((id) => id !== otherId);
     }
   }
+  return [...touched];
 }
 
-function displayNameFor(user) {
-  return normalizePublicProfile(user.profile, user.pseudo).displayName || user.pseudo;
-}
 
-function friendCodeFor(user) {
-  return String(user?.id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase();
-}
 
-function maskedEmail(value) {
-  const [local = "", domain = ""] = normalizeEmail(value).split("@");
-  if (!domain) return "";
-  return `${local.slice(0, 2)}${"*".repeat(Math.max(1, Math.min(6, local.length - 2)))}@${domain}`;
-}
 
-function publicProfileFor(user) {
-  const profile = normalizePublicProfile(user.profile, user.pseudo);
-  const { birthDate: _birthDate, ...publicProfile } = profile;
-  return publicProfile;
-}
+
 
 function sanitizeUser(user, db = readDb()) {
-  ensureUserSocial(user);
-  const verificationRequired = platformSettings(db).emailVerificationRequired;
-  const settings = platformSettings(db);
-  const moderation = activeModeration(user);
-  const parentalRevocation = activeParentalRevocation(user);
-  return { gameProgression: playerProgression(user, db, true), gameTitle: playerTitle(user, db), id: user.id, login: user.email ?? user.pseudo, email: user.email ?? "", emailVerified: Boolean(user.emailVerifiedAt), requiresEmailUpgrade: !user.guest && !validEmail(user.email), requiresEmailVerification: !user.guest && verificationRequired && validEmail(user.email) && !user.emailVerifiedAt, pseudo: displayNameFor(user), friendCode: friendCodeFor(user), tokens: user.tokens, guest: Boolean(user.guest), admin: Boolean(user.admin), editor: Boolean(user.editor), active: user.active !== false, lastDailyClaim: user.lastDailyClaim, dailyBonus: dailyBonusStatus(user, db), cosmetics: normalizeCosmetics(user.cosmetics), achievements: normalizeAchievements(user.achievements), profileStats: normalizeProfileStats(user.profileStats), profile: user.profile, friendCount: user.friends.length, mfa: mfaSummary(user), minor: isUnder13(user) ? { restricted: true, restrictions: settings.minorRestrictions, turnsThirteenAt: turnsThirteenAt(user.profile?.birthDate) } : null, moderation: moderation ? { type: moderation.type, reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" } : null, parentalRevocation: parentalRevocation ? { reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil } : null };
+  return configurationCache.read(() => serializeUser(user, db));
 }
+function serializeUser(user, db) {
+  return serviceExecution.measure("information", () => serializeUserInternal(user, db));
+}
+
 
 function roomPlayerFor(user) {
   const cosmetics = normalizeCosmetics(user.cosmetics);
@@ -1402,59 +1393,12 @@ function roomPlayerFor(user) {
   };
 }
 
-function sanitizeFriendUser(user, db) {
-  ensureUserSocial(user);
-  refreshPublicProfileStats(user, db);
-  return { id: user.id, gameTitle: playerTitle(user, db), pseudo: displayNameFor(user), friendCode: friendCodeFor(user), age: ageFromBirthDate(user.profile.birthDate), cosmetics: normalizeCosmetics(user.cosmetics), profileStats: normalizeProfileStats(user.profileStats), profile: publicProfileFor(user) };
-}
 
-function publicUserPayload(user, db, viewerId = "") {
-  ensureUserSocial(user);
-  refreshPublicProfileStats(user, db);
-  const statistics = playerStatistics(db, user.id);
-  const wins = statistics.wins;
-  const achievements = achievementStatus(user, db);
-  const viewer = db.users.find((row) => row.id === viewerId);
-  if (viewer) ensureUserSocial(viewer);
-  const firstDayKey = shiftDateKey(casinoDateKey(), -364);
-  const activityMap = new Map(Object.entries(statistics.activity));
-  const activity = [];
-  for (let i = 0; i < 365; i += 1) {
-    const key = shiftDateKey(firstDayKey, i);
-    activity.push({ date: key, count: activityMap.get(key) ?? 0 });
-  }
-  return {
-    id: user.id,
-    pseudo: displayNameFor(user),
-    friendCode: friendCodeFor(user),
-    ranked: RANKED_GAMES.map((gameId)=>({gameId, ...eloFor(user,gameId,rankedRuntime.config(db).games[gameId])})),
-    gameProgression: playerProgression(user, db),
-    gameTitle: playerTitle(user, db),
-    cosmetics: normalizeCosmetics(user.cosmetics),
-    profileStats: normalizeProfileStats(user.profileStats),
-    profile: publicProfileFor(user),
-    age: ageFromBirthDate(user.profile.birthDate),
-    friendCount: user.friends.length,
-    relationship: {
-      self: viewerId === user.id,
-      isFriend: viewer?.friends?.includes(user.id) ?? false,
-      requested: viewer?.friendRequests?.outgoing?.includes(user.id) ?? false,
-      incoming: viewer?.friendRequests?.incoming?.includes(user.id) ?? false,
-      blocked: viewer?.blockedUsers?.includes(user.id) ?? false,
-      muted: viewer?.mutedUsers?.includes(user.id) ?? false
-    },
-    stats: {
-      gamesPlayed: statistics.gamesPlayed,
-      wins,
-      winRate: statistics.gamesPlayed ? Math.round((wins / statistics.gamesPlayed) * 100) : 0,
-      achievementsUnlocked: achievements.filter((achievement) => achievement.unlocked).length,
-      achievementsTotal: achievements.length
-    },
-    activity
-  };
-}
 
 function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false) {
+  return configurationCache.read(() => serializeRoom(room, viewerId, db, forceSpectator));
+}
+function serializeRoom(room, viewerId, db, forceSpectator, playerPresentations = new Map()) {
   if (!room) return room;
   const { passwordHash: _passwordHash, ...safeRoom } = room;
   const spectating = forceSpectator || !room.players.some((player) => player.id === viewerId);
@@ -1466,9 +1410,14 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
       return player;
     }
     const fullUser = db.users.find((u) => u.id === player.id);
+    let presentation = playerPresentations.get(player.id);
+    if (fullUser && !presentation) {
+      presentation = { rankedBadge: playerRankedBadge(fullUser, db), gameTitle: playerTitle(fullUser, db), login: fullUser.pseudo, pseudo: displayNameFor(fullUser), age: ageFromBirthDate(fullUser.profile?.birthDate), cosmetics: { equipped: { ...defaultCosmetics.equipped, ...fullUser.cosmetics?.equipped } }, profileStats: normalizeProfileStats(fullUser.profileStats), profile: publicProfileFor(fullUser) };
+      playerPresentations.set(player.id, presentation);
+    }
     const sanitized = !fullUser
       ? { ...player, profile: publicProfileFor(player), profileStats: normalizeProfileStats(player.profileStats) }
-      : { ...player, gameTitle: playerTitle(fullUser, db), login: fullUser.pseudo, pseudo: displayNameFor(fullUser), age: ageFromBirthDate(fullUser.profile?.birthDate), cosmetics: normalizeCosmetics(fullUser.cosmetics), profileStats: normalizeProfileStats(fullUser.profileStats), profile: publicProfileFor(fullUser) };
+      : { ...player, ...presentation };
     sanitizedPlayers.set(player.id, sanitized);
     return sanitized;
   };
@@ -1500,6 +1449,8 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
     safeState.hands = Object.fromEntries(Object.entries(safeState.hands ?? {}).map(([playerId, hand]) => [playerId, playerId === viewerId ? [...hand] : Array(hand.length).fill(null)]));
   }
   if (safeState?.gameId === "midnight-dice") {
+    safeState.contractOffers = safeState.players.some((player)=>player.id===viewerId) ? [...midnightContractOffers(safeState,viewerId)] : [];
+    delete safeState.privateContractOffers;
     safeState.secretContracts = Object.fromEntries(safeState.players.map((player) => [player.id, player.id === viewerId ? safeState.secretContracts?.[player.id] ?? null : null]));
     safeState.usedContracts = Object.fromEntries(safeState.players.map((player) => [player.id, player.id === viewerId ? [...(safeState.usedContracts?.[player.id] ?? [])] : []]));
   }
@@ -1517,6 +1468,7 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
   if (!room.state) safeState = null;
   return {
     ...(spectating ? { id: room.id, code: room.code, name: room.name, gameId: room.gameId, ownerId: room.ownerId, isPublic: room.isPublic, finished: room.finished, stake: room.stake, pacing: room.pacing ?? null } : safeRoom),
+    ...(room.ranked ? {ranked:publicRanked(room,viewerId)} : {}),
     players: safeRoom.players.map(sanitizeRoomPlayer),
     state: safeState,
     spectator: spectating,
@@ -1535,6 +1487,7 @@ function sanitizeLobbyRoom(room) {
     gameId: room.gameId,
     name: room.name,
     stake: room.stake,
+    ...(room.ranked ? {ranked:{roster:room.ranked.roster.map(({id,rank})=>({id,rank}))}} : {}),
     isPublic: room.isPublic,
     hasPassword: Boolean(room.passwordHash),
     inProgress: Boolean(room.state && !room.finished),
@@ -1548,82 +1501,24 @@ function sanitizeRooms(rooms) {
 }
 
 function emitRoomUpdate(room, db = readDb()) {
-  for (const socketId of roomPresence.get(room.id) ?? []) {
-    const socket = io.sockets.sockets.get(socketId);
-    if (socket) socket.emit("room", sanitizeRoom(room, socket.data.userId, db, socket.data.spectator === true));
-  }
+  configurationCache.read(() => {
+    const players = new Map();
+    for (const socketId of roomPresence.get(room.id) ?? []) {
+      const socket = io.sockets.sockets.get(socketId);
+      if (socket) socket.emit("room", serializeRoom(room, socket.data.userId, db, socket.data.spectator === true, players));
+    }
+  });
 }
 
-function normalizeCosmetics(cosmetics = {}) {
-  return {
-    icons: [...new Set([...(cosmetics.icons ?? []), ...defaultCosmetics.icons])],
-    nameEffects: [...new Set([...(cosmetics.nameEffects ?? []), ...defaultCosmetics.nameEffects])],
-    memberCards: [...new Set([...(cosmetics.memberCards ?? []), ...defaultCosmetics.memberCards])],
-    profileBanners: [...new Set([...(cosmetics.profileBanners ?? []), ...defaultCosmetics.profileBanners])],
-    profileFrames: [...new Set([...(cosmetics.profileFrames ?? []), ...defaultCosmetics.profileFrames])],
-    profileEffects: [...new Set([...(cosmetics.profileEffects ?? []), ...defaultCosmetics.profileEffects])],
-    diceSkins: [...new Set([...(cosmetics.diceSkins ?? []), ...defaultCosmetics.diceSkins])],
-    cardSkins: [...new Set([...(cosmetics.cardSkins ?? []), ...defaultCosmetics.cardSkins])],
-    equipped: { ...defaultCosmetics.equipped, ...(cosmetics.equipped ?? {}) }
-  };
-}
 
-function normalizeAchievements(achievements = {}) {
-  return {
-    unlocked: [...new Set(achievements.unlocked ?? [])],
-    unlockedAt: achievements.unlockedAt ?? {},
-    suppressed: [...new Set(achievements.suppressed ?? [])]
-  };
-}
 
 function ensureUserAchievements(user) {
   user.achievements = normalizeAchievements(user.achievements);
   return user.achievements;
 }
 
-function refreshPublicProfileStats(user, db) {
-  if (!user) return user;
-  user.profileStats = normalizeProfileStats(user.profileStats);
-  user.profileStats.publicStats = publicMemberStats(user, db);
-  return user;
-}
 
-function normalizeProfileStats(profileStats = {}) {
-  const legacyCustomId = profileStats.customAchievementId ?? "";
-  const defaultVisibleProfileStats = ["age", "gender", "friends", "gamesPlayed", "wins", "winRate", "achievements"];
-  return {
-    memberCardStats: (Array.isArray(profileStats.memberCardStats) && profileStats.memberCardStats.length ? profileStats.memberCardStats.slice(0, 2) : [profileStats.memberCardStat ?? "winRate", "achievementsUnlocked"]).map((stat) => stat === "overallWinRate" ? "winRate" : stat),
-    customAchievementId: legacyCustomId,
-    customAchievementIds: Array.isArray(profileStats.customAchievementIds)
-      ? [profileStats.customAchievementIds[0] ?? "", profileStats.customAchievementIds[1] ?? ""]
-      : [legacyCustomId, ""],
-    visibleProfileStats: Array.isArray(profileStats.visibleProfileStats)
-      ? profileStats.visibleProfileStats.filter((key) => defaultVisibleProfileStats.includes(key))
-      : defaultVisibleProfileStats,
-    publicStats: Array.isArray(profileStats.publicStats) ? profileStats.publicStats.slice(0, 2) : []
-  };
-}
 
-function publicMemberStats(user, db) {
-  const status = achievementStatus(user, db);
-  const statistics = playerStatistics(db, user.id);
-  const wins = statistics.wins;
-  const today = casinoDateKey();
-  const todayGames = statistics.activity[today] ?? 0;
-  const unlocked = status.filter((achievement) => achievement.unlocked);
-  const ratio = statistics.gamesPlayed ? `${Math.round((wins / statistics.gamesPlayed) * 100)}%` : "0%";
-  const profileStats = normalizeProfileStats(user.profileStats);
-  return profileStats.memberCardStats.map((stat, index) => {
-    if (stat === "hidden") return null;
-    if (stat === "todayGames") return { key: stat, label: "Aujourd'hui", value: todayGames.toLocaleString("fr-BE") };
-    if (stat === "achievementsUnlocked") return { key: stat, label: "Succès", value: `${unlocked.length}/${status.length}` };
-    if (stat === "customAchievement") {
-      const custom = status.find((achievement) => achievement.id === (profileStats.customAchievementIds[index] || profileStats.customAchievementId));
-      return { key: stat, label: "Milestone", value: custom?.title ?? "Aucun" };
-    }
-    return { key: stat, label: "Winrate", value: ratio };
-  }).filter(Boolean).slice(0, 2);
-}
 
 function enrichHistoryRow(row, db, userId) {
   const players = (row.players ?? []).map((player) => {
@@ -1642,7 +1537,8 @@ function enrichHistoryRow(row, db, userId) {
     };
   });
   const playerGain = Number(row.payouts?.[userId] ?? 0) + Number(row.blackjackPayouts?.[userId] ?? 0);
-  return { ...row, players, winners: row.winners ?? [], playerGain };
+  return { ...row, players, winners: row.winners ?? [], playerGain,
+    ...(row.ranked ? {ranked:{matchId:row.ranked.matchId,...(row.ranked.cancelled ? {cancelled:row.ranked.cancelled} : {}),results:(row.ranked.results??[]).map((entry)=>rankedResultFor(entry,userId,row.ranked.config?.ranks))}} : {}) };
 }
 
 function titleWithNumber(prefix, value) {
@@ -1704,6 +1600,7 @@ function baseAchievementCatalog() {
 }
 
 function achievementCatalog(db = readDb(), { includeDisabled = false } = {}) {
+  return configurationCache.get(`achievements:${includeDisabled}`, [db.settings?.achievementOverrides, db.settings?.customAchievements], () => {
   const overrides = db.settings?.achievementOverrides ?? {};
   const builtIn = baseAchievementCatalog().map((entry) => ({ ...entry, ...(overrides[entry.id] ?? {}), id: entry.id, builtIn: true }));
   const custom = (db.settings?.customAchievements ?? []).map((entry) => ({ ...entry, builtIn: false, categories: [...new Set([entry.group, entry.type === "games" || entry.gameId ? "Jeux" : "Progression", entry.secret ? "Secrets" : null, entry.milestone || entry.secret ? "Milestones" : null].filter(Boolean))] }));
@@ -1711,105 +1608,13 @@ function achievementCatalog(db = readDb(), { includeDisabled = false } = {}) {
   const completion = catalog.find((entry) => entry.id === achievementCompletionId);
   if (completion) completion.target = catalog.filter((entry) => entry.id !== achievementCompletionId && !entry.secret && entry.enabled !== false).length;
   return catalog;
-}
-
-function dailyBonusStatus(user, db) {
-  const settings = platformSettings(db);
-  const baseTokens = settings.dailyTokens;
-  if (!user || user.guest) return { claims: 0, streak: 0, multiplier: 1, nextMultiplier: 1, nextReward: baseTokens, claimedToday: false };
-  return calculateDailyBonusStatus(playerStatistics(db, user.id).claimDates, baseTokens, new Date(), {
-    defaultMultiplier: settings.dailyBonusDefaultMultiplier,
-    maxMultiplier: settings.dailyBonusMaxMultiplier,
-    rules: settings.dailyBonusRules
   });
 }
 
-function longestDateStreak(dates) {
-  let best = 0;
-  let current = 0;
-  let previous = null;
-  for (const date of dates) {
-    const time = new Date(`${date}T00:00:00.000Z`).getTime();
-    if (previous === null || time - previous === 86400000) current += 1;
-    else current = 1;
-    best = Math.max(best, current);
-    previous = time;
-  }
-  return best;
-}
 
-function cosmeticCount(user) {
-  const cosmetics = normalizeCosmetics(user.cosmetics);
-  return shopTypes.reduce((sum, key) => sum + cosmetics[key].length, 0);
-}
 
-function userAchievementProgress(user, db) {
-  const statistics = playerStatistics(db, user.id);
-  const { staked, shopSpent, claimDates: dates, resultIds } = statistics;
-  const progress = {};
-  for (const value of achievementThresholds.gamesPlayed) progress[`classic-games-${value}`] = statistics.gamesPlayed;
-  for (const value of achievementThresholds.wins) progress[`classic-wins-${value}`] = statistics.wins;
-  for (const value of achievementThresholds.staked) progress[`classic-staked-${value}`] = staked;
-  for (const value of achievementThresholds.dailyClaims) progress[`classic-daily-${value}`] = dates.length;
-  for (const value of achievementThresholds.dailyStreak) progress[`classic-daily-streak-${value}`] = longestDateStreak(dates);
-  for (const game of games) {
-    const gameWins = statistics.gameWins[game.id] ?? 0;
-    for (const value of achievementThresholds.gameWins) progress[`game-${game.id}-wins-${value}`] = gameWins;
-  }
-  progress["shop-first-purchase"] = statistics.shopPurchases ? 1 : 0;
-  progress["shop-collector-10"] = cosmeticCount(user);
-  progress["shop-collector-25"] = cosmeticCount(user);
-  progress["shop-fashionista"] = ["icons", "nameEffects", "memberCards", "diceSkins", "cardSkins"].filter((key) => normalizeCosmetics(user.cosmetics)[key].length > 1).length;
-  progress["shop-big-spender"] = shopSpent;
-  for (const id of resultIds) progress[id] = 1;
-  progress["midnight-all-contracts"] = completedMidnightContractCount(resultIds);
-  const metricValues = {
-    ...Object.fromEntries(Object.keys(tableTimeMetrics).map((key) => [key, Number(user.siteActivity?.[key]) || 0])),
-    ...playerAchievementContext(user, []),
-    gamesPlayed: statistics.gamesPlayed,
-    wins: statistics.wins,
-    staked,
-    dailyClaims: dates.length,
-    dailyStreak: longestDateStreak(dates),
-    shopPurchases: statistics.shopPurchases,
-    shopSpent,
-    cosmeticCount: cosmeticCount(user),
-    cosmeticTypes: ["icons", "nameEffects", "memberCards", "diceSkins", "cardSkins"].filter((key) => normalizeCosmetics(user.cosmetics)[key].length > 1).length,
-    midnightContractsCompleted: completedMidnightContractCount(resultIds)
-  };
-  for (const [gameId, wins] of Object.entries(statistics.gameWins)) metricValues[`gameWins.${gameId}`] = wins;
-  const progression = playerProgression(user, db);
-  metricValues.highestGameLevel = Math.max(1, ...progression.map((row) => row.highestLevel));
-  metricValues.totalGameXp = progression.reduce((total, row) => total + row.xp, 0);
-  for (const row of progression) { metricValues[`gameLevel.${row.gameId}`] = row.highestLevel; metricValues[`gameCurrentLevel.${row.gameId}`] = row.level; metricValues[`gameMastery.${row.gameId}`] = row.mastery; metricValues[`gameXp.${row.gameId}`] = row.xp; }
-  for (const entry of achievementCatalog(db)) {
-    if (entry.rule?.source === "metric" && metricValues[entry.rule.metric] !== undefined) progress[entry.id] = metricValues[entry.rule.metric];
-    if (entry.rule?.legacyResultId && resultIds.includes(entry.rule.legacyResultId)) progress[entry.id] = Math.max(progress[entry.id] ?? 0, 1);
-    if (user.achievementProgress?.[entry.id]) progress[entry.id] = Math.max(progress[entry.id] ?? 0, Number(user.achievementProgress[entry.id].value) || 0);
-  }
-  for (const id of normalizeAchievements(user.achievements).unlocked) progress[id] = Math.max(progress[id] ?? 0, 1);
-  const catalog = achievementCatalog(db);
-  const normalizedAchievements = normalizeAchievements(user.achievements);
-  const persisted = new Set(normalizedAchievements.unlocked);
-  const suppressed = new Set(normalizedAchievements.suppressed);
-  const isComplete = (entry) => !suppressed.has(entry.id) && (persisted.has(entry.id) || (progress[entry.id] ?? 0) >= entry.target);
-  const countedUnlocked = catalog.filter((entry) => !["achievement-collector-50", achievementCompletionId].includes(entry.id) && isComplete(entry)).length;
-  progress["achievement-collector-50"] = countedUnlocked;
-  progress[achievementCompletionId] = catalog.filter((entry) => entry.id !== achievementCompletionId && isComplete(entry)).length;
-  return progress;
-}
 
-function achievementStatus(user, db) {
-  const achievements = normalizeAchievements(user.achievements);
-  const progress = userAchievementProgress(user, db);
-  return achievementCatalog(db).map((entry) => {
-    const { rule: _rule, builtIn: _builtIn, enabled: _enabled, ...publicEntry } = entry;
-    const value = progress[entry.id] ?? 0;
-    const suppressed = achievements.suppressed.includes(entry.id);
-    const unlocked = !suppressed && (achievements.unlocked.includes(entry.id) || value >= entry.target);
-    return { ...publicEntry, description: entry.secret && !unlocked ? "Succès secret" : entry.description, progress: Math.min(value, entry.target), unlocked, suppressed, unlockedAt: achievements.unlockedAt[entry.id] ?? null };
-  });
-}
+
 
 function unlockEligibleAchievements(user, db, extraIds = [], depth = 0, room = null) {
   if (!user || user.guest) return [];
@@ -1868,6 +1673,13 @@ function triggerRandomAchievement(db, userId, room = null) {
 
 const achievementEventQueues = new WeakMap();
 function processAchievementEvent(db, userId, event, room = null, depth = 0) {
+  return serviceExecution.measure("achievements", () => processAchievementEventInternal(db, userId, event, room, depth));
+}
+
+function processAchievementEventInternal(db, userId, event, room = null, depth = 0) {
+  return configurationCache.read(() => drainAchievementEvents(db, userId, event, room, depth));
+}
+function drainAchievementEvents(db, userId, event, room, depth) {
   const pending = achievementEventQueues.get(db);
   if (pending) { pending.push({ userId, event, room, depth }); return []; }
   // Drain reward chains iteratively. One-time unlocks bound the queue, not call-stack depth.
@@ -2157,7 +1969,7 @@ function auth(req, res, next) {
   const token = sessionTokenFromRequest(req);
   if (!token) return res.status(401).json({ error: "Non authentifié." });
   try {
-    req.auth = jwt.verify(token, JWT_SECRET);
+    req.auth = jwt.verify(token, JWT_KEY, { algorithms: ["HS256"] });
     if (req.headers.authorization) setSessionCookie(res, token);
     const persistentUser = !req.auth.guest ? readDb().users.find((user) => user.id === req.auth.id) : null;
     if (!req.auth.guest && !persistentUser) return res.status(401).json({ error: "Session invalide." });
@@ -2238,11 +2050,12 @@ function resolveChatChannel(db, user, input = {}) {
   return null;
 }
 
-function decorateChatMessage(message, db = readDb()) {
+function decorateChatMessage(message, db = readDb(), viewer, senderPayload) {
   const sender = db.users.find((entry) => entry.id === message.senderId);
   return {
     ...message,
-    sender: sender ? sanitizeFriendUser(sender, db) : { id: message.senderId, pseudo: "Compte supprimé", cosmetics: structuredClone(defaultCosmetics) }
+    links: describeChatLinks(message.content, { rooms: db.rooms, events: db.communityEvents, users: db.users, canSeeRoom: (room) => Boolean(viewer && maySpectate(room, viewer.id)) }),
+    sender: senderPayload ?? (sender ? sanitizeFriendUser(sender, db) : { id: message.senderId, pseudo: "Compte supprimé", cosmetics: structuredClone(defaultCosmetics) })
   };
 }
 
@@ -2255,7 +2068,13 @@ function saveRoom(room) {
     const index = db.rooms.findIndex((r) => r.id === room.id);
     if (index >= 0) db.rooms[index] = room;
     else db.rooms.push(room);
-  });
+  }, (db) => roomWriteScope(db, [room]));
+}
+
+function writeRoomDb(db, room, additionalUsers = []) {
+  const scope = roomWriteScope(db, [room]);
+  scope.users = [...new Set([...scope.users, ...additionalUsers])];
+  writeDb(db, scope);
 }
 
 function addTokens(db, userId, amount, meta = {}) {
@@ -2393,7 +2212,7 @@ function applyTribunalDecision(caseId, body, adminId, now = Date.now()) {
     if (["social-ban", "hard-ban-review", "permanent-ban-review"].includes(outcome)) pushNotification(user, {
       type: "moderation-decision",
       title: "Sanction confirmée",
-      message: `${reason} Pour demander un réexamen, adresse un recours écrit à ${process.env.CONTACT_EMAIL || "contact@netdis.org"} en indiquant le dossier ${entry.code}.`
+      message: `${reason} Pour demander un réexamen, adresse un recours écrit à ${contactEmail()} en indiquant le dossier ${entry.code}.`
     });
     return true;
   });
@@ -2432,7 +2251,7 @@ function removePlayerFromRoomState(room, playerId) {
     if (removedIndex < state.currentPlayerIndex) state.currentPlayerIndex -= 1;
     if (state.currentPlayerIndex >= state.players.length) state.currentPlayerIndex = 0;
   }
-  for (const key of ["scores", "hands", "bets", "piles", "boxes", "diceCounts", "drawnCards", "pendingChoices", "botThinking", "cardCounts", "trays", "secretContracts", "usedContracts", "discardRemaining", "prestige", "stats"]) {
+  for (const key of ["scores", "hands", "bets", "piles", "boxes", "diceCounts", "drawnCards", "pendingChoices", "botThinking", "cardCounts", "trays", "secretContracts", "privateContractOffers", "usedContracts", "discardRemaining", "prestige", "stats"]) {
     if (state[key]) delete state[key][playerId];
   }
   if (state.deckKnowledge) {
@@ -2458,6 +2277,10 @@ function removePlayerFromRoomState(room, playerId) {
   if (state.players.length <= 1) {
     state.winners = state.players.length ? [state.players[0].id] : [];
     state.finished = true;
+  }
+  if (state.gameId === "midnight-dice" && removedIndex >= 0) {
+    if (removedIndex < state.startingPlayerIndex) state.startingPlayerIndex -= 1;
+    resumeMidnightAfterDeparture(state);
   }
 }
 
@@ -2486,9 +2309,22 @@ function cashOutPokerPlayer(room, db, playerId, reason = "poker-cash-out") {
   return amount;
 }
 
+const legacyLobbyBroadcast = createLobbyBroadcast({
+  rooms: () => sanitizeRooms(readDb().rooms.filter((room) => room.isPublic && !room.finished)),
+  delayMs: 2000,
+  emit: (rooms) => io.to("casino-lobby").except("casino-lobby-incremental").emit("rooms", rooms)
+});
+const lobbyBroadcast = createLobbyBroadcast({
+  rooms: () => sanitizeRooms(readDb().rooms.filter((room) => room.isPublic && !room.finished)),
+  emit: (_rooms, patch) => {
+    io.to("casino-lobby-incremental").emit("rooms-patch", patch);
+    if ([...(io.sockets.adapter.rooms.get("casino-lobby") ?? [])].some((id) => !io.sockets.sockets.get(id)?.rooms.has("casino-lobby-incremental"))) legacyLobbyBroadcast.schedule();
+  }
+});
+
 function broadcastRooms(db = readDb()) {
   if (cleanupEmptyRooms(db)) writeDb(db);
-  io.emit("rooms", sanitizeRooms(db.rooms.filter((room) => room.isPublic && !room.finished)));
+  lobbyBroadcast.schedule();
 }
 
 function cleanupEmptyRooms(db) {
@@ -2504,6 +2340,12 @@ function cleanupEmptyRooms(db) {
 function finishRoomIfNeeded(room, db) {
   if (!room.state?.finished || room.finished) return;
   room.finished = true;
+  const pendingReceipt = room.ranked && db.history.pending?.find((row)=>row.ranked?.matchId===room.ranked.matchId && row.ranked.results?.length);
+  const receipt = room.ranked && (pendingReceipt?.ranked ?? rankedSettlement(room.ranked.matchId));
+  if (receipt) {
+    settleRanked(room, db.users, {}, receipt);
+    return;
+  }
   if (room.ranked?.cancelled) {
     db.history.push({id:randomUUID(),roomId:room.id,code:room.code,name:room.name,gameId:room.gameId,players:room.ranked.roster.map((p)=>({id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? "Joueur",isBot:false})),winners:[],ranking:[],pot:0,finishedAt:new Date().toISOString(),ranked:{matchId:room.ranked.matchId,cancelled:room.ranked.cancelled}});
     return;
@@ -2560,6 +2402,10 @@ function finishRoomIfNeeded(room, db) {
 }
 
 function botActionFor(state, bot) {
+  return serviceExecution.measure("rooms", () => calculateBotActionFor(state, bot));
+}
+
+function calculateBotActionFor(state, bot) {
   if (state.gameId === "belote") return beloteBotAction(state, bot);
   if (state.gameId === "yahtzee") return yahtzeeBotAction(state, bot);
   if (state.gameId === "421") return fourTwentyOneBotAction(state, bot);
@@ -2785,7 +2631,7 @@ function startRoomRound(room, db) {
     if (getTokenBalance(db, player.id) < room.stake) return `${player.pseudo} n'a pas assez de jetons.`;
   }
   for (const player of room.players.filter((p) => !p.isBot)) {
-    addTokens(db, player.id, -room.stake, { gameId: room.gameId, roomId: room.id, reason: "room-stake" });
+    if (room.stake > 0) addTokens(db, player.id, -room.stake, { gameId: room.gameId, roomId: room.id, reason: "room-stake" });
     appendRoomAchievementUnlocks(room, player.id, unlockEligibleAchievements(db.users.find((u) => u.id === player.id), db));
     triggerRandomAchievement(db, player.id, room);
   }
@@ -2864,7 +2710,7 @@ app.post("/api/patchnotes/:id/reaction", auth, (req, res) => {
 
 updateDb((db) => {
   db.settings ??= {};
-  db.settings.platform = platformSettings(db);
+  db.settings.platform = structuredClone(platformSettings(db));
   db.settings.games ??= {};
   for (const game of games) {
     db.settings.games[game.id] ??= {};
@@ -2914,7 +2760,7 @@ updateDb((db) => {
 
 setCatalogSource((db) => ({ achievements: achievementCatalog(db, { includeDisabled: true }), items: configuredShop(db) }));
 
-app.get("/api/config", (_req, res) => res.json({ ...platformSettings(), emailVerificationAvailable: emailDeliveryConfigured(), supportEmail: process.env.CONTACT_EMAIL || "contact@netdis.org" }));
+app.get("/api/config", (_req, res) => res.json({ ...platformSettings(), emailVerificationAvailable: emailDeliveryConfigured() }));
 
 app.get("/api/games", (_req, res) => res.json(configuredGames().filter((game) => game.enabled !== false)));
 
@@ -3035,7 +2881,7 @@ app.post("/api/auth/register", async (req, res) => {
     let request;
     try { request = parentalControls.createRequest({ childEmail: email, childPseudo: pseudo, childBirthDate: req.body.birthDate, passwordHash, parentEmail }, marker); }
     catch (error) { return res.status(409).json({ error: String(error.message).includes("UNIQUE") ? "Une demande existe déjà pour cette adresse email." : "La demande parentale n’a pas pu être créée." }); }
-    try { await Promise.all([sendParentVerification(request), sendParentalAdminNotice(request)]); }
+    try { await Promise.all([sendParentVerification(request), sendParentalAdminNotice(request, { ...process.env, CONTACT_EMAIL: contactEmail() })]); }
     catch (error) { console.error("Parental request email delivery failed:", error.message); return res.status(503).json({ code: "EMAIL_DELIVERY_FAILED", error: `Le dossier ${request.code} a été créé, mais un email n’a pas pu être envoyé. Contacte le support avec ce code.` }); }
     return res.status(202).json({ parentalApprovalRequired: true, code: request.code, parentEmail: maskedEmail(parentEmail), message: "La demande a été envoyée au responsable légal. Le compte sera créé après son accord et la validation de l’équipe." });
   }
@@ -3069,15 +2915,22 @@ app.post("/api/auth/login", async (req, res) => {
   cleanupSecurityState();
   const identifier = String(req.body.login ?? req.body.pseudo ?? "").trim();
   const password = String(req.body.password ?? "");
-  const db = readDb();
+  let db = readDb();
   const normalizedIdentifier = normalizeEmail(identifier);
-  const user = db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizedIdentifier : entry.pseudo.toLowerCase() === identifier.toLowerCase());
+  let user = db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizedIdentifier : entry.pseudo.toLowerCase() === identifier.toLowerCase());
   const failureKey = authFailureKey(identifier, req);
   const currentLock = authLockStatus(user, failureKey);
   if (currentLock.locked) return sendAuthLocked(res, currentLock);
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  const verifiedHash = user?.passwordHash, verifiedUserId = user?.id;
+  const matches = user ? await bcrypt.compare(password, verifiedHash) : false;
+  // Account restrictions and passwords may change while the CPU worker runs.
+  db = readDb();
+  user = verifiedUserId ? db.users.find((entry) => entry.id === verifiedUserId) : null;
+  const refreshedLock = authLockStatus(user, failureKey);
+  if (refreshedLock.locked) return sendAuthLocked(res, refreshedLock);
+  if (!user || !matches || user.passwordHash !== verifiedHash) {
     const lock = recordAuthFailure(user, failureKey);
-    if (user) writeDb(db);
+    if (user) writeDb(db, { users: [user.id], rooms: [] });
     if (lock.locked) return sendAuthLocked(res, lock);
     return res.status(401).json({ error: "Identifiants invalides.", remainingBeforeLock: Math.max(0, 3 - lock.failures) });
   }
@@ -3348,7 +3201,7 @@ registerBugReportRoutes({ app, auth, requireBackOffice, store: bugReports, versi
   notifyContact: (key, notice) => contactNotices.enqueue(key, notice),
   identify: (req) => {
     try {
-      const claims = jwt.verify(sessionTokenFromRequest(req), JWT_SECRET);
+      const claims = jwt.verify(sessionTokenFromRequest(req), JWT_KEY, { algorithms: ["HS256"] });
       const user = readDb().users.find((entry) => entry.id === claims.id);
       if (!user || user.active === false || activeModeration(user)?.type === "hard" || activeParentalRevocation(user) || (Number(claims.sessionVersion) || 0) !== (Number(user.sessionVersion) || 0)) return null;
       const completedAccount = validEmail(user.email) && (!platformSettings().emailVerificationRequired || user.emailVerifiedAt);
@@ -3357,7 +3210,7 @@ registerBugReportRoutes({ app, auth, requireBackOffice, store: bugReports, versi
   },
   staff: () => readDb().users.filter((user) => user.active !== false && (user.admin || user.editor)).map((user) => ({ id: user.id, name: displayNameFor(user) }))
 });
-registerDataRequestRoutes({ app, auth, requireAdmin, store: dataRequests, readDb, updateDb, siteName: () => platformSettings().siteName, paths: {
+registerDataRequestRoutes({ app, auth, requireAdmin, store: dataRequests, readDb, updateDb, siteName: () => platformSettings().siteName, contactEmail, paths: {
   main: databaseFilename, chat: CHAT_DB_PATH, parental: PARENTAL_DB_PATH, tribunal: TRIBUNAL_DB_PATH,
   bugs: bugFilename, bugImages: bugImageDirectory,
   logs: path.resolve(process.env.REQUEST_LOG_PATH || path.join(__dirname, "..", "data", "request-logs.sqlite")),
@@ -3369,6 +3222,7 @@ registerDataRequestRoutes({ app, auth, requireAdmin, store: dataRequests, readDb
 app.get("/api/me", auth, (req, res) => {
   const sessionUser = sessions.get(req.auth.id);
   if (sessionUser) {
+    if (accountsWork) return accountReading(req, res, "account");
     const db = readDb();
     refreshPublicProfileStats(sessionUser, db);
     return res.json(sanitizeUser(sessionUser));
@@ -3377,16 +3231,18 @@ app.get("/api/me", auth, (req, res) => {
     const found = db.users.find((entry) => entry.id === req.auth.id);
     if (!found) return null;
     grantAchievementCosmetics(found);
-    refreshPublicProfileStats(found, db);
+    if (!accountsWork) refreshPublicProfileStats(found, db);
     return found;
-  });
+  }, { users: [req.auth.id], rooms: [] });
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+  if (accountsWork) return accountReading(req, res, "account");
   res.json(sanitizeUser(user));
 });
 
 app.get("/api/users/search", auth, (req, res) => {
   const query = String(req.query.q ?? "").trim().toLowerCase();
   if (query.length < 2) return res.json([]);
+  if (accountsWork) return accountReading(req, res, "user-search", { query });
   const db = readDb();
   const requester = db.users.find((u) => u.id === req.auth.id);
   if (requester) ensureUserSocial(requester);
@@ -3405,6 +3261,7 @@ app.get("/api/users/search", auth, (req, res) => {
 });
 
 app.get("/api/users/:id/public", auth, (req, res) => {
+  if (accountsWork) return accountReading(req, res, "public-profile", { targetId: req.params.id });
   const db = readDb();
   const user = db.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ error: "Profil introuvable." });
@@ -3534,7 +3391,7 @@ app.post("/api/tribunal/cases/:id/vote", auth, (req, res) => {
   }
 });
 
-app.get("/api/leaderboards", auth, (req, res) => {
+app.get("/api/leaderboards", auth, (req, res) => configurationCache.read(() => {
   const db = readDb();
   try {
     const result = buildLeaderboard(db, req.query, req.auth.id, new Date(), games.map((game) => game.id));
@@ -3549,13 +3406,14 @@ app.get("/api/leaderboards", auth, (req, res) => {
     };
     res.json({ ...result, rows: result.rows.map(decorate), self: decorate(result.self), games: games.map(({ id, name }) => ({ id, name })) });
   } catch (error) { res.status(400).json({ error: error.message }); }
-});
+}));
 
 app.get("/api/friends", auth, (req, res) => {
+  let touched = [];
   const result = updateDb((db) => {
     const user = db.users.find((u) => u.id === req.auth.id);
     if (!user) return null;
-    normalizeFriendGraph(db);
+    touched = normalizeFriendGraph(db, user.id);
     user.roomInvites = (user.roomInvites ?? []).filter((invite) => db.rooms.some((room) => room.code === invite.code && !room.finished));
     const byIds = (ids) => ids.map((id) => db.users.find((u) => u.id === id)).filter(Boolean).map((friend) => sanitizeFriendUser(friend, db));
     return {
@@ -3570,7 +3428,7 @@ app.get("/api/friends", auth, (req, res) => {
         return { ...invite, roomName: room?.name, gameId: room?.gameId, from: from ? sanitizeFriendUser(from, db) : null };
       })
     };
-  });
+  }, () => ({ users: touched, rooms: [] }));
   if (!result) return res.status(400).json({ error: "Les amis sont réservés aux comptes enregistrés." });
   res.json(result);
 });
@@ -3587,7 +3445,8 @@ app.get("/api/chat/unread", auth, (req, res) => {
   });
   const room = req.query.roomCode ? chatRoomAccess(db, user.id, req.query.roomCode) : null;
   if (room) channels.push({ channelType: "room", channelId: room.id, roomCode: room.code });
-  const hidden = db.users.filter((sender) => messageHiddenFor(user, sender)).map((sender) => sender.id);
+  const hiddenIds = new Set([...user.mutedUsers, ...user.blockedUsers]);
+  const hidden = db.users.filter((sender) => sender.id !== user.id && (hiddenIds.has(sender.id) || Array.isArray(sender.blockedUsers) && sender.blockedUsers.some((id) => String(id) === user.id))).map((sender) => sender.id);
   const counts = chat.unread(user.id, channels, hidden);
   const activity = chat.conversationActivity(user.id, channels);
   res.json({ channels: channels.map((channel) => ({ ...channel, ...activity[`${channel.channelType}:${channel.channelId}`], count: counts[`${channel.channelType}:${channel.channelId}`] ?? 0 })) });
@@ -3599,9 +3458,14 @@ app.get("/api/chat/messages", auth, (req, res) => {
   const user = db.users.find((entry) => entry.id === req.auth.id);
   const channel = user ? resolveChatChannel(db, user, req.query) : null;
   if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
-  const messages = chat.list(channel.channelType, channel.channelId)
+  const senders = new Map();
+  const messages = configurationCache.read(() => chat.list(channel.channelType, channel.channelId)
     .filter((message) => !messageHiddenFor(user, db.users.find((entry) => entry.id === message.senderId)))
-    .map((message) => decorateChatMessage(message, db));
+    .map((message) => {
+      const decorated = decorateChatMessage(message, db, user, senders.get(message.senderId));
+      senders.set(message.senderId, decorated.sender);
+      return decorated;
+    }));
   res.json({ channel: { type: channel.channelType, id: channel.channelId }, messages, readAt: new Date().toISOString() });
 });
 
@@ -3616,19 +3480,24 @@ app.post("/api/chat/messages", auth, (req, res) => {
   if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
   if (!chatRateAllowed(user.id)) return res.status(429).json({ error: "Tu envoies des messages trop rapidement." });
   try {
-    const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content, participantIds: channel.friend ? [channel.friend.id] : [] }), db);
-    for (const socket of io.sockets.sockets.values()) {
-      if (!socket.rooms.has(channel.socketRoom)) continue;
+    const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content, participantIds: channel.friend ? [channel.friend.id] : [] }), db, user);
+    const shared = !detectChatLinks(message.content).length, recipients = [];
+    for (const socketId of io.sockets.adapter.rooms.get(channel.socketRoom) ?? []) {
+      const socket = io.sockets.sockets.get(socketId);
+      if (!socket) continue;
       const viewer = db.users.find((entry) => entry.id === socket.data.chatUserId);
       if (!viewer || viewer.active === false || activeModeration(viewer)?.type === "hard" || activeParentalRevocation(viewer) || messageHiddenFor(viewer, user)) continue;
       if (socket.data.chatSessionVersion !== (Number(viewer.sessionVersion) || 0)) continue;
       if (channel.channelType === "direct" && viewer.id !== user.id && !viewer.friends?.includes(user.id)) continue;
       if (channel.channelType === "room" && !chatRoomAccess(db, viewer.id, channel.room.code)) continue;
-      socket.emit("chat-message", message);
+      if (shared) recipients.push(socketId);
+      else socket.emit("chat-message", decorateChatMessage(message, db, viewer, message.sender));
     }
+    // Visibility is checked per viewer; link-free content is encoded only once.
+    if (recipients.length) io.to(recipients).emit("chat-message", message);
     res.status(201).json(message);
   } catch (error) {
-    res.status(400).json({ error: error.message === "INVALID_CHAT_MESSAGE" ? "Écris un message de 500 caractères maximum." : "Le message n’a pas pu être envoyé." });
+    res.status(400).json({ error: error.message === "CHAT_EXTERNAL_LINK" ? "Seuls les liens KTGA.ME sont autorisés. Les liens externes et les liens personnels de sécurité ne peuvent pas être envoyés." : error.message === "INVALID_CHAT_MESSAGE" ? "Écris un message de 500 caractères maximum." : "Le message n’a pas pu être envoyé." });
   }
 });
 
@@ -3655,11 +3524,12 @@ app.get("/api/chat/journal", auth, (req, res) => {
 
 app.get("/api/notifications", auth, (req, res) => {
   if (req.auth.guest) return res.json([]);
+  if (accountsWork) return accountReading(req, res, "notifications");
   const db = readDb();
   const user = db.users.find((u) => u.id === req.auth.id);
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
   ensureUserSocial(user);
-  res.json(user.notifications.map((notification) => sanitizeNotification(notification, user)));
+  res.json(configurationCache.read(() => user.notifications.map((notification) => sanitizeNotification(notification, user))));
 });
 
 app.delete("/api/notifications/:id", auth, (req, res) => {
@@ -3831,11 +3701,13 @@ app.delete("/api/connections/muted/:id", auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/shop", (_req, res) => {
+app.get("/api/shop", (req, res) => {
+  if (accountsWork) return accountReading(req, res, "shop");
   res.json(configuredShop());
 });
 
 app.get("/api/achievements", auth, (req, res) => {
+  if (accountsWork) return accountReading(req, res, "achievement-list");
   const db = readDb();
   const user = db.users.find((u) => u.id === req.auth.id) ?? sessions.get(req.auth.id);
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
@@ -3911,7 +3783,7 @@ app.post("/api/me/privacy", auth, (req, res) => {
         for (const entry of achievementCatalog(db)) if (["site.visit", "site.activity", "account.browser", "table.activity", "game.round.activity"].includes(entry.rule?.event) || Object.hasOwn(tableTimeMetrics, entry.rule?.metric ?? "")) delete user.achievementProgress?.[entry.id];
       }
       return consent;
-    });
+    }, { users: [req.auth.id], rooms: [] });
     res.json(result);
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
@@ -3921,13 +3793,19 @@ app.post("/api/me/activity", auth, (req, res) => {
   if (req.auth.guest || !validActivityConsent(user)) return res.status(403).json({ error: "Suivi facultatif desactive." });
   if (req.body.active === false) { siteActivityTracker.forget(user.id); return res.json({ unlocked: [] }); }
   try {
+    let activeRoom;
     const unlocked = updateDb((db) => {
       const found = db.users.find((entry) => entry.id === user.id);
       const room = req.body.page === "room" ? db.rooms.find((entry) => entry.code === String(req.body.roomCode ?? "").slice(0, 20).toUpperCase()) : null;
+      activeRoom = room;
       const events = siteActivityTracker.record(found, req.body, req.headers["user-agent"], allowedUrlMarkers(achievementCatalog(db)), Date.now(), tableActivityContext(room, found.id));
       const ids = events.flatMap((event) => processAchievementEvent(db, found.id, event, ["table.activity", "game.round.activity"].includes(event.type) ? room : null));
       if (events.some((event) => event.type === "site.visit")) ids.push(...processAchievementEvent(db, found.id, { type: "account.browser", payload: { browser: events[0].payload.browser } }));
       return [...new Set(ids)];
+    }, (db) => {
+      const scope = roomWriteScope(db, activeRoom ? [activeRoom] : []);
+      scope.users.push(user.id);
+      return scope;
     });
     res.json({ unlocked });
   } catch (error) { res.status(400).json({ error: error.message }); }
@@ -4310,6 +4188,8 @@ function adminUserDetail(db, user) {
     return { ...entry, description: source?.description ?? entry.description };
   });
   const statistics = playerStatistics(db, user.id);
+  const rankedRules = rankedRuntime.config(db);
+  const progression = playerProgression(user, db, true).map((row) => row.competitive ? { ...row, competitive: { ...row.competitive, elo:eloFor(user,row.gameId,rankedRules.games[row.gameId]).elo, minimumElo: rankedRules.games[row.gameId].minimumElo } } : row);
   const relation = (id) => {
     const related = db.users.find((entry) => entry.id === id && !entry.guest);
     return related ? { id: related.id, displayName: displayNameFor(ensureUserSocial(related)), active: related.active !== false } : null;
@@ -4327,6 +4207,8 @@ function adminUserDetail(db, user) {
       gender: profile.gender,
       bio: profile.bio,
       favoriteGames: profile.favoriteGames,
+      gameXp: Object.fromEntries(progression.map((row) => [row.gameId, row.xp])),
+      gameElo: Object.fromEntries(progression.filter((row) => row.competitive).map((row) => [row.gameId, row.competitive.elo])),
       tokens: Math.max(0, Number(user.tokens) || 0),
       active: user.active !== false,
       admin: Boolean(user.admin),
@@ -4344,6 +4226,7 @@ function adminUserDetail(db, user) {
       }
     },
     inventory: { cosmetics: normalizeCosmetics(user.cosmetics), catalog },
+    progression,
     achievements,
     history,
     transactions,
@@ -5017,6 +4900,17 @@ app.get("/api/admin/health", auth, requireAdmin, (req, res) => {
   res.json(serverHealthPayload(req.query.points));
 });
 
+app.get("/api/admin/execution-history", auth, requireAdmin, (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json(executionHistory.summary(req.query.days));
+});
+registerCapacityTestRoutes({ app, auth, requireAdmin, tests: capacityTests });
+registerDesktopSupervision({ app, auth, requireBackOffice,
+  health: serverHealthPayload, metrics: (days) => adminMetrics(readDb(), days),
+  status: (days) => statusMonitor.payload(Number(days) === 90 ? 90 : 7),
+  version: () => patchnotes.currentVersion, viewerName: displayNameFor, connectedUsers: () => onlinePresence.size
+});
+
 app.get("/api/admin/health/logs", auth, requireAdmin, (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.json(requestLogs.query(req.query));
@@ -5118,6 +5012,7 @@ app.put("/api/admin/patchnotes/settings", auth, requireBackOffice, (req, res) =>
 });
 
 app.get("/api/admin/patchnotes/:id", auth, requireBackOffice, (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   const note = patchnotes.get(req.params.id, { includeDrafts: true, includeReactions: true });
   if (!note) return res.status(404).json({ error: "Patchnote introuvable." });
   res.json(note);
@@ -5268,7 +5163,13 @@ app.delete("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
-  try { if (req.body.gameProgression !== undefined) normalizeProgressionConfig(req.body.gameProgression, games.map((game) => game.id)); }
+  try {
+    if (req.body.gameProgression !== undefined) normalizeProgressionConfig(req.body.gameProgression, games.map((game) => game.id));
+    if (req.body.contactEmail !== undefined) {
+      if (typeof req.body.contactEmail !== "string") throw new Error("Adresse de contact invalide.");
+      normalizeContactEmail(req.body.contactEmail);
+    }
+  }
   catch (error) { return res.status(400).json({ error: error.message }); }
   if (req.body.emailVerificationRequired === true && !emailDeliveryConfigured()) return res.status(400).json({ error: "Configure SMTP_HOST et EMAIL_FROM avant d'activer la validation des emails." });
   const settings = updateDb((db) => {
@@ -5276,7 +5177,7 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
     db.settings.platform = normalizePlatformSettings({ ...platformSettings(db), ...req.body });
     return db.settings.platform;
   });
-  res.json({ ...settings, emailVerificationAvailable: emailDeliveryConfigured() });
+  res.json({ ...settings, supportEmail: settings.contactEmail, emailVerificationAvailable: emailDeliveryConfigured() });
 });
 
 app.post("/api/admin/progression/preview", auth, requireAdmin, (req, res) => {
@@ -5287,6 +5188,15 @@ app.post("/api/admin/progression/preview", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
+  for (const [field, allowed, minimum, maximum] of [["gameXp", games.map((game) => game.id), 0, MAX_XP], ["gameElo", RANKED_GAMES, -10000000, 10000000]]) {
+    const values = req.body[field];
+    if (values === undefined) continue;
+    const expected = req.body.progressionExpected?.[field];
+    if (!values || typeof values !== "object" || Array.isArray(values) || !expected || typeof expected !== "object" || Array.isArray(expected)) return res.status(400).json({ error: "Progression invalide ou valeurs initiales manquantes." });
+    for (const [gameId, value] of Object.entries(values)) {
+      if (!allowed.includes(gameId) || typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum || (field === "gameXp" ? !Number.isSafeInteger(value) : Math.abs(value * 100 - Math.round(value * 100)) > 0.000001) || typeof expected[gameId] !== "number" || !Number.isFinite(expected[gameId])) return res.status(400).json({ error: field === "gameXp" ? "L’XP doit être un entier entre 0 et 1 000 000 000 000 pour un jeu existant." : "L’Elo doit être un nombre valide, avec deux décimales maximum, pour un jeu classé." });
+    }
+  }
   for (const field of ["birthDate", "lastDailyClaim"]) {
     const value = req.body[field];
     if (value && (!validDateOnly(value) || value > casinoDateKey())) return res.status(400).json({ error: "La date doit être valide et ne peut pas être dans le futur." });
@@ -5310,6 +5220,14 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
     const email = normalizeEmail(req.body.login ?? user.email);
     const unchangedLegacy = !validEmail(user.email) && (req.body.login === undefined || String(req.body.login) === String(user.pseudo));
     if (!unchangedLegacy && (!validEmail(email) || db.users.some((entry) => entry.id !== user.id && normalizeEmail(entry.email) === email))) return "duplicate";
+    const rules = rankedRuntime.config(db);
+    for (const field of ["gameXp", "gameElo"]) for (const [gameId, value] of Object.entries(req.body[field] ?? {})) {
+      const current = field === "gameXp" ? gameProgress(user, gameId, progressionConfig(db)).xp : eloFor(user, gameId, rules.games[gameId]).elo;
+      if (current !== req.body.progressionExpected[field][gameId]) return "progression-conflict";
+      if (value === current) continue;
+      if ((field === "gameElo" && rankedRuntime.ratingLocked(db, user.id, gameId)) || (field === "gameXp" && db.rooms.some((room) => room.gameId === gameId && !room.finished && room.state && (room.players.some((player) => player.id === user.id) || room.ranked?.roster.some((player) => player.id === user.id))))) return "progression-locked";
+      if (field === "gameElo" && rules.games[gameId].minimumElo !== null && value < rules.games[gameId].minimumElo) return "elo-floor";
+    }
     ensureUserSocial(user);
     const emailChanged = !unchangedLegacy && normalizeEmail(user.email) !== email;
     if (emailChanged) {
@@ -5326,6 +5244,8 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
     user.profile.gender = String(req.body.gender ?? user.profile.gender ?? "").trim().slice(0, 32);
     if (Array.isArray(req.body.favoriteGames)) user.profile.favoriteGames = [...new Set(req.body.favoriteGames.map(String))].filter((id) => games.some((game) => game.id === id)).slice(0, 5);
     if (req.body.profileStats && typeof req.body.profileStats === "object") user.profileStats = normalizeProfileStats(req.body.profileStats);
+    for (const [gameId, xp] of Object.entries(req.body.gameXp ?? {})) (user.gameXp ??= {})[gameId] = xp;
+    for (const [gameId, elo] of Object.entries(req.body.gameElo ?? {})) (user.gameElo ??= {})[gameId] = { ...eloFor(user, gameId, rules.games[gameId]), elo };
     const requestedBalance = req.body.tokens === undefined ? Number(user.tokens) || 0 : Number(req.body.tokens);
     const balanceDelta = requestedBalance - (Number(user.tokens) || 0);
     if (balanceDelta) addTokens(db, user.id, balanceDelta, { reason: "admin-adjustment", note: "Solde modifié depuis la fiche joueur" });
@@ -5355,7 +5275,7 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
         const startedAt = active ? (!wasActive ? updatedAt : previous.startedAt || previous.updatedAt || updatedAt) : previous.startedAt ?? "";
         user.moderation[type] = { active, reason: normalizePlainText(input.reason, 240), endsAt, updatedAt, updatedBy: req.auth.id, caseId, startedAt };
         if (active && caseId) moderationDecisions.push({ id: caseId, userId: user.id, adminId: req.auth.id, kind: type, reason: user.moderation[type].reason, startsAt: startedAt, endsAt, durationDays: endsAt ? Math.max(1, Math.ceil((Date.parse(endsAt) - Date.parse(startedAt)) / 86400000)) : 0 });
-        if (active && !wasActive) pushNotification(user, { type: "moderation-decision", title: "Sanction administrative", message: `${user.moderation[type].reason || "Une sanction temporaire a été appliquée à ton compte."} Cette décision est inscrite au registre du tribunal selon la procédure 49,3. Un recours écrit peut être envoyé à ${process.env.CONTACT_EMAIL || "contact@netdis.org"}.` });
+        if (active && !wasActive) pushNotification(user, { type: "moderation-decision", title: "Sanction administrative", message: `${user.moderation[type].reason || "Une sanction temporaire a été appliquée à ton compte."} Cette décision est inscrite au registre du tribunal selon la procédure 49,3. Un recours écrit peut être envoyé à ${contactEmail()}.` });
         if (type === "hardBan" && !wasActive && active) user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
       }
     }
@@ -5364,6 +5284,9 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
   });
   if (!result) return res.status(404).json({ error: "Joueur introuvable." });
   if (result === "duplicate") return res.status(409).json({ error: "Adresse email invalide ou déjà utilisée." });
+  if (result === "progression-conflict") return res.status(409).json({ error: "La progression a changé depuis l’ouverture de la fiche. Recharge la fiche avant de modifier l’XP ou l’Elo." });
+  if (result === "progression-locked") return res.status(409).json({ error: "Termine la partie concernée et quitte sa file classée avant de modifier la progression." });
+  if (result === "elo-floor") return res.status(400).json({ error: "L’Elo ne peut pas être inférieur au minimum configuré pour ce jeu." });
   try {
     for (const decision of moderationDecisions) tribunal.recordAdministrativeDecision(decision);
   } catch (error) {
@@ -5619,6 +5542,7 @@ app.patch("/api/me", auth, async (req, res) => {
   const publicStatOptions = ["age", "gender", "friends", "gamesPlayed", "wins", "winRate", "achievements"];
   if (login && !validEmail(login)) return res.status(400).json({ error: "Adresse email invalide." });
   const currentAccount = readDb().users.find((entry) => entry.id === req.auth.id);
+  if (req.body.rankedBadgeGameId !== undefined && req.body.rankedBadgeGameId !== "" && !RANKED_GAMES.includes(req.body.rankedBadgeGameId)) return res.status(400).json({ error: "Jeu de l’insigne classé invalide." });
   if (req.body.titleGameId && !games.some((game) => game.id === req.body.titleGameId)) return res.status(400).json({ error: "Jeu du titre invalide." });
   if (req.body.titleHidden !== undefined && typeof req.body.titleHidden !== "boolean") return res.status(400).json({ error: "Affichage du titre invalide." });
   if (req.body.titleLevel !== undefined && (!Number.isSafeInteger(req.body.titleLevel) || req.body.titleLevel < 0 || req.body.titleLevel > 1000)) return res.status(400).json({ error: "Palier du titre invalide." });
@@ -5665,6 +5589,7 @@ app.patch("/api/me", auth, async (req, res) => {
     }
     if (req.body.titleLevel !== undefined) found.profile.titleLevel = req.body.titleLevel;
     if (req.body.titleHidden !== undefined) found.profile.titleHidden = req.body.titleHidden;
+    if (req.body.rankedBadgeGameId !== undefined) found.profile.rankedBadgeGameId = req.body.rankedBadgeGameId;
     found.profile = normalizePublicProfile(found.profile, found.pseudo);
     if (passwordHash) {
       found.passwordHash = passwordHash;
@@ -5852,7 +5777,9 @@ app.get("/api/rooms", (_req, res) => {
   res.json(sanitizeRooms(db.rooms.filter((room) => room.isPublic && !room.finished)));
 });
 
-const rankedRuntime = createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb, rankedRows, rankedRecent, games: configuredGames, platformSettings,
+const insigniaStore = registerRankInsigniaRoutes({ app, auth, requireAdmin,
+  directory: process.env.RANK_INSIGNIA_UPLOAD_DIR ? path.resolve(process.env.RANK_INSIGNIA_UPLOAD_DIR) : path.join(path.dirname(databaseFilename), "rank-insignia-images") });
+const rankedRuntime = createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb, rankedRows, rankedRecent, rankedSettlement, rankedMetrics, games: configuredGames, platformSettings, insigniaStore, rankedConfig,
   userFeatureAccess, roomCode, roomPlayerFor, startRoomRound, finishRoomIfNeeded, removePlayerFromRoomState, cashOutPokerPlayer,
   addTokens, sanitizeFriendUser, emitRoomUpdate, broadcastRooms, io,
   isWatching: (roomId,userId)=>[...(roomPresence.get(roomId) ?? [])].some((id)=>io.sockets.sockets.get(id)?.data.userId === userId && !io.sockets.sockets.get(id)?.data.spectator)
@@ -5935,7 +5862,7 @@ app.post("/api/rooms/:code/join", auth, async (req, res) => {
   if (levelError) return res.status(403).json({ error: levelError });
   room.players.push(roomPlayerFor(user));
   if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
-  writeDb(db);
+  writeRoomDb(db, room);
   broadcastRooms();
   emitRoomUpdate(room);
   res.json(sanitizeRoom(room, req.auth.id));
@@ -5972,7 +5899,7 @@ app.post("/api/rooms/:code/belote-team", auth, (req, res) => {
   if (!access.allowed) return rejectFeature(res, access);
   try {
     chooseBeloteTeam(room, req.auth.id, String(req.body.playerId ?? req.auth.id), req.body.team);
-    writeDb(db); emitRoomUpdate(room, db);
+    writeRoomDb(db, room); emitRoomUpdate(room, db);
     res.json(sanitizeRoom(room, req.auth.id, db));
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
@@ -6065,7 +5992,7 @@ app.delete("/api/rooms/:code", auth, (req, res) => {
     for (const player of [...room.players]) cashOutPokerPlayer(room, db, player.id, "poker-table-closed");
   }
   db.rooms = db.rooms.filter((r) => r.id !== room.id);
-  writeDb(db);
+  writeRoomDb(db, room);
   io.to(room.id).emit("room-closed", { code: room.code });
   broadcastRooms();
   res.json({ ok: true });
@@ -6093,7 +6020,7 @@ app.post("/api/rooms/:code/kick", auth, (req, res) => {
   }
   if (room.state && !room.state.finished) runBotTurns(room, db);
   finishRoomIfNeeded(room, db);
-  writeDb(db);
+  writeRoomDb(db, room, [playerId]);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   // Notify before the room update and revoke every live subscription of this player.
   for (const socketId of [...(roomPresence.get(room.id) ?? [])]) {
@@ -6117,7 +6044,7 @@ app.post("/api/rooms/:code/bot", auth, (req, res) => {
   if (room.players.length >= game.maxPlayers) return res.status(400).json({ error: "Table complète." });
   room.players.push({ id: randomUUID(), pseudo: `Bot ${room.players.length}`, tokens: platformSettings(db).signupTokens, isBot: true, guest: true });
   if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
-  writeDb(db);
+  writeRoomDb(db, room);
   emitRoomUpdate(room);
   broadcastRooms();
   res.json(sanitizeRoom(room, req.auth.id));
@@ -6134,7 +6061,7 @@ app.post("/api/rooms/:code/poker-settings", auth, (req, res) => {
   const maximumBet = Math.floor(Number(req.body.maximumBet));
   if (!Number.isFinite(maximumBet) || maximumBet < bigBlind) return res.status(400).json({ error: "La mise maximale doit être supérieure ou égale à la grosse blinde." });
   room.pokerBlinds = { smallBlind, bigBlind, maximumBet };
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   res.json(safeRoom);
@@ -6145,7 +6072,7 @@ app.post("/api/rooms/:code/battle-settings", auth, (req, res) => {
   const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && entry.ownerId === req.auth.id && !entry.state && entry.gameId === "bataille");
   if (!room) return res.status(404).json({ error: "Modificateurs de Bataille indisponibles." });
   room.battleModifiers = normalizeBattleModifiers(req.body);
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   broadcastRooms();
@@ -6157,7 +6084,7 @@ app.post("/api/rooms/:code/game-settings", auth, (req, res) => {
   const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && entry.ownerId === req.auth.id && !entry.state);
   if (!room) return res.status(404).json({ error: "Réglages de table indisponibles." });
   room.gameModifiers = normalizeGameModifiers(room.gameId, req.body);
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   res.json(safeRoom);
@@ -6174,7 +6101,7 @@ app.post("/api/rooms/:code/level-settings", auth, (req, res) => {
       const error = roomLevelError(db.users.find((user) => user.id === player.id) ?? player, { ...room, ...limits }, config);
       if (error) return res.status(400).json({ error: `${player.pseudo} : ${error}` });
     }
-    Object.assign(room, limits); writeDb(db); emitRoomUpdate(room); broadcastRooms();
+    Object.assign(room, limits); writeRoomDb(db, room); emitRoomUpdate(room); broadcastRooms();
     res.json(sanitizeRoom(room, req.auth.id, db));
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
@@ -6184,7 +6111,7 @@ app.post("/api/rooms/:code/leave", auth, (req, res) => {
   const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && !entry.finished);
   if (!room || !room.players.some((entry) => entry.id === req.auth.id)) return res.status(404).json({ error: "Table introuvable." });
   if (room.ranked) {
-    rankedRuntime.forfeit(room,db,req.auth.id);writeDb(db);emitRoomUpdate(room);broadcastRooms();return res.json({ok:true});
+    rankedRuntime.forfeit(room,db,req.auth.id);writeRoomDb(db,room,[req.auth.id]);emitRoomUpdate(room);broadcastRooms();return res.json({ok:true});
   }
   if (room.state?.gameId === "texas-holdem") cashOutPokerPlayer(room, db, req.auth.id);
   else {
@@ -6200,7 +6127,7 @@ app.post("/api/rooms/:code/leave", auth, (req, res) => {
     if (humans.length === 1) room.readyPlayerIds = [...new Set([...(room.readyPlayerIds ?? []), humans[0].id])];
   }
   finishRoomIfNeeded(room, db);
-  writeDb(db);
+  writeRoomDb(db, room, [req.auth.id]);
   emitRoomUpdate(room);
   broadcastRooms();
   res.json({ ok: true });
@@ -6214,7 +6141,7 @@ app.post("/api/rooms/:code/ready", auth, (req, res) => {
   if (!access.allowed) return rejectFeature(res, access);
   room.readyPlayerIds ??= [];
   room.readyPlayerIds = room.readyPlayerIds.includes(req.auth.id) ? room.readyPlayerIds.filter((id) => id !== req.auth.id) : [...room.readyPlayerIds, req.auth.id];
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   res.json(safeRoom);
@@ -6239,7 +6166,7 @@ app.post("/api/rooms/:code/start", auth, (req, res) => {
   if (error === "missing") return res.status(404).json({ error: "Jeu introuvable." });
   if (error) return res.status(400).json({ error });
   const achievementUnlocks = consumeRoomAchievementUnlocks(room, req.auth.id);
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   broadcastRooms();
@@ -6257,7 +6184,7 @@ app.post("/api/rooms/:code/replay", auth, (req, res) => {
   room.finished = false;
   room.createdAt = new Date().toISOString();
   syncRoomPlayerTokens(room, db);
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   broadcastRooms();
@@ -6273,7 +6200,7 @@ app.post("/api/rooms/:code/replay-now", auth, (req, res) => {
   if (error) return res.status(400).json({ error });
   room.createdAt = new Date().toISOString();
   const achievementUnlocks = consumeRoomAchievementUnlocks(room, req.auth.id);
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id);
   emitRoomUpdate(room);
   broadcastRooms();
@@ -6293,7 +6220,7 @@ app.post("/api/rooms/:code/action", auth, (req, res) => {
     || (room.pacing?.kind === "turn-end" && room.pacing.actorIsBot && room.state.gameId === "midnight-dice" && room.state.phase === "contract" && req.body.type === "choose-contract");
   if (roomPacingActive(room) && !actionAllowedDuringPacing) {
     if (pacingAdvanced) {
-      writeDb(db);
+      writeRoomDb(db, room);
       emitRoomUpdate(room, db);
     }
     const pacingError = room.pacing.kind === "round-results"
@@ -6372,7 +6299,7 @@ app.post("/api/rooms/:code/action", auth, (req, res) => {
     }
     finishRoomIfNeeded(room, db);
     const achievementUnlocks = consumeRoomAchievementUnlocks(room, req.auth.id);
-    writeDb(db);
+    writeRoomDb(db, room);
     const safeRoom = sanitizeRoom(room, req.auth.id, db);
     emitRoomUpdate(room, db);
     res.json({ ...safeRoom, achievementUnlocks });
@@ -6390,26 +6317,101 @@ app.post("/api/rooms/:code/pacing/skip", auth, (req, res) => {
   room.pacing.endsAt = Date.now();
   advanceRoomPacing(room, db, Date.now());
   finishRoomIfNeeded(room, db);
-  writeDb(db);
+  writeRoomDb(db, room);
   const safeRoom = sanitizeRoom(room, req.auth.id, db);
   emitRoomUpdate(room, db);
   res.json(safeRoom);
 });
 
-app.get("/api/history", auth, (req, res) => {
+const accountArchiveEpochs = new WeakMap();
+let accountArchiveSequence = 0;
+let accountConfigurationRevision, accountConfiguration;
+function configuredAccountProcess(db) {
+  const revision = databaseSettingsRevision();
+  if (accountConfigurationRevision !== revision) {
+    const platform = platformSettings(db), ranked = rankedConfig(db), catalog = achievementCatalog(db), shop = configuredShop(db);
+    accountConfiguration = accountsWork.configure({ platform, ranked, catalog, shop }, [platform, ranked, catalog, shop]);
+    accountConfigurationRevision = revision;
+  }
+  return accountConfiguration;
+}
+function accountArchiveRevision(archive, userId) {
+  if (!accountArchiveEpochs.has(archive)) accountArchiveEpochs.set(archive, ++accountArchiveSequence);
+  return `${accountArchiveEpochs.get(archive)}:${archive.revisionFor(userId)}`;
+}
+
+async function accountReading(req, res, service, input = {}) {
+  const controller = new AbortController();
+  const disconnected = () => { if (!res.writableEnded) controller.abort(); };
+  res.once("close", disconnected);
+  try {
+    const payload = configurationCache.read(() => {
+      const db = readDb(), configuration = configuredAccountProcess(db);
+      const ids = [req.auth?.id, input.targetId].filter(Boolean);
+      const revisions = Object.fromEntries(ids.map((id) => [id, {
+        history: accountArchiveRevision(db.history, id), transactions: accountArchiveRevision(db.transactions, id)
+      }]));
+      const guest = req.auth?.guest ? sessions.get(req.auth.id) : undefined;
+      return { ...input, userId: req.auth?.id, guest, revisions, configuration };
+    });
+    let result = await accountsWork.run(service, payload, { signal: controller.signal });
+    // A queued projection may have reused statistics from before a game settled.
+    // Refresh once with the committed revisions instead of returning that cache.
+    const db = readDb();
+    const changed = Object.keys(payload.revisions).some((id) => payload.revisions[id].history !== accountArchiveRevision(db.history, id) ||
+      payload.revisions[id].transactions !== accountArchiveRevision(db.transactions, id));
+    if (!controller.signal.aborted && changed) {
+      for (const id of Object.keys(payload.revisions)) payload.revisions[id] = {
+        history: accountArchiveRevision(db.history, id), transactions: accountArchiveRevision(db.transactions, id)
+      };
+      result = await accountsWork.run(service, payload, { signal: controller.signal });
+    }
+    if (controller.signal.aborted) return;
+    // Never deliver private results after an intervening session/account revocation.
+    if (req.auth) {
+      let accepted = false;
+      auth(req, res, () => { accepted = true; });
+      if (!accepted) return;
+    }
+    res.status(result.status).type("application/json").send(result.json);
+  } finally { res.off("close", disconnected); }
+}
+
+async function playerReading(req, res, service) {
+  const controller = new AbortController();
+  const disconnected = () => { if (!res.writableEnded) controller.abort(); };
+  res.once("close", disconnected);
+  const query = Object.fromEntries(["game", "result", "event", "direction", "search", "searchReasons", "limit", "offset"]
+    .filter((key) => typeof req.query[key] === "string")
+    .map((key) => [key, req.query[key].slice(0, key === "searchReasons" ? 2000 : 200)]));
+  try {
+    const result = await readingWork.run(service, { userId: req.auth.id, query }, { signal: controller.signal });
+    if (controller.signal.aborted) return null;
+    // Account/session revocation can occur while a read is queued.
+    let accepted = false;
+    auth(req, res, () => { accepted = true; });
+    return accepted ? result : null;
+  } catch (error) { if (controller.signal.aborted) return null; throw error; }
+  finally { res.off("close", disconnected); }
+}
+
+app.get("/api/history", auth, async (req, res) => {
+  const page = await playerReading(req, res, "history");
+  if (!page) return;
   const db = readDb();
-  const page = ledgerPage(db.history, req.auth.id, req.query);
   page.rows = page.rows.map((row) => enrichHistoryRow(row, db, req.auth.id));
   res.json(req.query.paged === "1" ? page : page.rows);
 });
 
-app.get("/api/transactions", auth, (req, res) => {
-  const page = ledgerPage(readDb().transactions, req.auth.id, req.query);
+app.get("/api/transactions", auth, async (req, res) => {
+  const page = await playerReading(req, res, "transactions");
+  if (!page) return;
   res.json(req.query.paged === "1" ? page : page.rows);
 });
 
-app.get("/api/me/statistics", auth, (req, res) => {
-  const stats = playerStatistics(readDb(), req.auth.id);
+app.get("/api/me/statistics", auth, async (req, res) => {
+  const stats = await playerReading(req, res, "statistics");
+  if (!stats) return;
   res.json({ ...stats, todayGames: stats.activity[casinoDateKey()] ?? 0 });
 });
 
@@ -6459,11 +6461,12 @@ setInterval(() => {
 setInterval(() => {
   const db = readDb();
   let changed = false;
+  const changedRooms = new Set();
   const now = Date.now();
   for (const room of db.rooms.filter((entry) => entry.pacing)) {
     if (!advanceRoomPacing(room, db, now)) continue;
     changed = true;
-    emitRoomUpdate(room, db);
+    changedRooms.add(room);
   }
   for (const room of db.rooms.filter((entry) => entry.state?.gameId === "texas-holdem" && !entry.finished)) {
     if (roomPacingActive(room, now)) continue;
@@ -6481,7 +6484,7 @@ setInterval(() => {
     if (roomChanged && !room.state.finished && !roomPacingActive(room, now)) runBotTurns(room, db);
     if (roomChanged) {
       changed = true;
-      emitRoomUpdate(room, db);
+      changedRooms.add(room);
     }
   }
   for (const room of db.rooms.filter((entry) => entry.state?.gameId === "bataille" && !entry.finished)) {
@@ -6492,20 +6495,26 @@ setInterval(() => {
     finishRoomIfNeeded(room, db);
     if (!room.finished && !showingResults) runBotTurns(room, db);
     changed = true;
-    emitRoomUpdate(room, db);
+    changedRooms.add(room);
   }
   if (changed) {
-    writeDb(db);
+    writeDb(db, roomWriteScope(db, [...changedRooms]));
+    for (const room of changedRooms) emitRoomUpdate(room, db);
   }
 }, 1000).unref();
 
 io.on("connection", (socket) => {
-  socket.emit("rooms", sanitizeRooms(readDb().rooms.filter((room) => room.isPublic && !room.finished)));
+  // Unknown clients retain the old lobby subscription until they enter a table.
+  if (!["conversation", "table", "event"].includes(socket.handshake.auth?.stream)) {
+    socket.join("casino-lobby");
+    if (socket.handshake.auth?.lobbyDeltas === true) socket.join("casino-lobby-incremental");
+    socket.emit("rooms", sanitizeRooms(readDb().rooms.filter((room) => room.isPublic && !room.finished)));
+  }
   const subscribeToChat = (payload = {}) => {
     const token = payload.token || socket.handshake.auth?.token || requestCookie(socket.handshake, SESSION_COOKIE);
     if (!token) return;
     let viewer;
-    try { viewer = jwt.verify(token, JWT_SECRET); } catch { return; }
+    try { viewer = jwt.verify(token, JWT_KEY, { algorithms: ["HS256"] }); } catch { return; }
     const db = readDb();
     const user = db.users.find((entry) => entry.id === viewer.id && entry.active !== false && !entry.guest);
     const staleSession = user && (Number(viewer.sessionVersion) || 0) !== (Number(user.sessionVersion) || 0);
@@ -6520,9 +6529,12 @@ io.on("connection", (socket) => {
     socket.join(`account:${user.id}`);
     onlinePresence.connect(user.id, socket.id);
     for (const joined of socket.rooms) if (joined.startsWith("chat:")) socket.leave(joined);
-    socket.join("chat:global");
-    for (const friendId of user.friends) socket.join(`chat:direct:${directChannelId(user.id, friendId)}`);
-    const room = payload.roomCode ? chatRoomAccess(db, user.id, payload.roomCode) : null;
+    const receivesChat = !["lobby", "table", "event"].includes(socket.handshake.auth?.stream);
+    if (receivesChat) {
+      socket.join("chat:global");
+      for (const friendId of user.friends) socket.join(`chat:direct:${directChannelId(user.id, friendId)}`);
+    }
+    const room = receivesChat && payload.roomCode ? chatRoomAccess(db, user.id, payload.roomCode) : null;
     if (room) socket.join(`chat:room:${room.id}`);
     socket.emit("chat-ready", { roomCode: room?.code ?? "" });
   };
@@ -6535,7 +6547,7 @@ io.on("connection", (socket) => {
     if (!token) return;
     let viewer;
     try {
-      viewer = jwt.verify(token, JWT_SECRET);
+      viewer = jwt.verify(token, JWT_KEY, { algorithms: ["HS256"] });
     } catch {
       socket.emit("room-error", { error: "Session invalide." });
       return;
@@ -6555,6 +6567,8 @@ io.on("connection", (socket) => {
       roomPresence.get(socket.data.roomId)?.delete(socket.id);
     }
     socket.join(roomId);
+    socket.leave("casino-lobby");
+    socket.leave("casino-lobby-incremental");
     socket.data.roomId = roomId;
     socket.data.userId = viewer.id;
     socket.data.spectator = payload.spectator === true || !seated;
@@ -6578,7 +6592,7 @@ io.on("connection", (socket) => {
       const room = db.rooms.find((r) => r.id === roomId);
       if (!room || room.state || room.finished) return;
       db.rooms = db.rooms.filter((r) => r.id !== roomId);
-      writeDb(db);
+      writeRoomDb(db, room);
       broadcastRooms();
     }, 10000);
   });
@@ -6588,12 +6602,17 @@ if (CLIENT_DIST) {
   if (!fs.existsSync(CLIENT_DIST)) {
     console.warn(`CLIENT_DIST is configured but does not exist: ${CLIENT_DIST}`);
   } else {
-    app.use(express.static(CLIENT_DIST));
-    app.get(/^(?!\/api).*/, (_req, res) => {
-      res.sendFile(path.join(CLIENT_DIST, "index.html"));
-    });
+    await registerPublicPages({ app, clientDist: CLIENT_DIST, settings: platformSettings, games: configuredGames, help: () => playerHelp.read(true), catalog: () => ({ currentVersion: patchnotes.currentVersion, notes: patchnotes.list() }), note: (version) => version ? patchnotes.get(version) : null, basePath: APP_BASE_PATH });
+    app.use(express.static(CLIENT_DIST, { index: false, dotfiles: "deny" }));
+    app.use((_req, res) => res.status(404).set("X-Robots-Tag", "noindex").type("text/plain").send("Not found"));
   }
 }
+
+app.use((error, _req, res, next) => {
+  if (String(error.code).startsWith("TASK_WORK_")) return res.set("Retry-After", "5").status(503).json({ error: "Traitement temporairement indisponible. Reessaie dans quelques instants." });
+  if (error.code !== "PASSWORD_WORK_BUSY") return next(error);
+  res.set("Retry-After", "5").status(503).json({ error: error.message });
+});
 
 updateDb((db) => {
   db.communityEvents = (db.communityEvents ?? []).map((event) => normalizeCommunityEvent(event, event));
@@ -6606,7 +6625,21 @@ updateDb((db) => {
   return true;
 });
 
-server.listen(PORT, HOST, () => {
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 70000;
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  setTimeout(() => process.exit(1), 10000).unref();
+  try { executionHistory.sample(serviceExecution.health(readingWork.health()), true); } catch {}
+  await Promise.all([readingWork.close(), bcrypt.close(), accountsWork?.close(), capacityTests.close()]);
+  executionHistory.close();
+  io.close(() => process.exit(0));
+}
+process.once("SIGTERM", shutdown);
+process.once("SIGINT", shutdown);
+server.listen({ port: PORT, host: HOST, backlog: 4096 }, () => {
   const protocol = HTTPS_PFX_PATH || (HTTPS_KEY_PATH && HTTPS_CERT_PATH) ? "https" : "http";
   console.log(`KTGA.ME server listening on ${protocol}://${HOST}:${PORT}`);
   requestLogs.append({ category: "lifecycle", level: "info", method: "SYSTEM", route: "server/start", message: `Serveur démarré, processus ${process.pid}.` });

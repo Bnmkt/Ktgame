@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Bot, Clock3, Coins, Gift, Landmark, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
+import { AlertTriangle, Bot, Clock3, Coins, Gift, Landmark, Mail, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { CompactNumber, formatCompactNumber } from "../../utils/presentation.jsx";
@@ -62,6 +62,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }
           <label className="admin-site-icon-field">Icône du site<span><span className="admin-site-icon-preview"><CosmeticIcon value="site" source={draft.siteIcon} /></span><input maxLength="6000" value={draft.siteIcon ?? ""} onChange={(event) => update("siteIcon", event.target.value)} placeholder="landmark, crown ou SVG" /></span><small>Nom d’une icône Lucide ou SVG personnalisé.</small></label>
           <label>Nom du casino<input required maxLength="36" value={draft.siteName} onChange={(event) => update("siteName", event.target.value)} /></label>
           <label className="settings-field-wide">Sous-titre<input required maxLength="120" value={draft.siteSubtitle} onChange={(event) => update("siteSubtitle", event.target.value)} /><small>{draft.siteSubtitle?.length ?? 0}/120 caractères</small></label>
+          <label className="settings-field-wide"><span><Mail size={16} /> Email de contact</span><input required type="email" maxLength="254" autoComplete="off" value={draft.contactEmail ?? draft.supportEmail ?? ""} onChange={(event) => update("contactEmail", event.target.value)} /><small>Contact public, recours, alertes de bugs, demandes de données et inscriptions parentales. L’expéditeur et la connexion SMTP restent configurés sur le serveur.</small></label>
         </div>
       </section>
       <section className="settings-group settings-access-group">

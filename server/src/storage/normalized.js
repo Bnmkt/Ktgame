@@ -1,9 +1,12 @@
 import { casinoDateKey, CASINO_TIME_ZONE } from "../services/time.js";
 import { bestScore } from "../services/leaderboard-score.js";
+import { historyDecoder } from "./history-reader.js";
 
 export const inventoryTypes = ["icons", "nameEffects", "memberCards", "profileBanners", "profileFrames", "profileEffects", "diceSkins", "cardSkins"];
 
-export function createNormalizedStorage(sqlite) {
+export function createNormalizedStorage(sqlite, { readOnly = false } = {}) {
+  let rebuildHistoryMembers = false;
+  if (!readOnly) {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS achievement_catalog (id TEXT PRIMARY KEY, data TEXT);
     CREATE TABLE IF NOT EXISTS user_game_xp (
@@ -16,12 +19,21 @@ export function createNormalizedStorage(sqlite) {
       PRIMARY KEY(user_id,game_id)
     );
     CREATE INDEX IF NOT EXISTS idx_game_elo_ranking ON user_game_elo(game_id,elo DESC,games DESC,user_id);
+    CREATE TABLE IF NOT EXISTS user_ranked_placements (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      game_id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(user_id,game_id)
+    );
     CREATE TABLE IF NOT EXISTS ranked_results (
       history_id TEXT NOT NULL REFERENCES history(id) ON DELETE CASCADE, match_id TEXT NOT NULL,
       user_id TEXT NOT NULL, game_id TEXT NOT NULL, finished_at TEXT NOT NULL, data TEXT NOT NULL,
       PRIMARY KEY(history_id,user_id), UNIQUE(match_id,user_id)
     );
     CREATE INDEX IF NOT EXISTS idx_ranked_result_user ON ranked_results(user_id,finished_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_ranked_result_game_date ON ranked_results(game_id,finished_at);
+    CREATE TABLE IF NOT EXISTS ranked_settlements (
+      match_id TEXT PRIMARY KEY, history_id TEXT NOT NULL, game_id TEXT NOT NULL, finished_at TEXT NOT NULL
+    );
+    INSERT OR IGNORE INTO ranked_settlements SELECT match_id,history_id,game_id,finished_at FROM ranked_results;
     CREATE TABLE IF NOT EXISTS achievement_reward_receipts (
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       achievement_id TEXT NOT NULL, PRIMARY KEY(user_id, achievement_id)
@@ -69,7 +81,6 @@ export function createNormalizedStorage(sqlite) {
   if (!sqlite.prepare("PRAGMA table_info(history)").all().some((row) => row.name === "day")) sqlite.exec("ALTER TABLE history ADD COLUMN day TEXT");
   sqlite.exec("CREATE INDEX IF NOT EXISTS idx_history_day ON history(day)");
   const memberColumns = new Set(sqlite.prepare("PRAGMA table_info(history_members)").all().map((row) => row.name));
-  let rebuildHistoryMembers = false;
   for (const [name, type] of [["is_bot", "INTEGER NOT NULL DEFAULT 0"], ["gain", "REAL NOT NULL DEFAULT 0"], ["score", "REAL"]]) {
     if (!memberColumns.has(name)) { sqlite.exec(`ALTER TABLE history_members ADD COLUMN ${name} ${type}`); rebuildHistoryMembers = true; }
   }
@@ -83,6 +94,7 @@ export function createNormalizedStorage(sqlite) {
   if (!potColumns.has("day")) sqlite.exec("ALTER TABLE community_event_pot_entries ADD COLUMN day TEXT");
   sqlite.exec("CREATE INDEX IF NOT EXISTS idx_event_pot_day ON community_event_pot_entries(day, event_id)");
 
+  }
   const statements = new Map();
   const stmt = (sql) => {
     if (!statements.has(sql)) statements.set(sql, sqlite.prepare(sql));
@@ -91,48 +103,67 @@ export function createNormalizedStorage(sqlite) {
   const ensureAchievement = (id) => stmt("INSERT OR IGNORE INTO achievement_catalog(id) VALUES (?)").run(id);
   const ensureItem = (type, id) => stmt("INSERT OR IGNORE INTO item_catalog(type, id) VALUES (?, ?)").run(type, id);
 
-  function splitUser(user) {
+  function splitUser(user, previous) {
     const data = { ...user };
+    const unchanged = (before, after) => previous && JSON.stringify(before) === JSON.stringify(after);
     if (user.gameElo) {
-      for (const [gameId,row] of Object.entries(user.gameElo)) stmt("INSERT INTO user_game_elo VALUES (?,?,?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET elo=excluded.elo,games=excluded.games,wins=excluded.wins").run(user.id,gameId,row.elo,row.games,row.wins);
+      for (const [gameId,row] of Object.entries(user.gameElo)) {
+        if (unchanged(previous?.gameElo?.[gameId], row)) continue;
+        stmt("INSERT INTO user_game_elo VALUES (?,?,?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET elo=excluded.elo,games=excluded.games,wins=excluded.wins").run(user.id,gameId,row.elo,row.games,row.wins);
+        if (row.placement) stmt("INSERT INTO user_ranked_placements VALUES (?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET data=excluded.data").run(user.id,gameId,JSON.stringify(row.placement));
+        else stmt("DELETE FROM user_ranked_placements WHERE user_id=? AND game_id=?").run(user.id,gameId);
+      }
       delete data.gameElo;
     }
     if (user.gameXp) {
-      for (const [gameId, xp] of Object.entries(user.gameXp)) stmt("INSERT INTO user_game_xp VALUES (?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET xp=excluded.xp").run(user.id, gameId, Math.max(0, Math.min(1000000000000, Math.trunc(Number(xp) || 0))));
-      user.gameXp = Object.fromEntries(stmt("SELECT game_id,xp FROM user_game_xp WHERE user_id=?").all(user.id).map((row) => [row.game_id, row.xp]));
+      if (!unchanged(previous?.gameXp, user.gameXp)) {
+        for (const [gameId, xp] of Object.entries(user.gameXp)) {
+          if (unchanged(previous?.gameXp?.[gameId], xp)) continue;
+          stmt("INSERT INTO user_game_xp VALUES (?,?,?) ON CONFLICT(user_id,game_id) DO UPDATE SET xp=excluded.xp").run(user.id, gameId, Math.max(0, Math.min(1000000000000, Math.trunc(Number(xp) || 0))));
+        }
+        user.gameXp = Object.fromEntries(stmt("SELECT game_id,xp FROM user_game_xp WHERE user_id=?").all(user.id).map((row) => [row.game_id, row.xp]));
+      }
       if (Object.keys(user.gameXp).length) delete data.gameXp;
     }
     if (user.achievementRewards) {
-      for (const id of user.achievementRewards) stmt("INSERT OR IGNORE INTO achievement_reward_receipts VALUES (?,?)").run(user.id, id);
-      user.achievementRewards = stmt("SELECT achievement_id FROM achievement_reward_receipts WHERE user_id=?").all(user.id).map((row) => row.achievement_id);
+      if (!unchanged(previous?.achievementRewards, user.achievementRewards)) {
+        for (const id of user.achievementRewards) if (!previous?.achievementRewards?.includes(id)) stmt("INSERT OR IGNORE INTO achievement_reward_receipts VALUES (?,?)").run(user.id, id);
+        user.achievementRewards = stmt("SELECT achievement_id FROM achievement_reward_receipts WHERE user_id=?").all(user.id).map((row) => row.achievement_id);
+      }
       if (user.achievementRewards.length) delete data.achievementRewards;
     }
     if (user.achievements) {
       const { unlocked = [], suppressed = [], unlockedAt = {}, ...extra } = user.achievements;
       data.achievements = extra;
-      stmt("DELETE FROM user_achievements WHERE user_id = ?").run(user.id);
-      for (const id of new Set([...unlocked, ...suppressed, ...Object.keys(unlockedAt)])) {
-        ensureAchievement(id);
-        stmt("INSERT INTO user_achievements VALUES (?, ?, ?, ?, ?, ?, ?)").run(user.id, id, Number(unlocked.includes(id)), Number(suppressed.includes(id)), unlockedAt[id] ?? null, unlocked.indexOf(id), suppressed.indexOf(id));
+      if (!unchanged(previous?.achievements, user.achievements)) {
+        stmt("DELETE FROM user_achievements WHERE user_id = ?").run(user.id);
+        for (const id of new Set([...unlocked, ...suppressed, ...Object.keys(unlockedAt)])) {
+          ensureAchievement(id);
+          stmt("INSERT INTO user_achievements VALUES (?, ?, ?, ?, ?, ?, ?)").run(user.id, id, Number(unlocked.includes(id)), Number(suppressed.includes(id)), unlockedAt[id] ?? null, unlocked.indexOf(id), suppressed.indexOf(id));
+        }
       }
     }
     if (user.achievementProgress) {
       delete data.achievementProgress;
-      stmt("DELETE FROM achievement_progress WHERE user_id = ?").run(user.id);
+      for (const id of Object.keys(previous?.achievementProgress ?? {})) {
+        if (!Object.hasOwn(user.achievementProgress, id)) stmt("DELETE FROM achievement_progress WHERE user_id = ? AND achievement_id = ?").run(user.id, id);
+      }
       for (const [achievementId, progress] of Object.entries(user.achievementProgress)) {
+        if (unchanged(previous?.achievementProgress?.[achievementId], progress)) continue;
         const value = Number(progress?.value) || 0;
         const extra = { ...progress };
         delete extra.value;
-        stmt("INSERT INTO achievement_progress VALUES (?, ?, ?, ?, ?)").run(user.id, achievementId, value, Object.keys(extra).length ? JSON.stringify(extra) : null, progress?.updatedAt ?? null);
+        stmt("INSERT INTO achievement_progress VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, achievement_id) DO UPDATE SET value=excluded.value,data=excluded.data,updated_at=excluded.updated_at").run(user.id, achievementId, value, Object.keys(extra).length ? JSON.stringify(extra) : null, progress?.updatedAt ?? null);
       }
     }
     if (user.cosmetics) {
       data.cosmetics = { ...user.cosmetics };
-      stmt("DELETE FROM user_inventory WHERE user_id = ?").run(user.id);
+      for (const type of inventoryTypes) if (!unchanged(previous?.cosmetics?.[type], user.cosmetics[type])) stmt("DELETE FROM user_inventory WHERE user_id = ? AND type = ?").run(user.id, type);
       for (const type of inventoryTypes) {
         if (!Array.isArray(user.cosmetics[type])) continue;
         // An empty array records the category's presence, not its possessions.
         data.cosmetics[type] = [];
+        if (unchanged(previous?.cosmetics?.[type], user.cosmetics[type])) continue;
         [...new Set(user.cosmetics[type])].forEach((id, position) => {
           ensureItem(type, id);
           stmt("INSERT INTO user_inventory VALUES (?, ?, ?, ?)").run(user.id, type, id, position);
@@ -148,6 +179,7 @@ export function createNormalizedStorage(sqlite) {
     const user = JSON.parse(row.data);
     const eloRows = stmt("SELECT game_id,elo,games,wins FROM user_game_elo WHERE user_id=?").all(user.id);
     if (eloRows.length) user.gameElo = Object.fromEntries(eloRows.map((r)=>[r.game_id,{elo:r.elo,games:r.games,wins:r.wins}]));
+    for (const placement of stmt("SELECT game_id,data FROM user_ranked_placements WHERE user_id=?").all(user.id)) if (user.gameElo?.[placement.game_id]) user.gameElo[placement.game_id].placement = JSON.parse(placement.data);
     const xpRows = stmt("SELECT game_id,xp FROM user_game_xp WHERE user_id=?").all(user.id);
     if (xpRows.length) user.gameXp = Object.fromEntries(xpRows.map((entry) => [entry.game_id, entry.xp]));
     const rewardRows = stmt("SELECT achievement_id FROM achievement_reward_receipts WHERE user_id=?").all(user.id);
@@ -191,6 +223,11 @@ export function createNormalizedStorage(sqlite) {
   }
 
   function indexHistory(row) {
+    if (row.ranked?.results?.length) {
+      const receipt = stmt("SELECT history_id FROM ranked_settlements WHERE match_id=?").get(row.ranked.matchId);
+      if (receipt && receipt.history_id !== row.id) throw new Error("Cette partie classée a déjà attribué son Elo.");
+      stmt("INSERT OR IGNORE INTO ranked_settlements VALUES (?,?,?,?)").run(row.ranked.matchId,row.id,row.gameId,row.finishedAt);
+    }
     for (const result of row.ranked?.results ?? []) stmt("INSERT INTO ranked_results VALUES (?,?,?,?,?,?) ON CONFLICT(history_id,user_id) DO UPDATE SET data=excluded.data").run(row.id,row.ranked.matchId,result.userId,row.gameId,row.finishedAt,JSON.stringify({ ...result, participants:row.ranked.participants, roomId:row.roomId }));
     stmt("UPDATE history SET day = ? WHERE id = ?").run(casinoDateKey(row.finishedAt), row.id);
     stmt("DELETE FROM history_members WHERE history_id = ?").run(row.id);
@@ -201,11 +238,7 @@ export function createNormalizedStorage(sqlite) {
       stmt("INSERT INTO history_members VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(row.id, id, row.gameId ?? null, casinoDateKey(row.finishedAt), Number(row.winners?.includes(id) ?? false), position, position < 0 ? null : JSON.stringify(row.players[position]), JSON.stringify(row.achievementEvents?.[id] ?? []), Number(Boolean(row.players?.[position]?.isBot)), gain, bestScore(row, id));
     }
   }
-  function hydrateHistory(row) {
-    const data = JSON.parse(row.data);
-    if (Array.isArray(data.players)) data.players = stmt("SELECT player FROM history_members WHERE history_id = ? AND player_order >= 0 ORDER BY player_order").all(data.id).map((r) => JSON.parse(r.player));
-    return data;
-  }
+  const hydrateHistory = historyDecoder(sqlite);
   function indexTransaction(row) {
     stmt("UPDATE transactions SET amount = ?, balance = ?, reason = ?, day = ? WHERE id = ?").run(Number(row.amount) || 0, Number.isFinite(row.balance) ? row.balance : null, row.reason ?? null, casinoDateKey(row.createdAt), row.id);
   }

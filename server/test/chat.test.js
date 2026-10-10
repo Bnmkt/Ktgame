@@ -20,6 +20,8 @@ test("les messages sont bornés, ordonnés et marqués comme lus", () => {
     store.markRead("alice", "global", "global", 3000);
     assert.equal(store.unread("alice", [{ channelType: "global", channelId: "global" }])["global:global"], 0);
     assert.throws(() => store.add({ channelType: "unknown", channelId: "x", senderId: "alice", content: "Non" }), /INVALID_CHAT_CHANNEL/);
+    assert.throws(() => store.add({ channelType: "global", channelId: "global", senderId: "alice", content: "https://example.com" }, 3000), /CHAT_EXTERNAL_LINK/);
+    assert.equal(store.list("global", "global").length, 2);
   } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });

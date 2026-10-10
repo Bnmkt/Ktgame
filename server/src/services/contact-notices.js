@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { emailDeliveryConfigured, sendTransactionalEmail, validEmail } from "./email-verification.js";
+import { siteContactEmail } from "./site-contact.js";
 
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 const kinds = {
@@ -15,7 +16,7 @@ const dateLabel = (value) => new Intl.DateTimeFormat("fr-BE", { dateStyle: "long
 export function contactNoticeEmail(input, environment = process.env, siteName = "KTGA.ME") {
   const kind = kinds[input.kind];
   if (!kind) throw new Error("Type de notification invalide.");
-  const to = String(environment.CONTACT_EMAIL || "contact@netdis.org").trim();
+  const to = siteContactEmail({}, environment);
   if (!validEmail(to)) throw new Error("Adresse de contact invalide.");
   const base = String(environment.PUBLIC_APP_URL || `${String(environment.CLIENT_ORIGIN || "http://localhost:5173").split(",")[0].replace(/\/$/, "")}/${String(environment.APP_BASE_PATH || "").replace(/^\/+|\/+$/g, "")}`).replace(/\/$/, "");
   const url = new URL(`${base}/${input.kind === "data-request" ? "admin" : `bugs/${encodeURIComponent(input.reference)}`}`);
@@ -30,7 +31,7 @@ export function contactNoticeEmail(input, environment = process.env, siteName = 
   return { to, subject, text, html };
 }
 
-export function createContactNoticeQueue({ filename, siteName = () => "KTGA.ME", environment = process.env, sendEmail = sendTransactionalEmail, configured = () => emailDeliveryConfigured(environment), now = () => Date.now(), intervalMs = 60000 }) {
+export function createContactNoticeQueue({ filename, siteName = () => "KTGA.ME", environment = process.env, contactEmail = () => siteContactEmail({}, environment), sendEmail = sendTransactionalEmail, configured = () => emailDeliveryConfigured(environment), now = () => Date.now(), intervalMs = 60000 }) {
   if (filename !== ":memory:") fs.mkdirSync(path.dirname(filename), { recursive: true });
   const db = new DatabaseSync(filename);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=1000;
@@ -44,7 +45,7 @@ export function createContactNoticeQueue({ filename, siteName = () => "KTGA.ME",
     for (const row of rows) {
       if (closed) break;
       try {
-        const mail = contactNoticeEmail({ kind: row.kind, reference: row.reference, at: row.event_at, dueAt: row.due_at }, environment, siteName());
+        const mail = contactNoticeEmail({ kind: row.kind, reference: row.reference, at: row.event_at, dueAt: row.due_at }, { ...environment, CONTACT_EMAIL: contactEmail() }, siteName());
         await sendEmail({ ...mail, messageId: `<contact-${createHash("sha256").update(row.event_key).digest("hex")}@ktga.me>` }, environment);
         if (!closed) db.prepare("UPDATE contact_notices SET sent_at=? WHERE event_key=?").run(now(), row.event_key);
       } catch {

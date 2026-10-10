@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createPatchnoteStore, suggestedVersionGroup } from "../src/services/patchnotes.js";
+import { DEFAULT_RANKS } from "../src/services/ranked.js";
+import { patchnote021 } from "../scripts/prepare-patchnote-0.2.1.mjs";
 
 test("les versions sont regroupees par branche majeure et mineure", () => {
   assert.equal(suggestedVersionGroup("1.1.2"), "1.1");
@@ -59,6 +61,53 @@ test("une image televersee est liee a sa patchnote et supprimee avec elle", () =
   assert.equal(fs.readdirSync(directory).length, 0);
   store.close();
   fs.rmSync(directory, { recursive: true, force: true });
+});
+
+test("un brouillon date reste prive et conserve sa date lors de la publication manuelle", () => {
+  const store = createPatchnoteStore({ filename: ":memory:", currentVersion: "0.2.0", now: () => Date.parse("2026-10-06T12:00:00Z") });
+  try {
+    const note = store.create({ version: "0.2.1" }, "editor-1");
+    const draft = store.update(note.id, { publishedAt: "2026-10-08T16:00:00+02:00", blocks: [{ type: "paragraph", content: "Nouveautés." }] });
+    assert.equal(draft.status, "draft");
+    assert.equal(draft.publishedAt, "2026-10-08T14:00:00.000Z");
+    assert.equal(store.get(note.id), null);
+    assert.deepEqual(store.list(), []);
+    assert.equal(store.currentVersion, "0.2.0");
+    const edited = store.update(note.id, { summary: "Résumé modifié." });
+    assert.equal(edited.publishedAt, draft.publishedAt);
+    assert.equal(store.update(note.id, { status: "published" }).publishedAt, draft.publishedAt);
+    assert.equal(store.list().length, 1);
+    assert.equal(store.currentVersion, "0.2.0");
+  } finally { store.close(); }
+});
+
+test("la date peut etre corrigee ou effacee sans accepter une date ambigue ou invalide", () => {
+  const store = createPatchnoteStore({ filename: ":memory:", now: () => Date.parse("2026-10-06T12:00:00Z") });
+  try {
+    const note = store.create({ version: "0.2.1" }, "editor-1");
+    const date = "2026-10-08T14:00:00.000Z";
+    store.update(note.id, { publishedAt: date, blocks: [{ type: "paragraph", content: "Nouveautés." }] });
+    for (const invalid of ["demain", "2026-10-08", "2026-10-08T16:00:00", "2026-99-08T14:00:00Z", "2026-02-29T14:00:00Z", "2026-04-31T14:00:00Z", 42]) {
+      assert.throws(() => store.update(note.id, { publishedAt: invalid }), /date de publication/);
+      assert.equal(store.get(note.id, { includeDrafts: true }).publishedAt, date);
+    }
+    assert.equal(store.update(note.id, { publishedAt: "" }).publishedAt, null);
+    assert.equal(store.update(note.id, { status: "published" }).publishedAt, "2026-10-06T12:00:00.000Z");
+    assert.equal(store.update(note.id, { publishedAt: date }).publishedAt, date);
+  } finally { store.close(); }
+});
+
+test("le brouillon 0.2.1 presente 26 insignes sans seuils de classement ni publication automatique", () => {
+  const image = "a".repeat(64);
+  const ranks = DEFAULT_RANKS.map((rank) => ({ ...rank, insigniaImage: image, divisionInsignia: rank.divisions === 3 ? Object.fromEntries(["I", "II", "III"].map((division) => [division, { insigniaImage: image }])) : {} }));
+  const note = patchnote021(ranks);
+  assert.equal(note.status, "draft");
+  assert.equal(note.publishedAt, "2026-10-08T14:00:00.000Z");
+  assert.equal((JSON.stringify(note).match(/insignia-images/g) ?? []).length, 26);
+  assert.ok(!/\belo\b/i.test(JSON.stringify(note)));
+  assert.ok(note.blocks.every((block) => (block.content?.length ?? 0) <= 4000));
+  assert.ok(note.blocks.some((block) => block.content?.includes("**I → II → III**")));
+  assert.throws(() => patchnote021(DEFAULT_RANKS), /Insigne manquant/);
 });
 
 test("la duplication copie et remappe les images sans partager les fichiers", () => {

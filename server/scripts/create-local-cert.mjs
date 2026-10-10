@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import selfsigned from "selfsigned";
 
-const domain = process.argv[2] || "ktgapi.netdis.org";
+const domain = process.argv[2] || "api.ktga.me";
 const certDir = path.resolve(process.cwd(), "certs");
 const keyPath = path.join(certDir, `${domain}-key.pem`);
 const certPath = path.join(certDir, `${domain}-cert.pem`);

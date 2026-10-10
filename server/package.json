@@ -8,11 +8,15 @@
   },
   "scripts": {
     "dev": "nodemon src/index.js",
-    "test": "node --test",
-    "cert:local": "node scripts/create-local-cert.mjs ktgapi.netdis.org",
+    "test": "node --test test/*.test.js",
+    "cert:local": "node scripts/create-local-cert.mjs api.ktga.me",
     "cert:prod:windows": "powershell -ExecutionPolicy Bypass -File scripts/setup-https-windows.ps1",
     "check:prod": "node scripts/check-production.mjs",
     "check:storage": "node scripts/check-storage.mjs",
+    "check:portability": "node scripts/check-portability.mjs",
+    "capacity:serve": "node scripts/capacity/serve.mjs",
+    "capacity:run": "node scripts/capacity/run.mjs",
+    "capacity:inspect": "node scripts/capacity/inspect.mjs",
     "start": "node src/index.js"
   },
   "dependencies": {

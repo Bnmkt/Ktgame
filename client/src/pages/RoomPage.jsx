@@ -1,6 +1,7 @@
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { ConfirmDialog } from "../components/common/ConfirmAction.jsx";
 import "../features/games/ranked.css";
+import { RankedResult, RankedTurnTimer } from "../features/games/RankedPlay.jsx";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { appPath } from "../navigation/routes.js";
@@ -80,9 +81,20 @@ function TurnPacingBanner({ pacing, players, canSkip, onSkip }) {
   return <section className={`room-pacing-banner ${thinking ? "thinking" : "turn-ended"}`} aria-live="polite"><div className="room-pacing-icon">{botTurn ? <Bot size={20} /> : <Clock3 size={20} />}</div><div><small>{thinking ? "Réflexion de l’IA" : botTurn ? "Tour de l’IA terminé" : "Tour terminé"}</small><strong>{actor ? <DisplayName user={actor} /> : pacing.actorName ?? (botTurn ? "L’IA" : "Le joueur")} {thinking ? "prépare son coup" : "laisse la table visible"}</strong></div><span className="room-pacing-countdown"><Clock3 size={16} /><PacingCountdown endsAt={pacing.endsAt} /> s</span>{canSkip && <button type="button" className="secondary" onClick={onSkip}><FastForward size={17} /> Passer l’attente</button>}</section>;
 }
 
-function RoundResultsOverlay({ pacing, players, canSkip, isOwner, onSkip, onDismiss }) {
+function RoundResultsOverlay({ pacing, players, canSkip, isOwner, onSkip, onDismiss, ranked }) {
   if (pacing?.kind !== "round-results") return null;
-  return <div className="modal-backdrop round-results-layer" role="presentation"><section className="modal round-results-modal" role="dialog" aria-modal="true" aria-labelledby="round-results-title"><header><div className="round-results-emblem"><Trophy size={25} /></div><div><span className="eyebrow">{pacing.final ? "Partie terminée" : `Manche ${pacing.round}`}</span><h2 id="round-results-title">{pacing.final ? "Résultats finaux" : "Résultats de la manche"}</h2></div><button type="button" className="secondary icon-toggle" aria-label={canSkip ? "Fermer les résultats et continuer" : "Masquer les résultats"} title={canSkip ? "Continuer la partie" : "Masquer pour moi"} onClick={canSkip ? onSkip : onDismiss}><X size={18} /></button></header><div className="round-results-timer"><span>{pacing.final ? "Fin de l’affichage" : "Reprise automatique"}</span><strong><PacingCountdown endsAt={pacing.endsAt} /> secondes</strong><i><b style={{ animationDuration: `${Math.max(1, pacing.endsAt - pacing.startedAt)}ms`, animationDelay: `${Math.min(0, pacing.startedAt - Date.now())}ms` }} /></i></div><ol className="round-results-list">{(pacing.results ?? []).map((result) => { const player = players.find((entry) => entry.id === result.id) ?? result; return <li className={result.winner ? "winner" : ""} key={result.id}><span>{result.rank}</span><DisplayName user={player} /><strong>{result.scoreLabel ?? <CompactNumber value={result.score} label={`Score exact de ${result.pseudo}`} />}</strong>{result.winner && <Trophy size={17} />}</li>; })}</ol><footer><small>Le plateau reste figé pour laisser le temps de lire les résultats.</small>{canSkip && <button type="button" onClick={onSkip}><FastForward size={18} /> {pacing.final ? "Fermer les résultats" : isOwner ? "Continuer maintenant" : "Passer les résultats"}</button>}</footer></section></div>;
+  return <div className="modal-backdrop round-results-layer" role="presentation">
+    <section className="modal round-results-modal" role="dialog" aria-modal="true" aria-labelledby="round-results-title">
+      <header><div className="round-results-emblem"><Trophy size={25}/></div><div><span className="eyebrow">{pacing.final ? "Partie terminée" : `Manche ${pacing.round}`}</span><h2 id="round-results-title">{pacing.final ? "Résultats finaux" : "Résultats de la manche"}</h2></div><button type="button" className="secondary icon-toggle" aria-label={canSkip ? "Fermer les résultats et continuer" : "Masquer les résultats"} title={canSkip ? "Continuer la partie" : "Masquer pour moi"} onClick={canSkip ? onSkip : onDismiss}><X size={18}/></button></header>
+      <div className="round-results-timer"><span>{pacing.final ? "Fin de l’affichage" : "Reprise automatique"}</span><strong><PacingCountdown endsAt={pacing.endsAt}/> secondes</strong><i><b style={{ animationDuration: `${Math.max(1, pacing.endsAt - pacing.startedAt)}ms`, animationDelay: `${Math.min(0, pacing.startedAt - Date.now())}ms` }}/></i></div>
+      {pacing.final && <RankedResult autoScroll={false} result={ranked?.results?.find((row)=>row.delta!==undefined)}/>}
+      <ol className="round-results-list">{(pacing.results ?? []).map((result) => {
+        const player=players.find((entry)=>entry.id===result.id) ?? result;
+        return <li className={result.winner ? "winner" : ""} key={result.id}><span>{result.rank}</span><DisplayName user={player}/><strong>{result.scoreLabel ?? <CompactNumber value={result.score} label={`Score exact de ${result.pseudo}`}/>}</strong>{result.winner && <Trophy size={17}/>}</li>;
+      })}</ol>
+      <footer><small>Le plateau reste figé pour laisser le temps de lire les résultats.</small>{canSkip && <button type="button" onClick={onSkip}><FastForward size={18}/> {pacing.final ? "Fermer les résultats" : isOwner ? "Continuer maintenant" : "Passer les résultats"}</button>}</footer>
+    </section>
+  </div>;
 }
 
 function BetLimitsEditor({ minimum, maximum, maxAllowed = 100000000, disabled, onChange, poker = false }) {
@@ -190,7 +202,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   }, [user.guest]);
   useEffect(() => {
     if (!room?.id) return undefined;
-    const socket = io(SOCKET_URL, { path: SOCKET_PATH, withCredentials: true });
+    const socket = io(SOCKET_URL, { path: SOCKET_PATH, withCredentials: true, auth: { stream: "table" } });
     const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     const watch = () => socket.emit("watch-room", { roomId: room.id, token: getToken() });
     socket.on("connect", watch);
@@ -458,8 +470,8 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
         {tableFullscreen && state && <aside className="fullscreen-player-rail" aria-label="Joueurs de la table"><div><span className="eyebrow">Table</span><h2>Joueurs</h2><small>{state.players.length} participant{state.players.length > 1 ? "s" : ""}</small></div><div className="fullscreen-player-list">{state.players.map((player, index) => { const active = room.gameId === "blackjack" ? !state.completedPlayerIds?.includes(player.id) : room.gameId === "bataille" ? !state.submittedPlayerIds?.includes(player.id) : index === state.currentPlayerIndex; return <article className={`${active && !state.finished ? "active" : ""} ${player.id === user.id ? "self" : ""}`} key={player.id}><i aria-hidden="true" /><DisplayName user={player} />{player.isBot && <small>IA</small>}{player.id === room.ownerId && <small>Maître</small>}</article>; })}</div></aside>}
         <section>
           <RoomStatusPanel room={room} state={state} current={current} userId={user.id} isOwner={isOwner} onAddBot={() => roomPost("bot")} onStart={() => roomPost("start")} onReady={() => roomPost("ready")} onKick={kickPlayer} onSettings={openRoomSettings} />
-          {room.ranked && <section className="ranked-match-heading"><Swords size={18}/><strong>Partie classée</strong>{room.ranked.results?.map((row)=><span key={row.userId}>{room.players.find((p)=>p.id===row.userId)?.pseudo ?? "Joueur"} : {row.delta>0?"+":""}{Math.round(row.delta*100)/100} Elo ({row.after})</span>)}</section>}
-          {rankedLeave && <ConfirmDialog title="Abandonner la partie classée ?" message={`Un abandon entraîne le classement en dernière position et une pénalité supplémentaire de ${room.ranked.config.abandonPenalty} Elo.`} danger confirmLabel="Abandonner" onConfirm={()=>leaveTable(true)} onClose={()=>setRankedLeave(false)}/>}
+          {room.ranked && <><section className="ranked-match-heading"><Swords size={18}/><strong>Partie classée</strong>{room.ranked.cancelled ? <span>Annulée : {room.ranked.cancelled.reason}</span> : !state?.finished && <RankedTurnTimer turn={room.ranked.turn} paused={Boolean(room.pacing || state?.nextHandAt)}/>}</section><RankedResult result={room.ranked.results?.find((row)=>row.userId===user.id && row.delta!==undefined)}/></>}
+          {rankedLeave && <ConfirmDialog title="Abandonner la partie classée ?" message={room.ranked.config.abandonPolicy==="cancel" ? "Un abandon annule l’attribution Elo de cette partie pour tous les joueurs." : `Un abandon entraîne le classement en dernière position${room.ranked.config.abandonPolicy==="rank" ? "." : ` et une pénalité supplémentaire pouvant atteindre ${room.ranked.config.abandonPenalty} Elo, selon les limites de la partie.`}`} danger confirmLabel="Abandonner" onConfirm={()=>leaveTable(true)} onClose={()=>setRankedLeave(false)}/>}
           {!state && room.gameId === "belote" && <BeloteTeams room={room} userId={user.id} onChange={changeBeloteTeam} />}
           {showFinishedResult && <FinishedLeaderboard room={room} state={state} />}
           <TurnPacingBanner pacing={pacing} players={room.players} canSkip={isSeatedPlayer} onSkip={skipPacing} />
@@ -523,7 +535,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
 
               {room.gameId === "texas-holdem" && <div className="poker-table card-game-arena poker-arena">
                 <div className="poker-play-area">
-                <div className="poker-pot"><span>{state.nextHandAt ? "Nouvelle main…" : ({ preflop: "Préflop", flop: "Flop", turn: "Turn", river: "River" })[state.street] ?? "Abattage"}</span><strong>Pot · <CompactNumber value={state.pot} label="Pot exact" /></strong><small>Blindes <CompactNumber value={state.smallBlind} />/<CompactNumber value={state.bigBlind} /> · plafond <CompactNumber value={state.maximumBet} /></small><PokerTurnTimer deadline={state.turnDeadline} /></div>
+                <div className="poker-pot"><span>{state.nextHandAt ? "Nouvelle main…" : ({ preflop: "Préflop", flop: "Flop", turn: "Turn", river: "River" })[state.street] ?? "Abattage"}</span><strong>Pot · <CompactNumber value={state.pot} label="Pot exact" /></strong><small>Blindes <CompactNumber value={state.smallBlind} />/<CompactNumber value={state.bigBlind} /> · plafond <CompactNumber value={state.maximumBet} /></small>{!room.ranked && <PokerTurnTimer deadline={state.turnDeadline}/>}</div>
                 <PokerResolutionTimer nextHandAt={state.nextHandAt} resolutionStartedAt={state.resolutionStartedAt} showdown={state.showdown} />
                 <section className="poker-center-stage"><span className="eyebrow">Cartes communes</span><div className="community-cards">{[0, 1, 2, 3, 4].map((index) => <PlayingCard key={`${index}-${state.community[index]?.rank ?? "empty"}`} card={state.community[index]} hidden={!state.community[index]} skin={cardSkin} />)}</div><div className="poker-table-mark"><i /> KTGA.ME <i /></div></section>
                 {state.handPreview && <div className="poker-hand-potential" aria-live="polite"><span>Score potentiel</span><strong>{state.handPreview.label}</strong>{state.handPreview.draws?.length ? <small>{state.handPreview.draws.join(" · ")}</small> : <small>Meilleure combinaison actuelle</small>}</div>}
@@ -583,7 +595,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
         <GameModifiersPanel gameId={room.gameId} value={gameModifiers} isOwner={isOwner} onChange={setGameModifiers} showFooter={false} />
       </div><div className="room-settings-modal-footer"><span><Swords size={16} /> Ces paramètres seront verrouillés au lancement.</span><div className="actions">{isOwner && <button onClick={applyRoomSettings}><Save size={17} /> Appliquer les paramètres</button>}<button className="secondary" onClick={cancelRoomSettings}>{isOwner ? "Annuler" : "Fermer"}</button></div></div></div></ModalBackdrop>}
       {rulesOpen && <RulesModal gameId={room.gameId} onClose={() => setRulesOpen(false)} />}
-      {pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && <RoundResultsOverlay pacing={pacing} players={room.players} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
+      {pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && <RoundResultsOverlay pacing={pacing} players={room.players} ranked={room.ranked} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
     </main>
   );
 }

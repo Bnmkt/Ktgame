@@ -6,15 +6,24 @@
 .patchnotes-current { color: #aaa28f; font-size: 12px; justify-self: end; }
 .patchnotes-feedback { align-items: center; display: flex; gap: 12px; justify-content: space-between; margin-top: 18px; }
 .patchnotes-page-panel { background: #101718; border: 1px solid #5b533b; border-radius: 8px; margin-top: 24px; min-height: 360px; padding: 22px; }
+.patchnotes-reader-controls { align-items: center; border-bottom: 1px solid #363b37; display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; padding-bottom: 16px; color: #e2c56d; }
+.patchnotes-reader-controls label { align-items: center; display: flex; gap: 14px; font-size: 14px; margin: 0; cursor: pointer; }
+.patchnotes-reader-controls input { accent-color: #d5ac3f; width: 20px; height: 20px; margin: 0; }
+.patchnotes-reader-label { color: #aeb5ad; font-size: 12px; margin-left: auto; }
+.patchnotes-private-notice { align-items: center; background: #29271b; border-left: 3px solid #d5ac3f; color: #f3d783; display: flex; gap: 10px; font-size: 13px; margin-bottom: 16px; padding: 12px; }
+.patchnotes-version-nav .patchnotes-state { font-size: 11px; font-weight: 600; }
+.patchnotes-version-nav .state-draft { color: #f3d783; }
+.patchnotes-version-nav .state-archived { color: #b4b9b5; }
+.patchnotes-version-nav .state-published { color: #7ccaaa; }
 .patchnotes-layout { display: grid; gap: 28px; grid-template-columns: 240px minmax(0, 1fr); }
 .patchnotes-version-nav { align-self: start; border-right: 1px solid #363b37; display: grid; gap: 8px; padding-right: 20px; position: sticky; top: 18px; }
 .patchnotes-version-nav > h1 { font-size: 24px; margin: 0 0 12px; }
 .patchnotes-version-nav section { display: grid; gap: 5px; margin-bottom: 13px; }
 .patchnotes-version-nav h2 { color: #e2c56d; font-size: 12px; margin: 0 0 2px; text-transform: uppercase; }
-.patchnotes-version-nav button { background: transparent; border-color: transparent; color: #d7cfbc; display: grid; gap: 2px; justify-items: start; padding: 9px 10px; text-align: left; width: 100%; }
-.patchnotes-version-nav button:hover { background: #181d1c; border-color: #3d433f; }
-.patchnotes-version-nav button.active { background: #27291f; border-color: #8d7331; color: #f7d97e; }
-.patchnotes-version-nav button small { color: #8f958e; font-size: 10px; }
+.patchnotes-version-nav a { background: transparent; border: 1px solid transparent; border-radius: 6px; color: #d7cfbc; display: grid; gap: 2px; justify-items: start; padding: 9px 10px; text-align: left; width: 100%; text-decoration: none; }
+.patchnotes-version-nav a:hover { background: #181d1c; border-color: #3d433f; }
+.patchnotes-version-nav a.active { background: #27291f; border-color: #8d7331; color: #f7d97e; }
+.patchnotes-version-nav a small { color: #8f958e; font-size: 10px; }
 .patchnotes-release { min-width: 0; }
 .patchnotes-release > header { border-bottom: 1px solid #3a403b; padding: 8px 0 24px; }
 .patchnotes-version { color: #e5c65d; font-size: 12px; font-weight: 950; text-transform: uppercase; }

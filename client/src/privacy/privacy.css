@@ -1,9 +1,11 @@
-.privacy-banner { border-bottom: 1px solid #706340; background: #15211e; padding: 24px; }
-.privacy-banner-inner { max-width: 1000px; margin: auto; }
-.privacy-banner h2 { display: flex; align-items: center; gap: 10px; font-size: 22px; margin: 0 0 12px; }
-.privacy-banner p, .privacy-dialog p { line-height: 1.6; margin: 8px 0 14px; }
+.privacy-choice-panel { border-bottom: 1px solid #706340; background: #15211e; padding: 24px; }
+.privacy-choice-inner { max-width: 1000px; margin: auto; }
+.privacy-choice-panel h2 { display: flex; align-items: center; gap: 10px; font-size: 22px; margin: 0 0 12px; }
+.privacy-choice-panel p, .privacy-dialog p { line-height: 1.6; margin: 8px 0 14px; }
 .privacy-purpose { display: flex; gap: 14px; padding: 14px 0; border-top: 1px solid #45534b; }
 .privacy-purpose > svg { flex-shrink: 0; color: #8ad4b9; }
+.privacy-purpose-choice { cursor: pointer; font-weight: normal; }
+.privacy-purpose-choice input { width: 18px; height: 18px; flex: 0 0 18px; margin: 2px 0 0; accent-color: #d7b652; }
 .privacy-age { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
 .privacy-age input { width: 18px; height: 18px; flex: 0 0 18px; margin: 2px 0 0; }
 .privacy-caption { color: #bfccbf; font-size: 13px; }
@@ -101,7 +103,7 @@
 @media(max-width:760px){.parent-portal-page{padding:16px 10px 50px}.parent-portal-heading{grid-template-columns:1fr}.parent-portal-heading>a{justify-self:start}.parent-consent-layout,.parent-dashboard-columns{grid-template-columns:1fr}.parent-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.parent-access-strip,.parent-day-toolbar{align-items:stretch;flex-direction:column}.parent-access-strip .actions button{width:100%}}
 .legal-footer { padding: 30px 20px; border-top: 1px solid #4c4935; background: #101715; text-align: center; margin-top: auto; flex-shrink: 0; }
 .legal-footer nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 16px 24px; align-items: center; margin-bottom: 15px; }
-.legal-footer a, .legal-page a, .privacy-banner a, .privacy-dialog a, .enrollment-fields a { color: #efce79; text-underline-offset: 4px; }
+.legal-footer a, .legal-page a, .privacy-choice-panel a, .privacy-dialog a, .enrollment-fields a { color: #efce79; text-underline-offset: 4px; }
 .legal-footer a { font-size: 14px; }
 .legal-footer small { color: #bcc5bb; }
 .legal-page { max-width: 1160px; margin: 0 auto; padding: 34px 28px 64px; }
@@ -138,6 +140,6 @@
   .legal-layout nav { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
   .legal-details { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .legal-details dd { margin-bottom: 12px; }
-  .privacy-banner { padding: 20px 18px; }
+  .privacy-choice-panel { padding: 20px 18px; }
   .enrollment-birth-help p { position: fixed; bottom: auto; left: 18px; right: 18px; top: 18px; width: auto; }
 }

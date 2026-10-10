@@ -15,6 +15,7 @@
 .account-admin-reference dt, .account-admin-facts dt { color: #9daf9f; font-size: 11px; }
 .account-admin-reference dd, .account-admin-facts dd { margin: 5px 0 0; color: #e2e7d9; font-size: 13px; overflow-wrap: anywhere; }
 .account-admin-content { min-width: 0; }
+.account-admin-rank { display:flex; align-items:center; gap:10px; }
 .account-admin-mobile-section { display:none !important; }
 .account-admin-section { padding: 0 0 26px; margin-bottom: 26px; border-bottom: 1px solid #394740; }
 .account-admin-section:last-child { margin-bottom: 0; }

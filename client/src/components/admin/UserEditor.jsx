@@ -124,6 +124,11 @@ export function UserEditor({ row, currentUser, games, settings, onClose, onSaved
     try {
       const original = JSON.parse(snapshot);
       const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(original.draft[key])));
+      for (const field of ["gameXp", "gameElo"]) if (changes[field]) {
+        changes[field] = Object.fromEntries(Object.entries(changes[field]).filter(([gameId, value]) => value !== original.draft[field]?.[gameId]));
+        changes.progressionExpected ??= {};
+        changes.progressionExpected[field] = Object.fromEntries(Object.keys(changes[field]).map((gameId) => [gameId, original.draft[field][gameId]]));
+      }
       if (Object.keys(changes).length) await api(`/api/admin/users/${row.id}`, { method: "PATCH", body: JSON.stringify(changes) });
       if (JSON.stringify(original.cosmetics) !== JSON.stringify(detail.inventory.cosmetics)) await api(`/api/admin/users/${row.id}/inventory`, { method: "PUT", body: JSON.stringify({ cosmetics: detail.inventory.cosmetics }) });
       if (Object.keys(achievementChanges).length) await api(`/api/admin/users/${row.id}/achievements`, { method: "PATCH", body: JSON.stringify({ states: achievementChanges }) });

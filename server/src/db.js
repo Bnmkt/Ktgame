@@ -5,6 +5,10 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { Archive } from "./storage/archives.js";
 import { createNormalizedStorage } from "./storage/normalized.js";
+import { queryRankedMetrics } from "./services/ranked-metrics.js";
+import { prepared } from "./storage/statements.js";
+import { selectedCollectionRows } from "./storage/selected-rows.js";
+import { sqliteSettings } from "./storage/sqlite-settings.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
@@ -35,11 +39,13 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 const sqlite = new DatabaseSync(sqlitePath);
 let normalizedStorage;
 let catalogSource;
+const storageSettings = sqliteSettings();
 sqlite.exec(`
   PRAGMA foreign_keys = ON;
   PRAGMA journal_mode = WAL;
   PRAGMA busy_timeout = 5000;
-  PRAGMA wal_autocheckpoint = 250;
+  PRAGMA synchronous = ${storageSettings.synchronous};
+  PRAGMA wal_autocheckpoint = ${storageSettings.walAutoCheckpoint};
   PRAGMA cache_size = -20000;
   PRAGMA temp_store = MEMORY;
   CREATE TABLE IF NOT EXISTS users (
@@ -198,19 +204,21 @@ function userIdsForHistory(row) {
   return JSON.stringify([...(row.players?.map((p) => p.id) ?? []), ...(row.winners ?? [])]);
 }
 
-function insertUser(user) {
-  sqlite.prepare("INSERT INTO users (id, data, pseudo, email, guest) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, pseudo=excluded.pseudo, email=excluded.email, guest=excluded.guest").run(
+function insertUser(user, previous) {
+  // Child rows require a parent for new accounts, not a full duplicate update.
+  if (normalizedStorage && !previous) prepared(sqlite, "INSERT OR IGNORE INTO users (id,data,pseudo,email,guest) VALUES (?,'{}',?,?,?)").run(user.id, user.pseudo, user.email ?? null, user.guest ? 1 : 0);
+  const data = normalizedStorage ? normalizedStorage.splitUser(user, previous) : user;
+  prepared(sqlite, "INSERT INTO users (id, data, pseudo, email, guest) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, pseudo=excluded.pseudo, email=excluded.email, guest=excluded.guest").run(
     user.id,
-    JSON.stringify(user),
+    JSON.stringify(data),
     user.pseudo,
     user.email ?? null,
     user.guest ? 1 : 0
   );
-  if (normalizedStorage) sqlite.prepare("UPDATE users SET data = ? WHERE id = ?").run(JSON.stringify(normalizedStorage.splitUser(user)), user.id);
 }
 
 function insertRoom(room) {
-  sqlite.prepare("INSERT INTO rooms (id, code, game_id, is_public, finished, created_at, data) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+  prepared(sqlite, "INSERT INTO rooms (id, code, game_id, is_public, finished, created_at, data) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET code=excluded.code,game_id=excluded.game_id,is_public=excluded.is_public,finished=excluded.finished,created_at=excluded.created_at,data=excluded.data").run(
     room.id,
     room.code,
     room.gameId,
@@ -351,18 +359,14 @@ const collectionDefinitions = [
   { key: "communityEventEffects", table: "community_event_effects", insert: insertCommunityEventEffect }
 ];
 
-function snapshotCollections(db, previous = new Map()) {
+function snapshotCollections(db, selection = {}) {
   const snapshots = new Map();
   for (const definition of collectionDefinitions) {
     if (definition.appendOnly) continue;
-    const priorRows = previous.get(definition.key) ?? new Map();
+    const selected = Object.hasOwn(selection, definition.key) ? new Set(selection[definition.key]) : null;
     const rows = new Map();
-    for (const row of db[definition.key] ?? []) {
-      const prior = priorRows.get(row.id);
-      // Les journaux sont immuables après insertion. Conserver leur chaîne JSON
-      // évite de sérialiser plusieurs mégaoctets à chaque action de jeu.
-      const json = definition.appendOnly && prior?.ref === row ? prior.json : JSON.stringify(row);
-      rows.set(row.id, { json, ref: row });
+    for (const row of selected ? selectedCollectionRows(db[definition.key] ?? [], selected) : db[definition.key] ?? []) {
+      rows.set(row.id, { json: JSON.stringify(row), ref: row });
     }
     snapshots.set(definition.key, rows);
   }
@@ -398,23 +402,41 @@ let cachedDb = loadDatabase();
 sqlite.exec("PRAGMA wal_checkpoint(TRUNCATE)");
 let persistedCollections = snapshotCollections(cachedDb);
 let persistedSettings = JSON.stringify(cachedDb.settings ?? {});
+let settingsRevision = 0;
+let mutationDepth = 0;
 
-// L'application fonctionne dans un seul processus : conserver le modèle actif
-// en mémoire supprime les relectures et JSON.parse complets sur chaque requête.
+export function databaseSettingsRevision() { return settingsRevision; }
+export function databaseSettingsReadRevision() { return mutationDepth ? undefined : settingsRevision; }
+
+// Le coordinateur conserve le modèle actif en mémoire; les autres processus
+// ne lisent que les données validées et ne possèdent pas les écritures.
 // Toutes les mutations passent ensuite par writeDb/updateDb pour être persistées.
 export function readDb() {
   return cachedDb;
 }
-export function rankedRows(gameId, minimumGames, limit = 100) {
-  return sqlite.prepare("SELECT e.user_id AS id,e.elo,e.games,e.wins FROM user_game_elo e JOIN users u ON u.id=e.user_id WHERE e.game_id=? AND e.games>=? AND u.guest=0 AND json_extract(u.data,'$.active') IS NOT 0 ORDER BY e.elo DESC,e.games DESC,e.user_id LIMIT ?").all(gameId,minimumGames,limit);
+export function rankedRows(gameId, minimumGames, limit = 100, placementGames = 0) {
+  return sqlite.prepare("SELECT e.user_id AS id,e.elo,e.games,e.wins FROM user_game_elo e JOIN users u ON u.id=e.user_id LEFT JOIN user_ranked_placements p ON p.user_id=e.user_id AND p.game_id=e.game_id WHERE e.game_id=? AND e.games>=? AND (?=0 OR json_extract(p.data,'$.completed')=1 OR p.data IS NULL AND e.games>=?) AND u.guest=0 AND json_extract(u.data,'$.active') IS NOT 0 ORDER BY e.elo DESC,e.games DESC,e.user_id LIMIT ?").all(gameId,minimumGames,placementGames,placementGames,limit);
 }
 export function rankedRecent(userId, limit = 30) {
   return sqlite.prepare("SELECT history_id AS historyId,match_id AS matchId,game_id AS gameId,finished_at AS finishedAt,data FROM ranked_results WHERE user_id=? ORDER BY finished_at DESC LIMIT ?").all(userId,limit).map(({data,...row})=>({...row,...JSON.parse(data)}));
 }
+export function rankedMetrics(config, filters) {
+  return queryRankedMetrics(sqlite, config, filters);
+}
+export function rankedSettlement(matchId) {
+  if (!sqlite.prepare("SELECT 1 FROM ranked_settlements WHERE match_id=?").get(matchId)) return null;
+  return { results: sqlite.prepare("SELECT data FROM ranked_results WHERE match_id=? ORDER BY user_id").all(matchId).map((row)=>JSON.parse(row.data)) };
+}
 
-export function writeDb(db) {
+export function writeDb(db, selection = {}) {
+  mutationDepth++;
+  try { return persistDatabase(db, selection); }
+  finally { mutationDepth--; }
+}
+
+function persistDatabase(db, selection) {
   const normalized = normalizeDb(db);
-  const nextCollections = snapshotCollections(normalized, persistedCollections);
+  const nextCollections = snapshotCollections(normalized, selection);
   const nextSettings = JSON.stringify(normalized.settings ?? {});
   const operations = [];
 
@@ -427,10 +449,11 @@ export function writeDb(db) {
     }
     const previousRows = persistedCollections.get(definition.key) ?? new Map();
     const nextRows = nextCollections.get(definition.key) ?? new Map();
-    for (const id of previousRows.keys()) {
+    const selected = Object.hasOwn(selection, definition.key) ? new Set(selection[definition.key]) : null;
+    for (const id of selected ?? previousRows.keys()) {
       if (!nextRows.has(id)) operations.push({ type: "delete", definition, id });
     }
-    for (const row of normalized[definition.key] ?? []) {
+    for (const { ref: row } of nextRows.values()) {
       const previous = previousRows.get(row.id);
       const next = nextRows.get(row.id);
       if (!previous || previous.json !== next.json) operations.push({ type: "upsert", definition, row });
@@ -443,10 +466,11 @@ export function writeDb(db) {
       for (const operation of operations) {
         if (operation.type === "replaceArchive") replaceAll(operation.definition.table, operation.rows, operation.definition.insert);
         else if (operation.type === "append") operation.definition.insert(operation.row);
-        else if (operation.type === "delete") sqlite.prepare(`DELETE FROM ${operation.definition.table} WHERE id = ?`).run(operation.id);
+        else if (operation.type === "delete") prepared(sqlite, `DELETE FROM ${operation.definition.table} WHERE id = ?`).run(operation.id);
         else {
-          if (operation.definition.key !== "users") sqlite.prepare(`DELETE FROM ${operation.definition.table} WHERE id = ?`).run(operation.row.id);
-          operation.definition.insert(operation.row);
+          if (!["users", "rooms"].includes(operation.definition.key)) prepared(sqlite, `DELETE FROM ${operation.definition.table} WHERE id = ?`).run(operation.row.id);
+          const prior = persistedCollections.get(operation.definition.key)?.get(operation.row.id);
+          operation.definition.insert(operation.row, operation.definition.key === "users" && prior ? JSON.parse(prior.json) : undefined);
           if (operation.definition.key === "users") nextCollections.get("users").set(operation.row.id, { json: JSON.stringify(operation.row), ref: operation.row });
         }
       }
@@ -471,23 +495,37 @@ export function writeDb(db) {
   }
 
   cachedDb = normalized;
+  // Publish sparse snapshots only after COMMIT; rollback retains the prior map.
+  for (const definition of collectionDefinitions) {
+    if (definition.appendOnly || !Object.hasOwn(selection, definition.key)) continue;
+    const merged = persistedCollections.get(definition.key) ?? new Map();
+    const patch = nextCollections.get(definition.key);
+    for (const id of selection[definition.key]) {
+      if (patch.has(id)) merged.set(id, patch.get(id)); else merged.delete(id);
+    }
+    nextCollections.set(definition.key, merged);
+  }
   persistedCollections = nextCollections;
+  if (persistedSettings !== nextSettings) settingsRevision++;
   persistedSettings = nextSettings;
 }
 
-export function updateDb(mutator) {
+export function updateDb(mutator, selection) {
   const db = readDb();
+  mutationDepth++;
   try {
     const result = mutator(db);
-    writeDb(db);
+    writeDb(db, typeof selection === "function" ? selection(db, result) : selection);
     return result;
   } catch (error) { restoreCommittedState(); throw error; }
+  finally { mutationDepth--; }
 }
 
 function restoreCommittedState() {
   cachedDb = loadDatabase();
   persistedCollections = snapshotCollections(cachedDb);
   persistedSettings = JSON.stringify(cachedDb.settings ?? {});
+  settingsRevision++;
 }
 
 export function syncCatalogs(achievements, items) { normalizedStorage.syncCatalog(achievements, items); }
@@ -516,6 +554,8 @@ export function databaseHealth() {
   ];
   return {
     engine: "SQLite",
+    synchronous: storageSettings.synchronous,
+    walAutoCheckpoint: storageSettings.walAutoCheckpoint,
     storageVersion: 2,
     archiveCacheRows: Object.fromEntries(collectionDefinitions.filter((entry) => entry.appendOnly).map((entry) => [entry.key, cachedDb[entry.key].pending.length])),
     journalMode: String(sqlite.prepare("PRAGMA journal_mode").get().journal_mode ?? "unknown"),

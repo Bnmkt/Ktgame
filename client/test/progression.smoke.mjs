@@ -110,6 +110,9 @@ try {
   assert.deepEqual(await page.locator(".public-profile-modal .xp-game-list article header strong").allTextContents(), ["Yahtzee", "Bataille"]);
   assert.equal(await page.locator(".public-profile-modal h2").count(), 0);
   assert.equal(await page.locator(".public-profile-modal .xp-workspace select").count(), 0);
+  assert.equal(await page.locator(".public-profile-modal .xp-game-list progress").count(), 0);
+  assert.equal(await page.locator(".public-profile-modal .xp-game-list small").count(), 0);
+  assert.equal(await page.locator(".public-profile-modal .xp-game-list").getByText(/Niveau|Maîtrise| XP/).count(), 0);
   await page.setViewportSize({ width: 390, height: 844 }); await noOverflow(page, ".public-profile-modal .xp-workspace"); await noOverflow(page, ".public-profile-layout"); await noOverflow(page, ".public-profile-scroll"); await page.screenshot({ path: path.join(previews, "game-progression-public-mobile.png") });
   await page.locator(".public-profile-modal").getByRole("button", { name: "Fermer le profil", exact: true }).click();
   await page.getByLabel("Titre affiché", { exact: true }).selectOption("yahtzee:1"); await page.getByRole("button", { name: "Enregistrer le profil", exact: true }).click();

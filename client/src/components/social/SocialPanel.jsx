@@ -4,6 +4,7 @@ import { api } from "../../api.js";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { useConversationInbox } from "./useConversationInbox.js";
 import { PresenceDot } from "../profile/FriendPresence.jsx";
+import { ChatMessageContent } from "./ChatMessageContent.jsx";
 
 const tabs = [
   { id: "journal", label: "Journal", icon: ReceiptText, needsRoom: true },
@@ -18,7 +19,7 @@ const savedWindow = () => {
   catch { return initial; }
 };
 
-export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnreadChange, requestedFriendId = "", requestedFriendRevision = 0 }) {
+export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnreadChange, siteIcon, onNavigate, requestedFriendId = "", requestedFriendRevision = 0 }) {
   const [mode, setMode] = useState(() => localStorage.getItem("ktga-social-mode") === "floating" ? "floating" : "docked");
   const [activeTab, setActiveTab] = useState(roomCode ? "journal" : "global");
   const [friends, setFriends] = useState([]);
@@ -55,7 +56,9 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
     setMessages((rows) => rows.some((row) => row.id === message.id) ? rows : [...rows, message].slice(-100));
     return document.visibilityState === "visible";
   };
-  const { channels, markRead, soundEnabled, toggleSound } = useConversationInbox({ userId: user.id, roomCode, onMessage: receiveMessage, onUnreadChange });
+  const { channels, markRead, soundEnabled, toggleSound } = useConversationInbox({ userId: user.id, roomCode, onMessage: receiveMessage, onUnreadChange, onRoomsChange: () => {
+    if (messages.some((message) => message.links?.some((link) => link.kind === "table"))) loadActive(true);
+  } });
   const friendChannels = new Map(channels.filter((channel) => channel.channelType === "direct").map((channel) => [channel.friendId, channel]));
   const conversations = friends.filter((friend) => friendChannels.get(friend.id)?.opened || openedFriends.includes(friend.id)).sort((left, right) => {
     const leftAt = friendChannels.get(left.id)?.lastMessageAt || "";
@@ -158,10 +161,14 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
     setWindowRect((rect) => ({ ...rect, left, top }));
   }
   function endDrag() {
+    if (mode !== "floating") return;
+    const dragged = Boolean(dragRef.current);
     dragRef.current = null;
-    const rect = panelRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const panel = panelRef.current;
+    if (!panel || !dragged && window.getComputedStyle(panel).resize === "none") return;
+    const rect = panel.getBoundingClientRect();
     const next = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    if (!dragged && Object.keys(next).every((key) => Math.abs(next[key] - windowRect[key]) < 1)) return;
     setWindowRect(next);
     localStorage.setItem("ktga-social-window", JSON.stringify(next));
   }
@@ -192,7 +199,7 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
       {loading && <p className="conversation-empty">Chargement…</p>}
       {!loading && activeTab === "journal" && journal.map((entry) => <article className="conversation-journal-entry" key={entry.id ?? `${entry.at}-${entry.text}`}><time>{formatTime(entry.at)}</time><div><strong>{entry.actor || "Table"}</strong><p>{entry.text}</p></div></article>)}
       {!loading && activeTab === "journal" && !journal.length && <p className="conversation-empty">Les actions de la table apparaîtront ici.</p>}
-      {!loading && activeTab !== "journal" && messages.map((message) => <article className={`conversation-message ${message.senderId === user.id ? "own" : ""}`} key={message.id}><div className="conversation-message-meta"><DisplayName user={message.sender} /><time>{formatTime(message.createdAt)}</time></div><p>{message.content}</p></article>)}
+      {!loading && activeTab !== "journal" && messages.map((message) => <article className={`conversation-message ${message.senderId === user.id ? "own" : ""}`} key={message.id}><div className="conversation-message-meta"><DisplayName user={message.sender} /><time>{formatTime(message.createdAt)}</time></div><ChatMessageContent message={message} siteIcon={siteIcon} onNavigate={onNavigate} /></article>)}
       {!loading && activeTab !== "journal" && !messages.length && <p className="conversation-empty">Aucun message dans ce canal.</p>}
     </div>
     {error && <div className="conversation-error" role="alert">{error}</div>}

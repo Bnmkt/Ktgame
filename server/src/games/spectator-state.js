@@ -37,6 +37,7 @@ export function spectatorState(state) {
   }
   if (state.gameId === "texas-holdem") for (const id of state.shownPlayerIds ?? []) result.hands[id] = (state.hands[id] ?? []).map(visibleCard);
   if (state.gameId === "belote") result.announcements = publicBeloteState(state, "").announcements;
+  if (state.gameId === "midnight-dice" && state.modifiers?.individualContracts) result.contractOffers = [];
   if (state.gameId === "bataille") {
     result.battleLanes = (state.battleLanes ?? []).map((lane) => ({ id: lane.id, tie: lane.tie, cards: lane.cards.map((card) => ({ ownerId: card.ownerId, ...(card.revealedToAll ? visibleCard(card) : { hidden: true }) })) }));
     result.cardCounts ??= Object.fromEntries(Object.entries(state.piles ?? {}).map(([id, pile]) => [id, pile.length]));

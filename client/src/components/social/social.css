@@ -35,6 +35,20 @@
 .conversation-message time, .conversation-journal-entry time { color: #8f968d; flex-shrink: 0; font-size: 10px; font-variant-numeric: tabular-nums; }
 .conversation-message p, .conversation-journal-entry p { line-height: 1.45; margin: 6px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .conversation-message p { color: #e7e2d4; font-size: 13px; }
+.conversation-message-body { min-width: 0; }
+.conversation-message-body p { white-space: normal; }
+.conversation-message-body .conversation-route-link { align-items: center; background: #101a17; border: 1px solid #64734f; border-radius: 6px; color: #f3e8cb; display: flex; gap: 9px; margin: 8px 0 3px; min-height: 52px; padding: 8px; text-decoration: none; white-space: normal; }
+.conversation-route-link:hover { background: #202b22; border-color: #dbb54c; }
+.conversation-route-link:focus-visible { outline: 2px solid #e1ba4b; outline-offset: 2px; }
+.conversation-message-body .conversation-route-ended { background: #171d19; border-color: #414c43; color: #9ea99f; cursor: default; }
+.conversation-route-ended .conversation-route-label strong { color: #b7c0b7; }
+.conversation-route-mark { align-items: center; display: flex; flex: 0 0 32px; justify-content: center; }
+.conversation-route-label { display: block; flex: 1; min-width: 0; }
+.conversation-route-label strong, .conversation-route-label small { display: block; overflow-wrap: anywhere; }
+.conversation-route-label strong { color: #ffe08b; font-size: 13px; }
+.conversation-route-label small { color: #b6c0af; font-size: 11px; margin-top: 3px; }
+.conversation-link-blocked { color: #c4a99d; }
+.conversation-message-body code { background: #080e0c; border-radius: 3px; color: #cce6d8; font-size: 12px; padding: 2px 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .conversation-journal-entry { border-bottom: 1px solid #29322d; display: grid; gap: 9px; grid-template-columns: 42px minmax(0, 1fr); padding: 3px 0 10px; }
 .conversation-journal-entry strong { color: #e6c86f; font-size: 12px; }
 .conversation-journal-entry p { color: #cfd6cf; font-size: 12px; }

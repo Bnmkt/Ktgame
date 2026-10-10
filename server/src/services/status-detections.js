@@ -57,7 +57,7 @@ export function createStatusDetections(db, components, now) {
     const description = [
       `La sonde du service « ${names.get(component.id)} » a relevé un état ${severity === "outage" ? "indisponible" : "dégradé"}.`,
       clean(component.message, 300),
-      Number(component.latencyMs) > 0 ? `Temps de réponse mesuré : ${Math.round(component.latencyMs)} ms.` : "",
+      Number(component.latencyMs) > 0 ? `Temps de réponse mesuré : ${Number(component.latencyMs) < 1 ? "moins de 1" : Math.round(component.latencyMs)} ms.` : "",
       source === "history" ? "Reconstitué depuis les tranches historiques : les heures sont approximatives et le diagnostic original n’est pas disponible." : "Ce relevé constate un symptôme ; il ne confirme pas la cause ni une interruption continue entre deux sondes."
     ].filter(Boolean).join("\n\n");
     db.prepare("INSERT INTO status_detections(id,component_id,severity,title,description,first_at,last_at,diagnostic,source,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)")

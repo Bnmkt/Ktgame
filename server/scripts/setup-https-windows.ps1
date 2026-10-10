@@ -1,5 +1,5 @@
 param(
-  [string]$Domain = "ktgapi.netdis.org",
+  [string]$Domain = "api.ktga.me",
   [string]$Email = "",
   [string]$ExpectedIp = "94.106.131.148",
   [ValidateSet("http-01", "tls-alpn-01")]

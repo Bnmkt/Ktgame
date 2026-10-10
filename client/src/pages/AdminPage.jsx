@@ -1,6 +1,6 @@
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { BugReportsAdmin } from "../features/bugs/BugReportsAdmin.jsx";
-import { Bug } from "lucide-react";
+import { Bug, FlaskConical } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, Copy, Gamepad2, HeartPulse, LayoutDashboard, Lock, Newspaper, Plus, RefreshCw, Save, Scale, Search, Settings, Shield, ShieldCheck, ShoppingBag, Spade, Sparkles, Trophy, Users, X } from "lucide-react";
 import { api } from "../api.js";
@@ -10,6 +10,7 @@ import { defaultPublicSettings } from "../config/site.js";
 import { CompactNumber, gameAudienceLabel, gameCategoryLabel, gameComplexityLabel, shopCategoryLabel } from "../utils/presentation.jsx";
 import { UserEditor } from "../components/admin/UserEditor.jsx";
 import { ServerHealth } from "../components/admin/ServerHealth.jsx";
+import { CapacityTests } from "../components/admin/CapacityTests.jsx";
 import { CommunityEventsAdmin } from "../components/admin/CommunityEventsAdmin.jsx";
 import { CasinoSettings } from "../components/admin/CasinoSettings.jsx";
 import { AchievementsAdmin } from "../components/admin/AchievementsAdmin.jsx";
@@ -132,8 +133,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
     setSaving("settings");
     setError("");
     try {
-      const { siteName, siteIcon, siteSubtitle, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds } = settingsDraft;
-      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds }) });
+      const { siteName, siteIcon, siteSubtitle, contactEmail, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds } = settingsDraft;
+      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, contactEmail, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds }) });
       setSettingsDraft(settings);
       setData((current) => ({ ...current, settings }));
       onSettingsChange?.(settings);
@@ -214,6 +215,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
     { label: "Pilotage", items: [
       { value: "overview", label: "Vue d’ensemble", icon: LayoutDashboard },
       { value: "health", label: "Supervision", icon: HeartPulse },
+      { value: "tests", label: "Debug / Tests", icon: FlaskConical },
       { value: "bugs", label: "Signalements de bugs", icon: Bug }
     ] },
     { label: "Contenu", items: [
@@ -264,6 +266,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
 
 
         {isAdministrator && tab === "health" && <ServerHealth reportError={setError} />}
+        {isAdministrator && tab === "tests" && <CapacityTests reportError={setError} />}
         {tab === "bugs" && <BugReportsAdmin />}
 
         {data.permissions?.manageCommunityEvents && tab === "events" && <CommunityEventsAdmin shop={data.shop} canOperate={Boolean(data.permissions?.operateCommunityEvents)} reportError={setError} />}

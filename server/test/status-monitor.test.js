@@ -4,6 +4,18 @@ import { createStatusMonitor, STATUS_SLOT_MS } from "../src/services/status-moni
 
 const allOperational = () => ["website", "api", "realtime", "games", "database", "email"].map((id) => ({ id, status: "operational", latencyMs: 10 }));
 
+test("une latence non mesuree n'est pas presentee comme zero", () => {
+  const timestamp = Date.parse("2026-10-07T12:00:00Z");
+  const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });
+  try {
+    monitor.recordSnapshot([{ id: "email", status: "operational" }, { id: "api", status: "operational", latencyMs: null }], timestamp);
+    assert.equal(monitor.payload(1).components.find((row) => row.id === "email").latencyMs, null);
+    assert.equal(monitor.payload(1).timeline.at(-1).components.api.latencyMs, null);
+    monitor.recordSnapshot([{ id: "api", status: "operational", latencyMs: 4 }], timestamp);
+    assert.equal(monitor.payload(1).components.find((row) => row.id === "api").latencyMs, 4);
+  } finally { monitor.close(); }
+});
+
 test("les sondes sont consolidees par tranches de 15 minutes en conservant le pire etat", () => {
   let timestamp = Date.parse("2026-09-29T10:02:00.000Z");
   const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });

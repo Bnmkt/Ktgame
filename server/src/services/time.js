@@ -13,12 +13,21 @@ const casinoClockFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
   hourCycle: "h23"
 });
+const dateKeys = new Map();
+const clockParts = new Map();
+function remember(cache, key, value) {
+  if (cache.size >= 128) cache.delete(cache.keys().next().value);
+  cache.set(key, value);
+  return value;
+}
 
 export function casinoDateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
+  const second = Math.floor(date.getTime() / 1000);
+  if (dateKeys.has(second)) return dateKeys.get(second);
   const parts = Object.fromEntries(casinoDateFormatter.formatToParts(date).map((part) => [part.type, part.value]));
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return remember(dateKeys, second, `${parts.year}-${parts.month}-${parts.day}`);
 }
 
 export function shiftDateKey(dateKey, days) {
@@ -37,7 +46,10 @@ export function validDateOnly(value) {
 export function casinoTimeParts(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
+  const second = Math.floor(date.getTime() / 1000);
+  const cached = clockParts.get(second);
+  if (cached) return { ...cached };
   const parts = Object.fromEntries(casinoClockFormatter.formatToParts(date).map((part) => [part.type, part.value]));
   const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.weekday);
-  return { weekday: Math.max(0, weekday), hour: Number(parts.hour) || 0 };
+  return { ...remember(clockParts, second, { weekday: Math.max(0, weekday), hour: Number(parts.hour) || 0 }) };
 }

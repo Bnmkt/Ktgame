@@ -1,4 +1,9 @@
-.player-game-title { font: 600 10px/1.25 Arial, sans-serif; color: #f4d57f; background: #353522; border: 1px solid #7e7546; border-radius: 3px; padding: 3px 5px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+.player-name-lines { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; line-height: 1.2; }
+.player-game-title { font: 600 10px/1.25 Arial, sans-serif; color: #f4d57f; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-rank-emblem { display: inline-flex; flex: 0 0 36px; width: 36px; height: 36px; align-items: center; justify-content: center; color: #e6bd56; }
+.player-rank-emblem .ranked-insignia { width: 100%; height: 100%; }
+.account-ranked-emblem-preview { margin-top: 12px; min-height: 36px; }
+.account-ranked-emblem-preview .ranked-insignia { width: 36px; height: 36px; }
 .xp-workspace { border-top: 1px solid #455045; margin-top: 22px; padding-top: 20px; min-width: 0; }
 .xp-workspace > header, .xp-game-list article > header, .xp-game-list article > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .xp-workspace h3 { font-size: 18px; display: flex; align-items: center; gap: 8px; margin: 7px 0; }

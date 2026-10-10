@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Trophy, Users, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
+import { applyRoomPatch } from "../features/games/room-feed.js";
+import { rankedGames, RankBadge } from "../features/games/RankedPlay.jsx";
 import { JoinRoomDialog } from "../components/navigation/JoinRoomDialog.jsx";
 import { PlayingCard } from "../components/game/GamePieces.jsx";
 import { RulesModal } from "../components/game/GameSupport.jsx";
@@ -46,6 +48,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const [gameComplexityFilter, setGameComplexityFilter] = useState("all");
   const [gameSearch, setGameSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [playMode,setPlayMode]=useState("classic");
+  const [rankedStatus,setRankedStatus]=useState(null);
   const [rulesGame, setRulesGame] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
   const [tableTab, setTableTab] = useState("create");
@@ -59,12 +63,20 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const joiningRestricted = roomsRestricted || user.moderation?.type === "soft";
   const eventsRestricted = accountRestrictions.includes("community-events") || user.moderation?.type === "soft";
 
+  useEffect(()=>{
+    if (playMode!=="ranked") return;
+    let active=true;
+    api("/api/ranked").then((data)=>{if(active)setRankedStatus(data);}).catch((err)=>{if(active)setError(err.message);});
+    return()=>{active=false;};
+  },[playMode,user.id]);
+
   useEffect(() => {
     api("/api/games").then(setGames);
-    api("/api/rooms").then(setRooms);
-    const socket = io(SOCKET_URL, { path: SOCKET_PATH });
+    const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { stream: "lobby", lobbyDeltas: true } });
     const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     socket.on("rooms", setRooms);
+    socket.on("rooms-patch", (patch) => setRooms((current) => applyRoomPatch(current, patch)));
+    socket.on("connect_error", () => api("/api/rooms").then((rows) => { if (!socket.connected) setRooms(rows); }).catch(() => {}));
     api("/api/community-events/carousel").then((result) => { setEventCarousel(result); setEventIndex(result.focusIndex ?? 0); }).catch(() => {});
     socket.on("community-event-update", () => api("/api/community-events/carousel").then((result) => { setEventCarousel(result); setEventIndex((index) => Math.min(index, Math.max(0, result.events.length - 1))); }).catch(() => {}));
     return () => { disposeDiagnostics(); socket.disconnect(); };
@@ -112,6 +124,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const favorites = user.profile?.favoriteGames ?? [];
   const favoriteOrder = (game) => favorites.includes(game.id) ? favorites.indexOf(game.id) : favorites.length;
   const visibleGames = [...games].sort((left, right) => favoriteOrder(left) - favoriteOrder(right)).filter((game) => {
+    if (playMode==="ranked" && !rankedGames.includes(game.id)) return false;
     if (roomsRestricted || accountRestrictions.includes(`game:${game.id}`)) return false;
     const searchMatch = !normalizedGameSearch || `${game.name} ${game.description ?? ""}`.toLocaleLowerCase("fr").includes(normalizedGameSearch);
     const typeMatch = gameTypeFilter === "all" || game.type === gameTypeFilter;
@@ -163,6 +176,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
             <div className="game-filter-toolbar">
               <label className="game-search-field"><Search size={18} /><span className="sr-only">Rechercher un jeu</span><input type="search" value={gameSearch} onChange={(event) => setGameSearch(event.target.value)} placeholder="Rechercher un jeu…" /></label>
               <button type="button" className={`secondary filter-toggle ${filtersOpen ? "active" : ""}`} aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}><Filter size={18} /> Filtres{activeFilterCount ? <b>{activeFilterCount}</b> : null}</button>
+              <div className="lobby-play-modes" role="group" aria-label="Mode des jeux"><button type="button" className={playMode==="classic"?"active":"secondary"} aria-pressed={playMode==="classic"} onClick={()=>setPlayMode("classic")}><Dice5 size={16}/>Classique</button><button type="button" className={playMode==="ranked"?"active":"secondary"} aria-pressed={playMode==="ranked"} onClick={()=>setPlayMode("ranked")}><Swords size={16}/>Classé</button></div>
             </div>
             {filtersOpen && <div className="game-filter-controls">
               <label><span>Type de jeu</span><select value={gameTypeFilter} onChange={(event) => setGameTypeFilter(event.target.value)}><option value="all">Tous les types</option><option value="dice">Jeux de dés</option><option value="cards">Jeux de cartes</option></select></label>
@@ -175,13 +189,13 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
           </div>
           <div className="game-grid">
             {visibleGames.map((game) => (
-              <article key={game.id} className={`game-card premium-card ${game.type}`}>
-                <span className="player-badge">{game.minPlayers}-{game.maxPlayers}</span>
+              <article key={game.id} className={`game-card premium-card ${game.type} ${playMode==="ranked"?"ranked-game-card":""}`}>
+                <span className="player-badge">{playMode==="ranked"?`${rankedStatus?.games.find((row)=>row.id===game.id)?.players ?? "…"} joueurs`:`${game.minPlayers}-${game.maxPlayers}`}</span>
                 <div className="game-icon">{game.type === "dice" ? <Dice5 /> : <PlayingCard card={{ rank: "A", suit: "S" }} />}</div>
                 <h3>{game.name}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label="Favori" fill="currentColor" />}</h3>
                 <p>{game.description || gameRules[game.id]?.goal}</p>
-                <div className="card-meta"><span>{gameCategoryLabel(game.category)}</span><span>{gameComplexityLabel(game.complexity)}</span><span>{rooms.filter((room) => room.gameId === game.id).length} tables publiques</span></div>
-                <div className="game-table-actions"><button type="button" onClick={() => chooseTables(game, "create")}><Plus size={18} />Créer une table</button>{!joiningRestricted && <button type="button" className="secondary" onClick={() => chooseTables(game, "browse")}><DoorOpen size={17} />Rejoindre ({rooms.filter((room) => room.gameId === game.id).length})</button>}<button type="button" className="secondary game-table-rules" title={`Règles de ${game.name}`} aria-label={`Règles de ${game.name}`} onClick={() => setRulesGame(game.id)}><HelpCircle size={18} /></button></div>
+                <div className="card-meta"><span>{gameCategoryLabel(game.category)}</span><span>{gameComplexityLabel(game.complexity)}</span>{playMode==="ranked"?<RankBadge rank={rankedStatus?.games.find((row)=>row.id===game.id)?.rank}/>:<span>{rooms.filter((room) => room.gameId === game.id && !room.ranked).length} tables publiques</span>}</div>
+                <div className="game-table-actions">{playMode==="ranked"?<button type="button" disabled={joiningRestricted || rankedStatus?.games.find((row)=>row.id===game.id)?.enabled===false} onClick={()=>chooseTables(game,"browse")}><Swords size={18}/>Rejoindre le classé</button>:<><button type="button" onClick={() => chooseTables(game, "create")}><Plus size={18} />Créer une table</button>{!joiningRestricted && <button type="button" className="secondary" onClick={() => chooseTables(game, "browse")}><DoorOpen size={17} />Rejoindre ({rooms.filter((room) => room.gameId === game.id && !room.ranked).length})</button>}</>}<button type="button" className="secondary game-table-rules" title={`Règles de ${game.name}`} aria-label={`Règles de ${game.name}`} onClick={() => setRulesGame(game.id)}><HelpCircle size={18} /></button></div>
               </article>
             ))}
           </div>
@@ -191,7 +205,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       {joinOpen && <JoinRoomDialog userId={user.id} onClose={() => setJoinOpen(false)} onJoined={onOpenRoom} />}
       <div className={selectedGame ? "game-table-rules-layer" : undefined}><RulesModal gameId={rulesGame} onClose={() => setRulesGame(null)} /></div>
       {selectedGame && <GameRoomsModal
-        key={selectedGame.id} game={selectedGame} initialTab={tableTab} rooms={rooms} user={user}
+        key={selectedGame.id} game={selectedGame} initialTab={tableTab} initialMode={playMode} rooms={rooms} user={user}
         stake={stake} setStake={setStake} isPublic={isPublic} setIsPublic={setIsPublic}
         roomName={roomName} setRoomName={(value) => { setRoomName(value); setError(""); }}
         roomPassword={roomPassword} setRoomPassword={(value) => { setRoomPassword(value); setError(""); }}

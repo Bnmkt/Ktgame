@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-ssr/
 .env
 .env.*
 !.env.example
@@ -9,7 +10,14 @@ dist/
 server/certs/
 server/tools/
 artifacts/
+desktop/.deps/
+desktop/build/
 /data/
 
 server/data/*
 !server/data/.gitkeep
+
+!docs/DEPLOYMENT-DEBIAN-13.md
+!docs/INDEXATION.md
+!docs/CAPACITY-TESTING.md
+!docs/ACCOUNTS-PROCESS.md

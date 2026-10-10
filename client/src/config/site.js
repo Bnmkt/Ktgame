@@ -9,6 +9,7 @@ export const defaultPublicSettings = {
   emailVerificationRequired: false,
   emailVerificationAvailable: false,
   supportEmail: "contact@netdis.org",
+  contactEmail: "contact@netdis.org",
   minorRestrictions: ["shop", "game:texas-holdem", "game:belote"],
   signupTokens: 1000,
   dailyTokens: 250,

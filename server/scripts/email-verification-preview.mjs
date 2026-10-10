@@ -9,7 +9,7 @@ const message = buildEmailVerificationMessage({
   user: { pseudo: "Bnmkt", profile: { displayName: "Bnmkt" } },
   token: "aperçu-validation-email",
   siteName: "KTGA.ME"
-}, { PUBLIC_APP_URL: "https://netdis.org/ktga" });
+}, { PUBLIC_APP_URL: "https://www.ktga.me" });
 
 const preview = `<!doctype html>
 <html lang="fr">
@@ -32,7 +32,7 @@ const preview = `<!doctype html>
   <main class="mail-shell">
     <header class="mail-toolbar">
       <strong>${message.subject}</strong>
-      <span>KTGA.ME &lt;no-reply@netdis.org&gt; · à Bnmkt</span>
+      <span>KTGA.ME &lt;contact@netdis.org&gt; · à Bnmkt</span>
     </header>
     <iframe class="mail-frame" title="Aperçu du contenu de l’email" srcdoc="${message.html.replaceAll("&", "&amp;").replaceAll('"', "&quot;")}"></iframe>
   </main>

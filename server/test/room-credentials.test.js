@@ -23,3 +23,15 @@ test("room creation rejects autofilled account credentials without weakening acc
 test("guests can use a table access code without an account password", async () => {
   assert.equal(await roomCredentialsError({ name: "Table invitée", password: "room-code", user: { guest: true } }, bcrypt.compare), "");
 });
+
+test("repeated public names reuse negative checks but password changes invalidate them", async () => {
+  const user = { passwordHash: "old" }; let calls = 0;
+  const compare = async (name, hash) => { calls++; return name === hash; };
+  const check = (name) => roomCredentialsError({ name, password: "", user }, compare);
+  assert.equal(await check("table"), ""); assert.equal(await check("table"), ""); assert.equal(calls, 1);
+  user.passwordHash = "table";
+  assert.match(await check("table"), /mot de passe/); assert.match(await check("table"), /mot de passe/); assert.equal(calls, 3);
+  user.passwordHash = "new";
+  for (let i = 0; i < 9; i++) await check(`name-${i}`);
+  await check("table"); assert.equal(calls, 13);
+});

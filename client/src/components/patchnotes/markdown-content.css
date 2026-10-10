@@ -17,5 +17,18 @@
 .patchnote-markdown table { border-collapse: collapse; display: block; margin: 14px 0; max-width: 100%; overflow-x: auto; width: max-content; }
 .patchnote-markdown th, .patchnote-markdown td { border: 1px solid #3d4842; padding: 8px 10px; text-align: left; }
 .patchnote-markdown th { background: #192321; color: #e6d19a; }
+.patchnote-document .patchnote-markdown td img { display: block; width: 56px; height: 56px; margin-inline: auto; object-fit: contain; }
+.patchnote-document .patchnote-markdown table:has(td img) th,
+.patchnote-document .patchnote-markdown table:has(td img) td { white-space: nowrap; overflow-wrap: normal; }
 .patchnote-markdown hr { border: 0; border-top: 1px solid #414942; margin: 20px 0; }
 .patchnote-markdown input[type="checkbox"] { accent-color: #d5ac3f; margin-right: 7px; }
+.ktga-inline-piece { align-items: center; display: inline-flex; justify-content: center; margin: 2px 3px; vertical-align: middle; }
+.ktga-inline-dice { height: 32px; width: 32px; }
+.ktga-inline-dice .die { border-radius: 6px; gap: 2px; height: 30px; min-height: 30px; min-width: 30px; padding: 5px; width: 30px; box-shadow: none; }
+.ktga-inline-dice .pip { height: 4px; width: 4px; }
+.ktga-inline-card { height: 48px; width: 34px; }
+.ktga-inline-card .playing-card { border-radius: 4px; height: 46px; min-height: 46px; min-width: 32px; padding: 3px; width: 32px; box-shadow: none; }
+.ktga-inline-card .playing-card strong, .ktga-inline-card .playing-card > span { font-size: 16px; line-height: 18px; }
+.ktga-inline-rank { height: 44px; width: 44px; }
+.ktga-inline-rank .ranked-insignia { height: 42px; width: 42px; }
+.ktga-inline-rank .ranked-insignia img, .ktga-inline-rank .ranked-insignia svg { height: 40px; object-fit: contain; width: 40px; }

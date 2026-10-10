@@ -3,13 +3,14 @@ import { authLockStatus, recordAuthFailure } from "./account-security.js";
 import { emailDeliveryConfigured, sendTransactionalEmail, validEmail } from "./email-verification.js";
 import { generatePersonalArchive } from "./data-requests.js";
 import { dataRequestEmail } from "./data-request-email.js";
+import { siteContactEmail } from "./site-contact.js";
 
 export function playerDataRequest(row) {
   const { id, status, requested_at, due_at, approved_at, sent_at, extension_reason, extended_at } = row;
   return { id, status, requested_at, due_at, approved_at, sent_at, extension_reason, extended_at };
 }
 
-export function registerDataRequestRoutes({ app, auth, requireAdmin, store, readDb, updateDb, paths, siteName, notifyContact = () => {}, exportArchive = generatePersonalArchive, sendEmail = sendTransactionalEmail }) {
+export function registerDataRequestRoutes({ app, auth, requireAdmin, store, readDb, updateDb, paths, siteName, contactEmail = () => siteContactEmail(readDb().settings?.platform), notifyContact = () => {}, exportArchive = generatePersonalArchive, sendEmail = sendTransactionalEmail }) {
   const changing = new Set();
   const jobs = [];
   let running = 0;
@@ -30,7 +31,7 @@ export function registerDataRequestRoutes({ app, auth, requireAdmin, store, read
   app.get("/api/me/data-requests", auth, (req, res) => {
     const user = userFor(req.auth.id);
     if (!user) return res.status(403).json({ error: "Un compte joueur est nécessaire." });
-    res.json({ requests: store.list(user.id).map(playerDataRequest), emailReady: eligible(user), contactEmail: process.env.CONTACT_EMAIL || "contact@netdis.org" });
+    res.json({ requests: store.list(user.id).map(playerDataRequest), emailReady: eligible(user), contactEmail: contactEmail() });
   });
   app.post("/api/me/data-requests", auth, async (req, res) => {
     const user = userFor(req.auth.id);
@@ -71,7 +72,7 @@ export function registerDataRequestRoutes({ app, auth, requireAdmin, store, read
     res.status(202).json({ request: approved });
     jobs.push(async () => {
       try {
-        const archive = await exportArchive({ userId: user.id, paths, requestId: request.id, contactEmail: process.env.CONTACT_EMAIL || "contact@netdis.org" });
+        const archive = await exportArchive({ userId: user.id, paths, requestId: request.id, contactEmail: contactEmail() });
         const recipient = userFor(user.id);
         if (!eligible(recipient) || recipient.email !== approved.email) throw new Error("Le compte ou son adresse vérifiée a changé pendant la génération. Revue manuelle nécessaire.");
         await sendEmail(mail(recipient, approved, "sent", { messageId: `<rights-${request.id}@ktga.me>`, attachments: [{ filename: `mes-donnees-${request.id}.zip`, content: archive.content, contentType: "application/zip" }] }));

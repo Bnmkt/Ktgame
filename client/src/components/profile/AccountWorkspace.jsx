@@ -4,6 +4,7 @@ import { PasswordField } from "../common/PasswordField.jsx";
 import { DataRequestPanel } from "./DataRequestPanel.jsx";
 import { AccountSecurity } from "./AccountSecurity.jsx";
 import { GameProgression } from "./GameProgression.jsx";
+import { RankBadge } from "../../features/games/RankedPlay.jsx";
 import { localDate } from "../../utils/dates.js";
 import { publicProfileStatOptions } from "../../config/site.js";
 import { ageFromBirthDate, memberStatOptions } from "../../utils/presentation.jsx";
@@ -29,6 +30,7 @@ export function AccountWorkspace({ user, form, setForm, favorites, games, toggle
         </section>
         <section className="account-workspace-section"><header><Star size={19} /><h3>Mes jeux favoris</h3><span>{favorites.length} / 5</span></header><div className="favorite-game-grid">{games.map((game) => <button type="button" key={game.id} className={favorites.includes(game.id) ? "favorite-game active" : "favorite-game"} aria-pressed={favorites.includes(game.id)} onClick={() => toggleFavorite(game.id)} disabled={!favorites.includes(game.id) && favorites.length >= 5}>{game.name}</button>)}</div></section>
         <GameProgression rows={user.gameProgression} favorites={favorites} selection={form} equippedTitle={user.gameTitle} onTitleChange={(value) => setForm((current) => ({ ...current, ...value }))} />
+        <section className="account-workspace-section"><header><BadgeCheck size={19}/><h3>Insigne classé affiché</h3></header><div className="account-workspace-row"><label htmlFor="account-ranked-emblem">À côté de ton icône</label><div><select id="account-ranked-emblem" value={form.rankedBadgeGameId ?? ""} onChange={change("rankedBadgeGameId")}><option value="">Aucun insigne</option>{(user.gameProgression ?? []).filter((row)=>row.competitive).map((row)=><option key={row.gameId} value={row.gameId}>{row.gameName} · {row.competitive.rank.label}</option>)}</select><div className="account-ranked-emblem-preview"><RankBadge rank={user.gameProgression?.find((row)=>row.gameId===form.rankedBadgeGameId)?.competitive?.rank}/></div></div></div></section>
         <div className="account-workspace-actions"><button type="submit" disabled={Boolean(saving)}><Save size={17} />{saving === "profile" ? "Enregistrement…" : "Enregistrer le profil"}</button></div>
       </form>}
       {tab === "visibility" && <><form onSubmit={save} className="account-workspace-form"><section className="account-workspace-section"><header><BadgeCheck size={19} /><h3>Statistiques de la member card</h3></header>

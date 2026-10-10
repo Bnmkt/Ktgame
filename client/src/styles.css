@@ -616,7 +616,7 @@ button .compact-number {
   align-items: center;
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(240px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
 }
 
 .game-search-field {
@@ -8929,17 +8929,27 @@ textarea {
 .room-app-shell.table-fullscreen .dice-throw-tray-label { padding-bottom: 5px; }
 .room-app-shell.table-fullscreen .board-texas-holdem { margin-top: 0; overflow: hidden; }
 .room-app-shell.table-fullscreen .board-texas-holdem > .board-felt { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
-.room-app-shell.table-fullscreen .poker-table { gap: 9px; grid-template-rows: minmax(0, 1fr) auto; height: 100%; min-height: 0; padding: 10px 12px; }
-.room-app-shell.table-fullscreen .poker-play-area { align-content: start; gap: 8px; min-height: 0; overflow: auto; padding: 2px 5px 5px 2px; scrollbar-gutter: stable; }
-.room-app-shell.table-fullscreen .poker-seats { gap: 8px; grid-template-columns: repeat(4, minmax(145px, 1fr)); }
+.room-app-shell.table-fullscreen .poker-table { container-type: inline-size; gap: 9px; grid-template-rows: minmax(0, 1fr) auto; height: 100%; min-height: 0; padding: 10px 12px; }
+.room-app-shell.table-fullscreen .poker-play-area { align-content: start; gap: 8px; min-height: 0; overflow: visible; padding: 2px 5px 5px 2px; }
+.room-app-shell.table-fullscreen .poker-seats { gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
 .room-app-shell.table-fullscreen .poker-seats > section { gap: 5px; padding: 8px; }
 .room-app-shell.table-fullscreen .poker-seat-header { align-items: center; gap: 5px; grid-template-columns: minmax(0, 1fr) auto; }
 .room-app-shell.table-fullscreen .poker-winner-badge { font-size: 9px; grid-column: 1 / -1; grid-row: 2; padding-block: 3px; }
-.room-app-shell.table-fullscreen .poker-seats .playing-card { height: 68px; min-width: 48px; width: 48px; }
+.room-app-shell.table-fullscreen .poker-seats .playing-card { height: 118px; min-width: 82px; width: 82px; }
 .room-app-shell.table-fullscreen .poker-seat-details { font-size: 11px; }
 .room-app-shell.table-fullscreen .poker-center-stage { gap: 4px; padding-block: 6px; }
 .room-app-shell.table-fullscreen .community-cards { gap: 7px; min-height: 0; }
-.room-app-shell.table-fullscreen .community-cards .playing-card { height: 72px; min-width: 51px; width: 51px; }
+.room-app-shell.table-fullscreen .community-cards .playing-card { height: 144px; min-width: 100px; width: 100px; }
+@media(max-width:900px) {
+  .room-app-shell.table-fullscreen .community-cards .playing-card,
+  .room-app-shell.table-fullscreen .poker-seats .playing-card { height:104px; min-width:72px; width:72px; }
+}
+@media(max-width:600px) {
+  .room-app-shell.table-fullscreen .community-cards { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; width:100%; }
+  .room-app-shell.table-fullscreen .community-cards .playing-card { height:auto; aspect-ratio:82 / 118; min-width:0; width:100%; padding:4px; }
+  .room-app-shell.table-fullscreen .community-cards .playing-card strong { font-size:18px; }
+  .room-app-shell.table-fullscreen .community-cards .playing-card span { font-size:24px; }
+}
 .room-app-shell.table-fullscreen .poker-pot { padding-block: 7px; }
 .room-app-shell.table-fullscreen .poker-hand-potential { padding-block: 7px; }
 .room-app-shell.table-fullscreen .poker-control-dock { align-items: stretch; background: rgba(2, 15, 12, .96); border: 1px solid rgba(255,226,138,.32); border-radius: 12px; box-shadow: 0 -10px 24px rgba(0,0,0,.24); display: grid; gap: 8px; grid-template-columns: minmax(250px, .36fr) minmax(0, 1fr); padding: 8px; position: relative; z-index: 5; }
@@ -8956,6 +8966,21 @@ textarea {
 .room-app-shell.table-fullscreen .poker-raise .bet-stepper-head { display: none; }
 .room-app-shell.table-fullscreen .poker-raise .bet-mouse-controls,
 .room-app-shell.table-fullscreen .poker-raise .bet-range-input { display: none; }
+@container (max-width: 1100px) {
+  .room-app-shell.table-fullscreen .poker-table .poker-control-dock { grid-template-columns: minmax(0, 1fr); }
+  .room-app-shell.table-fullscreen .poker-table .poker-actions { flex-wrap: wrap; }
+  .room-app-shell.table-fullscreen .poker-table .poker-actions > .actions { flex:0 1 auto; min-width:0; max-width:100%; flex-wrap:wrap; }
+  .room-app-shell.table-fullscreen .poker-table .poker-raise { flex-wrap: wrap; }
+  .room-app-shell.table-fullscreen .poker-table .poker-raise .bet-stepper { min-width: 0; flex: 1 1 280px; }
+  .room-app-shell.table-fullscreen .poker-table .bet-control { grid-template-columns: minmax(0, 1fr) minmax(54px, .7fr) minmax(0, 1fr); gap: 5px; }
+  .room-app-shell.table-fullscreen .poker-table .bet-step-group { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+  .room-app-shell.table-fullscreen .poker-table .bet-step-group button { padding-inline: 3px; font-size: 11px; }
+  .room-app-shell.table-fullscreen .poker-table .bet-value-input input { min-width: 0; width: 100%; }
+}
+@container (max-width:600px) {
+  .room-app-shell.table-fullscreen .poker-table .poker-actions > .actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; }
+  .room-app-shell.table-fullscreen .poker-table .poker-actions > .actions button { padding-inline:5px; font-size:12px; }
+}
 
 @media (max-width: 1500px) and (min-width: 901px) {
   .room-app-shell.table-fullscreen .poker-control-dock { grid-template-columns: 1fr; }
@@ -10596,4 +10621,94 @@ body:has(.midnight-contract-dialog-layer) .game-log-center { visibility: hidden;
   .tribunal-case-row { grid-template-columns: 1fr; }
   .tribunal-case-stamp { border-bottom: 1px solid #444039; border-right: 0; justify-items: start; min-height: auto; padding: 0 0 10px; }
   .tribunal-case-result, .tribunal-case-row .actions { grid-column: auto; }
+}
+
+.ranked-elo-workspace { display: grid; gap: 26px; padding-top: 18px; }
+.ranked-elo-workspace > section { min-width: 0; border-top: 1px solid #393d36; padding-top: 18px; }
+.ranked-elo-workspace h3 { margin: 0 0 14px; font-size: 18px; }
+.ranked-elo-equation code { color: #e8c66b; white-space: normal; overflow-wrap: anywhere; }
+.ranked-elo-equation p, .ranked-elo-equation small { color: #cad3cf; line-height: 1.6; }
+.ranked-provisional-list { display: grid; gap: 10px; margin-bottom: 12px; }
+.ranked-provisional-list > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; align-items: end; gap: 12px; max-width: 620px; }
+.ranked-elo-simulator input { min-width: 95px; }
+.ranked-elo-simulator td { vertical-align: middle; }
+.midnight-contract-dialog.casino-dialog:has(.midnight-selection) { height: auto; max-height: 90dvh; max-width: 820px; }
+.midnight-selection .midnight-codex-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.midnight-selection .midnight-codex-groups > section, .midnight-selection .midnight-codex-groups > section > div { display: contents; }
+.midnight-selection .midnight-codex-groups > section > header { display: none; }
+.midnight-selection .midnight-codex-groups article { min-width: 0; }
+@media(max-width: 600px) { .midnight-selection .midnight-codex-groups { grid-template-columns: 1fr; } }
+
+/* Tall tables have one accessible scroll surface, not nested clipped grids. */
+.room-app-shell.table-fullscreen :is(.board-texas-holdem, .board-midnight-dice):not(.finished-board) > .board-felt {
+  align-content: start; grid-template-rows: auto auto; overflow: auto; overscroll-behavior: contain;
+}
+.room-app-shell.table-fullscreen :is(.board-texas-holdem, .board-midnight-dice):not(.finished-board) .board-heading { display: none; }
+.room-app-shell.table-fullscreen:has(:is(.board-texas-holdem, .board-midnight-dice):not(.finished-board)) .table-status-card { display: none; }
+.room-app-shell.table-fullscreen .poker-table { height: auto; min-height: 100%; grid-template-rows: auto auto; }
+.room-app-shell.table-fullscreen .poker-control-dock { position: sticky; bottom: 0; }
+.room-app-shell.table-fullscreen .midnight-table { align-content: start; min-height: 0; overflow: visible; }
+.room-app-shell.table-fullscreen .midnight-table .die { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); padding: 6px; }
+.room-app-shell.table-fullscreen .midnight-table .pip { width: var(--custom-pip-size, 9px); height: var(--custom-pip-size, 9px); }
+
+@media (min-width: 901px) {
+  .room-app-shell.table-fullscreen .midnight-table { grid-template-columns: minmax(230px, .34fr) minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .room-app-shell.table-fullscreen .midnight-heading { grid-column: 1 / -1; gap: 8px; }
+  .room-app-shell.table-fullscreen .midnight-player-trays { grid-column: 1; grid-row: 2; grid-template-columns: 1fr; align-content: start; gap: 8px; }
+  .room-app-shell.table-fullscreen .midnight-player-trays article { grid-template-columns: minmax(0, 1fr) auto; padding: 8px; gap: 7px; min-width: 0; }
+  .room-app-shell.table-fullscreen .midnight-player-trays header { grid-column: 1; grid-row: 1; font-size: 12px; }
+  .room-app-shell.table-fullscreen .midnight-player-trays footer { grid-column: 1; grid-row: 2; }
+  .room-app-shell.table-fullscreen .midnight-player-trays .midnight-tray-dice { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+  .room-app-shell.table-fullscreen .midnight-player-trays header, .room-app-shell.table-fullscreen .midnight-player-trays footer { flex-wrap: wrap; gap: 4px; }
+  .room-app-shell.table-fullscreen .midnight-player-trays .die { height: 28px; min-width: 28px; width: 28px; --custom-pip-size: 5px; }
+  .room-app-shell.table-fullscreen .midnight-player-trays .die { padding: 3px; border-radius: 7px; }
+  .room-app-shell.table-fullscreen .midnight-die-slot { height: 30px; width: 30px; flex: 0 0 30px; }
+  .room-app-shell.table-fullscreen .midnight-tray-dice { gap: 3px; }
+  .room-app-shell.table-fullscreen .midnight-current-contract { grid-column: 1; grid-row: 3; grid-template-columns: 1fr; align-content: start; gap: 6px; padding: 9px; }
+  .room-app-shell.table-fullscreen .midnight-current-contract strong { font-size: 17px; }
+  .room-app-shell.table-fullscreen .midnight-current-contract > div:first-child { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px; }
+  .room-app-shell.table-fullscreen .midnight-current-contract small { font-size: 8px; letter-spacing: 0; }
+  .room-app-shell.table-fullscreen .midnight-current-contract p { font-size: 12px; line-height: 1.4; }
+  .room-app-shell.table-fullscreen .midnight-current-contract > div:last-child b { font-size: 12px; }
+  .room-app-shell.table-fullscreen .midnight-current-contract > div:last-child { justify-items: start; }
+  .room-app-shell.table-fullscreen .midnight-market { grid-column: 2; grid-row: 2 / span 2; align-self: start; padding: 10px; }
+  .room-app-shell.table-fullscreen .midnight-market-throw { margin-top: 8px; padding: 6px; }
+  .room-app-shell.table-fullscreen .midnight-market-grid { grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 5px; padding: 10px 6px; }
+  .room-app-shell.table-fullscreen .midnight-market-grid article { gap: 6px; padding: 7px 4px; transform: none; }
+  .room-app-shell.table-fullscreen .midnight-market-grid .die { height: 48px; min-width: 48px; width: 48px; --custom-pip-size: 9px; }
+  .room-app-shell.table-fullscreen .midnight-contract-prompt { grid-column: 2; grid-row: 2; grid-template-columns: 1fr; padding: 12px; }
+  .room-app-shell.table-fullscreen .midnight-reveal { grid-column: 1 / -1; }
+}
+@media (min-width: 901px) and (max-height: 900px) {
+  .room-app-shell.table-fullscreen { padding: 7px; gap: 7px; }
+  .room-app-shell.table-fullscreen .room-heading { margin: 0; }
+  .room-app-shell.table-fullscreen .room-heading h1 { font-size: 22px; }
+  .room-app-shell.table-fullscreen .room-heading .eyebrow { display: none; }
+  .room-app-shell.table-fullscreen .layout:has(> .fullscreen-player-rail) { grid-template-columns: 160px minmax(0, 1fr) 240px; gap: 10px; }
+  .room-app-shell.table-fullscreen .board-felt { padding: 8px; border-width: 4px; gap: 7px; }
+  .room-app-shell.table-fullscreen .turn-line { font-size: 13px; padding: 5px 8px; }
+  .room-app-shell.table-fullscreen .poker-table { padding: 8px; gap: 6px; }
+  .room-app-shell.table-fullscreen .poker-play-area { gap: 6px; }
+  .room-app-shell.table-fullscreen .community-cards .playing-card { height: 112px; width: 78px; min-width: 78px; }
+  .room-app-shell.table-fullscreen .poker-center-stage { padding: 3px 8px; }
+  .room-app-shell.table-fullscreen .poker-table-mark { display: none; }
+  .room-app-shell.table-fullscreen .poker-seats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 6px; }
+  .room-app-shell.table-fullscreen .poker-seats > section { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 5px; padding: 6px; align-content: center; }
+  .room-app-shell.table-fullscreen .poker-seat-header { grid-column: 1; grid-row: 1; }
+  .room-app-shell.table-fullscreen .poker-seat-details { grid-column: 1; grid-row: 2; font-size: 11px; }
+  .room-app-shell.table-fullscreen .poker-seats .card-row { grid-column: 2; grid-row: 1 / 3; gap: 4px; }
+  .room-app-shell.table-fullscreen .poker-seats .playing-card { height: 96px; min-width: 66px; width: 66px; }
+  .room-app-shell.table-fullscreen .poker-pot { flex-wrap: wrap; font-size: 12px; gap: 7px; padding: 5px 10px; }
+  .room-app-shell.table-fullscreen .poker-hand-potential { padding: 5px 8px; }
+  .room-app-shell.table-fullscreen .poker-hand-potential small { display: none; }
+  .room-app-shell.table-fullscreen .midnight-heading h2 { font-size: 20px; }
+  .room-app-shell.table-fullscreen .midnight-phase { min-width: 0; padding: 7px 9px; }
+  .room-app-shell.table-fullscreen .midnight-heading-actions { flex-wrap: wrap; justify-content: end; }
+  .room-app-shell.table-fullscreen .midnight-codex-button { font-size: 12px; padding: 6px 9px; }
+}
+@media (max-width: 900px) {
+  .room-app-shell.table-fullscreen :is(.board-texas-holdem, .board-midnight-dice):not(.finished-board) > .board-felt { height: auto; overflow: visible; }
+  .room-app-shell.table-fullscreen .poker-table { min-height: 0; }
+  .room-app-shell.table-fullscreen .poker-play-area { overflow: visible; }
+  .room-app-shell.table-fullscreen .poker-control-dock { position: relative; }
 }

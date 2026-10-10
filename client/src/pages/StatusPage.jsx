@@ -65,7 +65,7 @@ function StatusTimeline({ data }) {
         {data.components.map((component) => <div className="status-timeline-row" style={timelineGridStyle} key={component.id}>{data.timeline.map((point) => {
           const value = point.components[component.id];
           const incidents = (value.incidentIds ?? []).map((id) => data.justifications?.find((incident) => incident.id === id)).filter(Boolean);
-          const title = `${formatDate(point.at, true)} · ${statusMeta[value.status]?.label ?? value.status}${value.uptime == null ? "" : ` · ${formatUptime(value.uptime)}`}${value.latencyMs == null ? "" : ` · ${Math.round(value.latencyMs)} ms`}${incidents.length ? " · Justification disponible" : value.investigation ? " · Consulter le suivi" : ""}`;
+          const title = `${formatDate(point.at, true)} · ${statusMeta[value.status]?.label ?? value.status}${value.uptime == null ? "" : ` · ${formatUptime(value.uptime)}`}${value.latencyMs == null ? "" : ` · ${value.latencyMs > 0 && value.latencyMs < 1 ? "moins de 1" : Math.round(value.latencyMs)} ms`}${incidents.length ? " · Justification disponible" : value.investigation ? " · Consulter le suivi" : ""}`;
           return incidents.length || value.investigation
             ? <button type="button" key={point.at} className={`status-day status-${value.status} has-justification`} title={title} aria-label={`${component.name}, ${title}`} onClick={() => openJustification(component, point, incidents)} />
             : <span key={point.at} className={`status-day status-${value.status}`} title={title} />;

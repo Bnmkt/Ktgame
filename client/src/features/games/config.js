@@ -55,6 +55,7 @@ export const gameModifierDefinitions = {
     { key: "rounds", type: "range", label: "Nombre de manches", help: "Chaque manche comporte trois choix de dés par joueur.", min: 3, max: 8, defaultValue: 5 },
     { key: "marketExtra", type: "range", label: "Dés supplémentaires", help: "Ajoute des options au marché; les dés restants seront écartés.", min: 0, max: 6, defaultValue: 2 },
     { key: "discardsPerRound", type: "range", label: "Défausses tactiques", help: "Nombre de dés qu'un joueur peut remplacer dans le marché à chaque manche.", min: 0, max: 3, defaultValue: 1 },
+    { key: "individualContracts", type: "toggle", label: "Mandats individuels", enabledLabel: "Quatre mandats aléatoires propres à chaque joueur", disabledLabel: "Quatre mandats communs à toute la table", help: "Chaque joueur reçoit sa propre sélection secrète. Les sélections peuvent partager des mandats mais ne sont pas identiques. Elles sont renouvelées toutes les quatre manches.", defaultValue: true },
     { key: "uniqueContracts", type: "toggle", label: "Rotation des mandats", enabledLabel: "Mandats sans répétition avant rotation", disabledLabel: "Mandats à nouveau disponibles immédiatement", help: "Interdit de reprendre un mandat avant d'avoir essayé les quatre.", defaultValue: true }
   ],
   "velvet-ruse": [

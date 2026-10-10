@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
+# Legacy direct-Node TLS setup. For a new Debian VPS, use deploy/debian/install.sh
+# and the Nginx configuration documented in docs/DEPLOYMENT-DEBIAN-13.md instead.
 set -euo pipefail
 
-DOMAIN="${1:-ktgapi.netdis.org}"
+DOMAIN="${1:-api.ktga.me}"
 APP_USER="${2:-$USER}"
-EXPECTED_IP="${3:-94.106.131.148}"
+EXPECTED_IP="${3:-}"
 
 echo "Installing deployment prerequisites..."
 sudo apt update
@@ -22,7 +24,7 @@ if [ "${NODE_MAJOR}" -lt 22 ]; then
 fi
 
 RESOLVED_IPS="$(getent ahostsv4 "${DOMAIN}" | awk '{ print $1 }' | sort -u | tr '\n' ' ')"
-if ! printf '%s' "${RESOLVED_IPS}" | grep -q "\b${EXPECTED_IP}\b"; then
+if [ -n "${EXPECTED_IP}" ] && ! printf '%s' "${RESOLVED_IPS}" | grep -q "\b${EXPECTED_IP}\b"; then
   echo "${DOMAIN} does not resolve to ${EXPECTED_IP}."
   echo "Resolved IPv4 addresses: ${RESOLVED_IPS:-none}"
   echo "Fix DNS before requesting the certificate."

@@ -13,9 +13,12 @@ export function useCasinoRoute() {
     }
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
-  const navigate = useCallback((view, id = "", { replace = false } = {}) => {
-    const path = appPath(view, id);
-    if (window.location.pathname !== path || window.location.search) window.history[replace ? "replaceState" : "pushState"]({}, "", path);
+  const navigate = useCallback((view, id = "", { replace = false, search = "", hash = "" } = {}) => {
+    const target = new URL(appPath(view, id), window.location.origin);
+    target.search = search;
+    target.hash = hash;
+    const path = target.pathname + target.search + target.hash;
+    if (window.location.pathname + window.location.search + window.location.hash !== path) window.history[replace ? "replaceState" : "pushState"]({}, "", path);
     setRoute(readRoute(window.location));
     window.scrollTo({ top: 0, behavior: "auto" });
   }, []);

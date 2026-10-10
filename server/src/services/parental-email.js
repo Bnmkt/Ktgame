@@ -1,4 +1,5 @@
 import { sendTransactionalEmail } from "./email-verification.js";
+import { siteContactEmail } from "./site-contact.js";
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
 
@@ -27,7 +28,7 @@ export async function sendParentVerification(request, environment = process.env)
 }
 
 export async function sendParentalAdminNotice(request, environment = process.env) {
-  const to = environment.CONTACT_EMAIL || "contact@netdis.org";
+  const to = siteContactEmail({}, environment);
   const subject = `Nouvelle demande parentale ${request.code}`;
   const text = `Nouvelle demande parentale ${request.code}. Enfant : ${request.childPseudo} (${request.childEmail}). Parent : ${request.parentEmail}. En attente de validation email puis de revue administrative.`;
   const html = parentalTemplate({ eyebrow: "Contrôle parental", title: "Nouvelle inscription de moins de 13 ans", intro: "Un nouveau dossier a été créé. Aucune session ne sera ouverte avant la validation du parent et la revue administrative.", code: request.code, sections: [{ title: "Compte demandé", text: `${request.childPseudo} · ${request.childEmail} · naissance ${request.childBirthDate}` }, { title: "Responsable légal", text: request.parentEmail }] });

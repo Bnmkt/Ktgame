@@ -10,13 +10,32 @@ export class Archive {
     this.columns = columns;
     this.pending = [];
     this.revision = 0;
+    this.userRevisions = new Map();
+    this.userRevisionEpoch = 0;
     this.persistedCount = Number(sqlite.prepare(`SELECT count(*) AS n FROM ${table}`).get().n);
     this.iteratorStatement = sqlite.prepare(`SELECT * FROM ${table} ORDER BY rowid`);
   }
 
   get length() { return this.persistedCount + this.pending.length; }
-  push(...rows) { this.pending.push(...rows); this.revision++; return this.length; }
-  committed() { if (this.pending.length) { this.persistedCount += this.pending.length; this.pending = []; this.revision++; } }
+  touchUsers(rows) {
+    for (const row of rows) {
+      const ids = new Set([row.userId, ...(row.players ?? []).map((player) => player.id), ...(row.winners ?? [])].filter(Boolean));
+      for (const id of ids) {
+        if (!this.userRevisions.has(id) && this.userRevisions.size >= 4096) { this.userRevisions.clear(); this.userRevisionEpoch++; }
+        this.userRevisions.set(id, (this.userRevisions.get(id) ?? 0) + 1);
+      }
+    }
+  }
+  revisionFor(userId) { return `${this.userRevisionEpoch}:${this.userRevisions.get(userId) ?? 0}`; }
+  push(...rows) { this.pending.push(...rows); this.revision++; this.touchUsers(rows); return this.length; }
+  committed() {
+    if (this.pending.length) {
+      this.persistedCount += this.pending.length;
+      this.touchUsers(this.pending);
+      this.pending = [];
+      this.revision++;
+    }
+  }
   *[Symbol.iterator]() {
     for (const row of this.iteratorStatement.iterate()) yield this.decode(row);
     yield* this.pending;

@@ -1,6 +1,7 @@
 export function createOnlinePresence({ onChange, delayMs = 5000, schedule = setTimeout, cancel = clearTimeout }) {
   const users = new Map();
   return {
+    get size() { return users.size; },
     has: (userId) => users.has(userId),
     connect(userId, socketId) {
       let entry = users.get(userId);

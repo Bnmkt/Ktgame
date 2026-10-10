@@ -66,7 +66,7 @@ try {
   start(["src/index.js"], path.join(root, "server"), {
     NODE_ENV: "test", PORT: String(apiPort), HOST: "127.0.0.1", JWT_SECRET: secret,
     CLIENT_ORIGIN: origin, CLIENT_DIST: "", APP_BASE_PATH: "", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "",
-    SMTP_HOST: "", EMAIL_FROM: "", SQLITE_PATH: path.join(temporary, "main.sqlite"),
+    SMTP_HOST: "", EMAIL_FROM: "", PUBLIC_APP_URL: `${apiOrigin}/api/health`, SQLITE_PATH: path.join(temporary, "main.sqlite"),
     ...Object.fromEntries(["PARENTAL_DB_PATH", "TRIBUNAL_DB_PATH", "CHAT_DB_PATH", "STATUS_DB_PATH", "PATCHNOTES_DB_PATH", "REQUEST_LOG_PATH"].map((key) => [key, path.join(temporary, `${key}.sqlite`)]))
   });
   start(["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(webPort), "--strictPort"], path.join(root, "client"), {
@@ -74,7 +74,7 @@ try {
   });
   await waitFor(async () => (await fetch(`${apiOrigin}/api/health`)).ok && (await fetch(origin)).ok, "isolated servers");
   browser = await chromium.launch({ channel: "msedge", headless: true });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, hasTouch: true });
   await context.addCookies([{ name: "ktga_session", value: token("alpha"), url: apiOrigin, httpOnly: true, sameSite: "Lax" }]);
   await context.addInitScript(() => {
     localStorage.setItem("ktga-privacy-choice", JSON.stringify({ version: "2026-09-27", chosenAt: Date.now(), enabled: false }));
@@ -103,7 +103,7 @@ try {
   await waitFor(async () => await toggle.locator(".conversation-toggle-count").textContent() === "1", "private unread badge");
   await waitFor(async () => await page.evaluate(() => window.chatToneCount) === 2, "private notification sound");
   await toggle.click();
-  await waitFor(async () => await contacts().count() === 1 && await contacts().first().innerText() === "beta", "only beta conversation visible");
+  await waitFor(async () => await contacts().count() === 1 && await contacts().first().locator(".display-name-text").innerText() === "beta", "only beta conversation visible");
   await waitFor(async () => await toggle.locator(".conversation-toggle-count").count() === 0, "visible message acknowledged");
   let profileRequests = 0;
   page.on("request", (entry) => { if (/\/api\/users\/[^/]+\/public/.test(entry.url())) profileRequests += 1; });
@@ -113,7 +113,7 @@ try {
   await page.getByRole("button", { name: "Choisir un ami", exact: true }).click();
   await page.getByRole("button", { name: "Discuter avec gamma", exact: true }).click();
   await waitFor(async () => await contacts().count() === 2, "explicit empty conversation opened");
-  assert.equal(await contacts().first().innerText(), "beta", "recent messages sort before empty conversations");
+  assert.equal(await contacts().first().locator(".display-name-text").innerText(), "beta", "recent messages sort before empty conversations");
   await waitFor(async () => (await request("alpha", "/api/chat/unread", undefined, "GET")).channels.find((row) => row.friendId === "gamma")?.opened, "empty conversation saved");
   await page.reload();
   await toggle.waitFor();
@@ -143,6 +143,54 @@ try {
   await toggle.click();
   await page.getByRole("button", { name: /^Table 1/ }).click();
   await page.getByText("Bienvenue a la table", { exact: true }).waitFor();
+  await page.waitForTimeout(800);
+  const rich = await request("beta", "/api/chat/messages", { channelType: "room", roomCode: "CHAT01", content: "**Un guide** https://www.ktga.me/profil\nhttps://www.ktga.me/table/CHAT01\n@!ktga-dice-4 @!ktga-card-AH @!ktga-rank-diamant3\n# Un titre\n![Image](https://www.ktga.me/favicon.svg)" });
+  const richRow = page.locator(".conversation-message").filter({ hasText: "Un guide" });
+  await richRow.locator(".conversation-route-link").first().waitFor();
+  assert.equal(await richRow.locator(".conversation-route-link").count(), 2);
+  assert.ok(await richRow.getByRole("link", { name: /Table de alpha/ }).isVisible());
+  assert.equal(await richRow.locator("strong").filter({ hasText: "Un guide" }).count(), 1);
+  assert.equal(await richRow.locator("h1, img").count(), 0, "chat headings and images never render");
+  assert.equal(await richRow.locator(".ktga-inline-dice .pip").count(), 4);
+  assert.equal(await richRow.locator(".ktga-inline-card .playing-card").count(), 1);
+  await richRow.getByRole("img", { name: "Diamant III" }).waitFor();
+  assert.equal(rich.links.find((link) => link.kind === "table").label, "Table de alpha");
+  await page.waitForTimeout(800);
+  const blocked = await fetch(`${apiOrigin}/api/chat/messages`, { method: "POST", headers: { Authorization: `Bearer ${token("beta")}`, "Content-Type": "application/json" }, body: JSON.stringify({ channelType: "room", roomCode: "CHAT01", content: "https://evil.example/phishing" }) });
+  assert.equal(blocked.status, 400);
+  await page.screenshot({ path: path.join(previews, "chat-rich-content-desktop.png"), fullPage: false });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: path.join(previews, "chat-rich-content-mobile.png"), fullPage: false });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await richRow.getByRole("link", { name: "Profil", exact: true }).click();
+  await page.waitForURL(`${origin}/profil`, { timeout: 5000 });
+  await page.goBack();
+  await page.getByRole("button", { name: "Table", exact: true }).click();
+  await richRow.getByRole("link", { name: "Profil", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Passer en fenêtre", exact: true }).click();
+  await richRow.getByRole("link", { name: "Profil", exact: true }).click();
+  await page.waitForURL(`${origin}/profil`, { timeout: 5000 });
+  await page.goBack();
+  await page.getByRole("button", { name: "Table", exact: true }).click();
+  await richRow.getByRole("link", { name: /Table de alpha/ }).waitFor();
+  const roomLink = await richRow.getByRole("link", { name: /Table de alpha/ }).getAttribute("href");
+  assert.equal(roomLink, "https://www.ktga.me/table/CHAT01");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await richRow.getByRole("link", { name: "Profil", exact: true }).tap();
+  await page.waitForURL(`${origin}/profil`, { timeout: 5000 });
+  await page.goBack();
+  await page.getByRole("button", { name: "Table", exact: true }).click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const beforeDrag = await drawer.boundingBox();
+  const handle = await page.locator(".conversation-drag-handle").boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 40, handle.y + handle.height / 2 + 30, { steps: 5 });
+  await page.mouse.up();
+  const afterDrag = await drawer.boundingBox();
+  assert.ok(afterDrag.x > beforeDrag.x + 30 && afterDrag.y > beforeDrag.y + 20, "floating chat remains movable");
+  await page.getByRole("button", { name: "Attacher à droite", exact: true }).click();
   await waitFor(async () => await toggle.locator(".conversation-toggle-count").count() === 0, "table message acknowledged");
   await page.getByRole("button", { name: "Couper le son du chat", exact: true }).click();
   const tones = await page.evaluate(() => window.chatToneCount);
@@ -229,7 +277,35 @@ try {
   assert.deepEqual(unchanged.tribunal.behavior, sanctioned.tribunal.behavior, "resaving does not penalize twice");
   const register = await request("admin", "/api/admin/tribunal", undefined, "GET");
   assert.equal(register.cases.filter((entry) => entry.source === "administrative-49-3" && entry.accusedId === "delta").length, 1);
+  await request("gamma", "/api/chat/messages", { channelType: "global", content: "https://www.ktga.me/table/CHAT01\nhttps://www.ktga.me/table/GONE01\nhttps://www.ktga.me/bugs/1842\nhttps://www.ktga.me/patchnotes?version=0.1.0\nhttps://www.ktga.me/patchnotes/0.2.1" });
+  await page.goto(`${origin}/profil`);
+  await toggle.waitFor();
+  await toggle.click();
+  await page.getByRole("button", { name: "Global", exact: true }).click();
+  await page.locator(".conversation-feed").getByRole("link", { name: /BUG 1842/ }).waitFor();
+  assert.equal(await page.locator(".conversation-feed").getByRole("link", { name: /Partie terminée/ }).count(), 0);
+  assert.equal(await page.locator(".conversation-route-ended").count(), 1);
+  assert.equal(await page.locator(".conversation-feed").getByRole("link", { name: /Patchnote 0.2.1/ }).getAttribute("href"), "https://www.ktga.me/patchnotes?version=0.2.1");
+  await page.locator(".conversation-feed").getByRole("link", { name: /Patchnote 0.1.0/ }).click();
+  await page.waitForURL(`${origin}/patchnotes?version=0.1.0`);
+  await page.goBack();
+  await page.getByRole("button", { name: "Global", exact: true }).click();
+  await page.locator(".conversation-feed").getByRole("link", { name: /Table de alpha/ }).click();
+  await page.waitForURL(`${origin}/table/CHAT01`, { timeout: 5000 });
+  await page.goto(`${origin}/profil`);
+  await toggle.waitFor();
+  await toggle.click();
+  await page.getByRole("button", { name: "Global", exact: true }).click();
+  await page.locator(".conversation-feed").getByRole("link", { name: /Table de alpha/ }).waitFor();
+  await request("alpha", "/api/rooms/CHAT01", undefined, "DELETE");
+  await waitFor(async () => await page.locator(".conversation-route-ended").count() === 2, "existing table link becomes inactive on closure");
+  assert.equal(await page.locator(".conversation-feed").getByRole("link", { name: /Table de alpha|Partie terminée/ }).count(), 0);
+  await page.screenshot({ path: path.join(previews, "chat-closed-table-links-desktop.png"), fullPage: false });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: path.join(previews, "chat-closed-table-links-mobile.png"), fullPage: false });
   assert.deepEqual(errors, []);
+  console.log("PASS: chat links navigate by mouse and touch, docked/floating, and preserve dragging and table identifiers.");
+  console.log("PASS: closed tables lose their link live; bug IDs and patchnote versions are displayed, and version navigation retains its query.");
   console.log("PASS: opened conversations, recent order, persistence, nickname selection, private/table sound and badges, mute, desktop/mobile.");
   console.log(process.env.BLOCKER_MODULE ? "PASS: Ghostery content blocking enabled throughout the browser checks." : "NOTE: content blocking not requested; set BLOCKER_MODULE to test it.");
   console.log("PASS: temporary administrative sanction lowers behavior once and creates a 49,3 tribunal record.");

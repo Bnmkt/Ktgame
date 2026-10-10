@@ -14,10 +14,12 @@ import { appPath } from "./navigation/routes.js";
 import { CompactNumber } from "./utils/presentation.jsx";
 import { AchievementToasts, NotificationCenter } from "./components/feedback/Feedback.jsx";
 import { Auth } from "./pages/AuthPage.jsx";
+import { PublicGamesOverview, PublicGamesPage } from "./pages/PublicGamesPage.jsx";
+import { applyPageMetadata, pageMetadata, readPublicPageData } from "./seo/metadata.js";
 import { Lobby } from "./pages/LobbyPage.jsx";
 import { PublicProfileModal } from "./components/profile/PublicProfileModal.jsx";
 import { ReportPlayerDialog } from "./components/profile/ReportPlayerDialog.jsx";
-import { PrivacyProvider, legalLinks, useSiteActivity } from "./privacy/Privacy.jsx";
+import { PrivacyProvider, legalLinks, useSiteActivity, useAudienceMeasurement } from "./privacy/Privacy.jsx";
 import { BugReportProvider, useBugReportLocation } from "./features/bugs/BugReportProvider.jsx";
 import "./styles.css";
 import "./navigation/casino.css";
@@ -39,16 +41,20 @@ const TribunalPage = lazy(() => import("./pages/TribunalPage.jsx").then((module)
 const SocialPanel = lazy(() => import("./components/social/SocialPanel.jsx").then((module) => ({ default: module.SocialPanel })));
 const HelpPage = lazy(() => import("./components/help/HelpContent.jsx").then((module) => ({ default: module.HelpPage })));
 const HelpOnboarding = lazy(() => import("./components/help/HelpOnboarding.jsx").then((module) => ({ default: module.HelpOnboarding })));
+const publicPageData = readPublicPageData();
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [accountReady, setAccountReady] = useState(false);
   const [accountRecovery, setAccountRecovery] = useState(() => new URL(window.location.href).searchParams.has("reset-password"));
-  const [publicSettings, setPublicSettings] = useState(defaultPublicSettings);
+  const [publicSettings, setPublicSettings] = useState({ ...defaultPublicSettings, ...publicPageData?.settings });
+  const [publicGames, setPublicGames] = useState(publicPageData?.games ?? []);
   const [roomCode, setRoomCode] = useState(null);
   const [route, goTo] = useCasinoRoute();
   const view = route.view;
   useBugReportLocation(route, user);
   useSiteActivity(user, route);
+  useAudienceMeasurement(user, route, (accountReady || Boolean(user)) && !accountRecovery);
   useEffect(() => {
     if (!user?.minor?.restricted) return undefined;
     const send = () => api("/api/me/guardian-activity", { method: "POST", background: true, body: JSON.stringify({ page: route.view }) }).catch(() => {});
@@ -85,10 +91,17 @@ export default function App() {
       setUser(null);
       return;
     }
-    api("/api/me").then(setUser).catch(() => setToken(""));
+    let cancelled = false;
+    setAccountReady(false);
+    api("/api/me").then((account) => { if (!cancelled) { setUser(account); setAccountReady(true); } }).catch((error) => { if (!cancelled) { setToken(""); setAccountReady(error.status === 401); } });
+    return () => { cancelled = true; };
   }, [accountRecovery]);
   useEffect(() => { api("/api/config").then((settings) => setPublicSettings({ ...defaultPublicSettings, ...settings })).catch(() => {}); }, []);
-  useEffect(() => { document.title = publicSettings.siteName || defaultPublicSettings.siteName; }, [publicSettings.siteName]);
+  useEffect(() => { api("/api/games").then(setPublicGames).catch(() => {}); }, []);
+  useEffect(() => {
+    if (view === "patchnotes") return;
+    applyPageMetadata(pageMetadata({ pathname: window.location.pathname, search: window.location.search, basePath: (import.meta.env.BASE_URL || "/").replace(/\/$/, ""), siteName: publicSettings.siteName, games: publicGames }));
+  }, [route, publicSettings.siteName, publicGames]);
   useEffect(() => {
     if (!user || user.guest || user.minor?.restricted || user.moderation?.type === "soft") return setTribunalAvailable(false);
     let cancelled = false;
@@ -300,20 +313,23 @@ export default function App() {
   }
 
   const parentAccess = view === "parents" && (new URL(window.location.href).searchParams.has("parental-verify") || new URL(window.location.href).searchParams.has("parental-access"));
+  if (publicPageData?.meta.status === 404 && view === "patchnotes" && !user?.admin && !user?.editor && (route.id || new URLSearchParams(window.location.search).get("version")) === publicPageData.meta.id) return <main className="app-shell"><section className="panel"><h1>Version introuvable</h1><p>Cette version n’est pas disponible publiquement.</p><a href={appPath("patchnotes")}>Patchnotes publiées</a></section></main>;
+  if (view === "games") return <PublicGamesPage games={publicGames} id={route.id} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} />;
+  if (view === "not-found") return <main className="app-shell"><section className="panel"><h1>Page introuvable</h1><p>Cette page n’existe pas ou n’est pas disponible publiquement.</p><a href={appPath("lobby")}>Retour au casino</a></section></main>;
   if (view === "bugs") return <Suspense fallback={<main className="app-shell" role="status">Chargement des signalements…</main>}><BugReportsPage id={route.id} user={user} onBack={() => goTo("lobby")} onNavigate={(id) => goTo("bugs", id)} /></Suspense>;
-  if (["faq", "guide"].includes(view)) return <Suspense fallback={<main className="app-shell" role="status">Chargement de l’aide…</main>}><HelpPage key={view} mode={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
+  if (["faq", "guide"].includes(view)) return <Suspense fallback={<main className="app-shell" role="status">Chargement de l’aide…</main>}><HelpPage key={view} mode={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} initialDocument={publicPageData?.help} /></Suspense>;
   if (parentAccess) return <Suspense fallback={<main className="legal-page" role="status">Chargement de l’espace parent…</main>}><ParentalPortalPage siteName={publicSettings.siteName} /></Suspense>;
-  if (Object.hasOwn(legalLinks, view)) return <Suspense fallback={<main className="legal-page" role="status">Chargement…</main>}><LegalPage view={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
+  if (Object.hasOwn(legalLinks, view)) return <Suspense fallback={<main className="legal-page" role="status">Chargement…</main>}><LegalPage view={view} siteName={publicSettings.siteName} supportEmail={publicSettings.supportEmail} onBack={() => goTo("lobby")} /></Suspense>;
   if (view === "status") return <Suspense fallback={<main className="status-page" role="status">Chargement de l’état des services…</main>}><StatusPage siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
-  if (view === "patchnotes") return <Suspense fallback={<main className="patchnotes-page" role="status">Chargement des patchnotes…</main>}><PatchnotesPage siteName={publicSettings.siteName} user={user} onBack={() => goTo("lobby")} /></Suspense>;
-  if (accountRecovery || !user || user.requiresEmailUpgrade || user.requiresEmailVerification) return <Auth
+  if (view === "patchnotes") return <Suspense fallback={<main className="patchnotes-page" role="status">Chargement des patchnotes…</main>}><PatchnotesPage siteName={publicSettings.siteName} user={user} onBack={() => goTo("lobby")} initialCatalog={publicPageData?.catalog} initialNote={publicPageData?.note} initialVersion={route.id || publicPageData?.note?.version} /></Suspense>;
+  if (accountRecovery || !user || user.requiresEmailUpgrade || user.requiresEmailVerification) return <><Auth
     onAuth={setUser}
     onClearSession={() => { setToken(""); setUser(null); }}
     onRecoveryComplete={() => setAccountRecovery(false)}
     currentUser={user}
     pendingRoomCode={pendingRoomCode}
     settings={publicSettings}
-  />;
+  />{view === "lobby" && !accountRecovery && <PublicGamesOverview games={publicGames} siteName={publicSettings.siteName} compact />}</>;
   const accountRestrictions = user.minor?.restrictions ?? [];
   const blockedView = view === "shop" && accountRestrictions.includes("shop") || view === "event" && (accountRestrictions.includes("community-events") || user.moderation?.type === "soft");
   return (
@@ -339,7 +355,7 @@ export default function App() {
         {view === "lobby" && <Lobby user={user} setUser={setUser} onOpenRoom={openCasinoRoom} onEnterRoom={(code) => goTo("room", code)} onOpenEvent={openCommunityEvent} onAchievements={notifyAchievements} settings={publicSettings} />}
       </Suspense>
       {friendsOpen && <Suspense fallback={<div role="status" className="casino-modal-loading">Chargement des amis…</div>}><FriendsModal user={user} roomCode={roomCode} onClose={() => setFriendsOpen(false)} onOpenRoom={openCasinoRoom} onStartChat={(friendId) => { setConversationRequest((current) => ({ friendId, revision: current.revision + 1 })); setFriendsOpen(false); setNotificationsOpen(false); setSocialOpen(true); }} /></Suspense>}
-      {!user.guest && <Suspense fallback={null}><SocialPanel key={user.id} user={user} roomCode={["room", "spectator"].includes(view) ? route.id : roomCode} open={socialOpen} onUnreadChange={setConversationUnread} requestedFriendId={conversationRequest.friendId} requestedFriendRevision={conversationRequest.revision} onClose={() => setSocialOpen(false)} onFriends={() => { setFriendsOpen(true); setSocialOpen(false); setNotificationsOpen(false); }} /></Suspense>}
+      {!user.guest && <Suspense fallback={null}><SocialPanel key={user.id} user={user} siteIcon={publicSettings.siteIcon} onNavigate={(destination, id, options) => goTo(destination, id, options)} roomCode={["room", "spectator"].includes(view) ? route.id : roomCode} open={socialOpen} onUnreadChange={setConversationUnread} requestedFriendId={conversationRequest.friendId} requestedFriendRevision={conversationRequest.revision} onClose={() => setSocialOpen(false)} onFriends={() => { setFriendsOpen(true); setSocialOpen(false); setNotificationsOpen(false); }} /></Suspense>}
       {exclusion && <Dialog title="Vous avez été exclu" className="action-confirm-modal" layerClassName="action-confirm-layer" onClose={() => setExclusion(null)}><p>{exclusion.message}</p><div className="actions"><button type="button" onClick={() => setExclusion(null)}>J’ai compris</button></div></Dialog>}
       {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} onReport={(profile) => setReportTarget(profile)} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} roomCode={roomCode ?? ""} onClose={() => setReportTarget(null)} />}

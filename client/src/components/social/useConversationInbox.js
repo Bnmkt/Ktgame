@@ -6,15 +6,15 @@ import { createNotificationSound } from "../../utils/notification-sound.js";
 
 export const conversationKey = (channel) => `${channel.channelType}:${channel.channelId}`;
 
-export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChange }) {
+export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChange, onRoomsChange }) {
   const [channels, setChannels] = useState([]);
   const [soundEnabled, setSoundEnabled] = useState(() => {
     try { return localStorage.getItem(`ktga-conversation-sound:${userId}`) !== "off"; }
     catch { return true; }
   });
   const socketRef = useRef(null);
-  const current = useRef({ roomCode, onMessage, soundEnabled });
-  current.current = { roomCode, onMessage, soundEnabled };
+  const current = useRef({ roomCode, onMessage, soundEnabled, onRoomsChange });
+  current.current = { roomCode, onMessage, soundEnabled, onRoomsChange };
   const revision = useRef(0);
   const owner = useRef(userId);
   owner.current = userId;
@@ -49,7 +49,7 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
     try { setSoundEnabled(localStorage.getItem(`ktga-conversation-sound:${userId}`) !== "off"); } catch { setSoundEnabled(true); }
     const sound = createNotificationSound();
     const seen = new Set();
-    const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { token: getToken() }, transports: ["websocket", "polling"], withCredentials: true });
+    const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { token: getToken(), stream: "conversation" }, transports: ["websocket", "polling"], withCredentials: true });
     const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     socketRef.current = socket;
     const subscribe = () => {
@@ -57,6 +57,7 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
       refresh();
     };
     socket.on("connect", subscribe);
+    socket.on("rooms", () => current.current.onRoomsChange?.());
     socket.on("inbox-updated", () => {
       window.dispatchEvent(new Event("ktga-inbox-updated"));
       window.dispatchEvent(new Event("ktga-connections-updated"));
@@ -64,6 +65,7 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
     socket.on("presence-updated", () => window.dispatchEvent(new Event("ktga-presence-updated")));
     socket.on("connections-updated", () => window.dispatchEvent(new Event("ktga-connections-updated")));
     socket.on("ranked-match", () => window.dispatchEvent(new Event("ktga-ranked-updated")));
+    socket.on("ranked-queue-updated", () => window.dispatchEvent(new Event("ktga-ranked-updated")));
     socket.on("chat-message", (message) => {
       if (seen.has(message.id)) return;
       seen.add(message.id);

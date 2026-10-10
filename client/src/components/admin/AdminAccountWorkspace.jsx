@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Activity, BadgeCheck, CalendarDays, Eye, FileArchive, KeyRound, LogOut, Mail, Scale, Shield, ShieldCheck, Star, UserRound } from "lucide-react";
+import { Activity, BadgeCheck, CalendarDays, Eye, FileArchive, KeyRound, LogOut, Mail, Scale, Shield, ShieldCheck, Star, Trophy, UserRound } from "lucide-react";
 import { DataRequestPanel } from "../profile/DataRequestPanel.jsx";
 import { DisplayName, FriendCode } from "../cosmetics/Cosmetics.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
@@ -8,9 +8,10 @@ import { DateTimeInput } from "../common/DateTimeInput.jsx";
 import { publicProfileStatOptions } from "../../config/site.js";
 import { ageFromBirthDate, memberCardStats, memberStatOptions } from "../../utils/presentation.jsx";
 import { browserTimeZone, localDate } from "../../utils/dates.js";
+import { RankInsignia } from "../../features/games/RankInsignia.jsx";
 import "./admin-account.css";
 
-const sections = [["identity", "Identité et favoris", UserRound], ["visibility", "Carte et confidentialité", Eye], ["security", "Connexion et sécurité", KeyRound], ["access", "Droits et accès", ShieldCheck], ["moderation", "Modération", Scale], ["data", "Demandes de données", FileArchive], ["sensitive", "Actions sensibles", Shield]];
+const sections = [["identity", "Identité et favoris", UserRound], ["progression", "Progression et classé", Trophy], ["visibility", "Carte et confidentialité", Eye], ["security", "Connexion et sécurité", KeyRound], ["access", "Droits et accès", ShieldCheck], ["moderation", "Modération", Scale], ["data", "Demandes de données", FileArchive], ["sensitive", "Actions sensibles", Shield]];
 const genders = ["", "Homme", "Femme", "Non-binaire", "Autre", "Préfère ne pas dire"];
 const dateLabel = (value) => value ? new Intl.DateTimeFormat("fr-BE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "Non renseigné";
 
@@ -26,6 +27,7 @@ function Toggle({ label, hint, checked, onChange, disabled }) {
 
 export function AdminAccountWorkspace({ draft, detail, currentUser, games, settings, achievements, updateDraft, updateProfileStats, busy, dirty, runAccountAction, sensitiveActions, initialSection = "identity", onSectionChange, onDataRequests }) {
   const [section, setSection] = useState(initialSection);
+  const [progressionGame, setProgressionGame] = useState(detail.progression?.[0]?.gameId ?? "");
   const contentRef = useRef(null);
   function chooseSection(value) {
     setSection(value);
@@ -39,6 +41,7 @@ export function AdminAccountWorkspace({ draft, detail, currentUser, games, setti
   const lock = detail.security.loginLock ?? {};
   const parental = detail.parental ?? {};
   const favorites = draft.favoriteGames ?? [];
+  const progress = detail.progression?.find((row) => row.gameId === progressionGame);
   const preview = { ...draft, pseudo: draft.displayName, cosmetics: detail.inventory.cosmetics, statistics: { ...detail.statistics, todayGames: detail.statistics.todayGames ?? 0 } };
   const stats = memberCardStats(preview, detail.history, achievements);
   const setModeration = (key, patch) => updateDraft("moderation", { ...draft.moderation, [key]: { ...draft.moderation?.[key], ...patch } });
@@ -63,6 +66,12 @@ export function AdminAccountWorkspace({ draft, detail, currentUser, games, setti
         </Section>
         <Section icon={Star} title="Jeux favoris" tag={`${favorites.length} / 5`}><div className="account-admin-favorites">{games.map((game) => { const selected = favorites.includes(game.id); return <button type="button" data-request-feedback="state" key={game.id} className={selected ? "active" : ""} aria-pressed={selected} disabled={!selected && favorites.length >= 5} onClick={() => updateDraft("favoriteGames", selected ? favorites.filter((id) => id !== game.id) : [...favorites, game.id])}><Star size={15} />{game.name}</button>; })}</div></Section>
       </>}
+      {section === "progression" && progress && <Section icon={Trophy} title="Progression et classement du joueur">
+        <Field label="Jeu"><select aria-label="Jeu de la progression" disabled={busy} value={progressionGame} onChange={(event) => setProgressionGame(event.target.value)}>{detail.progression.map((row) => <option key={row.gameId} value={row.gameId}>{row.gameName}</option>)}</select></Field>
+        <Field label="XP totale"><input aria-label="XP totale du jeu" type="number" min={0} max={1000000000000} step={1} disabled={busy} value={draft.gameXp[progressionGame]} onChange={(event) => updateDraft("gameXp", { ...draft.gameXp, [progressionGame]: event.target.value === "" ? "" : Number(event.target.value) })}/></Field>
+        {progress.competitive && <Field label="Elo"><input aria-label="Elo du jeu" type="number" min={progress.competitive.minimumElo ?? -10000000} max={10000000} step={0.01} disabled={busy} value={draft.gameElo[progressionGame]} onChange={(event) => updateDraft("gameElo", { ...draft.gameElo, [progressionGame]: event.target.value === "" ? "" : Number(event.target.value) })}/></Field>}
+        <dl className="account-admin-facts"><div><dt>Niveau actuel</dt><dd>{progress.level}</dd></div><div><dt>Maîtrise</dt><dd>{progress.masteryLabel || "0"}</dd></div><div><dt>Titre actuel</dt><dd>{progress.title || "Aucun"}</dd></div>{progress.competitive && <><div><dt>Rang actuel</dt><dd className="account-admin-rank"><RankInsignia rank={progress.competitive.rank}/>{progress.competitive.rank.label}</dd></div><div><dt>Parties classées</dt><dd>{progress.competitive.games}</dd></div><div><dt>Victoires classées</dt><dd>{progress.competitive.wins}</dd></div></>}</dl>
+      </Section>}
       {section === "visibility" && <>
         <Section icon={BadgeCheck} title="Statistiques de la member card" tag="Deux emplacements">
           {[0, 1].map((index) => { const selected = draft.profileStats?.memberCardStats?.[index] ?? (index ? "achievementsUnlocked" : "winRate"); const normalized = selected === "overallWinRate" ? "winRate" : selected; const options = memberStatOptions(); return <Field key={index} label={`Emplacement ${index + 1}`}><select aria-label={`Emplacement ${index + 1}`} value={normalized} onChange={(event) => updateProfileStats((previous) => { const values = [...(previous.memberCardStats ?? ["winRate", "achievementsUnlocked"])]; values[index] = event.target.value; return { ...previous, memberCardStats: values }; })}>{!options.some(([key]) => key === normalized) && <option value={normalized}>Ancien réglage : {normalized}</option>}{options.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>{normalized === "customAchievement" && <div className="account-admin-custom-stat"><label htmlFor={`account-admin-achievement-${index}`}>Succès personnalisé {index + 1}</label><select id={`account-admin-achievement-${index}`} value={draft.profileStats?.customAchievementIds?.[index] ?? ""} onChange={(event) => updateProfileStats((previous) => { const ids = [...(previous.customAchievementIds ?? ["", ""])]; ids[index] = event.target.value; return { ...previous, customAchievementIds: ids }; })}><option value="">Aucun succès</option>{achievements.filter((entry) => entry.unlocked || entry.id === draft.profileStats?.customAchievementIds?.[index]).map((entry) => <option key={entry.id} value={entry.id}>{entry.title}{!entry.unlocked ? " · non obtenu" : ""}</option>)}</select></div>}</Field>; })}

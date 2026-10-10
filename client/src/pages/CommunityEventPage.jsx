@@ -68,7 +68,7 @@ export function CommunityEventPage({ slug, user, setUser, onBack, onLogout }) {
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
-    const socket = io(SOCKET_URL, { path: SOCKET_PATH });
+    const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { stream: "event" } });
     const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
     let refreshTimer;
     socket.on("community-event-update", (update) => {

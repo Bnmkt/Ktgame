@@ -9,6 +9,7 @@
 .status-detection-severity.severity-outage { color: #fa9caa; }
 .status-detection-severity.severity-degraded { color: #e6bd60; }
 .status-detection-state { color: #d6cda9; font-size: 12px; white-space: nowrap; }
+.status-detection-state.is-recovered { color: #7bd7b4; }
 .status-detection-row dl { display: flex; flex-wrap: wrap; gap: 14px 32px; margin: 0 0 16px; }
 .status-detection-row dt { color: #a6b9ae; font-size: 12px; margin-bottom: 4px; }
 .status-detection-row dd { color: #f0e4c6; font-size: 13px; margin: 0; }

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { assertChatLinks } from "./chat-links.js";
 
 const channelTypes = new Set(["global", "direct", "room"]);
 const clean = (value, maximum) => String(value ?? "").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim().slice(0, maximum);
@@ -51,6 +52,7 @@ export function createChatStore({ filename }) {
         content: clean(content, 500), createdAt: iso(now)
       };
       if (!message.channelId || !message.senderId || !message.content) throw new Error("INVALID_CHAT_MESSAGE");
+      assertChatLinks(message.content);
       if (channelType === "direct") {
         const member = db.prepare("INSERT OR IGNORE INTO chat_direct_members(user_id,channel_id) VALUES(?,?)");
         for (const id of new Set([senderId, ...participantIds])) member.run(clean(id, 100), message.channelId);

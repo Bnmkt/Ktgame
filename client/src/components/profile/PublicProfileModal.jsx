@@ -93,7 +93,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
             </div>}
           </section>}
         </div>
-        <GameProgression rows={profile.gameProgression} favorites={favoriteGames} />
+        <GameProgression rows={profile.gameProgression} favorites={favoriteGames} publicView />
         <DailyActivityChart activity={profile.activity ?? []} /></div>
       </div>
     </ModalBackdrop>

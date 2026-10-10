@@ -7,6 +7,7 @@ import { blackjackDealerDisplay, blackjackTotal, yahtzeeTotal, yahtzeeUpperTotal
 import { gameModifierDefinitions, gameTitle, payoutRatesForPlayerCount, scoreCategories, yahtzeeFixedScores, yahtzeeScoreHelp } from "../../features/games/config.js";
 import { midnightContractInfo, midnightContractLabel, midnightContractTiers } from "../../features/games/midnightDice/model.js";
 import { CompactNumber, formatTime } from "../../utils/presentation.jsx";
+import { RankBadge } from "../../features/games/RankedPlay.jsx";
 
 function MidnightContractBadge({ contract }) {
   const info = midnightContractInfo[contract];
@@ -50,6 +51,7 @@ export function ScorePanel({ state, userId }) {
 
 export function WagerPanel({ room, state }) {
   if (!state) return null;
+  if (room.ranked && room.gameId !== "texas-holdem") return <section className="card"><h2>Rangs de la table</h2><table className="score-table"><thead><tr><th>Joueur</th><th>Rang</th></tr></thead><tbody>{room.ranked.roster.map((player)=><tr key={player.id}><td><DisplayName user={room.players.find((row)=>row.id===player.id) ?? player}/></td><td><RankBadge rank={room.ranked.results?.find((row)=>row.userId===player.id)?.afterRank ?? player.rank}/></td></tr>)}</tbody></table></section>;
   if (state.gameId === "texas-holdem") return <section className="card"><h2>Caves et pot</h2><p>La cave de <strong><CompactNumber value={state.buyIn ?? room.stake} label="Cave exacte" /></strong> jetons est ton tapis de départ. Tout solde restant est recrédité à la fin.</p><div className="payout-split"><span>Pot actuel <strong><CompactNumber value={state.pot} label="Pot exact" /></strong></span><span>Petite blinde <strong><CompactNumber value={state.smallBlind} /></strong></span><span>Grosse blinde <strong><CompactNumber value={state.bigBlind} /></strong></span><span>Mise max. <strong><CompactNumber value={state.maximumBet} /></strong></span></div></section>;
   const hasRoomStake = Number(room.stake) > 0;
   const isBlackjack = state.gameId === "blackjack";
@@ -82,7 +84,8 @@ export function WagerPanel({ room, state }) {
 
 export function FinishedLeaderboard({ room, state }) {
   if (!state?.finished) return null;
-  const rows = (state.ranking?.length ? state.ranking : state.players).map((p) => {
+  const participants=room.ranked ? room.ranked.roster.map((player)=>({...player,...state.players.find((row)=>row.id===player.id)})).sort((a,b)=>(room.ranked.results?.find((row)=>row.userId===a.id)?.position ?? 99)-(room.ranked.results?.find((row)=>row.userId===b.id)?.position ?? 99)) : state.ranking?.length ? state.ranking : state.players;
+  const rows = participants.map((p) => {
     const yahtzee = state.gameId === "yahtzee" ? yahtzeeTotal(state.scores[p.id]) : null;
     const fourTwentyOne = state.gameId === "421" ? state.scores?.[p.id] ?? 0 : null;
     const cul = state.gameId === "cul-de-chouette" ? state.scores[p.id] ?? 0 : null;
@@ -101,11 +104,11 @@ export function FinishedLeaderboard({ room, state }) {
     return { ...p, score, payout, winner: state.winners.includes(p.id) };
   });
   return (
-    <section className="card leaderboard">
+    <section className={`card leaderboard ${room.ranked ? "ranked-final-scores" : ""}`}>
       <h2>Leaderboard final</h2>
       <table className="score-table">
-        <thead><tr><th>#</th><th>Joueur</th><th>Score</th><th>Gain</th></tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={row.id} className={row.winner ? "winner-row" : ""}><td>{index + 1}</td><td><DisplayName user={row} /></td><td><CompactNumber value={row.score} label="Score exact" /></td><td>{row.payout ? <CompactNumber value={row.payout} label="Gain exact" /> : "-"}</td></tr>)}</tbody>
+        <thead><tr><th>#</th><th>Joueur</th><th>Score</th><th>{room.ranked?"Évolution classée":"Gain"}</th></tr></thead>
+        <tbody>{rows.map((row, index) => {const result=room.ranked?.results?.find((entry)=>entry.userId===row.id);return <tr key={row.id} className={row.winner ? "winner-row" : ""}><td>{result?.position ?? index + 1}</td><td><DisplayName user={row} /></td><td><CompactNumber value={row.score} label="Score exact" /></td><td>{room.ranked ? result ? <div className="ranked-final-evolution"><RankBadge rank={result.beforeRank}/><span>→</span><RankBadge rank={result.afterRank}/>{result.placement ? <small>{result.placement.completed ? `${result.after} Elo` : `${result.placement.games} / ${result.placement.required} placements`}</small> : result.delta!==undefined && <strong className={result.delta<0?"ranked-loss":"ranked-gain"}>{result.delta>0?"+":""}{Number(result.delta.toFixed(2))} Elo<small>{result.before} → {result.after}</small></strong>}</div> : "—" : row.payout ? <CompactNumber value={row.payout} label="Gain exact" /> : "-"}</td></tr>;})}</tbody>
       </table>
     </section>
   );
@@ -180,11 +183,11 @@ export function RoomStatusPanel({ room, state, current, userId, isOwner, onAddBo
           <strong>{room.gameId === "texas-holdem" ? room.players.filter((player) => !player.isBot).length : room.players.length}</strong>
         </div>
         <div className="stake-status-item">
-          <span>{room.gameId === "texas-holdem" ? "Cave par joueur" : "Mise par joueur"}</span>
-          <strong><CompactNumber value={room.stake} suffix=" jetons" label="Mise exacte" /></strong>
+          <span>{room.gameId === "texas-holdem" ? "Cave par joueur" : room.ranked ? "Ton rang" : "Mise par joueur"}</span>
+          <strong>{room.ranked && room.gameId!=="texas-holdem" ? <RankBadge rank={room.ranked.roster.find((player)=>player.id===userId)?.rank}/> : <CompactNumber value={room.stake} suffix=" jetons" label="Mise exacte" />}</strong>
         </div>
       </div>
-      <div className="players table-seats">{room.players.map((p) => { const readyClass = !state && !p.isBot ? (room.readyPlayerIds?.includes(p.id) ? "ready-player" : "not-ready-player") : ""; return <span key={p.id} className={`player-seat ${state?.gameId !== "bataille" && current?.id === p.id && !state?.finished ? "active-player" : ""} ${readyClass}`}><DisplayName user={p} />{p.id === room.ownerId ? <small>Maître</small> : null}{p.isBot ? <small>IA</small> : !state ? <small>{room.readyPlayerIds?.includes(p.id) ? "Prêt" : "Pas prêt"}</small> : null}{isOwner && p.id !== userId && <ConfirmActionButton className="kick-button" title="Exclure ce joueur" dialogTitle="Exclure ce joueur ?" message={`${p.pseudo} sera retiré de la table.${state && !state.finished ? " La manche est en cours : il ne pourra plus y participer." : ""}`} confirmLabel="Exclure" danger onConfirm={() => onKick(p.id)}><UserMinus size={14} /></ConfirmActionButton>}</span>; })}</div>
+      <div className="players table-seats">{room.players.map((p) => { const readyClass = !state && !p.isBot ? (room.readyPlayerIds?.includes(p.id) ? "ready-player" : "not-ready-player") : ""; return <span key={p.id} className={`player-seat ${state?.gameId !== "bataille" && current?.id === p.id && !state?.finished ? "active-player" : ""} ${readyClass}`}><DisplayName user={p} />{room.ranked && <RankBadge rank={room.ranked.roster.find((player)=>player.id===p.id)?.rank}/>} {p.id === room.ownerId ? <small>Maître</small> : null}{p.isBot ? <small>IA</small> : !state ? <small>{room.readyPlayerIds?.includes(p.id) ? "Prêt" : "Pas prêt"}</small> : null}{isOwner && p.id !== userId && <ConfirmActionButton className="kick-button" title="Exclure ce joueur" dialogTitle="Exclure ce joueur ?" message={`${p.pseudo} sera retiré de la table.${state && !state.finished ? " La manche est en cours : il ne pourra plus y participer." : ""}`} confirmLabel="Exclure" danger onConfirm={() => onKick(p.id)}><UserMinus size={14} /></ConfirmActionButton>}</span>; })}</div>
       {!state && humanCount === 1 && <div className="solo-start-notice"><Bot size={20} /><div><strong>{automaticBots ? `${automaticBots} IA ${automaticBots > 1 ? "seront ajoutées" : "sera ajoutée"} au lancement` : "Démarrage solo prêt"}</strong><small>{automaticBots ? `Ce jeu demande au moins ${room.minPlayers} participants. Tu es automatiquement prêt; la table complétera les places manquantes.` : "Tu es automatiquement prêt tant qu'aucun autre joueur réel ne rejoint la table."}</small></div></div>}
       {!state && <div className="waiting-room-actions"><div className="actions"><button className={room.readyPlayerIds?.includes(userId) ? "secondary" : ""} onClick={onReady}><BadgeCheck size={18} /> {room.readyPlayerIds?.includes(userId) ? "Annuler prêt" : "Je suis prêt"}</button><button className="secondary room-settings-trigger" onClick={onSettings}><Settings size={18} /> Paramètres de la table</button>{isOwner && <button className="secondary" onClick={onAddBot}><Bot size={18} /> Ajouter une IA</button>}</div>{isOwner && <div className={`table-launch-zone ${canOwnerStart ? "launch-ready" : "launch-blocked"}`}><div><strong>{canOwnerStart ? "La table peut démarrer" : "Des joueurs ne sont pas prêts"}</strong><small>{canOwnerStart ? (room.readyPlayerIds?.includes(userId) ? "Tous les joueurs sont prêts." : "En lançant, tu seras considéré comme prêt automatiquement.") : `En attente de ${waitingOtherHumans.map((player) => player.pseudo).join(", ")}.`}</small></div><button className="launch-game-button" disabled={!canOwnerStart} onClick={onStart}><Play size={19} /> Démarrer la partie</button></div>}</div>}
       {!state && !isOwner && <p className="muted-line">En attente du maître de table.</p>}

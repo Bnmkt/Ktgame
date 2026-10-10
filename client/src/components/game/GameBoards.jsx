@@ -176,11 +176,13 @@ export function BattleBoard({ state, user, onDraw, onPlace }) {
 }
 
 function MidnightContractCatalog({ state, contracts, tierEntries, usedContracts, selecting, onAction }) {
-  return <section className="midnight-codex-panel" aria-label={selecting ? "Choisir un mandat" : "Codex des mandats"}>
+  const visibleEntries=Object.entries(midnightContractInfo).filter(([id])=>!selecting || contracts.some(([offered])=>offered===id) && (!state.modifiers.uniqueContracts || usedContracts.length>=contracts.length || !usedContracts.includes(id)));
+  const visibleTiers=tierEntries.filter(([tierId])=>visibleEntries.some(([,info])=>info.tier===tierId));
+  return <section className={`midnight-codex-panel ${selecting ? "midnight-selection" : ""}`} aria-label={selecting ? "Choisir un mandat" : "Codex des mandats"}>
     <header className="midnight-codex-heading"><div><span className="eyebrow">{selecting ? "Sélection secrète" : "Archives de la table"}</span><p>Chaque lancer rapporte sa somme. Réussir le mandat ajoute la prime de son palier.</p></div></header>
-    <div className="midnight-tier-legend">{tierEntries.map(([id, tier]) => <span className={`tier-${id}`} style={{ "--contract-accent": tier.accent }} key={id}><i /><strong>{tier.label}</strong><small>+{tier.bonus} pts</small></span>)}</div>
-    <div className="midnight-codex-groups">{tierEntries.map(([tierId, tier]) => {
-      const entries = Object.entries(midnightContractInfo).filter(([, info]) => info.tier === tierId);
+    {!selecting && <div className="midnight-tier-legend">{visibleTiers.map(([id, tier]) => <span className={`tier-${id}`} style={{ "--contract-accent": tier.accent }} key={id}><i /><strong>{tier.label}</strong><small>+{tier.bonus} pts</small></span>)}</div>}
+    <div className="midnight-codex-groups">{visibleTiers.map(([tierId, tier]) => {
+      const entries = visibleEntries.filter(([, info]) => info.tier === tierId);
       if (!entries.length) return null;
       return <section style={{ "--contract-accent": tier.accent }} key={tierId}><header><span className="midnight-tier-badge">{tier.label}</span><strong>Prime +{tier.bonus}</strong><small>{entries.length} mandat{entries.length > 1 ? "s" : ""}</small></header><div>{entries.map(([id, info]) => {
         const example = midnightContractEvaluation(id, info.example);
@@ -188,7 +190,7 @@ function MidnightContractCatalog({ state, contracts, tierEntries, usedContracts,
         const used = usedContracts.includes(id);
         const unavailable = state.modifiers.uniqueContracts && usedContracts.length < contracts.length && used;
         const selectable = selecting && offered && !unavailable;
-        return <article className={`${offered ? "offered" : ""} ${unavailable ? "used" : ""}`} key={id}><div><strong>{info.label}</strong><small>{info.hint}</small></div><div className="midnight-codex-example">{info.example.map((value, index) => <Die value={value} kept={false} animate={false} skin="default" key={`${id}-${index}`} />)}</div><footer><span>{offered ? unavailable ? "Rotation actuelle · utilisé" : "Disponible maintenant" : "Hors rotation"}</span><b>{example.base} + {tier.bonus} = {example.points} pts</b>{selectable && <button type="button" onClick={() => onAction({ type: "choose-contract", contract: id })}>Choisir</button>}</footer></article>;
+        return <article className={`${offered ? "offered" : ""} ${unavailable ? "used" : ""}`} style={{"--contract-accent":tier.accent}} key={id}><div>{selecting && <span className="midnight-tier-badge">{tier.label}</span>}<strong>{info.label}</strong><small>{info.hint}</small></div><div className="midnight-codex-example">{info.example.map((value, index) => <Die value={value} kept={false} animate={false} skin="default" key={`${id}-${index}`} />)}</div><footer><span>{offered ? unavailable ? "Rotation actuelle · utilisé" : "Disponible maintenant" : "Hors rotation"}</span><b>{example.base} + {tier.bonus} = {example.points} pts</b>{selectable && <button type="button" onClick={() => onAction({ type: "choose-contract", contract: id })}>Choisir</button>}</footer></article>;
       })}</div></section>;
     })}</div>
   </section>;

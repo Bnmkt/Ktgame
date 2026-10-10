@@ -7,11 +7,11 @@ import { JoinRoomDialog } from "./JoinRoomDialog.jsx";
 import { CompactNumber } from "../../utils/presentation.jsx";
 import { defaultPublicSettings } from "../../config/site.js";
 import "./game-rooms.css";
-import { RankedQueue, rankedGames } from "../../features/games/RankedPlay.jsx";
+import { RankBadge, RankedQueue, rankedGames } from "../../features/games/RankedPlay.jsx";
 
-export function GameRoomsModal({ game, rooms, user, initialTab = "create", stake, setStake, isPublic, setIsPublic, roomName, setRoomName, roomPassword, setRoomPassword, onCreate, onOpenRoom, onEnterRoom, onRules, onClose, canJoin = true, settings = defaultPublicSettings, error = "", busy = false }) {
+export function GameRoomsModal({ game, rooms, user, initialTab = "create", initialMode = "classic", stake, setStake, isPublic, setIsPublic, roomName, setRoomName, roomPassword, setRoomPassword, onCreate, onOpenRoom, onEnterRoom, onRules, onClose, canJoin = true, settings = defaultPublicSettings, error = "", busy = false }) {
   const [tab, setTab] = useState(canJoin ? initialTab : "create");
-  const [mode,setMode]=useState("classic");
+  const [mode,setMode]=useState(rankedGames.includes(game.id) ? initialMode : "classic");
   const [joinCode, setJoinCode] = useState(null);
   const [protectedTable, setProtectedTable] = useState(false);
   const [titleEditable, setTitleEditable] = useState(false);
@@ -22,13 +22,13 @@ export function GameRoomsModal({ game, rooms, user, initialTab = "create", stake
   const id = useId().replaceAll(":", "");
   const minimumStake = Math.max(game.id === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(game.entryPot) || 0);
   const actualStake = Math.max(stake, minimumStake);
-  const filteredRooms = rooms.filter((room) => room.gameId === game.id && room.isPublic !== false && !room.finished);
+  const filteredRooms = rooms.filter((room) => room.gameId === game.id && room.isPublic !== false && !room.finished && !room.ranked);
   const displayName = user.profile?.displayName || user.pseudo;
   const defaultName = displayName.includes("@") ? game.name : `${game.name} de ${displayName}`;
   const insufficientTokens = actualStake > (Number(user.tokens) || 0);
-  return <Dialog title={game.name} className="game-table-dialog" onClose={onClose} dismissible={!busy}>
+  return <Dialog title={game.name} hideTitle={mode==="ranked"} className="game-table-dialog" onClose={onClose} dismissible={!busy}>
     {rankedGames.includes(game.id) && <div className="ranked-mode-tabs" role="group" aria-label="Mode de jeu"><button type="button" className={mode==="classic"?"active":"secondary"} aria-pressed={mode==="classic"} onClick={()=>setMode("classic")}>Classique</button><button type="button" className={mode==="ranked"?"active":"secondary"} aria-pressed={mode==="ranked"} onClick={()=>setMode("ranked")}>Classé</button></div>}
-    {mode==="ranked" ? <RankedQueue game={game} user={user}/> : <>
+    {mode==="ranked" ? <RankedQueue game={game} user={user} onQueued={onClose}/> : <>
     <div className="game-table-toolbar">
       <div className="game-table-tabs" role="tablist" aria-label="Accéder à une table">
         {canJoin && <button type="button" role="tab" disabled={busy} id={`${id}-browse-tab`} aria-selected={tab === "browse"} aria-controls={`${id}-browse`} className={tab === "browse" ? "active" : ""} onClick={() => setTab("browse")}><DoorOpen size={18} />Tables publiques <span>{filteredRooms.length}</span></button>}
@@ -45,7 +45,7 @@ export function GameRoomsModal({ game, rooms, user, initialTab = "create", stake
         return <article className="game-table-entry" key={room.id}>
           <div className="game-table-entry-title"><strong>{room.name}</strong><small>{room.inProgress ? "En cours" : "En attente"} · Code {room.code} · Niv. {room.minLevel ?? 1}{room.maxLevel ? ` à ${room.maxLevel}` : "+"}{room.hasPassword && <><LockKeyhole size={13} />Protégée</>}</small></div>
           <span className="game-table-occupancy"><Users size={16} />{room.players.length}/{game.maxPlayers}</span>
-          <span className="game-table-stake"><CompactNumber value={room.stake} suffix=" jetons" label="Mise exacte" /></span>
+          <span className="game-table-stake">{room.ranked && room.gameId!=="texas-holdem" ? <RankBadge rank={room.ranked.roster?.find((player)=>player.rank)?.rank}/> : <CompactNumber value={room.stake} suffix=" jetons" label="Mise exacte" />}</span>
           <button type="button" title={outsideLevels ? `Ton niveau dans ce jeu : ${playerLevel}` : undefined} disabled={full && !seated || outsideLevels} onClick={() => onEnterRoom(room.code)}>{room.inProgress ? <Eye size={17} /> : <DoorOpen size={17} />}{seated ? "Retrouver ma table" : outsideLevels ? "Niveau requis" : full ? "Complète" : "Rejoindre"}</button>
         </article>;
       })}</div> : <div className="game-table-empty"><Users size={30} /><h3>Aucune table publique pour le moment</h3><button type="button" onClick={() => setTab("create")}><Plus size={17} />Créer une table</button></div>}

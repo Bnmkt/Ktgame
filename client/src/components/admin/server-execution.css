@@ -1,0 +1,29 @@
+.health-execution { display: grid; gap: 18px; min-width: 0; }
+.health-execution > .metrics-section-heading { margin-bottom: 0; flex-wrap: wrap; }
+.health-execution h3 { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.health-execution .health-kpi { border-radius: 8px; }
+.health-execution .health-kpi strong { font-size: 24px; white-space: normal; overflow-wrap: anywhere; }
+.health-execution-page .health-heading h2 { font-size: 28px; }
+.health-execution-details { align-items: start; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.health-execution-details > section { min-width: 0; }
+.health-execution-details .metrics-section-heading { flex-wrap: wrap; }
+.health-execution-details .health-detail-list dd { white-space: normal; overflow-wrap: anywhere; }
+.health-execution-details .health-detail-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.health-cache-table { min-width: 680px; }
+.health-cache-table th { color: #ffe28a; text-align: left; }
+.health-cache-table td { color: #e9e5d8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.health-cache-table tbody th { max-width: 150px; color: #e9e5d8; font-size: 13px; }
+.health-execution-alert { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: #241f14; border-left: 3px solid #f0bd48; color: #ffe28a; }
+.health-execution-alert svg { flex-shrink: 0; }
+.health-execution-alert div { display: grid; gap: 5px; min-width: 0; }
+.health-execution-alert span { color: #e2d8bf; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .health-execution-details .health-detail-list { grid-template-columns: minmax(0, 1fr); } }
+.health-service-choice { display: flex; align-items: center; gap: 10px; max-width: 100%; }
+.health-service-choice select { width: 230px; max-width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #6c6040; border-radius: 6px; background: #10191b; color: #f7e9c7; font: inherit; }
+.health-service-table { min-width: 1080px; }
+.health-processes { min-width: 0; }
+.health-processes table { min-width: 690px; }
+.health-processes th small { display: block; margin-top: 4px; color: #b9bba9; font-weight: 400; }
+@media (max-width: 640px) {
+  .health-service-choice { flex-wrap: wrap; }
+}
