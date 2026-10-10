@@ -4,11 +4,13 @@
 .game-artwork-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, #08100d55, #08100de8 75%); }
 .game-card > .game-artwork-backdrop ~ * { position: relative; z-index: 1; }
 .game-card > .game-artwork-backdrop ~ .player-badge { position: absolute; }
-.game-grid.game-grid-featured { grid-template-columns: minmax(0, 1fr); }
-.game-grid-featured .game-card { min-height: 280px; }
+.game-grid.game-grid-featured { grid-template-columns: minmax(0, 1fr); max-width: 1040px; margin-inline: auto; }
+.game-grid-featured .game-card { min-height: 320px; padding: 28px; justify-items: center; text-align: center; }
 .game-grid-featured .game-card h3 { font-size: 28px; }
-.game-grid-featured .game-card p { max-width: 680px; }
-.game-grid-featured .game-table-actions { max-width: 640px; }
+.game-grid-featured .game-card p { max-width: 680px; margin: 0; }
+.game-grid-featured .game-table-actions { max-width: 640px; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)) 40px; }
+.game-grid-featured .game-table-actions > button:first-child { grid-column: auto; }
+.game-grid-featured .card-meta { gap: 20px; justify-content: center; }
 .game-card > .game-artwork-media { aspect-ratio: 16 / 7; border-radius: 4px; }
 .game-catalog-toggle { white-space: nowrap; }
 .game-media-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -21,5 +23,7 @@
 @media (max-width: 700px) {
   .game-media-fields { grid-template-columns: minmax(0, 1fr); }
   .game-grid-featured .game-card h3 { font-size: 24px; }
+  .game-grid-featured .game-table-actions { grid-template-columns: minmax(0, 1fr) 40px; }
+  .game-grid-featured .game-table-actions > button:first-child { grid-column: 1 / -1; }
   .game-catalog-toggle { white-space: normal; }
 }

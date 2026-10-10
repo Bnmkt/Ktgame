@@ -6,11 +6,17 @@
 .public-games-heading a, .public-game-action, .public-game-bottom a { display: inline-flex; align-items: center; gap: 8px; color: #e6c56c; text-decoration: none; }
 .public-games-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .public-games-grid.public-games-featured { grid-template-columns: minmax(0, 1fr); }
-.public-games-featured .public-game-entry { max-width: 620px; }
-.public-games-featured .public-game-spotlight { max-width: none; min-height: 300px; position: relative; justify-content: end; }
-.public-game-spotlight > div { position: relative; z-index: 1; max-width: 700px; }
-.public-game-spotlight h3 { font-size: 28px; }
-.public-game-spotlight p { color: #f2e8d4; }
+.public-games-featured { justify-items: center; }
+.public-games-featured .public-game-entry { width: 100%; max-width: 1040px; min-height: 300px; text-align: center; position: relative; }
+.public-games-featured .public-game-spotlight { min-height: 340px; justify-content: center; }
+.public-games-featured .public-game-featured > div:last-child { position: relative; z-index: 1; width: 100%; max-width: 720px; margin-inline: auto; padding: 28px; }
+.public-games-featured .public-game-featured h3 { font-size: 30px; }
+.public-game-featured .public-game-type { justify-content: center; }
+.public-game-featured > .public-game-pieces { min-height: 90px; background: #192b24; }
+.public-game-featured-actions { display: flex; justify-content: center; align-items: center; gap: 24px; flex-wrap: wrap; }
+.public-game-featured-actions .public-game-play { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 140px; padding: 12px 22px; color: #171407; background: #d3a631; border: 1px solid #f1d27d; border-radius: 6px; text-decoration: none; font-weight: 700; }
+.public-game-play:hover { background: #e5bd52; }
+.public-games-featured .public-game-spotlight p { color: #f2e8d4; }
 .public-games-heading > .game-catalog-toggle { padding: 10px 14px; border: 1px solid #57523b; border-radius: 6px; }
 .public-game-intro > .game-artwork-media { aspect-ratio: 12 / 11; border-radius: 6px; }
 .public-game-entry { display: flex; flex-direction: column; overflow: hidden; border: 1px solid #41463c; border-radius: 8px; color: #f7efd9; background: #111b19; text-decoration: none; }

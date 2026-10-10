@@ -15,9 +15,12 @@ export function PublicGamesOverview({ games = [], siteName = "KTGA.ME", compact 
   const entries = compact ? (selected ? [selected] : []) : games.filter((game) => game.enabled !== false);
   return <section className={`public-games-overview ${compact ? "app-shell" : ""}`}>
     <header className="public-games-heading"><div><h2>{compact ? "À l’affiche" : "Choisir un jeu"}</h2><p>Cartes, dés et parties entre amis. Gratuit, avec des jetons exclusivement virtuels.</p></div>{compact ? <a className="secondary game-catalog-toggle" href={appPath("games")}>Tous les jeux<ArrowRight size={18} /></a> : <a href={appPath("guide")}><BookOpen size={18} />Guide du joueur</a>}</header>
-    <div className={`public-games-grid ${compact ? "public-games-featured" : ""}`}>{entries.map((game) => <a className={`public-game-entry ${compact && gameImageUrl(game.coverImage) ? "public-game-spotlight" : ""}`} key={game.id} href={appPath("games", game.id)}>
-      {compact && gameImageUrl(game.coverImage) ? <GameArtwork source={game.coverImage} backdrop eager fallback={<GameVisual game={{ ...game, coverImage: "" }} />} /> : <GameVisual game={game} />}<div><span className="public-game-type">{game.type === "dice" ? <Dice5 size={15} /> : <Spade size={15} />}{game.type === "dice" ? "Dés" : "Cartes"}<Users size={15} />{game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`} joueurs</span><h3>{game.name}</h3><p>{game.description || gameRules[game.id]?.goal}</p><span className="public-game-action">Découvrir les règles<ArrowRight size={17} /></span></div>
-    </a>)}</div>
+    <div className={`public-games-grid ${compact ? "public-games-featured" : ""}`}>{entries.map((game) => {
+      const Entry = compact ? "article" : "a";
+      return <Entry className={`public-game-entry ${compact ? "public-game-featured" : ""} ${compact && gameImageUrl(game.coverImage) ? "public-game-spotlight" : ""}`} key={game.id} {...(!compact ? { href: appPath("games", game.id) } : {})}>
+        {compact && gameImageUrl(game.coverImage) ? <GameArtwork source={game.coverImage} backdrop eager fallback={<GameVisual game={{ ...game, coverImage: "" }} />} /> : <GameVisual game={game} />}<div><span className="public-game-type">{game.type === "dice" ? <Dice5 size={15} /> : <Spade size={15} />}{game.type === "dice" ? "Dés" : "Cartes"}<Users size={15} />{game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`} joueurs</span><h3>{game.name}</h3><p>{game.description || gameRules[game.id]?.goal}</p>{compact ? <div className="public-game-featured-actions"><a className="public-game-play" href={`${appPath("lobby")}#connexion`}>Jouer<ArrowRight size={18} /></a><a className="public-game-action" href={appPath("games", game.id)}><BookOpen size={17} />Les règles</a></div> : <span className="public-game-action">Découvrir les règles<ArrowRight size={17} /></span>}</div>
+      </Entry>;
+    })}</div>
   </section>;
 }
 

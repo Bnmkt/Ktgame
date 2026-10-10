@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const dependencies = path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
 const { chromium } = await import(pathToFileURL(path.join(dependencies, "playwright/index.mjs")));
 const { PlaywrightBlocker } = await import(pathToFileURL(path.join(dependencies, "@ghostery/adblocker-playwright/dist/esm/index.js")));
-const directory = path.join(root, "docs/previews/game-presentation-20261010");
+const directory = path.join(root, "docs/previews/game-images-20261010");
 fs.mkdirSync(directory, { recursive: true });
 const app = express();
 app.use(express.static(path.join(root, "client/dist"), { index: false }));
@@ -35,10 +35,22 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
   const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
   await blocker.enableBlockingInPage(page);
   let user = logged ? { id: "player", pseudo: "Bnmkt", admin, tokens: 1000, profile: { favoriteGames: ["421"] }, cosmetics: { equipped: {} } } : null;
-  const requests = [];
+  const requests = [], uploads = [];
   await page.route("**/api/**", (route) => {
     const key = new URL(route.request().url()).pathname;
     requests.push(`${route.request().method()} ${key}`);
+    const imageHeaders = { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true" };
+    if (/\/api\/admin\/games\/yahtzee\/images\/(coverImage|descriptiveImage)$/.test(key)) {
+      const bytes = route.request().postDataBuffer();
+      const field = key.split("/").at(-1);
+      assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+      const expected = field === "coverImage" ? [1280, 560] : [960, 720];
+      assert.deepEqual([bytes.readUInt32BE(16), bytes.readUInt32BE(20)], expected);
+      uploads.push({ field, bytes });
+      fs.writeFileSync(path.join(directory, `crop-${viewport.width}-${field}.png`), bytes);
+      return route.fulfill({ contentType: "application/json", headers: imageHeaders, body: JSON.stringify({ image: `/api/game-images/${field}.png`, width: expected[0], height: expected[1] }) });
+    }
+    if (key.startsWith("/api/game-images/")) return route.fulfill({ contentType: "image/png", headers: imageHeaders, body: uploads.at(-1)?.bytes ?? fs.readFileSync(path.join(root, "client/public/ktga-preview.png")) });
     let status = 200, data = [];
     if (key === "/api/config") data = { siteName: "KTGA.ME", featuredGameId: "yahtzee", guestAccessEnabled: guests };
     else if (key === "/api/games") data = coverImage === undefined ? games : games.map((game) => ({ ...game, coverImage }));
@@ -55,7 +67,7 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
     return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data), headers: { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true" } });
   });
   await page.route(/https:\/\/[^/]*(googletagmanager\.com|google-analytics\.com)\//, (route) => route.fulfill({ contentType: "text/javascript", body: "" }));
-  return { page, context, requests };
+  return { page, context, requests, uploads };
 }
 try {
   browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -65,9 +77,15 @@ try {
     await page.locator(".public-game-spotlight").waitFor();
     assert.equal(await page.locator(".public-game-entry").count(), 1);
     await page.waitForFunction(() => document.querySelector(".game-artwork-backdrop img")?.naturalWidth > 0);
+    const featured = await page.locator(".public-game-featured").boundingBox();
+    const grid = await page.locator(".public-games-featured").boundingBox();
+    assert.ok(Math.abs(featured.x + featured.width / 2 - grid.x - grid.width / 2) < 2, "Featured game stays centered within the page content");
+    if (name === "desktop") assert.ok(featured.width > featured.height * 2, "Featured game uses a horizontal format");
+    await page.getByRole("link", { name: "Jouer", exact: true }).waitFor();
     await page.screenshot({ path: path.join(directory, `${name}-home.png`), fullPage: true });
     await page.getByRole("link", { name: "Tous les jeux", exact: true }).click();
     await page.getByRole("heading", { name: "Choisir un jeu", exact: true }).waitFor();
+    await page.waitForFunction(() => document.querySelectorAll(".public-game-entry").length === 2);
     assert.equal(await page.locator(".public-game-entry").count(), 2);
     assert.equal(await page.locator(".public-game-entry .game-artwork-media img").count(), 1);
     assert.equal(await page.locator(".public-game-entry .public-game-pieces").count(), 1);
@@ -117,7 +135,7 @@ try {
     await context.close();
   }
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }]]) {
-    const { page, context } = await setup(viewport, { logged: true, admin: true });
+    const { page, context, uploads } = await setup(viewport, { logged: true, admin: true });
     await page.goto(`${origin}/admin`);
     const section = async (value, title) => {
       if (name === "mobile") await page.locator(".admin-mobile-nav select").selectOption(value);
@@ -129,11 +147,41 @@ try {
     await page.screenshot({ path: path.join(directory, `${name}-settings.png`), fullPage: true });
     await section("games", "Jeux");
     await page.getByRole("row").filter({ hasText: "yahtzee" }).getByRole("button", { name: "Modifier", exact: true }).click();
-    await page.locator(".game-media-fields").getByRole("textbox", { name: /Image descriptive/ }).fill("/ktga-preview.png");
-    await page.locator(".game-media-fields").getByRole("textbox", { name: /Bannière/ }).fill("/ktga-preview.png");
+    for (const label of ["Image descriptive", "Bannière"]) {
+      await page.locator(".game-media-field").filter({ has: page.locator("strong", { hasText: label }) }).getByRole("button", { name: "Modifier / recadrer", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: `${label} · Yahtzee`, exact: true });
+      await dialog.getByLabel("Importer une image du jeu").setInputFiles({ name: "invalid.txt", mimeType: "text/plain", buffer: Buffer.from("invalid") });
+      await dialog.getByRole("alert").waitFor();
+      await dialog.getByLabel("Importer une image du jeu").setInputFiles(path.join(root, "client/public/ktga-preview.png"));
+      await dialog.getByRole("button", { name: "Appliquer le recadrage" }).waitFor({ state: "visible" });
+      await page.waitForFunction(() => !document.querySelector('.game-art-actions button:last-child')?.disabled);
+      await dialog.getByRole("slider", { name: "Zoom du recadrage" }).fill("2");
+      const crop = await dialog.getByRole("group", { name: "Zone de recadrage" }).boundingBox();
+      await page.mouse.move(crop.x + crop.width / 2, crop.y + crop.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(crop.x + crop.width / 2 + 30, crop.y + crop.height / 2 + 20, { steps: 4 });
+      await page.mouse.up();
+      const before = uploads.length;
+      const box = await dialog.boundingBox();
+      await page.mouse.move(box.x + 10, box.y + 10);
+      await page.mouse.down(); await page.mouse.move(2, 2, { steps: 4 }); await page.mouse.up();
+      assert.equal(await dialog.count(), 1, "Dragging from the modal onto its overlay must not close it");
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+      await page.screenshot({ path: path.join(directory, `${name}-${label === "Bannière" ? "cover" : "description"}-crop.png`) });
+      await dialog.getByRole("button", { name: "Appliquer le recadrage" }).click();
+      await dialog.waitFor({ state: "hidden" });
+      assert.equal(uploads.length, before + 1);
+    }
     await page.locator(".game-media-fields").scrollIntoViewIfNeeded();
     assert.equal(await page.locator(".game-media-fields .game-artwork-media img").count(), 2);
     await page.screenshot({ path: path.join(directory, `${name}-game-editor.png`) });
+    await page.locator(".game-media-field").filter({ has: page.locator("strong", { hasText: "Bannière" }) }).getByRole("button", { name: "Modifier / recadrer", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Bannière · Yahtzee", exact: true });
+    const before = uploads.length;
+    await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    assert.equal(uploads.length, before, "Cancel must not upload or replace the selected image");
+    checks.push(`${name}: image modal, import, validation, drag, zoom, PNG output, cancellation and overlay guard`);
     await context.close();
   }
   assert.deepEqual(errors, []);
