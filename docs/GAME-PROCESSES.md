@@ -8,8 +8,9 @@ Le mode historique reste disponible et est le defaut tant que les tests de
 capacite et d'endurance sur le VPS cible ne sont pas satisfaisants.
 Ce document ne constitue pas une certification de 1 000 ou 20 000 joueurs.
 Les essais du 10 octobre n'ont pas valide 1 000 joueurs actifs ; ne pas activer
-ce mode en production pour ce seul objectif. Aucun redemarrage, changement de
-configuration ou deploiement de cette evolution n'a ete effectue en production.
+ce mode en production pour ce seul objectif. A la demande explicite de
+l'exploitant, cette version a ensuite ete deployee le 10 octobre 2026 avec un
+seul Game Worker. Cette activation ne requalifie pas les resultats de capacite.
 
 ## Analyse des chemins critiques
 
@@ -177,6 +178,22 @@ ses enfants. Ne pas lancer un deuxieme Gateway sur la meme base SQLite.
 Pour revenir au comportement precedent : `GAME_WORKERS_ENABLED=0`, puis
 redemarrage coordonne sans partie en cours. Le champ interne `gameWorker`
 reste un checkpoint compatible et n'est jamais expose dans les vues joueur.
+
+Le script `deploy/debian/update-capacity.sh RELEASE --enable-game-workers`
+active exactement un worker, sauvegarde aussi `server.env` et restaure code,
+frontend et configuration si le demarrage echoue. Il conserve les autres
+parametres/secrets et ne reconfigure pas Nginx dans ce mode. Une table ouverte
+bloque toujours le deploiement. Les anciennes ressources frontend restent
+disponibles pour les onglets deja ouverts.
+
+Activation verifiee le 10 octobre a 11:56 UTC : Gateway PID 36888, Game Worker
+PID 36900, aucun processus Comptes active et aucun redemarrage automatique.
+Les onze bases metier passent les controles d'integrite avant/apres, le secret
+MFA existant reste lisible et les comptes, historiques et transactions sont
+conserves. API, pages publiques, assets et handshake WebSocket HTTPS verifies.
+43 tests cibles passent egalement sur Debian avec des donnees fictives avant
+activation. Aucun test de charge n'a ete lance sur les comptes de production.
+Sauvegarde privee : `/var/backups/ktga/capacity-20261010T115614Z-36379`.
 
 ## Telemetrie
 

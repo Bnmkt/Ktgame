@@ -550,6 +550,8 @@ mesure inclut le traitement IPC, pas seulement le transfert d'un message.
 Essais VPS du 10 octobre : 500 joueurs historiques passent (HTTP P95 485 ms),
 mais sans marge CPU sur le Gateway. Le dernier essai multiprocessus a 1000
 echoue (1194 erreurs, HTTP P95 8005 ms, arret de securite). Tous les audits
-financiers passent. Le mode reste desactive par defaut et non deploye. Les
+financiers passent. Le mode reste desactive par defaut dans les exemples ; il a
+ete active en production ensuite, sur demande explicite, avec un seul worker.
+Cette activation ne constitue pas une validation du palier 1000. Les
 chiffres complets, fichiers, limites et etapes suivantes sont dans
 [GAME-PROCESSES.md](GAME-PROCESSES.md).
