@@ -6,7 +6,7 @@
 .game-card > .game-artwork-backdrop ~ .player-badge { position: absolute; }
 .game-grid.game-grid-featured { grid-template-columns: minmax(0, 1fr); max-width: 1040px; margin-inline: auto; }
 .game-grid-featured .game-card { min-height: 320px; padding: 28px; justify-items: center; text-align: center; }
-.game-grid-featured .game-card h3 { font-size: 28px; }
+.game-grid-featured .game-card h3 { font-size: 28px; color: #edcb76; }
 .game-grid-featured .game-card p { max-width: 680px; margin: 0; }
 .game-grid-featured .game-table-actions { max-width: 640px; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)) 40px; }
 .game-grid-featured .game-table-actions > button:first-child { grid-column: auto; }

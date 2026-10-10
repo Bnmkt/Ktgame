@@ -96,7 +96,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
           }} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
             <img src={source.url} alt="Image à recadrer" draggable={false} style={imageStyle} />
           </div>
-          <label className="game-art-zoom">Zoom <output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={1} max={5} step={0.01} value={bounds.zoom} aria-label="Zoom du recadrage" disabled={busy || loading} onChange={(event) => update({ ...bounds, zoom: Number(event.target.value) })} /></label>
+          <label className="game-art-zoom">Zoom <output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.5} max={5} step={0.01} value={bounds.zoom} aria-label="Zoom du recadrage" disabled={busy || loading} onChange={(event) => update({ ...bounds, zoom: Number(event.target.value) })} /></label>
           <button type="button" className="secondary" disabled={busy || loading} onClick={() => setCrop(centered)}><RotateCcw size={17} />Réinitialiser le cadrage</button>
         </div>
         <aside className="game-art-preview"><span className="eyebrow">Aperçu</span><div style={{ aspectRatio: `${format.width} / ${format.height}` }}><img src={source.url} alt="Aperçu du recadrage" style={imageStyle} /></div><strong>{gameName}</strong></aside>

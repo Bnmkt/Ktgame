@@ -9,7 +9,7 @@ test("game images use distinct landscape formats", () => {
 
 test("crop fits portrait and landscape sources without empty margins", () => {
   for (const [width, height] of [[400, 1200], [1600, 900], [1280, 560]]) {
-    for (const zoom of [-1, 1, 2, 5, 10]) {
+    for (const zoom of [1, 2, 5, 10]) {
       for (const x of [-5, 0.5, 5]) {
         const crop = artworkCropBounds(width, height, { zoom, x, y: x });
         assert.ok(crop.left >= -1e-8 && crop.top >= -1e-8);
@@ -19,6 +19,22 @@ test("crop fits portrait and landscape sources without empty margins", () => {
         assert.ok(Math.abs(crop.width / crop.height - 16 / 7) < 1e-8);
       }
     }
+  }
+});
+
+test("0.5x zoom shows the full source and allows movement inside the larger frame", () => {
+  const original = artworkCropBounds(1280, 560);
+  const smaller = artworkCropBounds(1280, 560, { zoom: 0.5 });
+  assert.equal(smaller.zoom, 0.5);
+  assert.equal(smaller.width, original.width * 2);
+  assert.equal(smaller.height, original.height * 2);
+  assert.equal(smaller.left, -640);
+  assert.equal(smaller.top, -280);
+  for (const x of [-5, 0.5, 5]) {
+    const moved = artworkCropBounds(1280, 560, { zoom: -1, x, y: x });
+    assert.equal(moved.zoom, 0.5);
+    assert.ok(moved.left <= 0 && moved.top <= 0);
+    assert.ok(moved.left + moved.width >= 1280 && moved.top + moved.height >= 560);
   }
 });
 

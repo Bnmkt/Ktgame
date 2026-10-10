@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const dependencies = path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
 const { chromium } = await import(pathToFileURL(path.join(dependencies, "playwright/index.mjs")));
 const { PlaywrightBlocker } = await import(pathToFileURL(path.join(dependencies, "@ghostery/adblocker-playwright/dist/esm/index.js")));
-const directory = path.join(root, "docs/previews/game-images-20261010");
+const directory = path.join(root, "docs/previews/game-featured-20261010");
 fs.mkdirSync(directory, { recursive: true });
 const app = express();
 app.use(express.static(path.join(root, "client/dist"), { index: false }));
@@ -24,7 +24,7 @@ const games = [
   { id: "421", name: "421", type: "dice", minPlayers: 2, maxPlayers: 6, description: "La meilleure combinaison remporte la manche.", audience: "multi", category: "score", complexity: "easy" }
 ];
 let browser; const errors = [], checks = [];
-async function setup(viewport, { logged = false, admin = false, guests = true, ranked = false, closed = false, coverImage } = {}) {
+async function setup(viewport, { logged = false, admin = false, guests = true, ranked = false, closed = false, coverImage, descriptiveImage } = {}) {
   const context = await browser.newContext({ viewport });
   await context.addInitScript((version) => {
     localStorage.setItem("ktga-privacy-choice", JSON.stringify({ version, chosenAt: Date.now(), enabled: false }));
@@ -53,7 +53,7 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
     if (key.startsWith("/api/game-images/")) return route.fulfill({ contentType: "image/png", headers: imageHeaders, body: uploads.at(-1)?.bytes ?? fs.readFileSync(path.join(root, "client/public/ktga-preview.png")) });
     let status = 200, data = [];
     if (key === "/api/config") data = { siteName: "KTGA.ME", featuredGameId: "yahtzee", guestAccessEnabled: guests };
-    else if (key === "/api/games") data = coverImage === undefined ? games : games.map((game) => ({ ...game, coverImage }));
+    else if (key === "/api/games") data = games.map((game) => ({ ...game, ...(coverImage === undefined ? {} : { coverImage }), ...(descriptiveImage === undefined ? {} : { descriptiveImage }) }));
     else if (key === "/api/admin") data = { users: [], games, shop: [], achievements: [], pricing: {}, permissions: {}, overview: {}, settings: { ...defaultPublicSettings, featuredGameId: "yahtzee" } };
     else if (key === "/api/me") { status = user ? 200 : 401; data = user ?? { error: "Anonymous" }; }
     else if (key === "/api/table-entry/ABC123") { status = closed ? 404 : 200; data = closed ? { error: "Cette partie est terminée." } : { code: "ABC123", hostName: "Bnmkt", requiresPassword: true, ranked }; }
@@ -82,6 +82,14 @@ try {
     assert.ok(Math.abs(featured.x + featured.width / 2 - grid.x - grid.width / 2) < 2, "Featured game stays centered within the page content");
     if (name === "desktop") assert.ok(featured.width > featured.height * 2, "Featured game uses a horizontal format");
     await page.getByRole("link", { name: "Jouer", exact: true }).waitFor();
+    assert.equal(await page.locator(".public-game-featured .public-game-pieces, .public-game-featured .die, .public-game-featured .playing-card").count(), 0);
+    const heading = await page.locator(".public-game-featured h3").boundingBox();
+    assert.ok(Math.abs(heading.x + heading.width / 2 - featured.x - featured.width / 2) < 2, "Featured title is centered independently of the metadata");
+    assert.equal(await page.locator(".public-game-featured h3").evaluate((node) => getComputedStyle(node).color), "rgb(237, 203, 118)");
+    if (name === "desktop") {
+      const details = await page.locator(".public-game-featured .public-game-type").boundingBox();
+      assert.ok(details.x >= heading.x + heading.width, "Game type and players sit to the right of the title");
+    }
     await page.screenshot({ path: path.join(directory, `${name}-home.png`), fullPage: true });
     await page.getByRole("link", { name: "Tous les jeux", exact: true }).click();
     await page.getByRole("heading", { name: "Choisir un jeu", exact: true }).waitFor();
@@ -130,7 +138,9 @@ try {
   for (const coverImage of ["N/A", "/missing-image.webp"]) {
     const { page, context } = await setup({ width: 390, height: 844 }, { coverImage });
     await page.goto(origin);
-    await page.locator(".public-game-entry .public-game-pieces").waitFor();
+    await page.locator(".public-game-featured h3").waitFor();
+    assert.equal(await page.locator(".public-game-featured .public-game-pieces").count(), 0);
+    if (coverImage === "N/A") await page.waitForFunction(() => document.querySelector('.public-game-featured img')?.naturalWidth > 0);
     assert.equal(await page.locator(".public-game-entry").count(), 1);
     await context.close();
   }
@@ -166,11 +176,21 @@ try {
       await page.mouse.move(box.x + 10, box.y + 10);
       await page.mouse.down(); await page.mouse.move(2, 2, { steps: 4 }); await page.mouse.up();
       assert.equal(await dialog.count(), 1, "Dragging from the modal onto its overlay must not close it");
+      await dialog.getByRole("slider", { name: "Zoom du recadrage" }).fill("0.5");
+      assert.match(await dialog.locator("output").innerText(), /0\.50/);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
       await page.screenshot({ path: path.join(directory, `${name}-${label === "Bannière" ? "cover" : "description"}-crop.png`) });
       await dialog.getByRole("button", { name: "Appliquer le recadrage" }).click();
       await dialog.waitFor({ state: "hidden" });
       assert.equal(uploads.length, before + 1);
+      const field = label === "Bannière" ? "coverImage" : "descriptiveImage";
+      const pixel = await page.evaluate(async (url) => {
+        const image = new Image(); image.crossOrigin = "anonymous"; image.src = url; await image.decode();
+        const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d"); context.drawImage(image, 0, 0);
+        return [...context.getImageData(0, 0, 1, 1).data];
+      }, `${origin}/api/game-images/${field}.png`);
+      assert.deepEqual(pixel, [16, 27, 23, 255], "0.5x export fills the outside margins with the preview's opaque background");
     }
     await page.locator(".game-media-fields").scrollIntoViewIfNeeded();
     assert.equal(await page.locator(".game-media-fields .game-artwork-media img").count(), 2);
@@ -182,6 +202,14 @@ try {
     await dialog.waitFor({ state: "hidden" });
     assert.equal(uploads.length, before, "Cancel must not upload or replace the selected image");
     checks.push(`${name}: image modal, import, validation, drag, zoom, PNG output, cancellation and overlay guard`);
+    await context.close();
+  }
+  {
+    const { page, context } = await setup({ width: 390, height: 844 }, { coverImage: "N/A", descriptiveImage: "N/A" });
+    await page.goto(origin);
+    await page.locator(".public-game-featured h3").waitFor();
+    assert.equal(await page.locator(".public-game-featured img, .public-game-featured .public-game-pieces").count(), 0);
+    await page.getByRole("link", { name: "Jouer", exact: true }).waitFor();
     await context.close();
   }
   assert.deepEqual(errors, []);

@@ -199,7 +199,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
               <article key={game.id} className={`game-card premium-card ${game.type} ${playMode==="ranked"?"ranked-game-card":""}`}>
                 <GameArtwork source={showCatalog ? game.descriptiveImage : game.coverImage} backdrop eager={!showCatalog} />
                 <span className="player-badge">{playMode==="ranked"?`${rankedStatus?.games.find((row)=>row.id===game.id)?.players ?? "…"} joueurs`:`${game.minPlayers}-${game.maxPlayers}`}</span>
-                <GameArtwork source={showCatalog ? game.coverImage : ""} fallback={<div className="game-icon">{game.type === "dice" ? <Dice5 /> : <PlayingCard card={{ rank: "A", suit: "S" }} />}</div>} />
+                {showCatalog && <GameArtwork source={game.coverImage} fallback={<div className="game-icon">{game.type === "dice" ? <Dice5 /> : <PlayingCard card={{ rank: "A", suit: "S" }} />}</div>} />}
                 <h3>{game.name}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label="Favori" fill="currentColor" />}</h3>
                 <p>{game.description || gameRules[game.id]?.goal}</p>
                 <div className="card-meta"><span>{gameCategoryLabel(game.category)}</span><span>{gameComplexityLabel(game.complexity)}</span>{playMode==="ranked"?<RankBadge rank={rankedStatus?.games.find((row)=>row.id===game.id)?.rank}/>:<span>{rooms.filter((room) => room.gameId === game.id && !room.ranked).length} tables publiques</span>}</div>
