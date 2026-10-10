@@ -1008,7 +1008,7 @@ function collectServerHealthSample() {
   const readingWorkers = readingWork.health();
   const accounts = accountsProcessHealth(accountsWork);
   const gameWorkers = gameGateway?.health();
-  const services = serviceExecution.health(readingWorkers);
+  const services = serviceExecution.health(readingWorkers, gameWorkers);
   try { executionHistory.sample(services); } catch { console.error("Execution metrics could not be stored."); }
   const caches = { configuration: configurationCache.health(), statistics: playerStatisticsCacheHealth(db), achievements: achievementProgressCache.health(), memberStats: memberStatsCache.health() };
   const sample = {
@@ -1102,7 +1102,7 @@ function serverHealthPayload(requestedPoints = 360) {
     processTotals: { cpuPercent: sample.cpuProcess + (accounts.cpuPercent ?? 0) + (sample.gameWorkersCpu ?? 0), memoryRss: memory.rss + (accounts.memoryRss ?? 0) + (sample.gameWorkersRss ?? 0) },
     gameWorkers: gameWorkers ?? { enabled: false, rooms: 0, queued: 0, workers: [] },
     workers: { password: passwordWorkers, reading: readingWorkers },
-    services: serviceExecution.health(readingWorkers),
+    services: serviceExecution.health(readingWorkers, gameWorkers),
     executionHistory: executionHistory.health(),
     caches,
     process: {
@@ -5233,7 +5233,7 @@ app.patch("/api/me", auth, async (req, res) => {
       found.profileStats.customAchievementId = customAchievementIds[0] ?? "";
     }
     refreshPublicProfileStats(found, db);
-    if (displayName) {
+    if (displayName && !gameGateway) {
       for (const room of db.rooms.filter((r) => !r.finished)) {
         const player = room.players.find((p) => p.id === found.id);
         if (player) {
@@ -5289,7 +5289,7 @@ app.patch("/api/me/cosmetics", auth, (req, res) => {
       ...(diceSkin ? { diceSkin } : {}),
       ...(cardSkin ? { cardSkin } : {})
     };
-    for (const room of db.rooms.filter((r) => !r.finished)) {
+    if (!gameGateway) for (const room of db.rooms.filter((r) => !r.finished)) {
       const player = room.players.find((p) => p.id === found.id);
       if (player) player.cosmetics = cosmetics;
       const statePlayer = room.state?.players?.find((p) => p.id === found.id);
@@ -5323,7 +5323,7 @@ app.post("/api/shop/purchase", auth, (req, res) => {
     cosmetics[item.type].push(item.value);
     const equippedKey = cosmeticEquippedKeys[item.type];
     cosmetics.equipped = { ...cosmetics.equipped, [equippedKey]: item.value };
-    for (const room of db.rooms.filter((r) => !r.finished)) {
+    if (!gameGateway) for (const room of db.rooms.filter((r) => !r.finished)) {
       const player = room.players.find((p) => p.id === found.id);
       if (player) player.cosmetics = cosmetics;
       const statePlayer = room.state?.players?.find((p) => p.id === found.id);
@@ -5365,7 +5365,7 @@ app.post("/api/shop/purchase-pack", auth, (req, res) => {
       cosmetics[item.type].push(item.value);
       cosmetics.equipped[cosmeticEquippedKeys[item.type]] = item.value;
     }
-    for (const room of db.rooms.filter((entry) => !entry.finished)) {
+    if (!gameGateway) for (const room of db.rooms.filter((entry) => !entry.finished)) {
       const player = room.players.find((entry) => entry.id === found.id);
       if (player) player.cosmetics = cosmetics;
       const statePlayer = room.state?.players?.find((entry) => entry.id === found.id);
@@ -5430,7 +5430,8 @@ gameGateway = process.env.GAME_WORKERS_ENABLED === "1" ? createGameGateway({
       throw Object.assign(new Error("Cette session n'est plus autorisee."), { code: "GAME_AUTH_REVOKED" });
     }
   },
-  onError: (error) => console.error("Game Worker transition failed:", error.code)
+  onError: (error) => console.error("Game Worker transition failed:", error.code),
+  measureTransition: (operation) => serviceExecution.measure("rooms", operation)
 }) : null;
 function dispatchRoomCommand(key, req, res, next) {
   return Promise.resolve().then(async () => {
@@ -5910,7 +5911,7 @@ async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
   setTimeout(() => process.exit(1), 10000).unref();
-  try { executionHistory.sample(serviceExecution.health(readingWork.health()), true); } catch {}
+  try { executionHistory.sample(serviceExecution.health(readingWork.health(), gameGateway?.health()), true); } catch {}
   await gameGateway?.close();
   await Promise.all([readingWork.close(), bcrypt.close(), accountsWork?.close(), capacityTests.close()]);
   executionHistory.close();

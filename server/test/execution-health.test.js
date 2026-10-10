@@ -5,6 +5,7 @@ import { createPasswordWork } from "../src/services/password-work.js";
 import { ConfigurationCache } from "../src/services/configuration-cache.js";
 import { PlayerProgressCache } from "../src/services/player-progress-cache.js";
 import { DurationTelemetry } from "../src/services/duration-telemetry.js";
+import { createServiceExecution } from "../src/services/service-execution.js";
 
 class TestWorker extends EventEmitter {
   ref() {}
@@ -89,4 +90,16 @@ test("progress cache counts invalidation and bounded eviction without exposing p
   cache.get("private-user", references, 1, build); cache.get("another-user", references, 0, build);
   assert.deepEqual(cache.health(), { entries:1, capacity:1, requests:4, hits:1, misses:3, invalidations:1, evictions:1, hitRate:.25 });
   assert.ok(!JSON.stringify(cache.health()).includes("private-user"));
+});
+
+test("coordinated room telemetry preserves end-to-end timings and reports the execution mode", async () => {
+  const execution = createServiceExecution();
+  await execution.measure("rooms", async () => {});
+  await assert.rejects(execution.measure("rooms", async () => { throw new Error("unavailable"); }), /unavailable/);
+  const games = { enabled: true, queued: 3, rejected: 2, retired: { timeouts: 1 }, workers: [{ timeouts: 2 }, { timeouts: 0 }] };
+  const health = execution.health({ services: {} }, games);
+  assert.equal(health.rooms.mode, "game-process"); assert.equal(health.rooms.name, "Transitions de table");
+  assert.equal(health.rooms.completed, 1); assert.equal(health.rooms.failed, 1); assert.equal(health.rooms.processing.count, 2);
+  assert.equal(health.rooms.queued, 3); assert.equal(health.rooms.rejected, 2); assert.equal(health.rooms.timedOut, 3);
+  assert.equal(health.persistence.mode, "main"); assert.equal(execution.health().rooms.mode, "main");
 });

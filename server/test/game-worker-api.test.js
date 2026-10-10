@@ -20,7 +20,7 @@ before(async () => {
   const db = new DatabaseSync(path.join(directory, "main.sqlite"));
   db.exec("CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO meta VALUES('legacy-json-migrated','true'); CREATE TABLE users(id TEXT PRIMARY KEY,data TEXT NOT NULL,pseudo TEXT NOT NULL,email TEXT,guest INTEGER)");
   for (const id of ["player", "friend", "admin"]) {
-    const user = { id, pseudo: id, email: `${id}@example.test`, active: true, admin: id === "admin", tokens: 10000,
+    const user = { id, pseudo: id, email: `${id}@example.test`, active: true, admin: id === "admin", tokens: 100000,
       emailVerifiedAt: new Date().toISOString(), passwordHash: "not-used", profile: { birthDate: "1990-01-01" } };
     db.prepare("INSERT INTO users VALUES(?,?,?,?,0)").run(id, JSON.stringify(user), id, user.email);
   }
@@ -67,8 +67,34 @@ test("existing room API runs through two Game Workers without exposing worker me
   assert.deepEqual(health.data.gameWorkers.workers.map((worker) => worker.assignedRooms), [1, 1]);
   assert.ok(health.data.gameWorkers.workers.every((worker) => worker.pid && worker.pid !== health.data.process.pid));
   assert.ok(health.data.gameWorkers.actions.count >= 7);
-  assert.equal((await request("player", "/api/me")).data.tokens, 9990);
-  assert.equal((await request("friend", "/api/me")).data.tokens, 9990);
+  assert.equal(health.data.services.rooms.mode, "game-process"); assert.ok(health.data.services.rooms.completed >= 7);
+  assert.equal((await request("player", "/api/me")).data.tokens, 99990);
+  assert.equal((await request("friend", "/api/me")).data.tokens, 99990);
   assert.equal((await request("player", `/api/rooms/${first.code}`, "DELETE")).status, 200);
   assert.equal((await request("player", `/api/rooms/${second.code}`, "DELETE")).status, 200);
+});
+
+test("profile, equipment and shop changes never write a worker-owned room directly", async () => {
+  const created = await request("player", "/api/rooms", "POST", { gameId: "yahtzee", name: "Profile changes", stake: 10 });
+  assert.equal(created.status, 200, JSON.stringify(created.data)); const code = created.data.code;
+  try {
+    const renamed = await request("player", "/api/me", "PATCH", { displayName: "Updated player" });
+    assert.equal(renamed.status, 200, JSON.stringify(renamed.data));
+    const purchased = await request("player", "/api/shop/purchase", "POST", { itemId: "name-gold" });
+    assert.equal(purchased.status, 200, JSON.stringify(purchased.data));
+    const equipment = await request("player", "/api/me/cosmetics", "PATCH", { nameEffect: "gold" });
+    assert.equal(equipment.status, 200, JSON.stringify(equipment.data));
+    const catalog = (await request("player", "/api/shop")).data;
+    const packItem = catalog.filter((item) => !item.rewardOnly && item.packs?.length && item.price < 90000).sort((a, b) => a.price - b.price)[0];
+    assert.ok(packItem);
+    const packed = await request("player", "/api/shop/purchase-pack", "POST", { packId: packItem.packs[0], itemIds: [packItem.id] });
+    assert.equal(packed.status, 200, JSON.stringify(packed.data));
+    const beforeStart = (await request("player", `/api/rooms/${code}`)).data;
+    assert.equal(beforeStart.players[0].pseudo, "Updated player");
+    const started = await request("player", `/api/rooms/${code}/start`, "POST", {});
+    assert.equal(started.status, 200, JSON.stringify(started.data));
+    assert.equal(started.data.state.players[0].pseudo, "Updated player");
+    assert.equal(started.data.state.players[0].cosmetics.equipped.nameEffect, packItem.type === "nameEffects" ? packItem.value : "gold");
+    assert.equal((await request("player", `/api/rooms/${code}/action`, "POST", { type: "roll" })).status, 200);
+  } finally { assert.equal((await request("player", `/api/rooms/${code}`, "DELETE")).status, 200); }
 });

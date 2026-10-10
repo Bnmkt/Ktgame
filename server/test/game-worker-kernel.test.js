@@ -13,7 +13,7 @@ function fixture(gameId = "yahtzee") {
   kernel.register({ roomId: "room", epoch: "epoch", version: 0, room: null });
   let version = 0, sequence = 0;
   const context = { actor: { id: user.id }, users: [user] };
-  return { kernel,
+  return { kernel, context,
     async command(command, body = {}, commit = true) {
       const input = { roomId: "room", epoch: "epoch", version, commandId: String(++sequence), configurationId: "1", command, context,
         params: { code: this.code }, body: command === "POST /api/rooms" ? { gameId, name: "Test table", ...body } : body };
@@ -63,4 +63,13 @@ test("an idle tick and activity recording do not publish room or lobby snapshots
   const f = fixture(); await f.command("POST /api/rooms"); await f.command("POST /api/rooms/:code/start");
   const tick = await f.command("tick"); assert.equal(tick.result.written, false); assert.equal(tick.result.publishRoom, false); assert.equal(tick.result.publishLobby, false);
   const activity = await f.command("activity"); assert.equal(activity.result.publishRoom, false); assert.equal(activity.result.publishLobby, false);
+});
+
+test("account presentation refreshes in the owner's draft without losing game state", async () => {
+  const f = fixture(); await f.command("POST /api/rooms"); await f.command("POST /api/rooms/:code/start");
+  f.context.users = [{ ...user, roomPlayer: { id: user.id, pseudo: "Updated player", cosmetics: { equipped: { nameEffect: "gold" } } } }];
+  const roll = (await f.command("POST /api/rooms/:code/action", { type: "roll" })).result;
+  assert.equal(roll.room.players[0].pseudo, "Updated player"); assert.equal(roll.room.state.players[0].pseudo, "Updated player");
+  assert.equal(roll.room.state.players[0].cosmetics.equipped.nameEffect, "gold");
+  assert.equal(roll.room.state.dice.length, 5); assert.equal(roll.room.state.rollsLeft, 2);
 });

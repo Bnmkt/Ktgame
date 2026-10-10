@@ -30,11 +30,14 @@ export function createServiceExecution() {
         return result;
       } catch (error) { done(false); throw error; }
     },
-    health(workerHealth) {
+    health(workerHealth, gameHealth) {
       return Object.fromEntries([...entries].map(([name, entry]) => [name, {
         name: serviceNames[name], mode: workerHealth?.services[name] ? "read-worker" : "main",
         ...entry, processing: entry.processing.snapshot(), queued: 0, rejected: 0, cancelled: 0, timedOut: 0,
-        ...(workerHealth?.services[name] ?? {})
+        ...(workerHealth?.services[name] ?? {}),
+        ...(name === "rooms" && gameHealth?.enabled ? { name: "Transitions de table", mode: "game-process",
+          queued: gameHealth.queued, rejected: gameHealth.rejected,
+          timedOut: (gameHealth.retired?.timeouts ?? 0) + gameHealth.workers.reduce((sum, worker) => sum + (worker.timeouts ?? 0), 0) } : {})
       }]));
     }
   };

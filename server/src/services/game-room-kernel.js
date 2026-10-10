@@ -50,6 +50,12 @@ export function createGameRoomKernel() {
     const effects = [], events = [];
     const db = { users: context.users, rooms: [...(room ? [room] : []), ...(context.conflicts ?? [])], history: [], transactions: [], settings: {} };
     const player = (id) => db.users.find((user) => user.id === id);
+    // Account presentation is refreshed only in the owner's draft. HTTP views
+    // already use fresh profiles; account changes must not mutate Gateway rooms.
+    for (const target of [...(room?.players ?? []), ...(room?.state?.players ?? [])]) {
+      const account = !target.isBot && player(target.id);
+      if (account?.roomPlayer) { target.pseudo = account.roomPlayer.pseudo; target.cosmetics = account.roomPlayer.cosmetics; }
+    }
     const settings = () => activeConfiguration.platform;
     const balances = new Map(context.users.map((user) => [user.id, Number(user.tokens) || 0]));
     let written = false, settlement = false, publishRoom = false, publishLobby = false;

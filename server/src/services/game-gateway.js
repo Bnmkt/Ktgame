@@ -4,7 +4,14 @@ import { createRoomDirectory } from "./room-directory.js";
 import { selectedCollectionRows } from "../storage/selected-rows.js";
 
 const conflict = () => Object.assign(new Error("La table a change pendant le traitement. Reessaie."), { code: "GAME_CONFLICT" });
-const userFields = ["id", "pseudo", "tokens", "guest", "active", "profile", "cosmetics", "gameXp", "moderation", "registrationAuthorization", "parentalAccess"];
+const userFields = ["id", "pseudo", "tokens", "guest", "active", "gameXp", "moderation"];
+function workerAccount(user, presentation) {
+  return { ...Object.fromEntries(userFields.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])),
+    profile: { displayName: user.profile?.displayName, birthDate: user.profile?.birthDate }, cosmetics: { equipped: user.cosmetics?.equipped },
+    registrationAuthorization: { ageBand: user.registrationAuthorization?.ageBand },
+    parentalAccess: { status: user.parentalAccess?.status, revokedUntil: user.parentalAccess?.revokedUntil, reason: user.parentalAccess?.reason },
+    roomPlayer: presentation };
+}
 
 // The Gateway supplies a sparse account view and commits effects against fresh
 // revisions. A Game Worker never opens SQLite or writes an account directly.
@@ -31,7 +38,7 @@ export function createGameGateway(dependencies) {
       for (const player of [...(room?.players ?? []), ...(room?.state?.players ?? [])]) if (player.isBot) ids.delete(player.id);
       const users = [...ids].map(account).filter(Boolean);
       const payload = { actor: input.actor,
-        users: users.map((user) => ({ ...Object.fromEntries(userFields.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])), profile: { displayName: user.profile?.displayName, birthDate: user.profile?.birthDate }, cosmetics: { equipped: user.cosmetics?.equipped }, roomPlayer: dependencies.roomPlayerFor(user) })),
+        users: users.map((user) => workerAccount(user, dependencies.roomPlayerFor(user))),
         spectatorAccess: [...ids].filter((id) => room && (maySpectate(room, id) || input.inviteId && id === input.actor?.id && getUser(id)?.roomInvites?.some((invite) => invite.id === input.inviteId && invite.code === room.code))),
         sockets: [...(roomPresence.get(roomId) ?? [])].flatMap((id) => {
           const socket = io.sockets.sockets.get(id); return socket ? [{ id, data: { userId: socket.data.userId, roomId, spectator: socket.data.spectator } }] : [];
@@ -108,7 +115,10 @@ export function createGameGateway(dependencies) {
   async function execute(id, command, input = {}) {
     let result;
     for (let attempt = 0; ; attempt++) {
-      try { result = await pool.execute(id, command, input); break; }
+      try {
+        const operation = () => pool.execute(id, command, input);
+        result = await (dependencies.measureTransition ? dependencies.measureTransition(operation) : operation()); break;
+      }
       catch (error) { if (!error.gameRetryable || attempt >= 2) throw error; }
     }
     const room = snapshot(id);

@@ -59,6 +59,7 @@ try {
     await page.getByRole("heading", { name: "Processus du casino", exact: true }).waitFor();
     assert.equal(await page.locator(".health-processes table").first().locator("tbody tr").count(), 4);
     assert.equal(await page.locator(".health-processes table").nth(1).locator("tbody tr").count(), 2);
+    assert.match(await page.locator(".health-service-table tbody tr").filter({ hasText: "Transitions de table" }).innerText(), /Gateway \+ Game Workers/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.screenshot({ path: path.join(previews, `${name}.png`), fullPage: true }); await context.close();
   }
