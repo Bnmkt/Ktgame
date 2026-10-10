@@ -8,6 +8,7 @@ import { AUDIENCE_VERSION, audienceAllowed, createAudienceClient } from "./audie
 import "./privacy.css";
 
 const PrivacyContext = createContext(null);
+export function usePrivacyChoice() { return useContext(PrivacyContext)?.choice; }
 export const legalLinks = { terms: "Conditions d'utilisation", legal: "Mentions légales", privacy: "Confidentialité", cookies: "Cookies", parents: "Parents" };
 
 export function PrivacyProvider({ children }) {

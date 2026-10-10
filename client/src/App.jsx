@@ -24,6 +24,7 @@ import { BugReportProvider, useBugReportLocation } from "./features/bugs/BugRepo
 import "./styles.css";
 import "./navigation/casino.css";
 import "./components/social/social.css";
+import { InstallNotice } from "./pwa/InstallNotice.jsx";
 
 const Admin = lazy(() => import("./pages/AdminPage.jsx").then((module) => ({ default: module.Admin })));
 const LegalPage = lazy(() => import("./privacy/LegalPage.jsx").then((module) => ({ default: module.LegalPage })));
@@ -364,7 +365,7 @@ export default function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<PrivacyProvider><BugReportProvider><App /></BugReportProvider></PrivacyProvider>);
+createRoot(document.getElementById("root")).render(<PrivacyProvider><BugReportProvider><InstallNotice /><App /></BugReportProvider></PrivacyProvider>);
 
 function RestrictedFeature({ onBack }) {
   return <main className="app-shell"><section className="panel restricted-feature"><ShieldAlert size={34} /><span className="eyebrow">Accès adapté</span><h1>Cette fonctionnalité n’est pas disponible</h1><p>La restriction est appliquée au compte par les règles de protection ou de modération du casino.</p><button type="button" onClick={onBack}>Retour au casino</button></section></main>;

@@ -1,0 +1,16 @@
+.install-notice { border-bottom: 1px solid #665b3c; background: #17211e; color: #f0ebdb; flex-shrink: 0; }
+.install-notice-inner { display: flex; align-items: center; gap: 14px; max-width: 1450px; margin: auto; padding: 12px 24px; }
+.install-notice-inner > svg { color: #e1bb53; flex: 0 0 auto; }
+.install-notice-inner > div { min-width: 0; }
+.install-notice strong { font-size: 15px; }
+.install-notice p { margin: 3px 0 0; font-size: 13px; line-height: 1.5; color: #becbc3; }
+.install-notice-actions { display: flex; flex-shrink: 0; gap: 8px; margin-left: auto; }
+.install-notice-actions button { min-height: 40px; }
+.install-help { width: min(560px, 94vw); }
+.install-help li { margin: 12px 0; line-height: 1.6; }
+.install-help li svg { vertical-align: middle; color: #e1bb53; }
+.install-help p { line-height: 1.6; }
+@media (max-width: 600px) {
+  .install-notice-inner { display: grid; grid-template-columns: 24px minmax(0, 1fr); padding: 12px 16px; gap: 10px; }
+  .install-notice-actions { grid-column: 2; margin-left: 0; flex-wrap: wrap; }
+}
