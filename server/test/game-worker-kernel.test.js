@@ -58,3 +58,9 @@ test("invalid commands can be aborted without losing room state", async () => {
   f.kernel.abort(input);
   const next = await f.command("POST /api/rooms/:code/action", { type: "roll" }); assert.equal(next.result.status, 200);
 });
+
+test("an idle tick and activity recording do not publish room or lobby snapshots", async () => {
+  const f = fixture(); await f.command("POST /api/rooms"); await f.command("POST /api/rooms/:code/start");
+  const tick = await f.command("tick"); assert.equal(tick.result.written, false); assert.equal(tick.result.publishRoom, false); assert.equal(tick.result.publishLobby, false);
+  const activity = await f.command("activity"); assert.equal(activity.result.publishRoom, false); assert.equal(activity.result.publishLobby, false);
+});

@@ -20,6 +20,7 @@ files=(
   server/src/services/room-runtime.js server/src/services/room-commands.js server/src/services/ranked-room-runtime.js
   server/src/services/game-gateway.js server/src/services/game-workers.js server/src/services/game-ipc-transport.js
   server/src/services/game-room-kernel.js server/src/services/game-worker-process.js
+  server/src/services/room-directory.js
   server/src/services/desktop-supervision.js
   server/src/services/capacity-config.js server/src/services/capacity-tests.js
   server/scripts/capacity/admin-runner.mjs server/scripts/capacity/serve.mjs server/scripts/capacity/run.mjs

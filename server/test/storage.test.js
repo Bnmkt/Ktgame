@@ -68,6 +68,13 @@ test("owner fencing rejects direct room writes and rolls back account effects", 
   } finally { setRoomMutationGuard(undefined); }
 });
 
+test("entity-only transactions retain configuration caches without skipping ledger persistence", () => {
+  const revision = databaseSettingsRevision(), balance = readDb().users[0].tokens;
+  updateDb((db) => { assert.equal(databaseSettingsReadRevision(), revision); db.users[0].tokens++; }, { users: ["a"], rooms: [], settings: false });
+  assert.equal(databaseSettingsRevision(), revision); assert.equal(readDb().users[0].tokens, balance + 1);
+  updateDb((db) => { db.users[0].tokens--; }, { users: ["a"], rooms: [], settings: false });
+});
+
 test("legacy migration is backed up, lossless, relational and idempotent", () => {
   assert.deepEqual(readDb().users, original.users);
   assert.deepEqual([...readDb().history], original.history);

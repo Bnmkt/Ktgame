@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createGameWorkers } from "./game-workers.js";
+import { createRoomDirectory } from "./room-directory.js";
+import { selectedCollectionRows } from "../storage/selected-rows.js";
 
 const conflict = () => Object.assign(new Error("La table a change pendant le traitement. Reessaie."), { code: "GAME_CONFLICT" });
 const userFields = ["id", "pseudo", "tokens", "guest", "active", "profile", "cosmetics", "gameXp", "moderation", "registrationAuthorization", "parentalAccess"];
@@ -12,11 +14,13 @@ export function createGameGateway(dependencies) {
     triggerRandomAchievement, finishRoomIfNeeded, consumeRoomAchievementUnlocks,
     roomWriteScope, sanitizeRoom, emitRoomUpdate, broadcastRooms, grantSpectatorAccess,
     maySpectate, ensureUserSocial, invalidateInbox, io, roomPresence, validateActor } = dependencies;
-  const snapshot = (id) => readDb().rooms.find((room) => room.id === id);
+  const directory = createRoomDirectory(() => readDb().rooms);
+  const snapshot = (id) => directory.get(id);
+  const account = (id) => sessions.get(id) ?? selectedCollectionRows(readDb().users, new Set([id]))[0];
   let writeLease;
   dependencies.setRoomMutationGuard?.((id) => { if (writeLease !== id) throw Object.assign(new Error("Room write requires its owner."), { code: "GAME_FENCED" }); });
-  const relatedMatches = (roomId, ids) => readDb().rooms.filter((other) => other.id !== roomId && other.ranked && !other.finished && other.ranked.roster.some((player) => ids.has(player.id) && !other.ranked.forfeits?.[player.id]));
-  const activeTables = (roomId, ids) => readDb().rooms.filter((other) => other.id !== roomId && other.state && !other.finished && other.players.some((player) => ids.has(player.id))).map(({ id }) => id).sort().join("|");
+  const relatedMatches = (roomId, ids) => directory.related(ids).filter((other) => other.id !== roomId && other.ranked && !other.finished && other.ranked.roster.some((player) => ids.has(player.id) && !other.ranked.forfeits?.[player.id]));
+  const activeTables = (roomId, ids) => directory.related(ids).filter((other) => other.id !== roomId && other.state && !other.finished && other.players.some((player) => ids.has(player.id))).map(({ id }) => id).sort().join("|");
   const tickPending = new Set();
   const pool = createGameWorkers({ size: dependencies.size, configuration, snapshot,
     context(roomId, input) {
@@ -24,7 +28,8 @@ export function createGameGateway(dependencies) {
       const ids = new Set([input.actor?.id, input.body?.playerId, room?.ownerId,
         ...(room?.players ?? []).map((player) => player.id), ...(room?.state?.players ?? []).map((player) => player.id),
         ...(room?.ranked?.roster ?? []).map((player) => player.id)].filter(Boolean));
-      const users = [...ids].map(getUser).filter(Boolean);
+      for (const player of [...(room?.players ?? []), ...(room?.state?.players ?? [])]) if (player.isBot) ids.delete(player.id);
+      const users = [...ids].map(account).filter(Boolean);
       const payload = { actor: input.actor,
         users: users.map((user) => ({ ...Object.fromEntries(userFields.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])), profile: { displayName: user.profile?.displayName, birthDate: user.profile?.birthDate }, cosmetics: { equipped: user.cosmetics?.equipped }, roomPlayer: dependencies.roomPlayerFor(user) })),
         spectatorAccess: [...ids].filter((id) => room && (maySpectate(room, id) || input.inviteId && id === input.actor?.id && getUser(id)?.roomInvites?.some((invite) => invite.id === input.inviteId && invite.code === room.code))),
@@ -49,6 +54,9 @@ export function createGameGateway(dependencies) {
       }
       const guestBefore = guard.users.filter((row) => row.guest).map((row) => [row.id, structuredClone(sessions.get(row.id))]);
       let room = result.room ?? result.deletedRoom;
+      const scope = roomWriteScope(readDb(), room ? [room] : []);
+      scope.users = [...new Set([...scope.users, ...guard.users.filter((row) => !row.guest).map((row) => row.id)])];
+      scope.rooms = [roomId]; scope.settings = false;
       try {
         writeLease = roomId;
         updateDb((db) => {
@@ -82,13 +90,10 @@ export function createGameGateway(dependencies) {
             user.roomInvites = user.roomInvites.filter((invite) => invite.id !== inviteId);
           }
           if (!result.room) db.rooms = db.rooms.filter((target) => target.id !== roomId);
-        }, (db) => {
-          const scope = roomWriteScope(db, room ? [room] : []);
-          scope.users = [...new Set([...scope.users, ...guard.users.filter((row) => !row.guest).map((row) => row.id)])];
-          scope.rooms = [roomId]; return scope;
-        });
+        }, scope);
       } catch (error) { for (const [id, user] of guestBefore) if (user) sessions.set(id, user); throw error; }
       finally { writeLease = undefined; }
+      if (result.room) directory.committed(room);
       for (const effect of result.effects) if (effect.kind === "notification") invalidateInbox(effect.userId);
       return room ? { finished: room.finished, ranked: room.ranked, players: room.players,
         achievementUnlocksByUser: room.achievementUnlocksByUser ?? {}, achievementRuleProgress: room.achievementRuleProgress ?? {},
@@ -116,7 +121,8 @@ export function createGameGateway(dependencies) {
           socket?.leave(id); roomPresence.get(id)?.delete(event.socketId); if (socket) delete socket.data.roomId;
         } else if (event.event) io.to(event.target).emit(event.event, event.payload);
       }
-      if (room) emitRoomUpdate(room); broadcastRooms();
+      if (room && (result.publishRoom || command === "activity" && result.response.unlocked?.length)) emitRoomUpdate(room);
+      if (result.publishLobby) broadcastRooms();
     }
     let response = result.response;
     if (response?.roomView) {
@@ -127,7 +133,7 @@ export function createGameGateway(dependencies) {
   }
   return {
     async dispatch(key, req, res) {
-      const room = req.params.code && readDb().rooms.find((target) => target.code === req.params.code.toUpperCase());
+      const room = req.params.code && directory.code(req.params.code.toUpperCase());
       if (req.params.code && !room) return res.status(404).json({ error: "Table introuvable." });
       const id = room?.id ?? randomUUID();
       const result = await execute(id, key, { params: req.params, body: req.body, actor: req.auth });

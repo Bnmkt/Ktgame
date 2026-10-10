@@ -407,12 +407,13 @@ let persistedCollections = snapshotCollections(cachedDb);
 let persistedSettings = JSON.stringify(cachedDb.settings ?? {});
 let settingsRevision = 0;
 let mutationDepth = 0;
+let settingsMutationDepth = 0;
 let roomMutationGuard;
 
 export function setRoomMutationGuard(guard) { roomMutationGuard = guard; }
 
 export function databaseSettingsRevision() { return settingsRevision; }
-export function databaseSettingsReadRevision() { return mutationDepth ? undefined : settingsRevision; }
+export function databaseSettingsReadRevision() { return settingsMutationDepth ? undefined : settingsRevision; }
 
 // Le coordinateur conserve le modèle actif en mémoire; les autres processus
 // ne lisent que les données validées et ne possèdent pas les écritures.
@@ -436,14 +437,17 @@ export function rankedSettlement(matchId) {
 
 export function writeDb(db, selection = {}) {
   mutationDepth++;
+  const mayChangeSettings = selection.settings !== false;
+  if (mayChangeSettings) settingsMutationDepth++;
   try { return persistDatabase(db, selection); }
-  finally { mutationDepth--; }
+  finally { mutationDepth--; if (mayChangeSettings) settingsMutationDepth--; }
 }
 
 function persistDatabase(db, selection) {
   const normalized = normalizeDb(db);
   const nextCollections = snapshotCollections(normalized, selection);
-  const nextSettings = JSON.stringify(normalized.settings ?? {});
+  // A trusted entity-only transaction neither edits nor serializes configuration.
+  const nextSettings = selection.settings === false ? persistedSettings : JSON.stringify(normalized.settings ?? {});
   const operations = [];
 
   for (const definition of collectionDefinitions) {
@@ -526,12 +530,14 @@ function persistDatabase(db, selection) {
 export function updateDb(mutator, selection) {
   const db = readDb();
   mutationDepth++;
+  const mayChangeSettings = selection?.settings !== false;
+  if (mayChangeSettings) settingsMutationDepth++;
   try {
     const result = mutator(db);
     writeDb(db, typeof selection === "function" ? selection(db, result) : selection);
     return result;
   } catch (error) { restoreCommittedState(); throw error; }
-  finally { mutationDepth--; }
+  finally { mutationDepth--; if (mayChangeSettings) settingsMutationDepth--; }
 }
 
 function restoreCommittedState() {

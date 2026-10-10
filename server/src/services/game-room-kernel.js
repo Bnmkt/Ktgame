@@ -52,7 +52,7 @@ export function createGameRoomKernel() {
     const player = (id) => db.users.find((user) => user.id === id);
     const settings = () => activeConfiguration.platform;
     const balances = new Map(context.users.map((user) => [user.id, Number(user.tokens) || 0]));
-    let written = false, settlement = false;
+    let written = false, settlement = false, publishRoom = false, publishLobby = false;
     const finish = (target) => {
       if (target.state?.finished && !target.finished && !settlement) { effects.push({ kind: "settle", ranking: runtime.roomRanking(target) }); settlement = true; }
     };
@@ -86,7 +86,7 @@ export function createGameRoomKernel() {
       DEFAULT_BOT_THINKING_MS: 1000, DEFAULT_TURN_END_DELAY_MS: 5000, DEFAULT_ROUND_RESULTS_MS: 30000,
       addTokens, appendRoomAchievementUnlocks: () => {}, applyAction,
       battleBotTimers: new Map(Object.entries(room?.state?.botThinking ?? {}).map(([id, thinking]) => [`${input.roomId}:${room.state.round}:${id}:${thinking.phase}`, true])), configuredGames: () => activeConfiguration.games,
-      emitRoomUpdate: () => { written = true; }, finishRoomIfNeeded: finish,
+      emitRoomUpdate: () => { written = true; publishRoom = true; }, finishRoomIfNeeded: finish,
       getTokenBalance: (_db, id) => balances.get(id) ?? 0, platformSettings: settings,
       pokerBlindsFromBigBlind: blindSettings, readDb: () => db,
       serviceExecution: { measure: (_name, callback) => callback() }, syncRoomPlayerTokens: syncTokens,
@@ -100,9 +100,9 @@ export function createGameRoomKernel() {
       action(target) { if (target.ranked) { target.ranked.actionAt = Date.now(); target.ranked.turnActor = target.state.players[target.state.currentPlayerIndex]?.id; } },
     };
     const commands = createRoomCommands({ ...runtime, addTokens, appendRoomAchievementUnlocks: () => {}, applyAction, bcrypt,
-      broadcastRooms: () => {}, configuredGames: () => activeConfiguration.games,
+      broadcastRooms: () => { publishLobby = true; }, configuredGames: () => activeConfiguration.games,
       consumeRoomAchievementUnlocks: () => [], displayNameFor: (user) => String(user.profile?.displayName || user.pseudo || "Joueur"),
-      emitRoomUpdate: () => { written = true; }, finishRoomIfNeeded: finish,
+      emitRoomUpdate: () => { written = true; publishRoom = true; }, finishRoomIfNeeded: finish,
       getTokenBalance: (_db, id) => balances.get(id) ?? 0, getUser: player,
       grantSpectatorAccess: (_room, userId) => events.push({ kind: "spectator", userId }),
       io: { sockets: { sockets }, to: (target) => ({ emit: (event, payload) => emit(target, event, payload) }) },
@@ -133,6 +133,7 @@ export function createGameRoomKernel() {
       const error = runtime.startRoomRound(created, db);
       if (error) { status = 400; response = { error }; }
       else { written = true; response = { ok: true }; }
+      publishRoom = written; publishLobby = written;
     } else if (input.command === "cancel-ranked") {
       if (!room?.ranked || room.finished || !input.reason) throw fault("GAME_INVALID");
       room.ranked.cancelled = { reason: input.reason, by: context.actor.id, at: new Date().toISOString() };
@@ -142,9 +143,11 @@ export function createGameRoomKernel() {
       }
       room.state.finished = true; room.state.winners = []; room.pacing = null; finish(room);
       written = true; response = { ok: true };
+      publishRoom = true; publishLobby = true;
     } else if (input.command === "expire") {
       if (room && !room.state && !room.finished && !context.sockets?.length && (input.forceExpired || Date.now() - new Date(room.createdAt).getTime() >= 30000)) {
         db.rooms = db.rooms.filter((target) => target.id !== input.roomId); written = true;
+        publishLobby = true;
       }
       response = { ok: true };
     } else if (input.command === "activity") {
@@ -178,6 +181,7 @@ export function createGameRoomKernel() {
           if (changed && !showingResults) runtime.runBotTurns(room, db);
         }
         finish(room); written = changed || settlement;
+        publishRoom = written; publishLobby = settlement;
       }
       response = { ok: true };
     } else {
@@ -187,7 +191,7 @@ export function createGameRoomKernel() {
     }
     const result = { status, response, room: db.rooms.find((target) => target.id === input.roomId) ?? null, deletedRoom: !db.rooms.some((target) => target.id === input.roomId) ? room : null,
       effects: status < 400 || written ? effects : [], events: status < 400 || written ? events : [],
-      written, commandId: input.commandId, version: entry.version + 1 };
+      written, publishRoom, publishLobby, commandId: input.commandId, version: entry.version + 1 };
     entry.prepared = { commandId: input.commandId, result };
     return result;
   }
