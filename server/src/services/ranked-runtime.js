@@ -1,3 +1,4 @@
+import { createRankedRoomRuntime } from "./ranked-room-runtime.js";
 import { randomUUID } from "node:crypto";
 import { RANKED_GAMES, balancedBeloteSeats, competitiveFor, eloFor, matchmakingElo, matchQueue, normalizeRankedConfig, queueGroupFor, rankFor, rankProgress, rankedResultFor, searchRange } from "./ranked.js";
 import { gameProgress } from "./game-progression.js";
@@ -7,7 +8,8 @@ import { roomWriteScope } from "../storage/room-write-scope.js";
 
 export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb, rankedRows, rankedRecent, rankedSettlement, rankedMetrics, games, platformSettings,
   userFeatureAccess, roomCode, roomPlayerFor, startRoomRound, finishRoomIfNeeded, removePlayerFromRoomState, cashOutPokerPlayer,
-  addTokens, sanitizeFriendUser, emitRoomUpdate, broadcastRooms, io, isWatching, insigniaStore, rankedConfig }) {
+  addTokens, sanitizeFriendUser, emitRoomUpdate, broadcastRooms, io, isWatching, insigniaStore, rankedConfig, roomDriver }) {
+  const { stillPlaying, forfeit } = createRankedRoomRuntime({ cashOutPokerPlayer, removePlayerFromRoomState, finishRoomIfNeeded });
   const queue = new Map();
   const offers = new Map();
   const config = (db = readDb()) => rankedConfig ? rankedConfig(db) : normalizeRankedConfig(db.settings?.ranked, games(db), platformSettings(db));
@@ -73,12 +75,14 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
   }
   function leaveQueue(userId) {
     const entry=queue.get(userId),offer=offers.get(entry?.offerId);
+    if (offer?.starting) return;
     if(offer) cancelOffer(offer,new Set([userId]));
     else queue.delete(userId);
   }
   function startMatch(offer, now) {
+    if (offer.starting) return;
     const {group,gameId,rules}=offer;
-    const room=updateDb((current)=> {
+    function buildRoom(current) {
       // Confirm eligibility again before any stake is charged.
       for (const entry of group) { const error=eligibility(current,current.users.find((u)=>u.id===entry.userId),gameId); if (error) throw new Error(error); }
       const seats=gameId === "belote" ? balancedBeloteSeats(group) : group.map((r)=>r.userId);
@@ -88,13 +92,28 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
         ...(gameId === "belote" ? {beloteSeats:seats} : {}),
         ...(gameId === "texas-holdem" ? {pokerBlinds:{smallBlind:preset.bigBlind/2,bigBlind:preset.bigBlind,maximumBet:preset.maximumBet},pokerTurnSeconds:preset.turnSeconds} : {}),
         ranked:{matchId:randomUUID(),config:structuredClone(rules),roster:seats.map((id,index)=>({id,pseudo:roomPlayerFor(current.users.find((u)=>u.id===id)).pseudo,rank:competitiveFor(current.users.find((u)=>u.id===id),gameId,rules).rank,...(gameId === "belote" ? {team:index%2} : {})})),forfeits:{},actionAt:now,startedAt:now}};
+      return created;
+    }
+    function announce(room) {
+      offers.delete(offer.id);
+      for (const entry of group) { queue.delete(entry.userId); io.to(`account:${entry.userId}`).emit("ranked-match",{code:room.code,gameId}); }
+      emitRoomUpdate(room); broadcastRooms();
+    }
+    if (roomDriver) {
+      offer.starting = true;
+      try {
+        const room = buildRoom(readDb());
+        roomDriver.start(room).then(() => announce(readDb().rooms.find((target) => target.id === room.id)), () => { offer.starting = false; cancelOffer(offer); });
+      } catch { offer.starting = false; cancelOffer(offer); }
+      return;
+    }
+    const room = updateDb((current) => {
+      const created = buildRoom(current);
       current.rooms.push(created);
-      const error=startRoomRound(created,current); if (error) throw new Error(error);
+      const error = startRoomRound(created, current); if (error) throw new Error(error);
       return created;
     }, (db, room) => roomWriteScope(db, [room]));
-    offers.delete(offer.id);
-    for (const entry of group) { queue.delete(entry.userId); io.to(`account:${entry.userId}`).emit("ranked-match",{code:room.code,gameId}); }
-    emitRoomUpdate(room); broadcastRooms();
+    announce(room);
   }
   function match(now=Date.now()) {
     const db=readDb(), settings=config(db);
@@ -104,6 +123,7 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
       if (now-entry.heartbeat>120000 || eligibility(db,user,entry.gameId) || !entry.offerId && rules.queueSeconds && now-entry.joinedAt>rules.queueSeconds*1000) leaveQueue(entry.userId);
     }
     for (const offer of [...offers.values()]) {
+      if (offer.starting) continue;
       if (offer.group.some((row)=>!queue.has(row.userId))) {cancelOffer(offer);continue;}
       if (now>=offer.startsAfter && offer.ready.size===offer.group.length) {startMatch(offer,now);continue;}
       if (now>=offer.expiresAt) cancelOffer(offer,new Set(offer.group.filter((row)=>!offer.ready.has(row.userId)).map((row)=>row.userId)));
@@ -130,40 +150,9 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
       }
     }
   }
-  function stillPlaying(room,id) {
-    if (room.ranked.forfeits[id] || !room.state.players.some((p)=>p.id===id)) return false;
-    if (room.gameId === "president" && room.state.finishedOrder.includes(id)) return false;
-    if (room.gameId === "liars-dice" && !(room.state.diceCounts[id]>0)) return false;
-    if (room.gameId === "texas-holdem" && !(room.state.stacks[id]>0) && !room.state.allInPlayerIds?.includes(id)) return false;
-    return true;
-  }
-  function forfeit(room,db,id,reason="abandon") {
-    if (!room.ranked || room.finished || room.ranked.forfeits[id]) return false;
-    if (!stillPlaying(room,id)) return false;
-    room.ranked.forfeits[id]=reason;
-    if (room.gameId === "belote") {
-      const team=room.ranked.roster.find((p)=>p.id===id).team;
-      room.state.finished=true; room.state.winners=room.ranked.roster.filter((p)=>p.team!==team).map((p)=>p.id);
-    } else if (room.gameId === "texas-holdem") cashOutPokerPlayer(room,db,id,"ranked-abandon-cash-out");
-    else {
-      room.players=room.players.filter((p)=>p.id!==id); removePlayerFromRoomState(room,id);
-      if (room.gameId === "president") {
-        const remaining=room.state.players.filter((p)=>!room.state.finishedOrder.includes(p.id));
-        if (remaining.length<=1) {
-          if (remaining.length) room.state.finishedOrder.push(remaining[0].id);
-          room.state.finished=true;room.state.winners=room.state.finishedOrder.slice(0,1);
-        } else if (!remaining.some((p)=>p.id===room.state.players[room.state.currentPlayerIndex]?.id)) {
-          room.state.currentPlayerIndex=room.state.players.findIndex((p)=>p.id===remaining[0].id);
-        }
-      }
-    }
-    room.pacing=null;
-    room.ranked.actionAt=Date.now(); room.ranked.turnActor=null;
-    finishRoomIfNeeded(room,db);
-    return true;
-  }
   function tick(now=Date.now()) {
     match(now);
+    if (roomDriver) return;
     if (!readDb().rooms.some((r)=>r.ranked && r.state && !r.finished)) return;
     const changed=[];
     updateDb((db)=> {
@@ -258,8 +247,13 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
       updateDb((db)=>{db.settings.ranked=next;});res.json(next);
     } catch(error){res.status(400).json({error:error.message});}
   });
-  app.post("/api/admin/ranked/:code/cancel",auth,requireAdmin,(req,res)=> {
+  app.post("/api/admin/ranked/:code/cancel",auth,requireAdmin,async (req,res,next)=> {
     const reason=String(req.body.reason??"").trim().slice(0,1000);if(!reason)return res.status(400).json({error:"Indique la raison technique de l'annulation."});
+    if (roomDriver) {
+      const room = readDb().rooms.find((target) => target.code === req.params.code && target.ranked && !target.finished);
+      if (!room) return res.status(404).json({error:"Partie classée introuvable."});
+      try { await roomDriver.cancel(room, reason, req.auth); return res.json({ok:true}); } catch (error) { return next(error); }
+    }
     const room=updateDb((db)=> {
       const room=db.rooms.find((r)=>r.code===req.params.code && r.ranked && !r.finished);if(!room)return null;
       room.ranked.cancelled={reason,by:req.auth.id,at:new Date().toISOString()};
@@ -269,6 +263,6 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
     if(!room)return res.status(404).json({error:"Partie classée introuvable."});emitRoomUpdate(room);broadcastRooms();res.json({ok:true});
   });
   // Restart grace: existing matches survive without charging downtime as AFK.
-  for(const room of readDb().rooms.filter((r)=>r.ranked && !r.finished)) {room.ranked.actionAt=Date.now();room.ranked.offline={};room.ranked.turnActor=null;if(room.state?.turnDeadline)room.state.turnDeadline=Date.now()+room.ranked.config.reconnectSeconds*1000;}
+  if (!roomDriver) for(const room of readDb().rooms.filter((r)=>r.ranked && !r.finished)) {room.ranked.actionAt=Date.now();room.ranked.offline={};room.ranked.turnActor=null;if(room.state?.turnDeadline)room.state.turnDeadline=Date.now()+room.ranked.config.reconnectSeconds*1000;}
   return { config, forfeit, tick, ratingLocked(db,userId,gameId) {return queue.get(userId)?.gameId===gameId || db.rooms.some((room)=>room.gameId===gameId && room.ranked && !room.finished && room.ranked.roster.some((player)=>player.id===userId));}, action(room) {if(room.ranked){room.ranked.actionAt=Date.now();room.ranked.turnActor=room.state.players[room.state.currentPlayerIndex]?.id;}}, status };
 }

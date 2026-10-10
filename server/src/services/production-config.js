@@ -5,6 +5,8 @@ export function checkProductionConfig(environment) {
   const errors = [], warnings = [];
   try { sqliteSettings(environment); } catch (error) { errors.push(error.message); }
   if (environment.ACCOUNTS_PROCESS_ENABLED !== undefined && !["0", "1"].includes(environment.ACCOUNTS_PROCESS_ENABLED)) errors.push("ACCOUNTS_PROCESS_ENABLED must be 0 or 1.");
+  if (environment.GAME_WORKERS_ENABLED !== undefined && !["0", "1"].includes(environment.GAME_WORKERS_ENABLED)) errors.push("GAME_WORKERS_ENABLED must be 0 or 1.");
+  if (environment.GAME_WORKERS !== undefined && !/^[1-4]$/.test(environment.GAME_WORKERS)) errors.push("GAME_WORKERS must be 1..4.");
   for (const key of ["NODE_ENV", "HOST", "PORT", "JWT_SECRET", "CLIENT_ORIGIN", "SQLITE_PATH", "PUBLIC_APP_URL"]) {
     if (!String(environment[key] || "").trim()) errors.push(`${key} is missing.`);
   }

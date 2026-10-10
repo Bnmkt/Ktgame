@@ -37,6 +37,9 @@ if (!fs.existsSync(path.dirname(sqlitePath))) fs.mkdirSync(path.dirname(sqlitePa
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const sqlite = new DatabaseSync(sqlitePath);
+const entityRevisions = new Map();
+let entityRevisionEpoch = 0;
+export function databaseEntityRevision(collection, id) { return `${entityRevisionEpoch}:${entityRevisions.get(`${collection}:${id}`) ?? 0}`; }
 let normalizedStorage;
 let catalogSource;
 const storageSettings = sqliteSettings();
@@ -404,6 +407,9 @@ let persistedCollections = snapshotCollections(cachedDb);
 let persistedSettings = JSON.stringify(cachedDb.settings ?? {});
 let settingsRevision = 0;
 let mutationDepth = 0;
+let roomMutationGuard;
+
+export function setRoomMutationGuard(guard) { roomMutationGuard = guard; }
 
 export function databaseSettingsRevision() { return settingsRevision; }
 export function databaseSettingsReadRevision() { return mutationDepth ? undefined : settingsRevision; }
@@ -463,6 +469,7 @@ function persistDatabase(db, selection) {
   if (operations.length || nextSettings !== persistedSettings) {
     sqlite.exec("BEGIN IMMEDIATE");
     try {
+      for (const operation of operations) if (operation.definition.key === "rooms") roomMutationGuard?.(operation.id ?? operation.row.id);
       for (const operation of operations) {
         if (operation.type === "replaceArchive") replaceAll(operation.definition.table, operation.rows, operation.definition.insert);
         else if (operation.type === "append") operation.definition.insert(operation.row);
@@ -482,6 +489,12 @@ function persistDatabase(db, selection) {
         }
       }
       sqlite.exec("COMMIT");
+      for (const operation of operations) {
+        if (!["users", "rooms"].includes(operation.definition.key)) continue;
+        if (entityRevisions.size >= 8192) { entityRevisions.clear(); entityRevisionEpoch++; }
+        const key = `${operation.definition.key}:${operation.id ?? operation.row.id}`;
+        entityRevisions.set(key, (entityRevisions.get(key) ?? 0) + 1);
+      }
     } catch (error) {
       sqlite.exec("ROLLBACK");
       restoreCommittedState();
@@ -522,6 +535,7 @@ export function updateDb(mutator, selection) {
 }
 
 function restoreCommittedState() {
+  entityRevisionEpoch++;
   cachedDb = loadDatabase();
   persistedCollections = snapshotCollections(cachedDb);
   persistedSettings = JSON.stringify(cachedDb.settings ?? {});

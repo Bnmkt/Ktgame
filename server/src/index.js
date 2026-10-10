@@ -1,3 +1,5 @@
+import { createRoomCommands } from "./services/room-commands.js";
+import { createGameGateway } from "./services/game-gateway.js";
 import { createRoomRuntime } from "./services/room-runtime.js";
 import "dotenv/config";
 import { registerPublicPages } from "./services/public-pages.js";
@@ -61,7 +63,7 @@ import {
   purchaseCommunityEventActions,
   validateCommunityEvent
 } from "./services/community-events.js";
-import { databaseFilename, databaseHealth, databaseSettingsRevision, databaseSettingsReadRevision, rankedRows, rankedRecent, rankedMetrics, rankedSettlement, readDb, setCatalogSource, updateDb as mutateDb, writeDb as persistDb } from "./db.js";
+import { databaseFilename, databaseHealth, databaseEntityRevision, databaseSettingsRevision, databaseSettingsReadRevision, rankedRows, rankedRecent, rankedMetrics, rankedSettlement, readDb, setCatalogSource, setRoomMutationGuard, updateDb as mutateDb, writeDb as persistDb } from "./db.js";
 import { RANKED_GAMES, competitiveFor, eloFor, equippedRankedBadge, normalizeRankedConfig, publicRanked, rankedResultFor, settleRanked as applyRankedSettlement, validateRankedAction } from "./services/ranked.js";
 import { createRankedRuntime } from "./services/ranked-runtime.js";
 import { registerRankInsigniaRoutes } from "./services/rank-insignia-images.js";
@@ -143,6 +145,7 @@ const JWT_SECRET = process.env.JWT_SECRET || (NODE_ENV === "production" ? "" : "
 const JWT_KEY = createSecretKey(Buffer.from(JWT_SECRET));
 const configurationCache = new ConfigurationCache({ revision: databaseSettingsReadRevision });
 const serviceExecution = createServiceExecution();
+let gameGateway = null;
 const accountsWork = process.env.ACCOUNTS_PROCESS_ENABLED === "1" ? createAccountsWork(databaseFilename) : null;
 const bcrypt = accountsWork?.passwords ?? passwordWork;
 const readingWork = accountsWork?.reading ?? createReadingWork(databaseFilename, { size: Number(process.env.READING_WORKERS || 1) });
@@ -1004,6 +1007,7 @@ function collectServerHealthSample() {
   const passwordWorkers = bcrypt.health();
   const readingWorkers = readingWork.health();
   const accounts = accountsProcessHealth(accountsWork);
+  const gameWorkers = gameGateway?.health();
   const services = serviceExecution.health(readingWorkers);
   try { executionHistory.sample(services); } catch { console.error("Execution metrics could not be stored."); }
   const caches = { configuration: configurationCache.health(), statistics: playerStatisticsCacheHealth(db), achievements: achievementProgressCache.health(), memberStats: memberStatsCache.health() };
@@ -1016,6 +1020,11 @@ function collectServerHealthSample() {
     accountsLoopMax: accounts.eventLoopMax ?? null,
     accountsBusy: accounts.busy,
     accountsQueued: accounts.queued,
+    gameWorkersCpu: gameWorkers?.workers.reduce((sum, worker) => sum + (worker.cpuPercent ?? 0), 0) ?? 0,
+    gameWorkersRss: gameWorkers?.workers.reduce((sum, worker) => sum + (worker.rss ?? 0), 0) ?? 0,
+    gameWorkersLoopP95: gameWorkers?.workers.reduce((maximum, worker) => Math.max(maximum, worker.eventLoopP95 ?? 0), 0) ?? 0,
+    gameWorkersQueued: gameWorkers?.queued ?? 0,
+    gameWorkersActionP95: gameWorkers?.actions.p95Ms ?? null,
     cpuSystem: Number(systemCpuPercent.toFixed(3)),
     memoryRss: memory.rss,
     memoryHeap: memory.heapUsed,
@@ -1081,15 +1090,17 @@ function serverHealthPayload(requestedPoints = 360) {
   const passwordWorkers = bcrypt.health();
   const readingWorkers = readingWork.health();
   const accounts = accountsProcessHealth(accountsWork);
+  const gameWorkers = gameGateway?.health();
   const caches = { configuration: configurationCache.health(), statistics: playerStatisticsCacheHealth(readDb()), achievements: achievementProgressCache.health(), memberStats: memberStatsCache.health() };
   return {
     generatedAt: new Date().toISOString(),
     sampleIntervalSeconds: 5,
-    status: accounts.status === "warning" || passwordWorkers.status !== "healthy" || readingWorkers.status !== "healthy" || sample.eventLoopP95 > 150 || sample.cpuProcess > 90 || memory.heapUsed / Math.max(1, heap.heap_size_limit) > .9 ? "warning" : "healthy",
+    status: gameWorkers?.workers.some((worker) => ["stopped", "warning"].includes(worker.status)) || accounts.status === "warning" || passwordWorkers.status !== "healthy" || readingWorkers.status !== "healthy" || sample.eventLoopP95 > 150 || sample.cpuProcess > 90 || memory.heapUsed / Math.max(1, heap.heap_size_limit) > .9 ? "warning" : "healthy",
     processes: { site: { role: "site", status: sample.eventLoopP95 > 150 || sample.cpuProcess > 90 ? "warning" : "healthy",
       pid: process.pid, cpuPercent: sample.cpuProcess, memoryRss: memory.rss, memoryHeap: memory.heapUsed,
-      eventLoopP95: sample.eventLoopP95, eventLoopMax: sample.eventLoopMax, uptimeSeconds: process.uptime() }, accounts },
-    processTotals: { cpuPercent: sample.cpuProcess + (accounts.cpuPercent ?? 0), memoryRss: memory.rss + (accounts.memoryRss ?? 0) },
+      eventLoopP95: sample.eventLoopP95, eventLoopMax: sample.eventLoopMax, uptimeSeconds: process.uptime() }, accounts, games: gameWorkers?.workers ?? [] },
+    processTotals: { cpuPercent: sample.cpuProcess + (accounts.cpuPercent ?? 0) + (sample.gameWorkersCpu ?? 0), memoryRss: memory.rss + (accounts.memoryRss ?? 0) + (sample.gameWorkersRss ?? 0) },
+    gameWorkers: gameWorkers ?? { enabled: false, rooms: 0, queued: 0, workers: [] },
     workers: { password: passwordWorkers, reading: readingWorkers },
     services: serviceExecution.health(readingWorkers),
     executionHistory: executionHistory.health(),
@@ -1402,7 +1413,7 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
 }
 function serializeRoom(room, viewerId, db, forceSpectator, playerPresentations = new Map()) {
   if (!room) return room;
-  const { passwordHash: _passwordHash, ...safeRoom } = room;
+  const { passwordHash: _passwordHash, gameWorker: _gameWorker, ...safeRoom } = room;
   const spectating = forceSpectator || !room.players.some((player) => player.id === viewerId);
   const sanitizedPlayers = new Map();
   const sanitizeRoomPlayer = (player) => {
@@ -2164,6 +2175,12 @@ function broadcastRooms(db = readDb()) {
 function cleanupEmptyRooms(db) {
   const before = db.rooms.length;
   const now = Date.now();
+  if (gameGateway) {
+    for (const room of db.rooms) if (!room.finished && !room.state && !(roomPresence.get(room.id)?.size) && now - new Date(room.createdAt ?? now).getTime() >= 30000) {
+      gameGateway.expire(room.id);
+    }
+    return 0;
+  }
   db.rooms = db.rooms.filter((room) => {
     const ageMs = now - new Date(room.createdAt ?? now).getTime();
     return room.finished || room.state || (roomPresence.get(room.id)?.size ?? 0) > 0 || ageMs < 30000;
@@ -2171,7 +2188,7 @@ function cleanupEmptyRooms(db) {
   return before - db.rooms.length;
 }
 
-function finishRoomIfNeeded(room, db) {
+function finishRoomIfNeeded(room, db, { ranking } = {}) {
   if (!room.state?.finished || room.finished) return;
   room.finished = true;
   const pendingReceipt = room.ranked && db.history.pending?.find((row)=>row.ranked?.matchId===room.ranked.matchId && row.ranked.results?.length);
@@ -2212,7 +2229,7 @@ function finishRoomIfNeeded(room, db) {
       if (amount > 0) addTokens(db, playerId, amount, { gameId: room.gameId, roomId: room.id, reason: "room-pot-win" });
     }
   }
-  room.state.ranking = roomRanking(room);
+  room.state.ranking = ranking ?? roomRanking(room);
   room.state.roomPayouts = roomPayouts;
   syncRoomPlayerTokens(room, db);
   const historyPlayers=room.ranked ? room.ranked.roster.map((p)=>room.players.find((player)=>player.id===p.id) ?? {id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? p.pseudo ?? "Joueur",isBot:false}) : room.players;
@@ -3390,11 +3407,22 @@ app.post("/api/me/privacy", auth, (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-app.post("/api/me/activity", auth, (req, res) => {
+app.post("/api/me/activity", auth, async (req, res, next) => {
   const user = readDb().users.find((entry) => entry.id === req.auth.id);
   if (req.auth.guest || !validActivityConsent(user)) return res.status(403).json({ error: "Suivi facultatif desactive." });
   if (req.body.active === false) { siteActivityTracker.forget(user.id); return res.json({ unlocked: [] }); }
   try {
+    if (gameGateway) {
+      const db = readDb();
+      const room = req.body.page === "room" ? db.rooms.find((entry) => entry.code === String(req.body.roomCode ?? "").slice(0, 20).toUpperCase()) : null;
+      const events = updateDb((current) => siteActivityTracker.record(current.users.find((entry) => entry.id === user.id), req.body, req.headers["user-agent"], allowedUrlMarkers(achievementCatalog(current)), Date.now(), tableActivityContext(room, user.id)), { users: [user.id], rooms: [] });
+      if (events.some((event) => event.type === "site.visit")) events.push({ type: "account.browser", payload: { browser: events[0].payload.browser } });
+      if (room) {
+        const result = await gameGateway.execute(room.id, "activity", { actor: req.auth, activityEvents: events });
+        return res.json({ unlocked: [...new Set(result.response.unlocked)] });
+      }
+      return res.json({ unlocked: updateDb((current) => [...new Set(events.flatMap((event) => processAchievementEvent(current, user.id, event)))], { users: [user.id], rooms: [] }) });
+    }
     let activeRoom;
     const unlocked = updateDb((db) => {
       const found = db.users.find((entry) => entry.id === user.id);
@@ -3410,7 +3438,7 @@ app.post("/api/me/activity", auth, (req, res) => {
       return scope;
     });
     res.json({ unlocked });
-  } catch (error) { res.status(400).json({ error: error.message }); }
+  } catch (error) { if (String(error.code).startsWith("GAME_")) return next(error); res.status(400).json({ error: error.message }); }
 });
 
 app.post("/api/secrets/:secret", auth, (req, res) => {
@@ -5379,11 +5407,54 @@ app.get("/api/rooms", (_req, res) => {
   res.json(sanitizeRooms(db.rooms.filter((room) => room.isPublic && !room.finished)));
 });
 
+const localRoomCommands = createRoomCommands({ actionAchievementSnapshot, addTokens, advanceRoomPacing, appendRoomAchievementUnlocks, applyAction, bcrypt, blackjackHandTotal, broadcastRooms, cashOutPokerPlayer, configuredGames, consumeRoomAchievementUnlocks, didRoundFinish, displayNameFor, emitRoomUpdate, finishRoomIfNeeded, gameActionAchievementEvent, getTokenBalance, getUser, grantSpectatorAccess, io, maySpectate, platformSettings, pokerBlindsFromBigBlind, processAchievementEvent, progressionConfig, pushNotification, rankedRuntime: { forfeit: (...args) => rankedRuntime.forfeit(...args), action: (...args) => rankedRuntime.action(...args) }, readDb, rejectFeature, removePlayerFromRoomState, roomCode, roomPacingActive, roomPlayerFor, roomPresence, roomTiming, roundProgressSnapshot, runBotTurns, sanitizeRoom, saveRoom, startRoomPacing, startRoomRound, startRoundResultsIfNeeded, syncRoomPlayerTokens, tableFeatureAccess, triggerRandomAchievement, unlockEligibleAchievements, userFeatureAccess, writeRoomDb });
+let gameConfigurationRevision, gameConfiguration;
+function configuredGameWorker() {
+  const revision = databaseSettingsRevision();
+  if (gameConfigurationRevision !== revision) {
+    gameConfiguration = { id: String(revision), platform: platformSettings(), games: configuredGames() };
+    gameConfigurationRevision = revision;
+  }
+  return gameConfiguration;
+}
+gameGateway = process.env.GAME_WORKERS_ENABLED === "1" ? createGameGateway({
+  size: Number(process.env.GAME_WORKERS || 1), readDb, updateDb, setRoomMutationGuard, revision: databaseEntityRevision,
+  settingsRevision: databaseSettingsRevision, configuration: configuredGameWorker, getUser, sessions,
+  addTokens, processAchievementEvent, unlockEligibleAchievements, appendRoomAchievementUnlocks,
+  triggerRandomAchievement, finishRoomIfNeeded, consumeRoomAchievementUnlocks, roomWriteScope,
+  sanitizeRoom, emitRoomUpdate, broadcastRooms, grantSpectatorAccess, maySpectate,
+  ensureUserSocial, invalidateInbox, io, roomPresence, roomPlayerFor,
+  validateActor(actor) {
+    const user = getUser(actor.id);
+    if (!user || user.active === false || (!actor.guest && (Number(actor.sessionVersion) || 0) !== (Number(user.sessionVersion) || 0)) || activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) {
+      throw Object.assign(new Error("Cette session n'est plus autorisee."), { code: "GAME_AUTH_REVOKED" });
+    }
+  },
+  onError: (error) => console.error("Game Worker transition failed:", error.code)
+}) : null;
+function dispatchRoomCommand(key, req, res, next) {
+  return Promise.resolve().then(async () => {
+    if (!gameGateway) return localRoomCommands.get(key)(req, res);
+    if (key === "POST /api/rooms") {
+      const error = await roomCredentialsError({ name: String(req.body.name ?? "").trim(), password: String(req.body.password ?? ""), user: getUser(req.auth.id) }, bcrypt.compare);
+      if (error) return res.status(400).json({ error });
+    }
+    return gameGateway.dispatch(key, req, res);
+  }).catch(next);
+}
+
 const insigniaStore = registerRankInsigniaRoutes({ app, auth, requireAdmin,
   directory: process.env.RANK_INSIGNIA_UPLOAD_DIR ? path.resolve(process.env.RANK_INSIGNIA_UPLOAD_DIR) : path.join(path.dirname(databaseFilename), "rank-insignia-images") });
 const rankedRuntime = createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb, rankedRows, rankedRecent, rankedSettlement, rankedMetrics, games: configuredGames, platformSettings, insigniaStore, rankedConfig,
   userFeatureAccess, roomCode, roomPlayerFor, startRoomRound, finishRoomIfNeeded, removePlayerFromRoomState, cashOutPokerPlayer,
   addTokens, sanitizeFriendUser, emitRoomUpdate, broadcastRooms, io,
+  roomDriver: gameGateway ? {
+    async start(template) {
+      const result = await gameGateway.execute(template.id, "start-ranked", { template });
+      if (result.status >= 400) throw new Error("Ranked start rejected.");
+    },
+    cancel: (room, reason, actor) => gameGateway.execute(room.id, "cancel-ranked", { reason, actor })
+  } : null,
   isWatching: (roomId,userId)=>[...(roomPresence.get(roomId) ?? [])].some((id)=>io.sockets.sockets.get(id)?.data.userId === userId && !io.sockets.sockets.get(id)?.data.spectator)
 });
 setInterval(()=>{try{rankedRuntime.tick();}catch(error){console.error("Ranked tick failed",error.message);}},2000).unref();
@@ -5393,82 +5464,9 @@ app.use("/api/rooms/:code",auth,(req,res,next)=> {
   next();
 });
 
-app.post("/api/rooms", auth, async (req, res) => {
-  if (req.body.ranked || req.body.mode === "ranked") return res.status(403).json({ error: "Le classé passe exclusivement par la file d'attente." });
-  const user = getUser(req.auth.id);
-  const game = configuredGames().find((g) => g.id === req.body.gameId);
-  if (!user || !game || game.enabled === false) return res.status(400).json({ error: "Création impossible." });
-  const roomAccess = userFeatureAccess(user, "rooms:create");
-  if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
-  const gameAccess = userFeatureAccess(user, `game:${game.id}`);
-  if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
-  const settings = platformSettings();
-  const name = String(req.body.name ?? "").trim();
-  let limits;
-  try { limits = roomLevelLimits(req.body); }
-  catch (error) { return res.status(400).json({ error: error.message }); }
-  const levelError = roomLevelError(user, { gameId: game.id, ...limits }, settings.gameProgression);
-  if (levelError) return res.status(400).json({ error: levelError });
-  const password = String(req.body.password ?? "");
-  const credentialsError = await roomCredentialsError({ name, password, user }, bcrypt.compare);
-  if (credentialsError) return res.status(400).json({ error: credentialsError });
-  const minimumStake = Math.max(game.id === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(game.entryPot) || 0);
-  const stake = Math.max(minimumStake, Number(req.body.stake || minimumStake));
-  if (user.tokens < stake) return res.status(400).json({ error: "Jetons insuffisants." });
-  const passwordHash = password ? await bcrypt.hash(password, 10) : null;
-  const room = {
-    id: randomUUID(),
-    code: roomCode(),
-    gameId: game.id,
-    name: name || (displayNameFor(user).includes("@") ? game.name : `${game.name} de ${displayNameFor(user)}`),
-    ...limits,
-    passwordHash,
-    isPublic: req.body.isPublic !== false,
-    stake,
-    pokerBlinds: game.id === "texas-holdem" ? { ...pokerBlindsFromBigBlind(settings.pokerDefaultBigBlind), maximumBet: stake } : undefined,
-    pokerTurnSeconds: game.id === "texas-holdem" ? settings.pokerTurnSeconds : undefined,
-    battleModifiers: game.id === "bataille" ? normalizeBattleModifiers(game.defaultModifiers) : undefined,
-    gameModifiers: normalizeGameModifiers(game.id, game.defaultModifiers),
-    readyPlayerIds: [user.id],
-    ownerId: user.id,
-    players: [roomPlayerFor(user)],
-    state: null,
-    finished: false,
-    createdAt: new Date().toISOString()
-  };
-  saveRoom(room);
-  broadcastRooms();
-  res.json(sanitizeRoom(room, req.auth.id));
-});
+app.post("/api/rooms", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms", req, res, next));
 
-app.post("/api/rooms/:code/join", auth, async (req, res) => {
-  const user = getUser(req.auth.id);
-  const db = readDb();
-  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
-  const game = room && games.find((g) => g.id === room.gameId);
-  if (room?.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===req.auth.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});
-  if (!user || !room || !game) return res.status(404).json({ error: "Table introuvable." });
-  const roomAccess = userFeatureAccess(user, "rooms:join", db);
-  if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
-  const gameAccess = userFeatureAccess(user, `game:${room.gameId}`, db);
-  if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
-  if (room.players.some((p) => p.id === user.id)) return res.json(sanitizeRoom(room, req.auth.id));
-  if (room.passwordHash && !maySpectate(room, user.id) && !(await bcrypt.compare(String(req.body.password ?? ""), room.passwordHash))) return res.status(403).json({ error: "Mot de passe de table requis ou invalide." });
-  if (room.state) {
-    grantSpectatorAccess(room, user.id);
-    return res.json(sanitizeRoom(room, user.id, db, true));
-  }
-  if (room.players.length >= game.maxPlayers) return res.status(400).json({ error: "Table complète." });
-  if (user.tokens < room.stake) return res.status(400).json({ error: "Jetons insuffisants." });
-  const levelError = roomLevelError(user, room, progressionConfig(db));
-  if (levelError) return res.status(403).json({ error: levelError });
-  room.players.push(roomPlayerFor(user));
-  if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
-  writeRoomDb(db, room);
-  broadcastRooms();
-  emitRoomUpdate(room);
-  res.json(sanitizeRoom(room, req.auth.id));
-});
+app.post("/api/rooms/:code/join", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/join", req, res, next));
 
 app.get("/api/rooms/:code", auth, (req, res) => {
   const db = readDb();
@@ -5480,31 +5478,9 @@ app.get("/api/rooms/:code", auth, (req, res) => {
   res.json(sanitizeRoom(room, req.auth.id, db, req.query.spectate === "1"));
 });
 
-app.post("/api/rooms/:code/spectate", auth, async (req, res) => {
-  const room = readDb().rooms.find((entry) => entry.code === req.params.code.toUpperCase());
-  if (!room) return res.status(404).json({ error: "Table introuvable." });
-  const user = getUser(req.auth.id);
-  const roomAccess = userFeatureAccess(user, "rooms:join");
-  if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
-  const gameAccess = userFeatureAccess(user, `game:${room.gameId}`);
-  if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
-  if (!maySpectate(room, req.auth.id) && room.passwordHash && !(await bcrypt.compare(String(req.body.password ?? ""), room.passwordHash))) return res.status(403).json({ error: "Mot de passe de table requis ou invalide." });
-  grantSpectatorAccess(room, req.auth.id);
-  res.json(sanitizeRoom(room, req.auth.id, undefined, true));
-});
+app.post("/api/rooms/:code/spectate", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/spectate", req, res, next));
 
-app.post("/api/rooms/:code/belote-team", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase());
-  if (!room) return res.status(404).json({ error: "Table introuvable." });
-  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
-  if (!access.allowed) return rejectFeature(res, access);
-  try {
-    chooseBeloteTeam(room, req.auth.id, String(req.body.playerId ?? req.auth.id), req.body.team);
-    writeRoomDb(db, room); emitRoomUpdate(room, db);
-    res.json(sanitizeRoom(room, req.auth.id, db));
-  } catch (error) { res.status(400).json({ error: error.message }); }
-});
+app.post("/api/rooms/:code/belote-team", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/belote-team", req, res, next));
 
 app.post("/api/rooms/:code/invite", auth, (req, res) => {
   const access = userFeatureAccess(getUser(req.auth.id), "friends");
@@ -5540,7 +5516,7 @@ app.post("/api/rooms/:code/invite", auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/room-invites/:id/accept", auth, (req, res) => {
+app.post("/api/room-invites/:id/accept", auth, async (req, res, next) => {
   const access = userFeatureAccess(getUser(req.auth.id), "friends");
   if (!access.allowed) return rejectFeature(res, access);
   if (req.auth.guest) return res.status(400).json({ error: "Les invitations sont réservées aux comptes enregistrés." });
@@ -5557,6 +5533,12 @@ app.post("/api/room-invites/:id/accept", auth, (req, res) => {
   const tableAccess = tableFeatureAccess(user, room, db);
   if (!tableAccess.allowed) return rejectFeature(res, tableAccess);
   if (room.players.some((p) => p.id === user.id)) return res.json(sanitizeRoom(room, req.auth.id));
+  if (gameGateway) {
+    try {
+      const result = await gameGateway.execute(room.id, "POST /api/rooms/:code/join", { actor: req.auth, params: { code: room.code }, body: {}, inviteId });
+      return res.status(result.status).json(result.response);
+    } catch (error) { return next(error); }
+  }
   if (room.state) {
     grantSpectatorAccess(room, user.id);
     user.roomInvites = user.roomInvites.filter((row) => row.id !== inviteId);
@@ -5585,345 +5567,33 @@ app.delete("/api/room-invites/:id", auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete("/api/rooms/:code", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
-  if (!room) return res.status(404).json({ error: "Table introuvable." });
-  if (room.ownerId !== req.auth.id) return res.status(403).json({ error: "Seul le créateur peut fermer cette table." });
-  if (room.state?.gameId === "texas-holdem") {
-    for (const player of [...room.players]) cashOutPokerPlayer(room, db, player.id, "poker-table-closed");
-  }
-  db.rooms = db.rooms.filter((r) => r.id !== room.id);
-  writeRoomDb(db, room);
-  io.to(room.id).emit("room-closed", { code: room.code });
-  broadcastRooms();
-  res.json({ ok: true });
-});
+app.delete("/api/rooms/:code", auth, (req, res, next) => dispatchRoomCommand("DELETE /api/rooms/:code", req, res, next));
 
-app.post("/api/rooms/:code/kick", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase() && !r.finished);
-  if (!room) return res.status(404).json({ error: "Table introuvable." });
-  if (room.ownerId !== req.auth.id) return res.status(403).json({ error: "Seul le maître peut exclure un joueur." });
-  const playerId = String(req.body.playerId ?? "");
-  if (!playerId || playerId === room.ownerId) return res.status(400).json({ error: "Joueur impossible à exclure." });
-  if (!room.players.some((p) => p.id === playerId)) return res.status(404).json({ error: "Joueur introuvable à cette table." });
-  const excludedUser = db.users.find((entry) => entry.id === playerId);
-  const exclusion = { type: "room-exclusion", title: "Vous avez été exclu", message: `Le maître vous a exclu de la table « ${room.name} ».`, actorId: room.ownerId, roomCode: room.code };
-  const notification = excludedUser ? pushNotification(excludedUser, exclusion) : { ...exclusion, id: randomUUID(), createdAt: new Date().toISOString() };
-  if (room.state?.gameId === "texas-holdem") cashOutPokerPlayer(room, db, playerId, "poker-kicked-cash-out");
-  else {
-    room.players = room.players.filter((p) => p.id !== playerId);
-    removePlayerFromRoomState(room, playerId);
-  }
-  if (!room.state) {
-    const humans = room.players.filter((player) => !player.isBot);
-    if (humans.length === 1) room.readyPlayerIds = [...new Set([...(room.readyPlayerIds ?? []), humans[0].id])];
-  }
-  if (room.state && !room.state.finished) runBotTurns(room, db);
-  finishRoomIfNeeded(room, db);
-  writeRoomDb(db, room, [playerId]);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  // Notify before the room update and revoke every live subscription of this player.
-  for (const socketId of [...(roomPresence.get(room.id) ?? [])]) {
-    const socket = io.sockets.sockets.get(socketId);
-    if (socket?.data.userId !== playerId) continue;
-    socket.emit("room-player-kicked", { code: room.code, playerId, reason: "owner", notification });
-    socket.leave(room.id);
-    roomPresence.get(room.id)?.delete(socketId);
-    delete socket.data.roomId;
-  }
-  emitRoomUpdate(room);
-  broadcastRooms();
-  res.json(safeRoom);
-});
+app.post("/api/rooms/:code/kick", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/kick", req, res, next));
 
-app.post("/api/rooms/:code/bot", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase() && r.ownerId === req.auth.id && !r.state);
-  if (!room) return res.status(404).json({ error: "Table introuvable." });
-  const game = games.find((g) => g.id === room.gameId);
-  if (room.players.length >= game.maxPlayers) return res.status(400).json({ error: "Table complète." });
-  room.players.push({ id: randomUUID(), pseudo: `Bot ${room.players.length}`, tokens: platformSettings(db).signupTokens, isBot: true, guest: true });
-  if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
-  writeRoomDb(db, room);
-  emitRoomUpdate(room);
-  broadcastRooms();
-  res.json(sanitizeRoom(room, req.auth.id));
-});
+app.post("/api/rooms/:code/bot", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/bot", req, res, next));
 
-app.post("/api/rooms/:code/poker-settings", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && entry.ownerId === req.auth.id && !entry.state && entry.gameId === "texas-holdem");
-  if (!room) return res.status(404).json({ error: "Réglages de table indisponibles." });
-  const requestedBigBlind = Math.floor(Number(req.body.bigBlind));
-  if (!Number.isFinite(requestedBigBlind) || requestedBigBlind < 2) return res.status(400).json({ error: "La grosse blinde doit être d'au moins 2 jetons." });
-  if (requestedBigBlind % 2) return res.status(400).json({ error: "La grosse blinde doit être paire afin que la petite blinde vaille exactement sa moitié." });
-  const { smallBlind, bigBlind } = pokerBlindsFromBigBlind(requestedBigBlind);
-  const maximumBet = Math.floor(Number(req.body.maximumBet));
-  if (!Number.isFinite(maximumBet) || maximumBet < bigBlind) return res.status(400).json({ error: "La mise maximale doit être supérieure ou égale à la grosse blinde." });
-  room.pokerBlinds = { smallBlind, bigBlind, maximumBet };
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  emitRoomUpdate(room);
-  res.json(safeRoom);
-});
+app.post("/api/rooms/:code/poker-settings", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/poker-settings", req, res, next));
 
-app.post("/api/rooms/:code/battle-settings", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && entry.ownerId === req.auth.id && !entry.state && entry.gameId === "bataille");
-  if (!room) return res.status(404).json({ error: "Modificateurs de Bataille indisponibles." });
-  room.battleModifiers = normalizeBattleModifiers(req.body);
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  emitRoomUpdate(room);
-  broadcastRooms();
-  res.json(safeRoom);
-});
+app.post("/api/rooms/:code/battle-settings", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/battle-settings", req, res, next));
 
-app.post("/api/rooms/:code/game-settings", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && entry.ownerId === req.auth.id && !entry.state);
-  if (!room) return res.status(404).json({ error: "Réglages de table indisponibles." });
-  room.gameModifiers = normalizeGameModifiers(room.gameId, req.body);
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  emitRoomUpdate(room);
-  res.json(safeRoom);
-});
+app.post("/api/rooms/:code/game-settings", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/game-settings", req, res, next));
 
-app.post("/api/rooms/:code/level-settings", auth, (req, res) => {
-  try {
-    const db = readDb(), room = db.rooms.find((row) => row.code === req.params.code.toUpperCase() && row.ownerId === req.auth.id && !row.state);
-    if (!room) return res.status(404).json({ error: "Table en attente introuvable." });
-    const access = tableFeatureAccess(getUser(req.auth.id), room, db);
-    if (!access.allowed) return rejectFeature(res, access);
-    const limits = roomLevelLimits(req.body), config = progressionConfig(db);
-    for (const player of room.players.filter((row) => !row.isBot)) {
-      const error = roomLevelError(db.users.find((user) => user.id === player.id) ?? player, { ...room, ...limits }, config);
-      if (error) return res.status(400).json({ error: `${player.pseudo} : ${error}` });
-    }
-    Object.assign(room, limits); writeRoomDb(db, room); emitRoomUpdate(room); broadcastRooms();
-    res.json(sanitizeRoom(room, req.auth.id, db));
-  } catch (error) { res.status(400).json({ error: error.message }); }
-});
+app.post("/api/rooms/:code/level-settings", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/level-settings", req, res, next));
 
-app.post("/api/rooms/:code/leave", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && !entry.finished);
-  if (!room || !room.players.some((entry) => entry.id === req.auth.id)) return res.status(404).json({ error: "Table introuvable." });
-  if (room.ranked) {
-    rankedRuntime.forfeit(room,db,req.auth.id);writeRoomDb(db,room,[req.auth.id]);emitRoomUpdate(room);broadcastRooms();return res.json({ok:true});
-  }
-  if (room.state?.gameId === "texas-holdem") cashOutPokerPlayer(room, db, req.auth.id);
-  else {
-    room.players = room.players.filter((entry) => entry.id !== req.auth.id);
-    removePlayerFromRoomState(room, req.auth.id);
-  }
-  if (room.gameId === "belote" && room.state && !room.state.finished) {
-    if (room.ownerId === req.auth.id) room.ownerId = room.players.find((player) => !player.isBot)?.id ?? room.ownerId;
-    runBotTurns(room, db);
-  }
-  if (!room.state) {
-    const humans = room.players.filter((player) => !player.isBot);
-    if (humans.length === 1) room.readyPlayerIds = [...new Set([...(room.readyPlayerIds ?? []), humans[0].id])];
-  }
-  finishRoomIfNeeded(room, db);
-  writeRoomDb(db, room, [req.auth.id]);
-  emitRoomUpdate(room);
-  broadcastRooms();
-  res.json({ ok: true });
-});
+app.post("/api/rooms/:code/leave", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/leave", req, res, next));
 
-app.post("/api/rooms/:code/ready", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && !entry.state && !entry.finished);
-  if (!room || !room.players.some((player) => player.id === req.auth.id && !player.isBot)) return res.status(404).json({ error: "Table introuvable." });
-  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
-  if (!access.allowed) return rejectFeature(res, access);
-  room.readyPlayerIds ??= [];
-  room.readyPlayerIds = room.readyPlayerIds.includes(req.auth.id) ? room.readyPlayerIds.filter((id) => id !== req.auth.id) : [...room.readyPlayerIds, req.auth.id];
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  emitRoomUpdate(room);
-  res.json(safeRoom);
-});
+app.post("/api/rooms/:code/ready", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/ready", req, res, next));
 
-app.post("/api/rooms/:code/start", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase() && r.ownerId === req.auth.id && !r.state);
-  if (!room) return res.status(404).json({ error: "Table introuvable." });
-  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
-  if (!access.allowed) return rejectFeature(res, access);
-  const game = configuredGames(db).find((entry) => entry.id === room.gameId);
-  if (!game) return res.status(404).json({ error: "Jeu introuvable." });
-  const humans = room.players.filter((player) => !player.isBot);
-  if (humans.length === 1) room.readyPlayerIds = [...new Set([...(room.readyPlayerIds ?? []), humans[0].id])];
-  while (room.players.length < game.minPlayers && room.players.length < game.maxPlayers) {
-    room.players.push({ id: randomUUID(), pseudo: `Bot ${room.players.filter((player) => player.isBot).length + 1}`, tokens: platformSettings(db).signupTokens, isBot: true, guest: true });
-  }
-  const waitingHumans = room.players.filter((player) => !player.isBot && player.id !== room.ownerId && !(room.readyPlayerIds ?? []).includes(player.id));
-  if (waitingHumans.length) return res.status(400).json({ error: `Tous les joueurs doivent être prêts (${waitingHumans.map((player) => player.pseudo).join(", ")}).` });
-  const error = startRoomRound(room, db);
-  if (error === "missing") return res.status(404).json({ error: "Jeu introuvable." });
-  if (error) return res.status(400).json({ error });
-  const achievementUnlocks = consumeRoomAchievementUnlocks(room, req.auth.id);
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  emitRoomUpdate(room);
-  broadcastRooms();
-  res.json({ ...safeRoom, achievementUnlocks });
-});
+app.post("/api/rooms/:code/start", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/start", req, res, next));
 
-app.post("/api/rooms/:code/replay", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase() && r.ownerId === req.auth.id && r.finished);
-  if (!room) return res.status(404).json({ error: "Replay indisponible." });
-  room.state = null;
-  room.pacing = null;
-  const humans = room.players.filter((player) => !player.isBot);
-  room.readyPlayerIds = humans.length === 1 ? [humans[0].id] : [];
-  room.finished = false;
-  room.createdAt = new Date().toISOString();
-  syncRoomPlayerTokens(room, db);
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  emitRoomUpdate(room);
-  broadcastRooms();
-  res.json(safeRoom);
-});
+app.post("/api/rooms/:code/replay", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/replay", req, res, next));
 
-app.post("/api/rooms/:code/replay-now", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase() && entry.ownerId === req.auth.id && entry.finished && entry.gameId === "blackjack");
-  if (!room) return res.status(404).json({ error: "Nouvelle manche de Blackjack indisponible." });
-  const error = startRoomRound(room, db);
-  if (error === "missing") return res.status(404).json({ error: "Jeu introuvable." });
-  if (error) return res.status(400).json({ error });
-  room.createdAt = new Date().toISOString();
-  const achievementUnlocks = consumeRoomAchievementUnlocks(room, req.auth.id);
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id);
-  emitRoomUpdate(room);
-  broadcastRooms();
-  res.json({ ...safeRoom, achievementUnlocks });
-});
+app.post("/api/rooms/:code/replay-now", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/replay-now", req, res, next));
 
-app.post("/api/rooms/:code/action", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
-  if (!room?.state) return res.status(404).json({ error: "Partie non démarrée." });
-  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
-  if (!access.allowed) return rejectFeature(res, access);
-  if (!room.players.some((player) => player.id === req.auth.id && !player.isBot) || !room.state.players.some((player) => player.id === req.auth.id && !player.isBot)) return res.status(403).json({ error: "Un spectateur ne peut pas jouer." });
-  if (room.finished && !(room.state.gameId === "texas-holdem" && req.body.type === "show")) return res.status(404).json({ error: "Cette partie est terminée." });
-  const pacingAdvanced = room.pacing && !roomPacingActive(room) ? advanceRoomPacing(room, db) : false;
-  const actionAllowedDuringPacing = (room.state.gameId === "texas-holdem" && req.body.type === "show")
-    || (room.pacing?.kind === "turn-end" && room.pacing.actorIsBot && room.state.gameId === "midnight-dice" && room.state.phase === "contract" && req.body.type === "choose-contract");
-  if (roomPacingActive(room) && !actionAllowedDuringPacing) {
-    if (pacingAdvanced) {
-      writeRoomDb(db, room);
-      emitRoomUpdate(room, db);
-    }
-    const pacingError = room.pacing.kind === "round-results"
-      ? "La manche suivante commencera après les résultats."
-      : room.pacing.kind === "bot-thinking"
-        ? "L'IA prépare encore son coup."
-        : "Le tour précédent est encore affiché.";
-    return res.status(409).json({ error: pacingError });
-  }
-  try {
-    if (room.ranked) validateRankedAction(room.state, req.auth.id, req.body);
-    const actionPlayer = room.state.players?.find((player) => player.id === req.auth.id);
-    const turnBeforeActionPlayerId = room.state.players?.[room.state.currentPlayerIndex]?.id ?? "";
-    const achievementSnapshot = actionAchievementSnapshot(room.state, req.auth.id);
-    const roundBeforeAction = roundProgressSnapshot(room.state);
-    const actionNow = Date.now();
-    if (req.body.type === "roll" && !actionPlayer?.isBot && (room.state.rollAvailableAt?.[req.auth.id] ?? 0) > actionNow) throw new Error("Laisse les dés terminer leur lancer avant de relancer.");
-    if (room.state.gameId === "blackjack" && req.body.type === "bet") {
-      const minimumBet = Math.max(1, Number(room.state.modifiers?.minimumBet) || 1);
-      const maximumBet = Math.max(minimumBet, Number(room.state.modifiers?.maximumBet) || minimumBet);
-      const amount = Math.floor(Number(req.body.amount) || 0);
-      if (amount < minimumBet) throw new Error(`La mise minimale est de ${minimumBet} jetons.`);
-      if (amount > maximumBet) throw new Error(`La mise maximale est de ${maximumBet} jetons.`);
-      if (room.state.bets[req.auth.id]) throw new Error("Mise déjà placée.");
-      if (getTokenBalance(db, req.auth.id) < amount) throw new Error("Jetons insuffisants.");
-      addTokens(db, req.auth.id, -amount, { gameId: room.gameId, roomId: room.id, reason: "blackjack-bet" });
-      appendRoomAchievementUnlocks(room, req.auth.id, unlockEligibleAchievements(db.users.find((u) => u.id === req.auth.id), db));
-      triggerRandomAchievement(db, req.auth.id, room);
-      syncRoomPlayerTokens(room, db);
-    }
-    if (room.state.gameId === "blackjack" && req.body.type === "double") {
-      const originalBet = Number(room.state.bets?.[req.auth.id]) || 0;
-      const hand = room.state.hands?.[req.auth.id] ?? [];
-      if (!originalBet || hand.length !== 2) throw new Error("Le doublement est disponible uniquement sur les deux cartes initiales.");
-      if (Object.keys(room.state.bets ?? {}).length < room.state.players.filter((player) => !player.isBot).length) throw new Error("Toutes les mises doivent être placées avant de doubler.");
-      if ((room.state.completedPlayerIds ?? []).includes(req.auth.id)) throw new Error("Ta main est déjà terminée.");
-      if (blackjackHandTotal(hand) === 21) throw new Error("Une main de 21 ne peut pas être doublée.");
-      if (getTokenBalance(db, req.auth.id) < originalBet) throw new Error("Jetons insuffisants pour doubler la mise.");
-      addTokens(db, req.auth.id, -originalBet, { gameId: room.gameId, roomId: room.id, reason: "blackjack-double" });
-      appendRoomAchievementUnlocks(room, req.auth.id, unlockEligibleAchievements(db.users.find((u) => u.id === req.auth.id), db));
-      triggerRandomAchievement(db, req.auth.id, room);
-      syncRoomPlayerTokens(room, db);
-    }
-    if (room.state.gameId === "421" && req.body.type === "buy-reroll") {
-      if (!room.state.modifiers?.paidRerollsEnabled) throw new Error("Les relances payantes sont désactivées.");
-      if (room.state.players?.[room.state.currentPlayerIndex]?.id !== req.auth.id) throw new Error("Ce n'est pas ton tour.");
-      if (room.state.rollsLeft > 0 || room.state.dice?.length !== 3) throw new Error("Cette relance sera disponible après les lancers gratuits.");
-      const used = Number(room.state.paidRerollsUsed?.[req.auth.id]) || 0;
-      if (used >= (room.state.modifiers?.paidRerollsPerTurn ?? 2)) throw new Error("Limite de relances payantes atteinte pour ce tour.");
-      const amount = paidRerollPrice421(room.state, req.auth.id);
-      if (getTokenBalance(db, req.auth.id) < amount) throw new Error("Jetons insuffisants pour acheter cette relance.");
-      addTokens(db, req.auth.id, -amount, { gameId: room.gameId, roomId: room.id, reason: "421-paid-reroll" });
-      syncRoomPlayerTokens(room, db);
-    }
-    room.state = applyAction(room.state, req.auth.id, req.body);
-    if (room.ranked && !["show","auto-check-fold"].includes(req.body.type)) rankedRuntime.action(room);
-    processAchievementEvent(db, req.auth.id, gameActionAchievementEvent(room, req.auth.id, req.body, achievementSnapshot), room);
-    if (req.body.type === "roll" && !actionPlayer?.isBot) room.state.rollAvailableAt = { ...(room.state.rollAvailableAt ?? {}), [req.auth.id]: Date.now() + 700 };
-    const showingRoundResults = startRoundResultsIfNeeded(room, roundBeforeAction, actionPlayer);
-    if (!showingRoundResults) {
-      const turnAfterActionPlayerId = room.state.players?.[room.state.currentPlayerIndex]?.id ?? "";
-      const humanTurnEnded = !room.state.finished
-        && room.state.gameId !== "bataille"
-        && turnBeforeActionPlayerId === req.auth.id
-        && (turnAfterActionPlayerId !== turnBeforeActionPlayerId || didRoundFinish(roundBeforeAction, room.state));
-      if (humanTurnEnded && !roomPacingActive(room)) {
-        const timing = roomTiming(room);
-        startRoomPacing(room, "turn-end", timing.turnEndDelayMs, {
-          actorId: actionPlayer?.id ?? req.auth.id,
-          actorName: actionPlayer?.pseudo ?? "Le joueur",
-          actorIsBot: false
-        });
-      } else {
-        runBotTurns(room, db);
-      }
-    }
-    finishRoomIfNeeded(room, db);
-    const achievementUnlocks = consumeRoomAchievementUnlocks(room, req.auth.id);
-    writeRoomDb(db, room);
-    const safeRoom = sanitizeRoom(room, req.auth.id, db);
-    emitRoomUpdate(room, db);
-    res.json({ ...safeRoom, achievementUnlocks });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
+app.post("/api/rooms/:code/action", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/action", req, res, next));
 
-app.post("/api/rooms/:code/pacing/skip", auth, (req, res) => {
-  const db = readDb();
-  const room = db.rooms.find((entry) => entry.code === req.params.code.toUpperCase());
-  if (!room?.state || !room.pacing) return res.status(404).json({ error: "Aucune attente à passer." });
-  if (!room.players.some((player) => player.id === req.auth.id && !player.isBot)) return res.status(403).json({ error: "Seuls les joueurs assis peuvent accélérer la partie." });
-  if (req.body?.pacingId && req.body.pacingId !== room.pacing.id) return res.status(409).json({ error: "Cette attente est déjà terminée." });
-  room.pacing.endsAt = Date.now();
-  advanceRoomPacing(room, db, Date.now());
-  finishRoomIfNeeded(room, db);
-  writeRoomDb(db, room);
-  const safeRoom = sanitizeRoom(room, req.auth.id, db);
-  emitRoomUpdate(room, db);
-  res.json(safeRoom);
-});
+app.post("/api/rooms/:code/pacing/skip", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/pacing/skip", req, res, next));
 
 const accountArchiveEpochs = new WeakMap();
 let accountArchiveSequence = 0;
@@ -6061,6 +5731,7 @@ setInterval(() => {
 }, 10000).unref();
 
 setInterval(() => {
+  if (gameGateway) return;
   const db = readDb();
   let changed = false;
   const changedRooms = new Set();
@@ -6193,6 +5864,7 @@ io.on("connection", (socket) => {
       const db = readDb();
       const room = db.rooms.find((r) => r.id === roomId);
       if (!room || room.state || room.finished) return;
+      if (gameGateway) { gameGateway.expire(roomId, true); return; }
       db.rooms = db.rooms.filter((r) => r.id !== roomId);
       writeRoomDb(db, room);
       broadcastRooms();
@@ -6211,6 +5883,10 @@ if (CLIENT_DIST) {
 }
 
 app.use((error, _req, res, next) => {
+  if (String(error.code).startsWith("GAME_")) {
+    const status = error.code === "GAME_AUTH_REVOKED" ? 403 : error.code === "GAME_CONFLICT" ? 409 : 503;
+    return res.set("Retry-After", "2").status(status).json({ error: status === 403 ? "Session invalide." : "Table temporairement indisponible. Reessaie dans quelques instants." });
+  }
   if (String(error.code).startsWith("TASK_WORK_")) return res.set("Retry-After", "5").status(503).json({ error: "Traitement temporairement indisponible. Reessaie dans quelques instants." });
   if (error.code !== "PASSWORD_WORK_BUSY") return next(error);
   res.set("Retry-After", "5").status(503).json({ error: error.message });
@@ -6235,12 +5911,15 @@ async function shutdown() {
   shuttingDown = true;
   setTimeout(() => process.exit(1), 10000).unref();
   try { executionHistory.sample(serviceExecution.health(readingWork.health()), true); } catch {}
+  await gameGateway?.close();
   await Promise.all([readingWork.close(), bcrypt.close(), accountsWork?.close(), capacityTests.close()]);
   executionHistory.close();
   io.close(() => process.exit(0));
 }
 process.once("SIGTERM", shutdown);
 process.once("SIGINT", shutdown);
+try { await gameGateway?.recover(); }
+catch (error) { await gameGateway?.close(); throw error; }
 server.listen({ port: PORT, host: HOST, backlog: 4096 }, () => {
   const protocol = HTTPS_PFX_PATH || (HTTPS_KEY_PATH && HTTPS_CERT_PATH) ? "https" : "http";
   console.log(`KTGA.ME server listening on ${protocol}://${HOST}:${PORT}`);

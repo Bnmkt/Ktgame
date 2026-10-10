@@ -27,7 +27,7 @@ for (const user of original.users) old.prepare("INSERT INTO users VALUES (?, ?, 
 for (const row of original.history) old.prepare("INSERT INTO history VALUES (?, ?, ?, ?)").run(row.id, JSON.stringify(["a", "bot"]), row.finishedAt, JSON.stringify(row));
 for (const row of original.transactions) old.prepare("INSERT INTO transactions VALUES (?, ?, ?, NULL, NULL, ?, ?)").run(row.id, row.userId, row.gameId ?? null, row.createdAt, JSON.stringify(row));
 old.close();
-const { readDb, writeDb, updateDb, databaseHealth, databaseSettingsRevision, databaseSettingsReadRevision, syncCatalogs, closeDatabase, rankedSettlement } = await import("../src/db.js");
+const { readDb, writeDb, updateDb, databaseHealth, databaseSettingsRevision, databaseSettingsReadRevision, databaseEntityRevision, setRoomMutationGuard, syncCatalogs, closeDatabase, rankedSettlement } = await import("../src/db.js");
 const inspection = new DatabaseSync(file);
 
 test("statistics cache telemetry counts reuse and invalidation without returning user IDs", () => {
@@ -53,6 +53,19 @@ test("account configuration revision changes only after committed settings or ro
   assert.equal(databaseSettingsReadRevision(), before + 2);
   assert.equal(readDb().settings.accountProjectionTest, "committed");
   updateDb((db) => { db.users[0].tokens--; delete db.settings.accountProjectionTest; });
+});
+
+test("owner fencing rejects direct room writes and rolls back account effects", () => {
+  const room = { id: "fenced", code: "FENCED", gameId: "yahtzee", players: [], createdAt: new Date().toISOString() };
+  const before = readDb().users[0].tokens;
+  const revision = databaseEntityRevision("users", "a");
+  setRoomMutationGuard(() => { throw Object.assign(new Error("Room owner required"), { code: "GAME_FENCED" }); });
+  try {
+    assert.throws(() => updateDb((db) => { db.rooms.push(room); db.users[0].tokens--; }, { rooms: [room.id], users: ["a"] }), { code: "GAME_FENCED" });
+    assert.equal(readDb().users[0].tokens, before); assert.ok(!readDb().rooms.some(({ id }) => id === room.id));
+    assert.notEqual(databaseEntityRevision("users", "a"), revision);
+    assert.equal(inspection.prepare("SELECT count(*) AS n FROM rooms WHERE id='fenced'").get().n, 0);
+  } finally { setRoomMutationGuard(undefined); }
 });
 
 test("legacy migration is backed up, lossless, relational and idempotent", () => {
