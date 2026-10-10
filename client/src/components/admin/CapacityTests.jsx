@@ -14,7 +14,7 @@ const reasons = { "admin-stop": "Arrêt demandé", "real-room-opened": "Une vrai
 const fields = [
   ["clients", "Joueurs simultanés", "joueurs"], ["seconds", "Durée en jeu", "s"], ["rampMs", "Délai entre connexions", "ms"],
   ["roomRampMs", "Délai entre tables", "ms"], ["actionMs", "Délai entre actions", "ms"], ["browseMs", "Délai entre lectures API", "ms"],
-  ["setupConcurrency", "Connexions en parallèle", ""], ["loopLimitMs", "Latence maximale P95", "ms"], ["freeMemoryMb", "Mémoire libre minimale", "Mo"], ["errorLimit", "Erreurs par échantillon", ""]
+  ["setupConcurrency", "Connexions en parallèle", ""], ["gameWorkers", "Processus jeux (0 : désactivés)", ""], ["loopLimitMs", "Latence maximale P95", "ms"], ["freeMemoryMb", "Mémoire libre minimale", "Mo"], ["errorLimit", "Erreurs par échantillon", ""]
 ];
 const switches = [["routinePolls", "Notifications et présence"], ["liveState", "États de table en temps réel"], ["chat", "Messages de chat"], ["events", "Événements communautaires"], ["reconnect", "Reconnexions"], ["ranked", "Matchmaking classé"]];
 const checkNames = { integrity: "Intégrité SQLite", foreignKeys: "Relations entre données", uniqueRankedResults: "Résultats classés uniques", uniqueSettlements: "Attribution unique du classement", uniqueGameHistories: "Historiques sans doublon", uniqueAchievementRewards: "Récompenses uniques", uniqueEventActions: "Actions communautaires uniques", nonnegativeXp: "XP non négative", xpMatchesRecordedAwards: "XP et récompenses cohérentes", balancesMatchTransactions: "Soldes et transactions cohérents", validBalances: "Soldes valides", fictitiousAccounts: "Uniquement des comptes fictifs" };

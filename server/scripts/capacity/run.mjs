@@ -195,7 +195,7 @@ async function sample() {
       health.push(healthSnapshot(h));
       if (health.length > 720) health.splice(1, 1);
       const delta=counters.errors-before;before=counters.errors;
-      consecutive = Math.max(h.eventLoop.p95Ms,h.processes?.accounts?.eventLoopP95??0)>loopLimitMs || h.system.freeMemory<freeMemoryMb*1024*1024 || delta>errorLimit ? consecutive+1 : 0;
+      consecutive = Math.max(h.eventLoop.p95Ms,h.processes?.accounts?.eventLoopP95??0,...(h.gameWorkers?.workers ?? []).map((row)=>row.eventLoopP95??0))>loopLimitMs || h.system.freeMemory<freeMemoryMb*1024*1024 || delta>errorLimit ? consecutive+1 : 0;
       if(consecutive>=3)stopRun("Safety threshold exceeded for 3 consecutive samples");
     }catch{consecutive++;if(consecutive>=3)stopRun("Health unavailable for 3 consecutive samples");}
     console.log(JSON.stringify({at:new Date().toISOString(),phase,loadStartedAt,health:health.at(-1),clients:clients.length,connected:clients.filter((c)=>c.socket?.connected).length,requests:counters.requests,errors:counters.errors,actions:counters.actions,completed:counters.completed,p95Ms:latency.percentile(.95)}));
@@ -203,7 +203,7 @@ async function sample() {
   }
 }
 function healthSnapshot(h) {
-  return {at:new Date().toISOString(),cpu:h.processTotals?.cpuPercent??h.process.cpuPercent,siteCpu:h.process.cpuPercent,accountsCpu:h.processes?.accounts?.cpuPercent??null,systemCpu:h.system.cpuPercent,cpuCount:h.system.cpuCount,rss:h.processTotals?.memoryRss??h.process.memory.rss,siteRss:h.process.memory.rss,accountsRss:h.processes?.accounts?.memoryRss??null,heapUsed:h.process.memory.heapUsed,loopP95:h.eventLoop.p95Ms,loopMax:h.eventLoop.maxMs,accountsLoopP95:h.processes?.accounts?.eventLoopP95??null,rps:h.traffic.requestsPerSecond,sockets:h.realtime.sockets,rooms:h.realtime.playingRooms,systemFreeMemory:h.system.freeMemory,workers:h.workers,services:h.services,caches:h.caches,processes:h.processes};
+  return {at:new Date().toISOString(),cpu:h.processTotals?.cpuPercent??h.process.cpuPercent,siteCpu:h.process.cpuPercent,accountsCpu:h.processes?.accounts?.cpuPercent??null,systemCpu:h.system.cpuPercent,cpuCount:h.system.cpuCount,rss:h.processTotals?.memoryRss??h.process.memory.rss,siteRss:h.process.memory.rss,accountsRss:h.processes?.accounts?.memoryRss??null,heapUsed:h.process.memory.heapUsed,loopP95:h.eventLoop.p95Ms,loopMax:h.eventLoop.maxMs,accountsLoopP95:h.processes?.accounts?.eventLoopP95??null,rps:h.traffic.requestsPerSecond,sockets:h.realtime.sockets,rooms:h.realtime.playingRooms,systemFreeMemory:h.system.freeMemory,workers:h.workers,services:h.services,caches:h.caches,processes:h.processes,gameWorkers:h.gameWorkers};
 }
 async function routine(client) {
   const tasks = [
@@ -304,7 +304,7 @@ finally {
   try { health.push(healthSnapshot(await request(monitor,"/api/admin/health?points=1"))); } catch {}
   loop.disable();
   const report={runId:manifest.runId,target,targets,startedAt,loadStartedAt,finishedAt:new Date().toISOString(),clients:clients.length,seated:cohorts.filter((c)=>c.room).reduce((sum,c)=>sum+c.group.length,0),seconds,rampMs,roomRampMs,setupConcurrency,actionMs,browseMs,routinePolls,liveState,stopReason,rateLimits:manifest.rateLimits,
-    credentialWorkFactor:manifest.passwordRounds ?? 10,
+    credentialWorkFactor:manifest.passwordRounds ?? 10, architecture:manifest.architecture,
     scenario:"Real password logins; independent WebSockets; legal public-state game actions; pacing skip; browsing, chat, events, reconnects, ranked when requested. No production data, SMTP or browser analytics.",
     counters,statuses,latency:latency.summary(),phases:Object.fromEntries([...byPhase].map(([key,value])=>[key,value.summary()])),routes:Object.fromEntries([...byRoute].map(([key,value])=>[key,value.summary()])),coverage,failures,health,
     generator:{cpu:process.cpuUsage(cpuStart),rss:process.memoryUsage().rss,eventLoopP95Ms:Number(loop.percentile(95)/1e6).toFixed(1),eventLoopMaxMs:Number(loop.max/1e6).toFixed(1)},

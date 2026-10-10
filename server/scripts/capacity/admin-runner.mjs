@@ -57,7 +57,7 @@ async function run(input) {
     timer = setTimeout(() => { stop(); if (generator?.exitCode === null) generator.kill("SIGKILL"); if (fixture?.connected) fixture.send({ type: "stop" }, () => {}); }, (ttl + 60) * 1000);
     let resolveReady, rejectReady;
     const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
-    fixture = launch("./serve.mjs", ["--port", String(await freePort()), "--users", String(config.clients), "--ttl", String(ttl)], (row) => { if (row.ready) resolveReady(row); });
+    fixture = launch("./serve.mjs", ["--port", String(await freePort()), "--users", String(config.clients), "--ttl", String(ttl), "--game-workers", String(config.gameWorkers)], (row) => { if (row.ready) resolveReady(row); });
     fixture.on("message", (message) => {
       if (message?.type === "fixture" && path.dirname(message.directory) === fs.realpathSync(os.tmpdir()) && /^ktga-capacity-[\w-]+$/.test(path.basename(message.directory))) directory = message.directory;
     });

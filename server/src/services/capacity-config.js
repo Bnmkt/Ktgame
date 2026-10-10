@@ -3,11 +3,11 @@ import { games } from "../games/shared.js";
 export const testLimits = {
   clients: [2, 2000], seconds: [10, 1800], rampMs: [50, 5000], roomRampMs: [80, 5000],
   actionMs: [250, 30000], browseMs: [5000, 120000], setupConcurrency: [1, 16],
-  loopLimitMs: [100, 2000], freeMemoryMb: [150, 2048], errorLimit: [1, 100]
+  loopLimitMs: [100, 2000], freeMemoryMb: [150, 2048], errorLimit: [1, 100], gameWorkers: [0, 4]
 };
 export const testDefaults = {
   clients: 10, seconds: 60, rampMs: 300, roomRampMs: 500, actionMs: 1000, browseMs: 5000,
-  setupConcurrency: 1, loopLimitMs: 500, freeMemoryMb: 300, errorLimit: 10,
+  setupConcurrency: 1, loopLimitMs: 500, freeMemoryMb: 300, errorLimit: 10, gameWorkers: 0,
   routinePolls: true, liveState: true, ranked: false, chat: true, events: true, reconnect: true,
   games: games.map((game) => game.id)
 };
@@ -32,7 +32,7 @@ export function validateTestConfig(input) {
 
 // Forward only runtime settings, never the production environment or its credentials.
 export function testProcessEnvironment(env = process.env) {
-  const keys = ["PATH", "Path", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE", "COMSPEC", "LANG", "TZ", "CASINO_TIME_ZONE", "PASSWORD_WORKERS", "READING_WORKERS", "SQLITE_SYNCHRONOUS", "ACCOUNTS_PROCESS_ENABLED"];
+  const keys = ["PATH", "Path", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE", "COMSPEC", "LANG", "TZ", "CASINO_TIME_ZONE", "PASSWORD_WORKERS", "READING_WORKERS", "SQLITE_SYNCHRONOUS", "ACCOUNTS_PROCESS_ENABLED", "GAME_WORKERS_ENABLED", "GAME_WORKERS"];
   return { ...Object.fromEntries(keys.filter((key) => env[key] !== undefined).map((key) => [key, env[key]])), KTGA_TEST_CHILD: "1" };
 }
 
@@ -43,7 +43,7 @@ export function testMetadata() {
 export function sanitizeTestReport(report) {
   const output = {};
   if (Number.isInteger(report.credentialWorkFactor) && report.credentialWorkFactor >= 4 && report.credentialWorkFactor <= 14) output.credentialWorkFactor = report.credentialWorkFactor;
-  for (const key of ["runId", "startedAt", "loadStartedAt", "finishedAt", "clients", "seated", "seconds", "rampMs", "roomRampMs", "setupConcurrency", "actionMs", "browseMs", "routinePolls", "liveState", "rateLimits", "counters", "statuses", "latency", "phases", "coverage", "health", "generator", "passed", "incomplete", "sampledHealth", "diagnostics"]) {
+  for (const key of ["runId", "startedAt", "loadStartedAt", "finishedAt", "clients", "seated", "seconds", "rampMs", "roomRampMs", "setupConcurrency", "actionMs", "browseMs", "routinePolls", "liveState", "rateLimits", "architecture", "counters", "statuses", "latency", "phases", "coverage", "health", "generator", "passed", "incomplete", "sampledHealth", "diagnostics"]) {
     if (report[key] !== undefined) output[key] = report[key];
   }
   output.stopReason = ["duration", "interrupted", "setup failed", "preparation failed", "runner-failed"].includes(report.stopReason) ? report.stopReason : "safety";

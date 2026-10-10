@@ -17,6 +17,11 @@ const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ktga-capacity-"));
 if (process.connected) process.send({ type: "fixture", directory }, () => {});
 const runId = `capacity-${randomBytes(6).toString("hex")}`, secret = randomBytes(48).toString("hex");
 const env = isolatedEnvironment(directory, port, runId, secret, args["rate-limits"] === "production");
+if (args["game-workers"] !== undefined) {
+  const workers = Number(args["game-workers"]);
+  if (!Number.isInteger(workers) || workers < 0 || workers > 4) throw new Error("game-workers: 0 (inline) or 1..4.");
+  env.GAME_WORKERS_ENABLED = workers ? "1" : "0"; env.GAME_WORKERS = String(workers || 1);
+}
 const password = `Test-${randomBytes(12).toString("hex")}!`;
 const passwordRounds = Number(args["password-rounds"] ?? 10);
 if (!Number.isInteger(passwordRounds) || passwordRounds < 4 || passwordRounds > 14) throw new Error("password-rounds: 4..14; the default 10 is required for comparable capacity tests.");
@@ -37,6 +42,7 @@ database.prepare("INSERT INTO meta VALUES('admin-settings',?)").run(JSON.stringi
 database.close();
 const manifest = { runId, users, password, passwordRounds, port, expiresAt: new Date(Date.now()+ttl*1000).toISOString(), database: env.SQLITE_PATH, rateLimits: args["rate-limits"] === "production" ? "production" : "capacity-only-raised",
   monitorToken: jwt.sign({ id: `${runId}-monitor`, sessionVersion: 0 }, secret, { expiresIn: `${ttl+300}s` }) };
+manifest.architecture = { mode: env.GAME_WORKERS_ENABLED === "1" ? "game-processes" : "inline", gameWorkers: env.GAME_WORKERS_ENABLED === "1" ? Number(env.GAME_WORKERS || 1) : 0 };
 fs.writeFileSync(path.join(directory, "manifest.json"), JSON.stringify(manifest), { mode: 0o600 });
 const log = fs.openSync(path.join(directory, "server.log"), "w", 0o600);
 const profileArgs = args.profile === "true" ? ["--import", new URL("./profile.mjs", import.meta.url).href] : [];

@@ -17,6 +17,9 @@ files=(
   server/src/services/task-pool.js server/src/services/service-execution.js server/src/services/execution-history.js
   server/src/services/account-domain.js server/src/services/account-tasks.js server/src/services/accounts-work.js
   server/src/services/accounts-process.js server/src/services/process-worker.js server/src/services/process-health.js
+  server/src/services/room-runtime.js server/src/services/room-commands.js server/src/services/ranked-room-runtime.js
+  server/src/services/game-gateway.js server/src/services/game-workers.js server/src/services/game-ipc-transport.js
+  server/src/services/game-room-kernel.js server/src/services/game-worker-process.js
   server/src/services/desktop-supervision.js
   server/src/services/capacity-config.js server/src/services/capacity-tests.js
   server/scripts/capacity/admin-runner.mjs server/scripts/capacity/serve.mjs server/scripts/capacity/run.mjs

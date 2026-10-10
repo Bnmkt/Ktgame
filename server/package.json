@@ -17,6 +17,7 @@
     "capacity:serve": "node scripts/capacity/serve.mjs",
     "capacity:run": "node scripts/capacity/run.mjs",
     "capacity:inspect": "node scripts/capacity/inspect.mjs",
+    "capacity:compare": "node scripts/capacity/compare.mjs",
     "start": "node src/index.js"
   },
   "dependencies": {
