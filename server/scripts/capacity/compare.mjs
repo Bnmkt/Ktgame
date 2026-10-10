@@ -62,6 +62,9 @@ for (const count of workers) {
     let ready, failed;
     const readiness = new Promise((resolve, reject) => { ready = resolve; failed = reject; });
     fixture = launch("./serve.mjs", ["--port", String(await freePort()), "--users", args.clients ?? "60", "--ttl", args.ttl ?? "1800", "--game-workers", String(count)], (row) => { if (row.ready) ready(row); });
+    fixture.on("message", (message) => {
+      if (message?.type === "fixture" && path.dirname(message.directory) === fs.realpathSync(os.tmpdir()) && /^ktga-capacity-[\w-]+$/.test(path.basename(message.directory))) directory = message.directory;
+    });
     fixture.done.then(({ stderr }) => failed(new Error(`Isolated server stopped: ${stderr}`)), failed);
     const timeout = setTimeout(() => failed(new Error("Fixture startup timeout")), 60000);
     let row;

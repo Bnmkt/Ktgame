@@ -61,7 +61,7 @@ export class GameIpcTransport extends EventEmitter {
     this.emit("stopped", code);
   }
   terminate() {
-    if (this.child.exitCode !== null || this.child.signalCode !== null) return Promise.resolve();
+    if (!this.child.pid || this.child.exitCode !== null || this.child.signalCode !== null) return Promise.resolve();
     return new Promise((resolve) => {
       const force = setTimeout(() => this.child.kill("SIGKILL"), 1000);
       this.child.once("exit", () => { clearTimeout(force); resolve(); });
