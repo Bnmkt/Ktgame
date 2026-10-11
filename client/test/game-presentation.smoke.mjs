@@ -104,10 +104,10 @@ try {
 
     ({ page, context } = await setup(viewport, { logged: true }));
     await page.goto(origin);
-    await page.getByRole("button", { name: "Tous les jeux", exact: true }).waitFor();
-    assert.equal(await page.locator(".game-card").count(), 1);
-    await page.getByRole("button", { name: "Tous les jeux", exact: true }).click();
+    await page.getByRole("heading", { name: "Jeux disponibles", exact: true }).waitFor();
     await page.waitForFunction(() => document.querySelectorAll(".game-card").length === 3 && document.querySelector(".game-card h3")?.innerText.includes("421"));
+    assert.equal(await page.locator(".game-grid-featured, .public-game-featured").count(), 0, "Featured games are only displayed on the connection page");
+    assert.equal(await page.getByRole("button", { name: "À l’affiche", exact: true }).count(), 0);
     assert.match(await page.locator(".game-card").first().innerText(), /421/, "Favorites remain first in the full selection");
     assert.equal(await page.locator(".game-card .game-artwork-backdrop img").count(), 2);
     for (const [type, color] of [["dice", "rgb(137, 147, 153)"], ["cards", "rgb(184, 73, 93)"]]) {
@@ -120,6 +120,11 @@ try {
     }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.screenshot({ path: path.join(directory, `${name}-lobby.png`), fullPage: true });
+    await page.getByRole('searchbox', { name: 'Rechercher un jeu' }).fill('Blackjack');
+    await page.waitForFunction(() => document.querySelectorAll('.game-card').length === 1);
+    await page.getByRole('searchbox', { name: 'Rechercher un jeu' }).fill('');
+    await page.waitForFunction(() => document.querySelectorAll('.game-card').length === 3);
+    assert.equal(await page.locator('.game-grid-featured, .public-game-featured').count(), 0);
     await context.close();
 
     const invitation = await setup(viewport); ({ page, context } = invitation);
