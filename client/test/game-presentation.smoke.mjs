@@ -125,6 +125,25 @@ try {
     await page.getByRole('searchbox', { name: 'Rechercher un jeu' }).fill('');
     await page.waitForFunction(() => document.querySelectorAll('.game-card').length === 3);
     assert.equal(await page.locator('.game-grid-featured, .public-game-featured').count(), 0);
+    await page.evaluate(() => {
+      const spacer = document.createElement('div');
+      spacer.id = 'scroll-test-spacer';
+      spacer.style.height = '1500px';
+      document.querySelector('.app-shell').append(spacer);
+      window.scrollTo(0, 600);
+    });
+    await page.waitForFunction(() => window.scrollY >= 600);
+    const header = page.locator('.casino-header');
+    assert.equal(await header.evaluate((node) => getComputedStyle(node).position), 'sticky');
+    assert.ok(Math.abs((await header.boundingBox()).y) < 1, 'Header stays at the top when scrolling, including on mobile with the blocker enabled');
+    assert.ok(await page.locator('.casino-navigation').isVisible());
+    await page.screenshot({ path: path.join(directory, `${name}-sticky-header.png`) });
+    await page.evaluate(() => { document.getElementById('scroll-test-spacer').remove(); window.scrollTo(0, 0); });
+    await page.getByRole('button', { name: 'Rejoindre avec un code', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Rejoindre avec un code', exact: true }).waitFor();
+    assert.ok(await page.evaluate(() => document.elementFromPoint(5, 5)?.closest('.casino-dialog-layer')), 'Modal overlay remains above the sticky header');
+    await page.getByRole('dialog', { name: 'Rejoindre avec un code', exact: true }).getByRole('button', { name: 'Fermer', exact: true }).click();
+    checks.push(`${name}: sticky header, scroll, navigation and modal stacking with content blocker`);
     await context.close();
 
     const invitation = await setup(viewport); ({ page, context } = invitation);

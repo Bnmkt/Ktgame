@@ -1,4 +1,4 @@
-.casino-header { background: #101514; border-bottom: 1px solid #35413b; }
+.casino-header { position: sticky; top: 0; z-index: 10; flex-shrink: 0; background: #101514; border-bottom: 1px solid #35413b; box-shadow: 0 4px 12px rgba(0, 0, 0, .2); }
 .room-route-active .casino-header *,
 .room-route-active .casino-header *::before,
 .room-route-active .casino-header *::after { animation: none !important; }
