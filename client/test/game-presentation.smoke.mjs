@@ -36,7 +36,8 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
   const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
   await blocker.enableBlockingInPage(page);
   let user = logged ? { id: "player", pseudo: "Bnmkt", admin, tokens: 1000, profile: { favoriteGames: ["421"] }, cosmetics: { equipped: {} } } : null;
-  const requests = [], uploads = [];
+  let settings = { ...defaultPublicSettings, featuredGameId: "yahtzee", guestAccessEnabled: guests };
+  const requests = [], uploads = [], settingsUpdates = [];
   await page.route("**/api/**", (route) => {
     const key = new URL(route.request().url()).pathname;
     requests.push(`${route.request().method()} ${key}`);
@@ -53,9 +54,15 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
     }
     if (key.startsWith("/api/game-images/")) return route.fulfill({ contentType: "image/png", headers: imageHeaders, body: uploads.at(-1)?.bytes ?? fs.readFileSync(path.join(root, "client/public/ktga-preview.png")) });
     let status = 200, data = [];
-    if (key === "/api/config") data = { siteName: "KTGA.ME", featuredGameId: "yahtzee", guestAccessEnabled: guests };
+    if (key === "/api/config") data = settings;
     else if (key === "/api/games") data = games.map((game) => ({ ...game, ...(coverImage === undefined ? {} : { coverImage }), ...(descriptiveImage === undefined ? {} : { descriptiveImage }) }));
-    else if (key === "/api/admin") data = { users: [], games, shop: [], achievements: [], pricing: {}, permissions: {}, overview: {}, settings: { ...defaultPublicSettings, featuredGameId: "yahtzee" } };
+    else if (key === "/api/admin") data = { users: [], games, shop: [], achievements: [], pricing: {}, permissions: {}, overview: {}, settings };
+    else if (key === "/api/admin/settings" && route.request().method() === "PATCH") {
+      const update = route.request().postDataJSON();
+      settingsUpdates.push(update);
+      settings = { ...settings, ...update };
+      data = settings;
+    }
     else if (key === "/api/me") { status = user ? 200 : 401; data = user ?? { error: "Anonymous" }; }
     else if (key === "/api/table-entry/ABC123") { status = closed ? 404 : 200; data = closed ? { error: "Cette partie est terminée." } : { code: "ABC123", hostName: "Bnmkt", requiresPassword: true, ranked }; }
     else if (key === "/api/auth/guest") { user = { id: "guest", pseudo: "Testeur", guest: true, tokens: 1000, profile: {}, cosmetics: { equipped: {} } }; data = { token: "fixture-only", user }; }
@@ -68,7 +75,7 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
     return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data), headers: { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true" } });
   });
   await page.route(/https:\/\/[^/]*(googletagmanager\.com|google-analytics\.com)\//, (route) => route.fulfill({ contentType: "text/javascript", body: "" }));
-  return { page, context, requests, uploads };
+  return { page, context, requests, uploads, settingsUpdates };
 }
 try {
   browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -178,7 +185,7 @@ try {
     await context.close();
   }
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }]]) {
-    const { page, context, uploads } = await setup(viewport, { logged: true, admin: true });
+    const { page, context, uploads, settingsUpdates } = await setup(viewport, { logged: true, admin: true });
     await page.goto(`${origin}/admin`);
     const section = async (value, title) => {
       if (name === "mobile") await page.locator(".admin-mobile-nav select").selectOption(value);
@@ -186,7 +193,19 @@ try {
     };
     await page.locator(".admin-content .admin-dashboard").waitFor();
     await section("settings", "Paramètres");
-    await page.getByRole("combobox", { name: /^Jeux à l’affiche/ }).selectOption("421");
+    const featuredChoice = page.getByRole("combobox", { name: /^Jeux à l’affiche/ });
+    for (const choice of ["421", ""]) {
+      await featuredChoice.selectOption(choice);
+      await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+      await page.getByText("Paramètres du casino enregistrés.", { exact: true }).waitFor();
+      assert.equal(settingsUpdates.at(-1).featuredGameId, choice, 'Saving includes the featured game, including the automatic-selection reset');
+      assert.equal(await featuredChoice.inputValue(), choice);
+      await page.reload();
+      await page.locator(".admin-content .admin-dashboard").waitFor();
+      await section("settings", "Paramètres");
+      assert.equal(await featuredChoice.inputValue(), choice, 'The featured game selection persists after reloading the administration');
+    }
+    await featuredChoice.selectOption("421");
     await page.screenshot({ path: path.join(directory, `${name}-settings.png`), fullPage: true });
     await section("games", "Jeux");
     await page.getByRole("row").filter({ hasText: "yahtzee" }).getByRole("button", { name: "Modifier", exact: true }).click();
@@ -234,7 +253,7 @@ try {
     await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     assert.equal(uploads.length, before, "Cancel must not upload or replace the selected image");
-    checks.push(`${name}: image modal, import, validation, drag, zoom, PNG output, cancellation and overlay guard`);
+    checks.push(`${name}: featured settings save/reset/reload, image modal, import, validation, drag, zoom, PNG output, cancellation and overlay guard`);
     await context.close();
   }
   {

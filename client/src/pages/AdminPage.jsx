@@ -137,8 +137,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
     setSaving("settings");
     setError("");
     try {
-      const { siteName, siteIcon, siteSubtitle, contactEmail, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds } = settingsDraft;
-      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, contactEmail, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds }) });
+      const { siteName, siteIcon, siteSubtitle, featuredGameId, contactEmail, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds } = settingsDraft;
+      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, featuredGameId, contactEmail, registrationsEnabled, guestAccessEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds }) });
       setSettingsDraft(settings);
       setData((current) => ({ ...current, settings }));
       onSettingsChange?.(settings);
