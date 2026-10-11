@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useEffect, useState } from "react";
 import { api } from "../../api.js";
 import { Die, PlayingCard } from "../game/GamePieces.jsx";
@@ -12,17 +13,19 @@ function loadRanks() {
 }
 
 function MarkdownRank({ token, value }) {
+  const { t: localeText } = useLocale();
   const [ranks, setRanks] = useState(cachedRanks || []);
   useEffect(() => { let active = true; loadRanks().then((rows) => { if (active) setRanks(rows); }).catch(() => {}); return () => { active = false; }; }, []);
   const rank = resolveMarkdownRank(token, ranks);
-  return rank ? <span className="ktga-inline-piece ktga-inline-rank" role="img" aria-label={rank.label} title={rank.label}><RankInsignia rank={rank} /></span> : <>{value}</>;
+  return rank ? <span className="ktga-inline-piece ktga-inline-rank" role="img" aria-label={localeText(rank.label)} title={localeText(rank.label)}><RankInsignia rank={rank} /></span> : <>{value}</>;
 }
 
 export function MarkdownToken({ value }) {
+  const { t: localeText } = useLocale();
   const token = parseMarkdownToken(value);
   if (!token) return <>{value}</>;
   if (token.kind === "rank") return <MarkdownRank token={token} value={value} />;
-  return <span className={`ktga-inline-piece ktga-inline-${token.kind}`} role="img" aria-label={token.kind === "dice" ? `De ${token.value}` : token.card ? `Carte ${token.card.rank}${token.card.suit}` : "Dos de carte"}>
+  return <span className={`ktga-inline-piece ktga-inline-${token.kind}`} role="img" aria-label={token.kind === "dice" ? localeText("De {value0}", { value0: token.value }) : token.card ? localeText("Carte {value0}{value1}", { value0: token.card.rank, value1: token.card.suit }) : localeText("Dos de carte")}>
     {token.kind === "dice" ? <Die value={token.value} animate={false} kept={false} inline /> : <PlayingCard card={token.card} animate={false} inline />}
   </span>;
 }

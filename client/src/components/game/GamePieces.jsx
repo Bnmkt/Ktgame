@@ -1,12 +1,14 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import React from "react";
 import { suits } from "../../features/games/config.js";
 
 export function PlayingCard({ card, hidden = false, skin = "default", style, animate = true, inline = false }) {
+  const { t: localeText } = useLocale();
   const CardElement = inline ? "span" : "div";
   if (!card || hidden) return <CardElement className={`playing-card card-back ${animate ? "deal-card" : ""} card-skin-${skin}`} style={style}><span>?</span></CardElement>;
   const suit = suits[card.suit] ?? suits.S;
   return (
-    <CardElement className={`playing-card ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={style} title={`${card.rank} de ${suit.name}`}>
+    <CardElement className={`playing-card ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={style} title={localeText("{value0} de {value1}", { value0: card.rank, value1: suit.name })}>
       <strong>{card.rank}</strong>
       <span>{suit.symbol}</span>
     </CardElement>
@@ -14,13 +16,14 @@ export function PlayingCard({ card, hidden = false, skin = "default", style, ani
 }
 
 export function Die({ value, kept, onClick, skin = "default", animate = true, selectionLabel = "Gardé", style, inline = false }) {
+  const { t: localeText } = useLocale();
   const faces = {
     1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9]
   };
   const pips = faces[value] ?? [];
   const DieElement = onClick ? "button" : inline ? "span" : "div";
   return (
-    <DieElement className={`die die-skin-${skin} ${value && animate ? "roll-in" : ""} ${kept ? "kept" : ""} ${kept && selectionLabel === "À relancer" ? "selected-reroll" : ""}`} style={style} onClick={onClick} disabled={onClick ? !value : undefined} title={onClick ? (kept ? selectionLabel : `Cliquer pour marquer comme « ${selectionLabel.toLowerCase()} »`) : undefined}>
+    <DieElement className={`die die-skin-${skin} ${value && animate ? "roll-in" : ""} ${kept ? "kept" : ""} ${kept && selectionLabel === "À relancer" ? "selected-reroll" : ""}`} style={style} onClick={onClick} disabled={onClick ? !value : undefined} title={onClick ? (kept ? selectionLabel : localeText("Cliquer pour marquer comme « {value0} »", { value0: selectionLabel.toLowerCase() })) : undefined}>
       {pips.map((dot) => <span key={dot} className="pip" data-pip={dot} />)}
       {kept && <span className="kept-label">{selectionLabel}</span>}
     </DieElement>
@@ -39,9 +42,10 @@ const diceRestingPositions = [
 ];
 
 export function DiceThrowTray({ children, label = "Piste de lancer", caption = "Zone de jeu", className = "", compact = false }) {
+  const { t: localeText } = useLocale();
   return (
     <section className={`dice-throw-tray ${compact ? "compact" : ""} ${className}`.trim()}>
-      <header className="dice-throw-tray-label"><span aria-hidden="true" /><strong>{label}</strong><small>{caption}</small></header>
+      <header className="dice-throw-tray-label"><span aria-hidden="true" /><strong>{localeText(label)}</strong><small>{caption}</small></header>
       <div className="dice-throw-surface">
         <div className="dice-row">
           {React.Children.map(children, (child, index) => {
@@ -56,10 +60,11 @@ export function DiceThrowTray({ children, label = "Piste de lancer", caption = "
 }
 
 export function DiceSelectionMode({ selectToKeep, onChange, disabled = false }) {
+  const { t: localeText } = useLocale();
   return (
     <label className={`dice-mode-toggle ${disabled ? "disabled" : ""}`}>
-      <span><strong>Mode de sélection</strong><small>{selectToKeep ? "Clique les dés à garder" : "Clique les dés à relancer"}</small></span>
-      <span className="dice-mode-choice"><small>À relancer</small><input type="checkbox" checked={selectToKeep} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><i aria-hidden="true" /><small>À garder</small></span>
+      <span><strong>{localeText("Mode de sélection")}</strong><small>{selectToKeep ? localeText("Clique les dés à garder") : localeText("Clique les dés à relancer")}</small></span>
+      <span className="dice-mode-choice"><small>{localeText("À relancer")}</small><input type="checkbox" checked={selectToKeep} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><i aria-hidden="true" /><small>{localeText("À garder")}</small></span>
     </label>
   );
 }

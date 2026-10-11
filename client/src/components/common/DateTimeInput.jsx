@@ -1,7 +1,9 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useEffect, useId, useRef, useState } from "react";
 import { localDateTime, localDateTimeToIso } from "../../utils/dates.js";
 
 export function DateTimeInput({ value, onValueChange, storage = "iso", ...props }) {
+  const { t: localeText } = useLocale();
   const id = useId();
   const input = useRef(null);
   const [text, setText] = useState(() => storage === "local" ? value || "" : localDateTime(value));
@@ -15,5 +17,5 @@ export function DateTimeInput({ value, onValueChange, storage = "iso", ...props 
     event.target.setCustomValidity(message);
     setError(message);
     if (!message) onValueChange(storage === "local" ? selected : iso);
-  }} />{error && <small id={id} className="error-text" role="alert">{error}</small>}</>;
+  }} />{error && <small id={id} className="error-text" role="alert">{localeText(error)}</small>}</>;
 }

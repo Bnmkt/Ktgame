@@ -1,8 +1,10 @@
 import { Dice5, Landmark, LogOut, Scale, ShoppingBag, Sparkles, Trophy, User } from "lucide-react";
 import { appPath } from "../../navigation/routes.js";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
+import { LanguagePicker , useLocale } from "../../locales/LocaleProvider.jsx";
 
 export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
+  const { t: localeText } = useLocale();
   const restrictions = user.minor?.restrictions ?? [];
   const limited = (feature) => restrictions.includes(feature) || (user.moderation?.type === "soft" && ["friends", "community-events"].includes(feature));
   const destinations = [
@@ -22,13 +24,14 @@ export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSl
   return <header className="casino-header">
     <div className="casino-header-inner">
       <a className="casino-brand" href={appPath("lobby")} onClick={(event) => follow(event, "lobby")}><CosmeticIcon value="site" source={siteIcon} /> <span>{siteName}</span></a>
-      <nav className="casino-navigation" aria-label="Navigation du casino">
-        {destinations.map(([key, label, Icon]) => <a key={key} href={appPath(key, key === "room" ? roomCode : key === "event" ? eventSlug : "")} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={(event) => follow(event, key)}><Icon size={18} /><span>{label}</span></a>)}
+      <nav className="casino-navigation" aria-label={localeText("Navigation du casino")}>
+        {destinations.map(([key, label, Icon]) => <a key={key} href={appPath(key, key === "room" ? roomCode : key === "event" ? eventSlug : "")} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={(event) => follow(event, key)}><Icon size={18} /><span>{localeText(label)}</span></a>)}
       </nav>
       <div className="casino-accountbar">
         {children}
-        <button type="button" className="secondary icon-toggle casino-logout" onClick={onLogout} title="Déconnexion" aria-label="Déconnexion"><LogOut size={18} /></button>
+        <button type="button" className="secondary icon-toggle casino-logout" onClick={onLogout} title={localeText("Déconnexion")} aria-label={localeText("Déconnexion")}><LogOut size={18} /></button>
       </div>
     </div>
+    <div className="locale-header"><LanguagePicker /></div>
   </header>;
 }

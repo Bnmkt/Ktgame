@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useState } from "react";
 import { AlertTriangle, BadgeCheck, Bird, Bot, Cat, CheckCircle2, Club, Coins, Copy, Crown, Diamond, Dice5, Dog, Fish, Flame, Gem, Heart, Landmark, Medal, PawPrint, Rabbit, Rocket, Shield, Snail, Spade, Sparkles, Squirrel, Star, Swords, Trophy, Turtle, User, Zap } from "lucide-react";
 import { DynamicIcon, iconNames } from "lucide-react/dynamic.mjs";
@@ -112,6 +113,7 @@ export function CosmeticIcon({ value, source, style }) {
 }
 
 export function LucideIconPicker({ value, onChange }) {
+  const { t: localeText } = useLocale();
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(48);
   const normalizedQuery = normalizeLucideIconName(query);
@@ -126,34 +128,35 @@ export function LucideIconPicker({ value, onChange }) {
     setVisibleCount(48);
   }
 
-  return <section className="lucide-icon-picker" aria-label="Catalogue des icônes Lucide">
+  return <section className="lucide-icon-picker" aria-label={localeText("Catalogue des icônes Lucide")}>
     <div className="lucide-picker-heading">
-      <div><strong>Catalogue Lucide</strong><small>{lucideIconCatalog.length.toLocaleString("fr-FR")} icônes et alias disponibles</small></div>
+      <div><strong>{localeText("Catalogue Lucide")}</strong><small>{lucideIconCatalog.length.toLocaleString("fr-FR")}{" " + localeText("icônes et alias disponibles")}</small></div>
       {lucideIconNameSet.has(selectedName) && <span className="selected-lucide-icon"><DynamicIcon name={selectedName} size={18} fallback={Coins} /> {selectedName}</span>}
     </div>
-    <label className="lucide-search">Rechercher une icône
-      <input type="search" value={query} onChange={(event) => search(event.target.value)} placeholder="Ex. trophy, dice, landmark…" autoComplete="off" />
+    <label className="lucide-search">{localeText("Rechercher une icône")}<input type="search" value={query} onChange={(event) => search(event.target.value)} placeholder={localeText("Ex. trophy, dice, landmark…")} autoComplete="off" />
     </label>
-    <div className="lucide-picker-count">{matchingIcons.length ? `${Math.min(visibleCount, matchingIcons.length)} sur ${matchingIcons.length}` : "Aucun résultat"}</div>
+    <div className="lucide-picker-count">{matchingIcons.length ? localeText("{value0} sur {value1}", { value0: Math.min(visibleCount, matchingIcons.length), value1: matchingIcons.length }) : localeText("Aucun résultat")}</div>
     {visibleIcons.length > 0 && <div className="lucide-icon-grid">{visibleIcons.map((name) => <button
       className={selectedName === name ? "lucide-icon-option active" : "lucide-icon-option"}
       key={name}
       type="button"
       title={name}
-      aria-label={`Choisir l’icône ${name}`}
+      aria-label={localeText("Choisir l’icône {value0}", { value0: name })}
       onClick={() => onChange(name)}
     ><DynamicIcon name={name} size={22} fallback={Coins} /><span>{name}</span></button>)}</div>}
-    {visibleCount < matchingIcons.length && <button className="secondary lucide-load-more" type="button" onClick={() => setVisibleCount((count) => count + 48)}>Afficher 48 icônes de plus</button>}
+    {visibleCount < matchingIcons.length && <button className="secondary lucide-load-more" type="button" onClick={() => setVisibleCount((count) => count + 48)}>{localeText("Afficher 48 icônes de plus")}</button>}
   </section>;
 }
 
 export function FriendCode({ code }) {
+  const { t: localeText } = useLocale();
   const [copied, setCopied] = useState(false);
   if (!code) return null;
-  return <button className="friend-code" type="button" title="Copier le code ami" onClick={async () => { await copyText(code); setCopied(true); setTimeout(() => setCopied(false), 1800); }}><span>{copied ? "Copié !" : "Code ami"}</span><strong>{code}</strong>{copied ? <BadgeCheck size={14} /> : <Copy size={14} />}</button>;
+  return <button className="friend-code" type="button" title={localeText("Copier le code ami")} onClick={async () => { await copyText(code); setCopied(true); setTimeout(() => setCopied(false), 1800); }}><span>{copied ? localeText("Copié !") : localeText("Code ami")}</span><strong>{code}</strong>{copied ? <BadgeCheck size={14} /> : <Copy size={14} />}</button>;
 }
 
 export function DisplayName({ user, interactive = true }) {
+  const { t: localeText } = useLocale();
   const effect = user?.cosmetics?.equipped?.nameEffect ?? "none";
   const openProfile = () => {
     if (!interactive || !user?.id || user.isBot) return;
@@ -546,18 +549,22 @@ export function currentCosmeticCss(item) {
 }
 
 export function DesignerColor({ label, value, onChange }) {
-  return <label className="designer-control designer-color-control"><span>{label}<output>{value}</output></span><input type="color" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  const { t: localeText } = useLocale();
+  return <label className="designer-control designer-color-control"><span>{localeText(label)}<output>{value}</output></span><input type="color" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 export function DesignerRange({ label, value, min, max, step = 1, suffix = "", onChange }) {
-  return <label className="designer-control designer-range-control"><span>{label}<output>{value}{suffix}</output></span><input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+  const { t: localeText } = useLocale();
+  return <label className="designer-control designer-range-control"><span>{localeText(label)}<output>{value}{suffix}</output></span><input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
 }
 
 export function DesignerSelect({ label, value, options, onChange }) {
-  return <label className="designer-control"><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, optionLabel]) => <option value={optionValue} key={optionValue}>{optionLabel}</option>)}</select></label>;
+  const { t: localeText } = useLocale();
+  return <label className="designer-control"><span>{localeText(label)}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, optionLabel]) => <option value={optionValue} key={optionValue}>{optionLabel}</option>)}</select></label>;
 }
 
 export function MotionDesigner({ motion, onChange }) {
+  const { t: localeText } = useLocale();
   const activeMotion = { ...defaultCosmeticMotion, ...(motion ?? {}) };
   const set = (field, value) => onChange({ ...activeMotion, [field]: value });
   const applyPreset = (preset) => {
@@ -574,129 +581,131 @@ export function MotionDesigner({ motion, onChange }) {
   const exampleFrames = "0%, 100% { transform: translateY(0) rotate(0deg); opacity: 1; }\n50% { transform: translateY(var(--motion-negative-distance)) rotate(var(--motion-rotation)); opacity: .82; }";
 
   return <section className="motion-designer">
-    <div className="visual-designer-heading"><div><small>Animation réutilisable</small><h3>Mouvement de l’objet</h3></div><span className={activeMotion.preset !== "none" ? "designer-active-status" : ""}>{activeMotion.preset !== "none" ? "Active" : "Aucune"}</span></div>
-    <p className="motion-designer-intro">Choisis un effet, puis personnalise son rythme et son amplitude. L’animation s’applique au rendu final, quel que soit le type d’objet.</p>
-    <div className="motion-preset-grid">{Object.entries(cosmeticMotionPresets).map(([preset, config]) => <button type="button" key={preset} className={`motion-preset ${activeMotion.preset === preset ? "active" : ""}`} onClick={() => applyPreset(preset)}><span className={`motion-preset-demo motion-demo-${preset}`}><Sparkles size={15} /></span><span>{config.label}</span></button>)}</div>
+    <div className="visual-designer-heading"><div><small>{localeText("Animation réutilisable")}</small><h3>{localeText("Mouvement de l’objet")}</h3></div><span className={activeMotion.preset !== "none" ? "designer-active-status" : ""}>{activeMotion.preset !== "none" ? localeText("Active") : localeText("Aucune")}</span></div>
+    <p className="motion-designer-intro">{localeText("Choisis un effet, puis personnalise son rythme et son amplitude. L’animation s’applique au rendu final, quel que soit le type d’objet.")}</p>
+    <div className="motion-preset-grid">{Object.entries(cosmeticMotionPresets).map(([preset, config]) => <button type="button" key={preset} className={`motion-preset ${activeMotion.preset === preset ? "active" : ""}`} onClick={() => applyPreset(preset)}><span className={`motion-preset-demo motion-demo-${preset}`}><Sparkles size={15} /></span><span>{localeText(config.label)}</span></button>)}</div>
 
     {activeMotion.preset !== "none" && <>
-      <div className="designer-section"><h4>Propriété animation</h4><code className="animation-property-preview">animation: {animationProperty};</code><div className="designer-control-grid">
-        <DesignerRange label="Durée" value={activeMotion.duration} min={0.2} max={20} step={0.1} suffix=" s" onChange={(value) => set("duration", value)} />
-        <DesignerRange label="Délai" value={activeMotion.delay} min={0} max={10} step={0.1} suffix=" s" onChange={(value) => set("delay", value)} />
-        <DesignerSelect label="Courbe d’accélération" value={activeMotion.easing} onChange={(value) => set("easing", value)} options={[["linear", "Linéaire"], ["ease", "Naturelle"], ["ease-in", "Accélération"], ["ease-out", "Décélération"], ["ease-in-out", "Douce"], ["steps(2,end)", "Saccadée · 2 étapes"], ["steps(4,end)", "Saccadée · 4 étapes"]]} />
-        <DesignerSelect label="Répétition" value={activeMotion.iterations} onChange={(value) => set("iterations", value)} options={[["1", "Une fois"], ["2", "Deux fois"], ["3", "Trois fois"], ["infinite", "En boucle"]]} />
-        <DesignerSelect label="Direction" value={activeMotion.direction} onChange={(value) => set("direction", value)} options={[["normal", "Normale"], ["reverse", "Inversée"], ["alternate", "Aller-retour"], ["alternate-reverse", "Aller-retour inversé"]]} />
-        <DesignerSelect label="État avant/après" value={activeMotion.fillMode} onChange={(value) => set("fillMode", value)} options={[["none", "Aucun"], ["forwards", "Conserver la fin"], ["backwards", "Appliquer le départ"], ["both", "Les deux"]]} />
+      <div className="designer-section"><h4>{localeText("Propriété animation")}</h4><code className="animation-property-preview">{localeText("animation:") + " "}{animationProperty};</code><div className="designer-control-grid">
+        <DesignerRange label={localeText("Durée")} value={activeMotion.duration} min={0.2} max={20} step={0.1} suffix={localeText(" s")} onChange={(value) => set("duration", value)} />
+        <DesignerRange label={localeText("Délai")} value={activeMotion.delay} min={0} max={10} step={0.1} suffix={localeText(" s")} onChange={(value) => set("delay", value)} />
+        <DesignerSelect label={localeText("Courbe d’accélération")} value={activeMotion.easing} onChange={(value) => set("easing", value)} options={[["linear", "Linéaire"], ["ease", "Naturelle"], ["ease-in", "Accélération"], ["ease-out", "Décélération"], ["ease-in-out", "Douce"], ["steps(2,end)", "Saccadée · 2 étapes"], ["steps(4,end)", "Saccadée · 4 étapes"]]} />
+        <DesignerSelect label={localeText("Répétition")} value={activeMotion.iterations} onChange={(value) => set("iterations", value)} options={[["1", "Une fois"], ["2", "Deux fois"], ["3", "Trois fois"], ["infinite", "En boucle"]]} />
+        <DesignerSelect label={localeText("Direction")} value={activeMotion.direction} onChange={(value) => set("direction", value)} options={[["normal", "Normale"], ["reverse", "Inversée"], ["alternate", "Aller-retour"], ["alternate-reverse", "Aller-retour inversé"]]} />
+        <DesignerSelect label={localeText("État avant/après")} value={activeMotion.fillMode} onChange={(value) => set("fillMode", value)} options={[["none", "Aucun"], ["forwards", "Conserver la fin"], ["backwards", "Appliquer le départ"], ["both", "Les deux"]]} />
       </div></div>
-      {(usesDistance || usesScale || usesRotation || usesIntensity) && <div className="designer-section"><h4>Amplitude de l’effet</h4><div className="designer-control-grid">
-        {usesDistance && <DesignerRange label="Distance" value={activeMotion.distance} min={0} max={60} suffix=" px" onChange={(value) => set("distance", value)} />}
-        {usesScale && <DesignerRange label="Variation d’échelle" value={activeMotion.scale} min={0} max={40} suffix=" %" onChange={(value) => set("scale", value)} />}
-        {usesRotation && <DesignerRange label="Rotation" value={activeMotion.rotation} min={0} max={360} suffix="°" onChange={(value) => set("rotation", value)} />}
-        {usesIntensity && <DesignerRange label="Intensité lumineuse" value={activeMotion.intensity} min={0} max={100} suffix=" %" onChange={(value) => set("intensity", value)} />}
+      {(usesDistance || usesScale || usesRotation || usesIntensity) && <div className="designer-section"><h4>{localeText("Amplitude de l’effet")}</h4><div className="designer-control-grid">
+        {usesDistance && <DesignerRange label={localeText("Distance")} value={activeMotion.distance} min={0} max={60} suffix={localeText(" px")} onChange={(value) => set("distance", value)} />}
+        {usesScale && <DesignerRange label={localeText("Variation d’échelle")} value={activeMotion.scale} min={0} max={40} suffix=" %" onChange={(value) => set("scale", value)} />}
+        {usesRotation && <DesignerRange label={localeText("Rotation")} value={activeMotion.rotation} min={0} max={360} suffix="°" onChange={(value) => set("rotation", value)} />}
+        {usesIntensity && <DesignerRange label={localeText("Intensité lumineuse")} value={activeMotion.intensity} min={0} max={100} suffix=" %" onChange={(value) => set("intensity", value)} />}
       </div></div>}
       {activeMotion.preset === "custom" && <div className="designer-section custom-keyframes-section">
-        <div className="custom-keyframes-heading"><div><h4>Keyframes personnalisées</h4><small>Colle les étapes seules ou une règle @keyframes complète. Son nom sera isolé automatiquement pour cet objet.</small></div><button type="button" className="secondary" onClick={() => set("customKeyframes", exampleFrames)}>Charger un exemple</button></div>
-        <label>Étapes de l’animation<textarea className="keyframes-editor" spellCheck="false" value={activeMotion.customKeyframes} onChange={(event) => set("customKeyframes", event.target.value)} placeholder={exampleFrames} /></label>
-        <div className={`keyframes-validation ${customFrames ? "valid" : "invalid"}`}>{customFrames ? <><CheckCircle2 size={16} /> Keyframes valides et prêtes à être utilisées.</> : <><AlertTriangle size={16} /> Ajoute au moins deux étapes valides, par exemple 0% et 100%.</>}</div>
-        <small className="field-help">Propriétés acceptées : transform, opacity, filter, box-shadow, background-position, background-color, border-color, color et letter-spacing. Variables disponibles : --motion-distance, --motion-negative-distance, --motion-scale et --motion-rotation.</small>
+        <div className="custom-keyframes-heading"><div><h4>{localeText("Keyframes personnalisées")}</h4><small>{localeText("Colle les étapes seules ou une règle @keyframes complète. Son nom sera isolé automatiquement pour cet objet.")}</small></div><button type="button" className="secondary" onClick={() => set("customKeyframes", exampleFrames)}>{localeText("Charger un exemple")}</button></div>
+        <label>{localeText("Étapes de l’animation")}<textarea className="keyframes-editor" spellCheck="false" value={activeMotion.customKeyframes} onChange={(event) => set("customKeyframes", event.target.value)} placeholder={exampleFrames} /></label>
+        <div className={`keyframes-validation ${customFrames ? "valid" : "invalid"}`}>{customFrames ? <><CheckCircle2 size={16} />{" " + localeText("Keyframes valides et prêtes à être utilisées.")}</> : <><AlertTriangle size={16} />{" " + localeText("Ajoute au moins deux étapes valides, par exemple 0% et 100%.")}</>}</div>
+        <small className="field-help">{localeText("Propriétés acceptées : transform, opacity, filter, box-shadow, background-position, background-color, border-color, color et letter-spacing. Variables disponibles : --motion-distance, --motion-negative-distance, --motion-scale et --motion-rotation.")}</small>
       </div>}
-      <label className="motion-reduced-toggle"><span><strong>Respecter la réduction des animations</strong><small>Désactive cet effet pour les joueurs ayant activé ce réglage d’accessibilité.</small></span><input type="checkbox" checked={activeMotion.respectReducedMotion} onChange={(event) => set("respectReducedMotion", event.target.checked)} /></label>
+      <label className="motion-reduced-toggle"><span><strong>{localeText("Respecter la réduction des animations")}</strong><small>{localeText("Désactive cet effet pour les joueurs ayant activé ce réglage d’accessibilité.")}</small></span><input type="checkbox" checked={activeMotion.respectReducedMotion} onChange={(event) => set("respectReducedMotion", event.target.checked)} /></label>
     </>}
-    <div className="designer-footer"><ConfirmActionButton className="secondary" dialogTitle="Réinitialiser l’animation ?" message="Les réglages actuels seront remplacés par les réglages par défaut." confirmLabel="Réinitialiser" danger onConfirm={() => onChange({ ...defaultCosmeticMotion })}>Réinitialiser l’animation</ConfirmActionButton>{motion && <ConfirmActionButton className="danger-button" dialogTitle="Supprimer la configuration d’animation ?" message="Les réglages de mouvement seront retirés de cet objet. Enregistre ensuite l’objet pour appliquer ce changement." confirmLabel="Supprimer la configuration" danger onConfirm={() => onChange(null)}>Supprimer la configuration</ConfirmActionButton>}</div>
+    <div className="designer-footer"><ConfirmActionButton className="secondary" dialogTitle={localeText("Réinitialiser l’animation ?")} message={localeText("Les réglages actuels seront remplacés par les réglages par défaut.")} confirmLabel={localeText("Réinitialiser")} danger onConfirm={() => onChange({ ...defaultCosmeticMotion })}>{localeText("Réinitialiser l’animation")}</ConfirmActionButton>{motion && <ConfirmActionButton className="danger-button" dialogTitle={localeText("Supprimer la configuration d’animation ?")} message={localeText("Les réglages de mouvement seront retirés de cet objet. Enregistre ensuite l’objet pour appliquer ce changement.")} confirmLabel={localeText("Supprimer la configuration")} danger onConfirm={() => onChange(null)}>{localeText("Supprimer la configuration")}</ConfirmActionButton>}</div>
   </section>;
 }
 
 export function VisualDesigner({ type, design, onChange, onActivate, onDisable }) {
+  const { t: localeText } = useLocale();
   const [panel, setPanel] = useState("surface");
   if (!visualDesignerTypes.has(type)) return null;
   const activeDesign = design?.type === type ? { ...defaultVisualDesign(type), ...design } : null;
   if (!activeDesign) return <section className="visual-designer visual-designer-inactive">
-    <div className="visual-designer-heading"><div><small>Studio visuel</small><h3>Conception assistée</h3></div><span>Désactivé</span></div>
-    <p>Active le studio pour construire cet objet avec des couleurs, formes, motifs, ombres et animations sans écrire de CSS.</p>
-    <button type="button" onClick={onActivate}>Activer le studio visuel</button>
-    <small>L’activation remplace le CSS avancé actuellement chargé. Tu peux annuler le modal pour revenir en arrière.</small>
+    <div className="visual-designer-heading"><div><small>{localeText("Studio visuel")}</small><h3>{localeText("Conception assistée")}</h3></div><span>{localeText("Désactivé")}</span></div>
+    <p>{localeText("Active le studio pour construire cet objet avec des couleurs, formes, motifs, ombres et animations sans écrire de CSS.")}</p>
+    <button type="button" onClick={onActivate}>{localeText("Activer le studio visuel")}</button>
+    <small>{localeText("L’activation remplace le CSS avancé actuellement chargé. Tu peux annuler le modal pour revenir en arrière.")}</small>
   </section>;
 
   const set = (field, value) => onChange({ ...activeDesign, [field]: value });
   const presets = Object.keys(visualPresets[type] ?? {});
   const commonShapeOptions = [["rounded", "Arrondie"], ["cut", "Coins coupés"], ["beveled", "Biseautée"]];
   return <section className="visual-designer">
-    <div className="visual-designer-heading"><div><small>Studio visuel</small><h3>Conception assistée</h3></div><span className="designer-active-status">Actif</span></div>
-    <div className="designer-presets"><span>Préréglages</span>{presets.map((preset) => <button type="button" className="secondary" key={preset} onClick={() => onChange(visualPreset(type, preset))}>{preset}</button>)}</div>
-    <nav className="designer-subtabs" aria-label="Réglages du studio visuel">
-      {[['surface', 'Couleurs et matière'], ['shape', 'Forme et bordure'], ['effects', 'Ombre et effets']].map(([value, label]) => <button type="button" key={value} className={panel === value ? "active" : ""} onClick={() => setPanel(value)}>{label}</button>)}
+    <div className="visual-designer-heading"><div><small>{localeText("Studio visuel")}</small><h3>{localeText("Conception assistée")}</h3></div><span className="designer-active-status">{localeText("Actif")}</span></div>
+    <div className="designer-presets"><span>{localeText("Préréglages")}</span>{presets.map((preset) => <button type="button" className="secondary" key={preset} onClick={() => onChange(visualPreset(type, preset))}>{preset}</button>)}</div>
+    <nav className="designer-subtabs" aria-label={localeText("Réglages du studio visuel")}>
+      {[['surface', 'Couleurs et matière'], ['shape', 'Forme et bordure'], ['effects', 'Ombre et effets']].map(([value, label]) => <button type="button" key={value} className={panel === value ? "active" : ""} onClick={() => setPanel(value)}>{localeText(label)}</button>)}
     </nav>
 
     {panel === "surface" && <>{type === "diceSkins" && <>
-      <div className="designer-section"><h4>Corps du dé</h4><div className="designer-control-grid">
-        <DesignerSelect label="Fond" value={activeDesign.backgroundMode} onChange={(value) => set("backgroundMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]} />
-        <DesignerColor label="Couleur principale" value={activeDesign.primaryColor} onChange={(value) => set("primaryColor", value)} />
-        <DesignerColor label="Couleur secondaire" value={activeDesign.secondaryColor} onChange={(value) => set("secondaryColor", value)} />
-        <DesignerRange label="Angle" value={activeDesign.angle} min={0} max={360} suffix="°" onChange={(value) => set("angle", value)} />
+      <div className="designer-section"><h4>{localeText("Corps du dé")}</h4><div className="designer-control-grid">
+        <DesignerSelect label={localeText("Fond")} value={activeDesign.backgroundMode} onChange={(value) => set("backgroundMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]} />
+        <DesignerColor label={localeText("Couleur principale")} value={activeDesign.primaryColor} onChange={(value) => set("primaryColor", value)} />
+        <DesignerColor label={localeText("Couleur secondaire")} value={activeDesign.secondaryColor} onChange={(value) => set("secondaryColor", value)} />
+        <DesignerRange label={localeText("Angle")} value={activeDesign.angle} min={0} max={360} suffix="°" onChange={(value) => set("angle", value)} />
       </div></div>
-      <div className="designer-section"><h4>Points</h4><div className="designer-control-grid">
-        <DesignerColor label="Couleur des points" value={activeDesign.pipColor} onChange={(value) => set("pipColor", value)} />
-        <DesignerRange label="Taille" value={activeDesign.pipSize} min={6} max={16} suffix=" px" onChange={(value) => set("pipSize", value)} />
-        <DesignerSelect label="Forme" value={activeDesign.pipShape} onChange={(value) => set("pipShape", value)} options={[["round", "Ronds"], ["soft", "Carrés doux"], ["square", "Carrés"], ["diamond", "Diamants"]]} />
-        <DesignerRange label="Halo des points" value={activeDesign.pipGlow} min={0} max={24} suffix=" px" onChange={(value) => set("pipGlow", value)} />
+      <div className="designer-section"><h4>{localeText("Points")}</h4><div className="designer-control-grid">
+        <DesignerColor label={localeText("Couleur des points")} value={activeDesign.pipColor} onChange={(value) => set("pipColor", value)} />
+        <DesignerRange label={localeText("Taille")} value={activeDesign.pipSize} min={6} max={16} suffix={localeText(" px")} onChange={(value) => set("pipSize", value)} />
+        <DesignerSelect label={localeText("Forme")} value={activeDesign.pipShape} onChange={(value) => set("pipShape", value)} options={[["round", "Ronds"], ["soft", "Carrés doux"], ["square", "Carrés"], ["diamond", "Diamants"]]} />
+        <DesignerRange label={localeText("Halo des points")} value={activeDesign.pipGlow} min={0} max={24} suffix={localeText(" px")} onChange={(value) => set("pipGlow", value)} />
       </div></div>
     </>}
 
     {type === "cardSkins" && <>
-      <div className="designer-section"><h4>Face des cartes</h4><div className="designer-control-grid">
-        <DesignerSelect label="Fond" value={activeDesign.faceMode} onChange={(value) => set("faceMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]} />
-        <DesignerColor label="Face principale" value={activeDesign.facePrimary} onChange={(value) => set("facePrimary", value)} />
-        <DesignerColor label="Face secondaire" value={activeDesign.faceSecondary} onChange={(value) => set("faceSecondary", value)} />
-        <DesignerColor label="Piques et trèfles" value={activeDesign.blackSuitColor} onChange={(value) => set("blackSuitColor", value)} />
-        <DesignerColor label="Cœurs et carreaux" value={activeDesign.redSuitColor} onChange={(value) => set("redSuitColor", value)} />
+      <div className="designer-section"><h4>{localeText("Face des cartes")}</h4><div className="designer-control-grid">
+        <DesignerSelect label={localeText("Fond")} value={activeDesign.faceMode} onChange={(value) => set("faceMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]} />
+        <DesignerColor label={localeText("Face principale")} value={activeDesign.facePrimary} onChange={(value) => set("facePrimary", value)} />
+        <DesignerColor label={localeText("Face secondaire")} value={activeDesign.faceSecondary} onChange={(value) => set("faceSecondary", value)} />
+        <DesignerColor label={localeText("Piques et trèfles")} value={activeDesign.blackSuitColor} onChange={(value) => set("blackSuitColor", value)} />
+        <DesignerColor label={localeText("Cœurs et carreaux")} value={activeDesign.redSuitColor} onChange={(value) => set("redSuitColor", value)} />
       </div></div>
-      <div className="designer-section"><h4>Dos des cartes</h4><div className="designer-control-grid">
-        <DesignerSelect label="Motif" value={activeDesign.backPattern} onChange={(value) => set("backPattern", value)} options={[["solid", "Uni"], ["diagonal", "Rayures diagonales"], ["checker", "Damier"], ["radial", "Médaillon"], ["diamond", "Losanges"]]} />
-        <DesignerColor label="Dos principal" value={activeDesign.backPrimary} onChange={(value) => set("backPrimary", value)} />
-        <DesignerColor label="Dos secondaire" value={activeDesign.backSecondary} onChange={(value) => set("backSecondary", value)} />
-        <DesignerRange label="Angle" value={activeDesign.angle} min={0} max={360} suffix="°" onChange={(value) => set("angle", value)} />
+      <div className="designer-section"><h4>{localeText("Dos des cartes")}</h4><div className="designer-control-grid">
+        <DesignerSelect label={localeText("Motif")} value={activeDesign.backPattern} onChange={(value) => set("backPattern", value)} options={[["solid", "Uni"], ["diagonal", "Rayures diagonales"], ["checker", "Damier"], ["radial", "Médaillon"], ["diamond", "Losanges"]]} />
+        <DesignerColor label={localeText("Dos principal")} value={activeDesign.backPrimary} onChange={(value) => set("backPrimary", value)} />
+        <DesignerColor label={localeText("Dos secondaire")} value={activeDesign.backSecondary} onChange={(value) => set("backSecondary", value)} />
+        <DesignerRange label={localeText("Angle")} value={activeDesign.angle} min={0} max={360} suffix="°" onChange={(value) => set("angle", value)} />
       </div></div>
     </>}
 
     {["memberCards", "profileBanners", "profileFrames"].includes(type) && <>
-      <div className="designer-section"><h4>{type === "memberCards" ? "Fond de la carte" : type === "profileBanners" ? "Fond de la bannière" : "Matière du cadre"}</h4><div className="designer-control-grid">
-        <DesignerSelect label="Fond" value={activeDesign.backgroundMode} onChange={(value) => set("backgroundMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]} />
-        <DesignerColor label="Couleur principale" value={activeDesign.primaryColor} onChange={(value) => set("primaryColor", value)} />
-        <DesignerColor label="Couleur secondaire" value={activeDesign.secondaryColor} onChange={(value) => set("secondaryColor", value)} />
-        <DesignerColor label="Reflet central" value={activeDesign.tertiaryColor} onChange={(value) => set("tertiaryColor", value)} />
-        <DesignerRange label="Angle" value={activeDesign.angle} min={0} max={360} suffix="°" onChange={(value) => set("angle", value)} />
+      <div className="designer-section"><h4>{type === "memberCards" ? localeText("Fond de la carte") : type === "profileBanners" ? localeText("Fond de la bannière") : localeText("Matière du cadre")}</h4><div className="designer-control-grid">
+        <DesignerSelect label={localeText("Fond")} value={activeDesign.backgroundMode} onChange={(value) => set("backgroundMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]} />
+        <DesignerColor label={localeText("Couleur principale")} value={activeDesign.primaryColor} onChange={(value) => set("primaryColor", value)} />
+        <DesignerColor label={localeText("Couleur secondaire")} value={activeDesign.secondaryColor} onChange={(value) => set("secondaryColor", value)} />
+        <DesignerColor label={localeText("Reflet central")} value={activeDesign.tertiaryColor} onChange={(value) => set("tertiaryColor", value)} />
+        <DesignerRange label={localeText("Angle")} value={activeDesign.angle} min={0} max={360} suffix="°" onChange={(value) => set("angle", value)} />
       </div></div>
     </>}
     {type === "memberCards" && <>
-      <div className="designer-section"><h4>Identité et textes</h4><div className="designer-control-grid">
-        <DesignerColor label="Accent" value={activeDesign.accentColor} onChange={(value) => set("accentColor", value)} />
-        <DesignerColor label="Titre" value={activeDesign.titleColor} onChange={(value) => set("titleColor", value)} />
-        <DesignerColor label="Pseudo" value={activeDesign.textColor} onChange={(value) => set("textColor", value)} />
-        <DesignerColor label="Texte secondaire" value={activeDesign.secondaryTextColor} onChange={(value) => set("secondaryTextColor", value)} />
-        <DesignerSelect label="Typographie" value={activeDesign.fontStyle} onChange={(value) => set("fontStyle", value)} options={[["casino", "Casino du site"], ["serif", "Élégante avec empattements"], ["modern", "Moderne"], ["mono", "Monospace"]]} />
+      <div className="designer-section"><h4>{localeText("Identité et textes")}</h4><div className="designer-control-grid">
+        <DesignerColor label={localeText("Accent")} value={activeDesign.accentColor} onChange={(value) => set("accentColor", value)} />
+        <DesignerColor label={localeText("Titre")} value={activeDesign.titleColor} onChange={(value) => set("titleColor", value)} />
+        <DesignerColor label={localeText("Pseudo")} value={activeDesign.textColor} onChange={(value) => set("textColor", value)} />
+        <DesignerColor label={localeText("Texte secondaire")} value={activeDesign.secondaryTextColor} onChange={(value) => set("secondaryTextColor", value)} />
+        <DesignerSelect label={localeText("Typographie")} value={activeDesign.fontStyle} onChange={(value) => set("fontStyle", value)} options={[["casino", "Casino du site"], ["serif", "Élégante avec empattements"], ["modern", "Moderne"], ["mono", "Monospace"]]} />
       </div></div>
     </>}</>}
 
-    {panel === "shape" && <div className="designer-section"><h4>Forme et finition</h4><div className="designer-control-grid">
-      <DesignerSelect label="Silhouette" value={activeDesign.shape} onChange={(value) => set("shape", value)} options={commonShapeOptions} />
-      <DesignerRange label="Arrondi" value={activeDesign.radius} min={0} max={30} suffix=" px" onChange={(value) => set("radius", value)} />
-      <DesignerColor label="Bordure" value={activeDesign.borderColor} onChange={(value) => set("borderColor", value)} />
-      <DesignerRange label="Épaisseur" value={activeDesign.borderWidth} min={0} max={8} suffix=" px" onChange={(value) => set("borderWidth", value)} />
-      <DesignerSelect label="Style de bordure" value={activeDesign.borderStyle} onChange={(value) => set("borderStyle", value)} options={[["solid", "Continue"], ["double", "Double"], ["dashed", "Tirets"]]} />
+    {panel === "shape" && <div className="designer-section"><h4>{localeText("Forme et finition")}</h4><div className="designer-control-grid">
+      <DesignerSelect label={localeText("Silhouette")} value={activeDesign.shape} onChange={(value) => set("shape", value)} options={commonShapeOptions} />
+      <DesignerRange label={localeText("Arrondi")} value={activeDesign.radius} min={0} max={30} suffix={localeText(" px")} onChange={(value) => set("radius", value)} />
+      <DesignerColor label={localeText("Bordure")} value={activeDesign.borderColor} onChange={(value) => set("borderColor", value)} />
+      <DesignerRange label={localeText("Épaisseur")} value={activeDesign.borderWidth} min={0} max={8} suffix={localeText(" px")} onChange={(value) => set("borderWidth", value)} />
+      <DesignerSelect label={localeText("Style de bordure")} value={activeDesign.borderStyle} onChange={(value) => set("borderStyle", value)} options={[["solid", "Continue"], ["double", "Double"], ["dashed", "Tirets"]]} />
     </div></div>}
 
-    {panel === "effects" && <div className="designer-section"><h4>Ombre et animation</h4><div className="designer-control-grid">
-      <DesignerColor label="Couleur de l’ombre" value={activeDesign.shadowColor} onChange={(value) => set("shadowColor", value)} />
-      <DesignerRange label="Flou" value={activeDesign.shadowBlur} min={0} max={60} suffix=" px" onChange={(value) => set("shadowBlur", value)} />
-      <DesignerRange label="Opacité" value={activeDesign.shadowOpacity} min={0} max={100} suffix=" %" onChange={(value) => set("shadowOpacity", value)} />
-      <DesignerRange label="Halo" value={activeDesign.glow} min={0} max={50} suffix=" px" onChange={(value) => set("glow", value)} />
-      <DesignerSelect label="Animation" value={activeDesign.animation} onChange={(value) => set("animation", value)} options={[["none", "Aucune"], ["flow", "Dégradé mouvant"], ["pulse", "Pulsation"], ["shimmer", "Reflet traversant"]]} />
-      <DesignerRange label="Durée" value={activeDesign.animationSpeed} min={0.6} max={10} step={0.2} suffix=" s" onChange={(value) => set("animationSpeed", value)} />
+    {panel === "effects" && <div className="designer-section"><h4>{localeText("Ombre et animation")}</h4><div className="designer-control-grid">
+      <DesignerColor label={localeText("Couleur de l’ombre")} value={activeDesign.shadowColor} onChange={(value) => set("shadowColor", value)} />
+      <DesignerRange label={localeText("Flou")} value={activeDesign.shadowBlur} min={0} max={60} suffix={localeText(" px")} onChange={(value) => set("shadowBlur", value)} />
+      <DesignerRange label={localeText("Opacité")} value={activeDesign.shadowOpacity} min={0} max={100} suffix=" %" onChange={(value) => set("shadowOpacity", value)} />
+      <DesignerRange label={localeText("Halo")} value={activeDesign.glow} min={0} max={50} suffix={localeText(" px")} onChange={(value) => set("glow", value)} />
+      <DesignerSelect label={localeText("Animation")} value={activeDesign.animation} onChange={(value) => set("animation", value)} options={[["none", "Aucune"], ["flow", "Dégradé mouvant"], ["pulse", "Pulsation"], ["shimmer", "Reflet traversant"]]} />
+      <DesignerRange label={localeText("Durée")} value={activeDesign.animationSpeed} min={0.6} max={10} step={0.2} suffix={localeText(" s")} onChange={(value) => set("animationSpeed", value)} />
     </div></div>}
-    <div className="designer-footer"><ConfirmActionButton className="secondary" dialogTitle="Réinitialiser le style ?" message="Les réglages visuels actuels seront remplacés par les réglages par défaut." confirmLabel="Réinitialiser" danger onConfirm={() => onChange(defaultVisualDesign(type))}>Réinitialiser</ConfirmActionButton><ConfirmActionButton className="danger-button" dialogTitle="Désactiver le studio visuel ?" message="La configuration visuelle assistée sera retirée de cet objet." confirmLabel="Désactiver" danger onConfirm={onDisable}>Désactiver le studio</ConfirmActionButton></div>
+    <div className="designer-footer"><ConfirmActionButton className="secondary" dialogTitle={localeText("Réinitialiser le style ?")} message={localeText("Les réglages visuels actuels seront remplacés par les réglages par défaut.")} confirmLabel={localeText("Réinitialiser")} danger onConfirm={() => onChange(defaultVisualDesign(type))}>{localeText("Réinitialiser")}</ConfirmActionButton><ConfirmActionButton className="danger-button" dialogTitle={localeText("Désactiver le studio visuel ?")} message={localeText("La configuration visuelle assistée sera retirée de cet objet.")} confirmLabel={localeText("Désactiver")} danger onConfirm={onDisable}>{localeText("Désactiver le studio")}</ConfirmActionButton></div>
   </section>;
 }
 
 export function CosmeticPreview({ user, item, stats = [] }) {
+  const { t: localeText } = useLocale();
   const previewItem = item?.value ? item : { ...item, value: "admin-preview" };
   const previewUser = previewUserForItem(user, previewItem);
   const cardTier = previewUser.cosmetics?.equipped?.memberCard ?? "default";
@@ -706,15 +715,15 @@ export function CosmeticPreview({ user, item, stats = [] }) {
   return (
     <div className={`shop-preview preview-type-${previewType}`}>
       {(previewItem?.design || previewItem?.motion || previewItem?.css) && <style>{cosmeticCssRules([previewItem])}</style>}
-      <span>Aperçu · {shopTypeLabel(previewType)}</span>
+      <span>{localeText("Aperçu ·") + " "}{localeText(shopTypeLabel(previewType))}</span>
       {showMemberCard && <ProfileCosmeticShell user={previewUser} className="profile-cosmetic-preview"><div className={`vip-card preview-card member-${cardTier}`}>
-        <span className="vip-label">{memberCardOptions[cardTier] ?? item?.name ?? "Carte membre"} · KTGA.ME</span>
+        <span className="vip-label">{memberCardOptions[cardTier] ?? item?.name ?? localeText("Carte membre")}{" " + localeText("· KTGA.ME")}</span>
         <strong className={`display-name name-${previewUser.cosmetics?.equipped?.nameEffect ?? "none"}`}>
           <CosmeticIcon value={previewUser.cosmetics?.equipped?.icon} source={previewType === "icons" ? item?.icon : undefined} />
           <span className="display-name-text">{previewUser.profile?.displayName ?? previewUser.pseudo}</span>
         </strong>
-        <small>{previewUser.friendCode ? `Code ami · ${previewUser.friendCode}` : "MEMBRE · APERÇU"}</small>
-        <div className="vip-stats">{previewStats.map((stat, index) => <div className="vip-ratio" key={`${stat.label}-${index}`}>{stat.icon}<span>{stat.label}</span><strong>{stat.value}</strong></div>)}</div>
+        <small>{previewUser.friendCode ? localeText("Code ami · {value0}", { value0: previewUser.friendCode }) : localeText("MEMBRE · APERÇU")}</small>
+        <div className="vip-stats">{previewStats.map((stat, index) => <div className="vip-ratio" key={`${stat.label}-${index}`}>{stat.icon}<span>{localeText(stat.label)}</span><strong>{stat.value}</strong></div>)}</div>
       </div></ProfileCosmeticShell>}
       {previewType === "diceSkins" && <div className="admin-dice-preview">{[1, 2, 3, 4, 5, 6].map((value) => <Die key={value} value={value} kept={false} skin={previewUser.cosmetics?.equipped?.diceSkin} animate={false} />)}</div>}
       {previewType === "cardSkins" && <div className="skin-preview-row admin-card-preview">
@@ -722,7 +731,7 @@ export function CosmeticPreview({ user, item, stats = [] }) {
         <PlayingCard card={{ rank: "K", suit: "S" }} skin={previewUser.cosmetics?.equipped?.cardSkin} />
         <PlayingCard hidden skin={previewUser.cosmetics?.equipped?.cardSkin} />
       </div>}
-      {!item && <small>Sélectionne un article pour afficher son rendu.</small>}
+      {!item && <small>{localeText("Sélectionne un article pour afficher son rendu.")}</small>}
     </div>
   );
 }

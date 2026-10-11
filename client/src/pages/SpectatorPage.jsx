@@ -1,3 +1,4 @@
+import { useLocale } from "../locales/LocaleProvider.jsx";
 import { useCallback, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { DoorOpen, Eye, HelpCircle, LockKeyhole, RefreshCw, Trophy } from "lucide-react";
@@ -12,6 +13,7 @@ import { RankedTurnTimer } from "../features/games/RankedPlay.jsx";
 import "./spectator.css";
 
 export function SpectatorPage({ code, user, onBack, onJoin }) {
+  const { t: localeText } = useLocale();
   const [room, setRoom] = useState(null);
   useBugGameContext("spectator", code, room?.gameId, room?.activityMatchId);
   const [password, setPassword] = useState("");
@@ -44,11 +46,11 @@ export function SpectatorPage({ code, user, onBack, onJoin }) {
     try { accept(await api(`/api/rooms/${encodeURIComponent(code)}/spectate`, { method: "POST", body: JSON.stringify({ password }) })); }
     catch (err) { setError(err.message); } finally { setBusy(false); }
   }
-  return <main className="app-shell spectator-page"><header className="page-heading"><div><span className="eyebrow"><Eye size={16} /> Spectateur · {connected ? "En direct" : room ? "Connexion interrompue" : code}</span><h1>{room?.name ?? `Observer la table ${code}`}</h1></div></header><div className="room-table-tools"><button className="secondary" onClick={onBack}><DoorOpen size={18} />Quitter la vue</button>{room && <button className="secondary" onClick={() => setRules(true)}><HelpCircle size={18} />Règles</button>}{room && !room.state && !closed && <button onClick={onJoin}><DoorOpen size={18} />Rejoindre la table</button>}</div>
-    {error && <p className="error" role="alert">{error}</p>}
-    {room?.ranked && room.state && !room.state.finished && !closed && <div className="ranked-match-heading"><strong>Partie classée</strong><RankedTurnTimer turn={room.ranked.turn} paused={Boolean(room.pacing || room.state.nextHandAt)}/></div>}
-    {!room && (busy ? <p role="status"><RefreshCw size={18} />Connexion…</p> : <form className="spectator-access" onSubmit={unlock}><label><LockKeyhole size={16} />Mot de passe de la table<input type="password" autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button disabled={busy}><DoorOpen size={18} />Rejoindre</button></form>)}
-    {closed ? <h2>Cette table a été fermée.</h2> : room && <>{!room.state ? <section className="spectator-waiting"><h2>En salle d'attente</h2><div className="players">{room.players.map((player) => <DisplayName key={player.id} user={player} />)}</div></section> : <><section className="board"><div className="board-felt"><h2>{gameTitle(room.gameId)}</h2><div className="turn-line">{room.state.finished ? "Partie terminée" : room.state.players[room.state.currentPlayerIndex] ? <>Tour de <DisplayName user={room.state.players[room.state.currentPlayerIndex]} /></> : "Partie en cours"}</div>{room.state.finished && <div className="board-result"><Trophy size={20} /><span>Vainqueur : {room.state.winners.map((id) => room.state.players.find((player) => player.id === id)?.pseudo).filter(Boolean).join(", ") || "Aucun"}</span></div>}<SpectatorBoard state={room.state} user={user} /></div></section></>}</>}
+  return <main className="app-shell spectator-page"><header className="page-heading"><div><span className="eyebrow"><Eye size={16} />{" " + localeText("Spectateur ·") + " "}{connected ? localeText("En direct") : room ? localeText("Connexion interrompue") : code}</span><h1>{room?.name ?? localeText("Observer la table {value0}", { value0: code })}</h1></div></header><div className="room-table-tools"><button className="secondary" onClick={onBack}><DoorOpen size={18} />{localeText("Quitter la vue")}</button>{room && <button className="secondary" onClick={() => setRules(true)}><HelpCircle size={18} />{localeText("Règles")}</button>}{room && !room.state && !closed && <button onClick={onJoin}><DoorOpen size={18} />{localeText("Rejoindre la table")}</button>}</div>
+    {error && <p className="error" role="alert">{localeText(error)}</p>}
+    {room?.ranked && room.state && !room.state.finished && !closed && <div className="ranked-match-heading"><strong>{localeText("Partie classée")}</strong><RankedTurnTimer turn={room.ranked.turn} paused={Boolean(room.pacing || room.state.nextHandAt)}/></div>}
+    {!room && (busy ? <p role="status"><RefreshCw size={18} />{localeText("Connexion…")}</p> : <form className="spectator-access" onSubmit={unlock}><label><LockKeyhole size={16} />{localeText("Mot de passe de la table")}<input type="password" autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button disabled={busy}><DoorOpen size={18} />{localeText("Rejoindre")}</button></form>)}
+    {closed ? <h2>{localeText("Cette table a été fermée.")}</h2> : room && <>{!room.state ? <section className="spectator-waiting"><h2>{localeText("En salle d'attente")}</h2><div className="players">{room.players.map((player) => <DisplayName key={player.id} user={player} />)}</div></section> : <><section className="board"><div className="board-felt"><h2>{localeText(gameTitle(room.gameId))}</h2><div className="turn-line">{room.state.finished ? localeText("Partie terminée") : room.state.players[room.state.currentPlayerIndex] ? <>{localeText("Tour de") + " "}<DisplayName user={room.state.players[room.state.currentPlayerIndex]} /></> : localeText("Partie en cours")}</div>{room.state.finished && <div className="board-result"><Trophy size={20} /><span>{localeText("Vainqueur :") + " "}{room.state.winners.map((id) => room.state.players.find((player) => player.id === id)?.pseudo).filter(Boolean).join(", ") || localeText("Aucun")}</span></div>}<SpectatorBoard state={room.state} user={user} /></div></section></>}</>}
     {rules && room && <RulesModal gameId={room.gameId} onClose={() => setRules(false)} />}
   </main>;
 }

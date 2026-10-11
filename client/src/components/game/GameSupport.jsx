@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { useEffect, useRef, useState } from "react";
 import { Coins, Dice5, Landmark, Spade, Swords, Trophy, X } from "lucide-react";
@@ -129,6 +130,7 @@ export function yahtzeePotentialScore(dice = [], category) {
 }
 
 export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, label = "Mise" }) {
+  const { t: localeText } = useLocale();
   const finiteMax = Number.isFinite(max) && max < Number.MAX_SAFE_INTEGER;
   const clamp = (next) => Math.min(max, Math.max(min, Math.floor(Number(next) || 0)));
   const numeric = clamp(value);
@@ -140,18 +142,18 @@ export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INT
   return (
     <div className="bet-stepper">
       <div className="bet-stepper-head">
-        <span>{label}</span>
-        <strong><CompactNumber value={numeric} label={`${label} exacte`} /></strong>
+        <span>{localeText(label)}</span>
+        <strong><CompactNumber value={numeric} label={localeText("{value0} exacte", { value0: label })} /></strong>
       </div>
       <div className="bet-control">
-        <div className="bet-step-group negative-steps" aria-label="Réduire la mise">
+        <div className="bet-step-group negative-steps" aria-label={localeText("Réduire la mise")}>
           {minusSteps.map((step) => (
             <button key={step} className="chip-button" type="button" onClick={() => adjust(step)}>{step}</button>
           ))}
         </div>
         <label className="bet-value-input">
           <input
-            aria-label={label}
+            aria-label={localeText(label)}
             type="number"
             min={min}
             max={finiteMax ? max : undefined}
@@ -159,24 +161,25 @@ export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INT
             onChange={(e) => onChange(clamp(e.target.value))}
           />
         </label>
-        <div className="bet-step-group positive-steps" aria-label="Augmenter la mise">
+        <div className="bet-step-group positive-steps" aria-label={localeText("Augmenter la mise")}>
           {plusSteps.map((step) => (
             <button key={step} className="chip-button" type="button" onClick={() => adjust(step)}>+{step}</button>
           ))}
         </div>
       </div>
-      <div className="bet-mouse-controls" aria-label="Réglage rapide de la mise">
-        <button type="button" className="secondary" onClick={() => onChange(min)}>Minimum</button>
+      <div className="bet-mouse-controls" aria-label={localeText("Réglage rapide de la mise")}>
+        <button type="button" className="secondary" onClick={() => onChange(min)}>{localeText("Minimum")}</button>
         <button type="button" className="secondary" onClick={() => onChange(clamp(Math.max(min, Math.floor(numeric / 2))))}>÷ 2</button>
         <button type="button" className="secondary" onClick={() => onChange(clamp(numeric * 2))}>× 2</button>
-        {finiteMax && <button type="button" className="secondary" onClick={() => onChange(max)}>Maximum</button>}
+        {finiteMax && <button type="button" className="secondary" onClick={() => onChange(max)}>{localeText("Maximum")}</button>}
       </div>
-      {finiteMax && max > min && <label className="bet-range-input"><span className="sr-only">{label} à la souris</span><input type="range" min={min} max={max} step={Math.max(1, Math.floor((max - min) / 100))} value={numeric} onChange={(event) => onChange(clamp(event.target.value))} /></label>}
+      {finiteMax && max > min && <label className="bet-range-input"><span className="sr-only">{localeText(label)}{" " + localeText("à la souris")}</span><input type="range" min={min} max={max} step={Math.max(1, Math.floor((max - min) / 100))} value={numeric} onChange={(event) => onChange(clamp(event.target.value))} /></label>}
     </div>
   );
 }
 
 export function RulesModal({ gameId, onClose }) {
+  const { t: localeText } = useLocale();
   const rules = gameRules[gameId];
   if (!rules) return null;
   const examples = ruleDiceExamples[gameId] ?? [];
@@ -184,22 +187,22 @@ export function RulesModal({ gameId, onClose }) {
   return (
     <ModalBackdrop className="modal-backdrop" onClick={onClose}>
       <div className="modal rules-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title-row"><div><span className="eyebrow">Guide de jeu</span><h2>{gameTitle(gameId)}</h2></div><button className="secondary icon-toggle" onClick={onClose}><X size={18} /></button></div>
-        <div className="rule-goal"><span>{isCardGame ? <Spade size={22} /> : <Dice5 size={22} />}</span><div><small>Objectif de la partie</small><strong>{rules.goal}</strong></div><b>{rules.sections.length} chapitres</b></div>
+        <div className="modal-title-row"><div><span className="eyebrow">{localeText("Guide de jeu")}</span><h2>{localeText(gameTitle(gameId))}</h2></div><button className="secondary icon-toggle" onClick={onClose}><X size={18} /></button></div>
+        <div className="rule-goal"><span>{isCardGame ? <Spade size={22} /> : <Dice5 size={22} />}</span><div><small>{localeText("Objectif de la partie")}</small><strong>{localeText(rules.goal)}</strong></div><b>{rules.sections.length}{" " + localeText("chapitres")}</b></div>
         <div className="rule-sections">
           {rules.sections.map((section, sectionIndex) => (
             <section className="rule-section" key={section.title}>
-              <div className="rule-section-title"><span>{section.title.toLowerCase().includes("fin") || section.title.toLowerCase().includes("victoire") ? <Trophy size={20} /> : gameId === "bataille" || section.title.toLowerCase().includes("bluff") || section.title.toLowerCase().includes("stratég") ? <Swords size={20} /> : section.title.toLowerCase().includes("score") || section.title.toLowerCase().includes("point") || section.title.toLowerCase().includes("combinaison") || section.title.toLowerCase().includes("valeur") ? <Coins size={20} /> : isCardGame ? <Spade size={20} /> : <Dice5 size={20} />}</span><div><small>Chapitre {sectionIndex + 1}</small><h3>{section.title}</h3></div></div>
+              <div className="rule-section-title"><span>{section.title.toLowerCase().includes("fin") || section.title.toLowerCase().includes("victoire") ? <Trophy size={20} /> : gameId === "bataille" || section.title.toLowerCase().includes("bluff") || section.title.toLowerCase().includes("stratég") ? <Swords size={20} /> : section.title.toLowerCase().includes("score") || section.title.toLowerCase().includes("point") || section.title.toLowerCase().includes("combinaison") || section.title.toLowerCase().includes("valeur") ? <Coins size={20} /> : isCardGame ? <Spade size={20} /> : <Dice5 size={20} />}</span><div><small>{localeText("Chapitre") + " "}{sectionIndex + 1}</small><h3>{localeText(section.title)}</h3></div></div>
               <ul>
                 {section.items.map((item, itemIndex) => {
                   const itemExamples = examples.filter((example) => item.startsWith(example.match));
-                  return <li className={itemExamples.length ? "has-rule-example" : ""} key={item}><span className="rule-item-index">{String(itemIndex + 1).padStart(2, "0")}</span><div className="rule-item-content"><span>{item}</span>{itemExamples.map((example, exampleIndex) => <figure className="rule-combination-example" key={`${example.match}-${exampleIndex}`}>{example.dice ? <div className="rule-dice-row">{example.dice.map((value, index) => <Die key={`${example.match}-${index}`} value={value} kept={false} />)}</div> : <div className="rule-card-row">{example.cards.map((card, index) => <PlayingCard key={`${example.match}-${index}`} card={card} hidden={example.hidden || !card} />)}</div>}<figcaption><small>Exemple</small>{example.label}</figcaption></figure>)}</div></li>;
+                  return <li className={itemExamples.length ? "has-rule-example" : ""} key={item}><span className="rule-item-index">{String(itemIndex + 1).padStart(2, "0")}</span><div className="rule-item-content"><span>{localeText(item)}</span>{itemExamples.map((example, exampleIndex) => <figure className="rule-combination-example" key={`${example.match}-${exampleIndex}`}>{example.dice ? <div className="rule-dice-row">{example.dice.map((value, index) => <Die key={`${example.match}-${index}`} value={value} kept={false} />)}</div> : <div className="rule-card-row">{example.cards.map((card, index) => <PlayingCard key={`${example.match}-${index}`} card={card} hidden={example.hidden || !card} />)}</div>}<figcaption><small>{localeText("Exemple")}</small>{localeText(example.label)}</figcaption></figure>)}</div></li>;
                 })}
               </ul>
             </section>
           ))}
         </div>
-        <div className="rules-footer"><span><Landmark size={16} /> Guide de table KTGA.ME</span><button onClick={onClose}>Fermer</button></div>
+        <div className="rules-footer"><span><Landmark size={16} />{" " + localeText("Guide de table KTGA.ME")}</span><button onClick={onClose}>{localeText("Fermer")}</button></div>
       </div>
     </ModalBackdrop>
   );

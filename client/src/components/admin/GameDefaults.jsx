@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { Settings } from "lucide-react";
 import { gameModifierDefinitions } from "../../features/games/config.js";
 
@@ -9,16 +10,17 @@ const battleFields = [
 ];
 
 export function GameDefaults({ game, onChange, competitive = false }) {
+  const { t: localeText } = useLocale();
   const fields = game.id === "bataille" ? battleFields : gameModifierDefinitions[game.id] ?? [];
   if (!fields.length) return null;
   const value = game.defaultModifiers ?? {};
   const change = (key, next) => onChange({ ...value, [key]: next });
   return <section className="admin-form-section game-default-settings">
-    <div className="admin-form-section-title"><Settings /><div><h3>{competitive ? "Preset des parties classées" : "Parametres par defaut des tables"}</h3><p>{competitive ? "Règles communes imposées par le serveur, non modifiables par les joueurs." : "Appliques aux nouvelles tables. Leurs maitres peuvent ensuite les ajuster en salle d'attente."}</p></div></div>
-    <div className="admin-field-grid">{fields.filter((field) => field.type !== "toggle").map((field) => <label key={field.key}>{field.label}
-      {field.type === "select" ? <select aria-label={field.label} value={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.value)}>{field.options.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select> : <input aria-label={field.label} required type="number" min={field.min} max={field.max} step="1" value={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.value === "" ? "" : Number(event.target.value))} />}
+    <div className="admin-form-section-title"><Settings /><div><h3>{competitive ? localeText("Preset des parties classées") : localeText("Parametres par defaut des tables")}</h3><p>{competitive ? localeText("Règles communes imposées par le serveur, non modifiables par les joueurs.") : localeText("Appliques aux nouvelles tables. Leurs maitres peuvent ensuite les ajuster en salle d'attente.")}</p></div></div>
+    <div className="admin-field-grid">{fields.filter((field) => field.type !== "toggle").map((field) => <label key={field.key}>{localeText(field.label)}
+      {field.type === "select" ? <select aria-label={localeText(field.label)} value={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.value)}>{field.options.map(([id, label]) => <option key={id} value={id}>{localeText(label)}</option>)}</select> : <input aria-label={localeText(field.label)} required type="number" min={field.min} max={field.max} step="1" value={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.value === "" ? "" : Number(event.target.value))} />}
       {field.help && <small className="field-help">{field.help}</small>}
     </label>)}</div>
-    <div className="admin-toggle-row">{fields.filter((field) => field.type === "toggle").map((field) => <label key={field.key}><input type="checkbox" checked={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.checked)} /><span>{field.label}{field.help && <small className="field-help">{field.help}</small>}</span></label>)}</div>
+    <div className="admin-toggle-row">{fields.filter((field) => field.type === "toggle").map((field) => <label key={field.key}><input type="checkbox" checked={value[field.key] ?? field.defaultValue} onChange={(event) => change(field.key, event.target.checked)} /><span>{localeText(field.label)}{field.help && <small className="field-help">{field.help}</small>}</span></label>)}</div>
   </section>;
 }

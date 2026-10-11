@@ -1,8 +1,10 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useRef, useState } from "react";
 import { AlertTriangle, Check, X } from "lucide-react";
 import { Dialog } from "./Dialog.jsx";
 
 export function ConfirmDialog({ title, message, confirmLabel = "Confirmer", danger = false, onConfirm, onClose }) {
+  const { t: localeText } = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const pending = useRef(false);
@@ -23,15 +25,16 @@ export function ConfirmDialog({ title, message, confirmLabel = "Confirmer", dang
   }
   return <Dialog title={title} onClose={onClose} dismissible={!busy} className="action-confirm-modal" layerClassName="action-confirm-layer">
     <p className="action-confirm-message">{danger && <AlertTriangle size={20} />}{message}</p>
-    {error && <p className="error" role="alert">{error}</p>}
+    {error && <p className="error" role="alert">{localeText(error)}</p>}
     <div className="action-confirm-buttons">
-      <button type="button" className="secondary" disabled={busy} onClick={onClose}><X size={17} /> Annuler</button>
-      <button type="button" className={danger ? "danger-button" : ""} disabled={busy} onClick={confirm}><Check size={17} />{busy ? "Traitement…" : confirmLabel}</button>
+      <button type="button" className="secondary" disabled={busy} onClick={onClose}><X size={17} />{" " + localeText("Annuler")}</button>
+      <button type="button" className={danger ? "danger-button" : ""} disabled={busy} onClick={confirm}><Check size={17} />{busy ? localeText("Traitement…") : confirmLabel}</button>
     </div>
   </Dialog>;
 }
 
 export function ConfirmActionButton({ dialogTitle, message, confirmLabel, danger = false, onConfirm, children, ...buttonProps }) {
+  const { t: localeText } = useLocale();
   const [open, setOpen] = useState(false);
   return <>
     <button {...buttonProps} type="button" aria-haspopup="dialog" onClick={() => setOpen(true)}>{children}</button>

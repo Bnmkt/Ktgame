@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useEffect, useRef, useState } from "react";
 import { Check, Image as ImageIcon, RotateCcw, Upload } from "lucide-react";
 import { api, API_URL } from "../../api.js";
@@ -9,6 +10,7 @@ import { encodeInsigniaCrop, insigniaCropBounds } from "../../features/games/ins
 const centered = { zoom: 1, x: 0.5, y: 0.5 };
 
 export function RankInsigniaEditor({ rank, division = "", references = [], onApply, onClose, onInherit }) {
+  const { t: localeText } = useLocale();
   const [tab, setTab] = useState("image");
   const [icon, setIcon] = useState(rank.insignia || "shield");
   const [source, setSource] = useState(null);
@@ -95,30 +97,30 @@ export function RankInsigniaEditor({ rank, division = "", references = [], onApp
     finally { setBusy(false); }
   }
 
-  return <Dialog title={`Insigne · ${rank.name}${division ? ` ${division}` : ""}`} className="ranked-insignia-dialog" onClose={onClose} dismissible={!busy && !loading}>
-    {division && <button type="button" className="secondary ranked-inherit-insignia" disabled={busy || loading} onClick={onInherit}><RotateCcw size={17}/>Utiliser l’insigne commun</button>}
-    <div className="ranked-mode-tabs" role="group" aria-label="Type d’insigne">{[["image", "Image"], ["icon", "Icône"]].map(([id, label]) => <button key={id} type="button" className={tab === id ? "active" : "secondary"} aria-pressed={tab === id} disabled={busy || loading} onClick={() => { setTab(id); setError(""); }}>{label}</button>)}</div>
+  return <Dialog title={localeText("Insigne · {value0}{value1}", { value0: rank.name, value1: division ? ` ${division}` : "" })} className="ranked-insignia-dialog" onClose={onClose} dismissible={!busy && !loading}>
+    {division && <button type="button" className="secondary ranked-inherit-insignia" disabled={busy || loading} onClick={onInherit}><RotateCcw size={17}/>{localeText("Utiliser l’insigne commun")}</button>}
+    <div className="ranked-mode-tabs" role="group" aria-label={localeText("Type d’insigne")}>{[["image", "Image"], ["icon", "Icône"]].map(([id, label]) => <button key={id} type="button" className={tab === id ? "active" : "secondary"} aria-pressed={tab === id} disabled={busy || loading} onClick={() => { setTab(id); setError(""); }}>{localeText(label)}</button>)}</div>
     {tab === "image" ? <>
-      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" aria-label="Image de l’insigne" className="ranked-image-input" disabled={busy || loading} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
-      <div className="ranked-image-tools"><button type="button" className="secondary" disabled={busy || loading} onClick={() => input.current.click()}><Upload size={18}/>{source || rank.insigniaImage ? "Remplacer l’image" : "Importer une image"}</button>{rank.insigniaImage && !source && <button type="button" className="secondary" disabled={busy || loading} onClick={editExisting}><ImageIcon size={18}/>Recadrer</button>}</div>
-      {loading && <p role="status">Chargement de l’image…</p>}
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" aria-label={localeText("Image de l’insigne")} className="ranked-image-input" disabled={busy || loading} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
+      <div className="ranked-image-tools"><button type="button" className="secondary" disabled={busy || loading} onClick={() => input.current.click()}><Upload size={18}/>{source || rank.insigniaImage ? localeText("Remplacer l’image") : localeText("Importer une image")}</button>{rank.insigniaImage && !source && <button type="button" className="secondary" disabled={busy || loading} onClick={editExisting}><ImageIcon size={18}/>{localeText("Recadrer")}</button>}</div>
+      {loading && <p role="status">{localeText("Chargement de l’image…")}</p>}
       <div className="ranked-image-workspace">
         {source ? <div>
-          <div className="ranked-crop-stage" tabIndex={0} role="group" aria-label="Zone de recadrage" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" onKeyDown={nudge} onPointerDown={(event) => {
+          <div className="ranked-crop-stage" tabIndex={0} role="group" aria-label={localeText("Zone de recadrage")} aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight" onKeyDown={nudge} onPointerDown={(event) => {
             if (busy || event.button !== 0) return;
             event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY };
           }} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
             <img src={source.url} alt="Image à recadrer" draggable={false} style={imageStyle}/>
             {references.filter((reference)=>!hiddenReferences.includes(reference.division)).map((reference)=><div key={reference.division} className="ranked-crop-reference"><RankInsignia rank={reference.rank}/></div>)}
           </div>
-          <label className="ranked-crop-zoom">Zoom <output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.25} max={5} step={0.05} value={bounds.zoom} aria-label="Zoom du recadrage" disabled={busy} onChange={(event) => updateCrop({ zoom: Number(event.target.value) })}/></label>
-          <button type="button" className="secondary" disabled={busy} onClick={() => updateCrop({ x: 0.5, y: 0.5 })}><RotateCcw size={17}/>Recentrer</button>
+          <label className="ranked-crop-zoom">{localeText("Zoom") + " "}<output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.25} max={5} step={0.05} value={bounds.zoom} aria-label={localeText("Zoom du recadrage")} disabled={busy} onChange={(event) => updateCrop({ zoom: Number(event.target.value) })}/></label>
+          <button type="button" className="secondary" disabled={busy} onClick={() => updateCrop({ x: 0.5, y: 0.5 })}><RotateCcw size={17}/>{localeText("Recentrer")}</button>
         </div> : <div className="ranked-image-empty">{rank.insigniaImage ? <RankInsignia rank={rank}/> : <ImageIcon size={64}/>}</div>}
-        <div className="ranked-image-preview"><span className="eyebrow">Aperçu</span>{source ? <div className="ranked-crop-thumbnail"><img src={source.url} alt="Aperçu de l’insigne recadré" style={imageStyle}/></div> : <RankInsignia rank={rank}/>}<div><strong>{rank.name}</strong><small>{division ? `Division ${division}` : "Insigne commun"}</small></div></div>
+        <div className="ranked-image-preview"><span className="eyebrow">{localeText("Aperçu")}</span>{source ? <div className="ranked-crop-thumbnail"><img src={source.url} alt="Aperçu de l’insigne recadré" style={imageStyle}/></div> : <RankInsignia rank={rank}/>}<div><strong>{rank.name}</strong><small>{division ? localeText("Division {value0}", { value0: division }) : localeText("Insigne commun")}</small></div></div>
       </div>
-      {source && references.length>0 && <fieldset className="ranked-crop-references"><legend>Repères de division</legend>{references.map((reference)=><label key={reference.division}><input type="checkbox" disabled={busy} checked={!hiddenReferences.includes(reference.division)} onChange={(event)=>setHiddenReferences((previous)=>event.target.checked?previous.filter((value)=>value!==reference.division):[...previous,reference.division])}/><RankInsignia rank={reference.rank}/>{rank.name} {reference.division}</label>)}</fieldset>}
+      {source && references.length>0 && <fieldset className="ranked-crop-references"><legend>{localeText("Repères de division")}</legend>{references.map((reference)=><label key={reference.division}><input type="checkbox" disabled={busy} checked={!hiddenReferences.includes(reference.division)} onChange={(event)=>setHiddenReferences((previous)=>event.target.checked?previous.filter((value)=>value!==reference.division):[...previous,reference.division])}/><RankInsignia rank={reference.rank}/>{rank.name} {reference.division}</label>)}</fieldset>}
     </> : <><div className="ranked-insignia-preview"><RankInsignia rank={{ ...rank, insignia: icon, insigniaImage: "" }}/><strong>{rank.name}</strong></div><LucideIconPicker value={icon} onChange={setIcon}/></>}
-    {error && <p className="error" role="alert">{error}</p>}
-    <div className="ranked-insignia-actions"><button type="button" className="secondary" disabled={busy || loading} onClick={onClose}>Annuler</button><button type="button" disabled={busy || loading || tab === "image" && !source && !rank.insigniaImage} onClick={apply}><Check size={17}/>{busy ? "Enregistrement…" : "Appliquer"}</button></div>
+    {error && <p className="error" role="alert">{localeText(error)}</p>}
+    <div className="ranked-insignia-actions"><button type="button" className="secondary" disabled={busy || loading} onClick={onClose}>{localeText("Annuler")}</button><button type="button" disabled={busy || loading || tab === "image" && !source && !rank.insigniaImage} onClick={apply}><Check size={17}/>{busy ? localeText("Enregistrement…") : localeText("Appliquer")}</button></div>
   </Dialog>;
 }

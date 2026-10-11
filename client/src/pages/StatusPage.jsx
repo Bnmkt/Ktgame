@@ -1,3 +1,4 @@
+import { useLocale } from "../locales/LocaleProvider.jsx";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, Database, Gamepad2, Globe2, Mail, Plus, Radio, RefreshCw, Server, Wrench, XCircle } from "lucide-react";
 import { api } from "../api.js";
@@ -27,11 +28,13 @@ function formatUptime(value) {
 }
 
 function StatusBadge({ status }) {
+  const { t: localeText } = useLocale();
   const meta = statusMeta[status] ?? statusMeta.unknown;
-  return <span className={`public-status-badge status-${status}`}><meta.Icon size={15} />{meta.label}</span>;
+  return <span className={`public-status-badge status-${status}`}><meta.Icon size={15} />{localeText(meta.label)}</span>;
 }
 
 function StatusTimeline({ data }) {
+  const { t: localeText } = useLocale();
   const scrollRef = useRef(null);
   const [selectedJustification, setSelectedJustification] = useState(null);
   const pointWidth = data.timeline.length > 3000 ? 5 : data.timeline.length > 1000 ? 7 : 10;
@@ -58,10 +61,10 @@ function StatusTimeline({ data }) {
     }
   }
   return <div className="status-timeline-matrix">
-    <div className="status-timeline-labels"><div className="status-timeline-label-heading">Service</div>{data.components.map((component) => { const Icon = componentIcons[component.id] ?? Server; return <div className="status-timeline-label" key={component.id}><span><Icon size={19} /></span><div><h3>{component.name}</h3><StatusBadge status={component.status} /><strong>{formatUptime(component.uptime)}</strong></div></div>; })}</div>
-    <div ref={scrollRef} className="status-timeline-scroll" tabIndex="0" aria-label={`Historique synchronisé sur ${data.rangeDays} jours`}>
+    <div className="status-timeline-labels"><div className="status-timeline-label-heading">{localeText("Service")}</div>{data.components.map((component) => { const Icon = componentIcons[component.id] ?? Server; return <div className="status-timeline-label" key={component.id}><span><Icon size={19} /></span><div><h3>{component.name}</h3><StatusBadge status={component.status} /><strong>{formatUptime(component.uptime)}</strong></div></div>; })}</div>
+    <div ref={scrollRef} className="status-timeline-scroll" tabIndex="0" aria-label={localeText("Historique synchronisé sur {value0} jours", { value0: data.rangeDays })}>
       <div className="status-timeline-track" style={{ width }}>
-        <div className="status-timeline-axis" style={timelineGridStyle}>{data.timeline.map((point, index) => { const previous = data.timeline[index - 1]; const label = !previous || new Date(previous.at).getDate() !== new Date(point.at).getDate() ? dayKey(point.at) : ""; return <span key={point.at}>{label}</span>; })}</div>
+        <div className="status-timeline-axis" style={timelineGridStyle}>{data.timeline.map((point, index) => { const previous = data.timeline[index - 1]; const label = !previous || new Date(previous.at).getDate() !== new Date(point.at).getDate() ? dayKey(point.at) : ""; return <span key={point.at}>{localeText(label)}</span>; })}</div>
         {data.components.map((component) => <div className="status-timeline-row" style={timelineGridStyle} key={component.id}>{data.timeline.map((point) => {
           const value = point.components[component.id];
           const incidents = (value.incidentIds ?? []).map((id) => data.justifications?.find((incident) => incident.id === id)).filter(Boolean);
@@ -72,18 +75,19 @@ function StatusTimeline({ data }) {
         })}</div>)}
       </div>
     </div>
-    {selectedJustification && <Dialog title={selectedJustification.investigation ? "En investigation" : "Justification du relevé"} className="status-justification-dialog" onClose={() => setSelectedJustification(null)}>
-      <div className="status-justification-context"><strong>{selectedJustification.component.name}</strong><span>Segment du {formatDate(selectedJustification.point.at, true)}</span></div>
-      {selectedJustification.investigation && <div className="status-investigation-message">{selectedJustification.pending ? <p role="status">Transmission du relevé à l’équipe…</p> : selectedJustification.error ? <><p role="alert" className="error">{selectedJustification.error}</p><button type="button" className="secondary" onClick={() => openJustification(selectedJustification.component, selectedJustification.point, selectedJustification.incidents)}><RefreshCw size={16} />Réessayer</button></> : <p>Une anomalie a été relevée sur ce service. Le suivi est en investigation par l’équipe. Des informations seront publiées lorsqu’elles seront disponibles.</p>}</div>}
+    {selectedJustification && <Dialog title={selectedJustification.investigation ? localeText("En investigation") : localeText("Justification du relevé")} className="status-justification-dialog" onClose={() => setSelectedJustification(null)}>
+      <div className="status-justification-context"><strong>{selectedJustification.component.name}</strong><span>{localeText("Segment du") + " "}{formatDate(selectedJustification.point.at, true)}</span></div>
+      {selectedJustification.investigation && <div className="status-investigation-message">{selectedJustification.pending ? <p role="status">{localeText("Transmission du relevé à l’équipe…")}</p> : selectedJustification.error ? <><p role="alert" className="error">{selectedJustification.error}</p><button type="button" className="secondary" onClick={() => openJustification(selectedJustification.component, selectedJustification.point, selectedJustification.incidents)}><RefreshCw size={16} />{localeText("Réessayer")}</button></> : <p>{localeText("Une anomalie a été relevée sur ce service. Le suivi est en investigation par l’équipe. Des informations seront publiées lorsqu’elles seront disponibles.")}</p>}</div>}
       <div className="status-justification-list">{selectedJustification.incidents.map((incident) => <Incident key={incident.id} incident={incident} components={data.components} />)}</div>
     </Dialog>}
   </div>;
 }
 
 function LatencyChart({ components }) {
+  const { t: localeText } = useLocale();
   const series = components.filter((component) => ["website", "api"].includes(component.id)).map((component, index) => ({ ...component, color: index ? "#f0bd48" : "#69d5aa" }));
   const values = series.flatMap((component) => component.days.map((day) => day.averageLatencyMs).filter((value) => value != null));
-  if (!values.length) return <div className="status-chart-empty">Le graphique apparaîtra après les premiers relevés de latence.</div>;
+  if (!values.length) return <div className="status-chart-empty">{localeText("Le graphique apparaîtra après les premiers relevés de latence.")}</div>;
   const width = 960, height = 250, left = 52, right = 18, top = 20, bottom = 34;
   const graphWidth = width - left - right, graphHeight = height - top - bottom;
   const max = Math.max(10, ...values);
@@ -100,17 +104,18 @@ function LatencyChart({ components }) {
     return rows;
   };
   return <section className="status-latency-section">
-    <header><div><span className="eyebrow">Performance sur {components[0]?.days.length ?? 0} jours</span><h2>Temps de réponse moyen</h2></div><div className="status-chart-legend">{series.map((entry) => <span key={entry.id}><i style={{ background: entry.color }} />{entry.name}</span>)}</div></header>
-    <div className="status-latency-chart"><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Temps de réponse moyen quotidien du site et de l’API">
-      {[0, .25, .5, .75, 1].map((ratio) => <g key={ratio}><line x1={left} x2={width - right} y1={top + graphHeight * ratio} y2={top + graphHeight * ratio} /><text x={left - 8} y={top + graphHeight * ratio + 4}>{Math.round(max * (1 - ratio))} ms</text></g>)}
+    <header><div><span className="eyebrow">{localeText("Performance sur") + " "}{components[0]?.days.length ?? 0}{" " + localeText("jours")}</span><h2>{localeText("Temps de réponse moyen")}</h2></div><div className="status-chart-legend">{series.map((entry) => <span key={entry.id}><i style={{ background: entry.color }} />{entry.name}</span>)}</div></header>
+    <div className="status-latency-chart"><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={localeText("Temps de réponse moyen quotidien du site et de l’API")}>
+      {[0, .25, .5, .75, 1].map((ratio) => <g key={ratio}><line x1={left} x2={width - right} y1={top + graphHeight * ratio} y2={top + graphHeight * ratio} /><text x={left - 8} y={top + graphHeight * ratio + 4}>{Math.round(max * (1 - ratio))}{" " + localeText("ms")}</text></g>)}
       {series.flatMap((entry) => segments(entry.days).map((points, index) => <polyline key={`${entry.id}-${index}`} points={points.join(" ")} style={{ stroke: entry.color }} />))}
-      {series.flatMap((entry) => entry.days.map((day, index) => day.averageLatencyMs == null ? null : <circle key={`${entry.id}-${day.date}`} cx={x(index, entry.days.length)} cy={y(day.averageLatencyMs)} r="2.4" style={{ fill: entry.color }}><title>{entry.name} · {formatDate(`${day.date}T12:00:00Z`)} · {Math.round(day.averageLatencyMs)} ms</title></circle>))}
+      {series.flatMap((entry) => entry.days.map((day, index) => day.averageLatencyMs == null ? null : <circle key={`${entry.id}-${day.date}`} cx={x(index, entry.days.length)} cy={y(day.averageLatencyMs)} r="2.4" style={{ fill: entry.color }}><title>{entry.name} · {formatDate(`${day.date}T12:00:00Z`)} · {Math.round(day.averageLatencyMs)}{" " + localeText("ms")}</title></circle>))}
       <text className="status-chart-date" x={left} y={height - 7}>{formatDate(`${series[0].days[0].date}T12:00:00Z`)}</text><text className="status-chart-date" textAnchor="end" x={width - right} y={height - 7}>{formatDate(`${series[0].days.at(-1).date}T12:00:00Z`)}</text>
     </svg></div>
   </section>;
 }
 
 function Incident({ incident, components }) {
+  const { t: localeText } = useLocale();
   const names = incident.components.map((id) => components.find((component) => component.id === id)?.name ?? id).join(" · ");
   const affected = incident.scheduledAt ? `Relevé concerné : ${formatDate(incident.scheduledAt, true)}` : "";
   return <article className={`public-incident incident-${incident.type}`}>
@@ -121,6 +126,7 @@ function Incident({ incident, components }) {
 }
 
 export function StatusPage({ siteName, onBack }) {
+  const { t: localeText } = useLocale();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -142,18 +148,18 @@ export function StatusPage({ siteName, onBack }) {
   const globalStatus = error ? "outage" : data?.status ?? "unknown";
   const globalMeta = statusMeta[globalStatus] ?? statusMeta.unknown;
   return <main className="status-page">
-    <header className="status-site-header"><button type="button" className="secondary" onClick={onBack}><ArrowLeft size={17} />Retour au casino</button><div><span>{siteName}</span><strong>Service Status</strong></div><button type="button" className="secondary icon-toggle" title="Actualiser" aria-label="Actualiser l’état des services" onClick={() => load({ days: expanded ? data?.configuredRangeDays ?? 7 : 7 })} disabled={loading}><RefreshCw size={18} className={loading ? "spinning" : ""} /></button></header>
-    <section className={`status-summary status-${globalStatus}`} aria-live="polite"><globalMeta.Icon size={28} /><div><h1>{error ? "Interruption du service de statut" : globalStatus === "operational" ? "Tous les services sont opérationnels" : globalStatus === "maintenance" ? "Une maintenance est en cours" : globalStatus === "degraded" ? "Certains services sont ralentis" : globalStatus === "outage" ? "Un service est indisponible" : "Collecte en cours"}</h1><p>{error || `Dernière consolidation ${data ? formatDate(data.generatedAt, true) : "en cours"}.`}</p></div></section>
+    <header className="status-site-header"><button type="button" className="secondary" onClick={onBack}><ArrowLeft size={17} />{localeText("Retour au casino")}</button><div><span>{siteName}</span><strong>{localeText("Service Status")}</strong></div><button type="button" className="secondary icon-toggle" title={localeText("Actualiser")} aria-label={localeText("Actualiser l’état des services")} onClick={() => load({ days: expanded ? data?.configuredRangeDays ?? 7 : 7 })} disabled={loading}><RefreshCw size={18} className={loading ? "spinning" : ""} /></button></header>
+    <section className={`status-summary status-${globalStatus}`} aria-live="polite"><globalMeta.Icon size={28} /><div><h1>{error ? localeText("Interruption du service de statut") : globalStatus === "operational" ? localeText("Tous les services sont opérationnels") : globalStatus === "maintenance" ? localeText("Une maintenance est en cours") : globalStatus === "degraded" ? localeText("Certains services sont ralentis") : globalStatus === "outage" ? localeText("Un service est indisponible") : localeText("Collecte en cours")}</h1><p>{error || localeText("Dernière consolidation {value0}.", { value0: data ? formatDate(data.generatedAt, true) : "en cours" })}</p></div></section>
 
-    {error && <section className="status-offline-help"><p>L’interface publique reste accessible, mais l’API ne peut pas fournir son état ni son historique.</p><button type="button" onClick={() => load({ days: expanded ? data?.configuredRangeDays ?? 7 : 7 })}>Réessayer</button></section>}
+    {error && <section className="status-offline-help"><p>{localeText("L’interface publique reste accessible, mais l’API ne peut pas fournir son état ni son historique.")}</p><button type="button" onClick={() => load({ days: expanded ? data?.configuredRangeDays ?? 7 : 7 })}>{localeText("Réessayer")}</button></section>}
     {data && <>
-      {!!data.incidents.length && <section className="status-incidents"><div className="status-section-heading"><div><span className="eyebrow">Informations en cours</span><h2>Incidents et maintenances</h2></div></div>{data.incidents.map((incident) => <Incident key={incident.id} incident={incident} components={data.components} />)}</section>}
-      <section className="status-components"><div className="status-section-heading"><div><span className="eyebrow">Disponibilité publique</span><h2>Services</h2></div><div className="status-range-actions"><p>{data.rangeDays} jours · segments de {data.displayIntervalMinutes} min</p>{!expanded && data.configuredRangeDays > 7 && <button type="button" className="secondary" onClick={async () => { setExpanded(true); await load({ days: data.configuredRangeDays }); }} disabled={loading}><Plus size={16} />Afficher {data.configuredRangeDays} jours</button>}</div></div>
+      {!!data.incidents.length && <section className="status-incidents"><div className="status-section-heading"><div><span className="eyebrow">{localeText("Informations en cours")}</span><h2>{localeText("Incidents et maintenances")}</h2></div></div>{data.incidents.map((incident) => <Incident key={incident.id} incident={incident} components={data.components} />)}</section>}
+      <section className="status-components"><div className="status-section-heading"><div><span className="eyebrow">{localeText("Disponibilité publique")}</span><h2>{localeText("Services")}</h2></div><div className="status-range-actions"><p>{data.rangeDays}{" " + localeText("jours · segments de") + " "}{data.displayIntervalMinutes}{" " + localeText("min")}</p>{!expanded && data.configuredRangeDays > 7 && <button type="button" className="secondary" onClick={async () => { setExpanded(true); await load({ days: data.configuredRangeDays }); }} disabled={loading}><Plus size={16} />{localeText("Afficher") + " "}{data.configuredRangeDays}{" " + localeText("jours")}</button>}</div></div>
         <StatusTimeline data={data} />
-        <div className="status-history-legend"><span><i className="status-operational" />Opérationnel</span><span><i className="status-degraded" />Dégradé</span><span><i className="status-outage" />Indisponible</span><span><i className="status-no_data" />Sans données</span></div>
+        <div className="status-history-legend"><span><i className="status-operational" />{localeText("Opérationnel")}</span><span><i className="status-degraded" />{localeText("Dégradé")}</span><span><i className="status-outage" />{localeText("Indisponible")}</span><span><i className="status-no_data" />{localeText("Sans données")}</span></div>
       </section>
       <LatencyChart components={data.components} />
-      <section className="status-history"><div className="status-section-heading"><div><span className="eyebrow">Suivi</span><h2>Historique des incidents</h2></div><p>Collecte active depuis {formatDate(data.monitoringSince, true)}</p></div>{data.history.length ? data.history.map((incident) => <Incident key={incident.id} incident={incident} components={data.components} />) : <p className="status-empty">Aucun incident terminé depuis le début de la collecte.</p>}</section>
+      <section className="status-history"><div className="status-section-heading"><div><span className="eyebrow">{localeText("Suivi")}</span><h2>{localeText("Historique des incidents")}</h2></div><p>{localeText("Collecte active depuis") + " "}{formatDate(data.monitoringSince, true)}</p></div>{data.history.length ? data.history.map((incident) => <Incident key={incident.id} incident={incident} components={data.components} />) : <p className="status-empty">{localeText("Aucun incident terminé depuis le début de la collecte.")}</p>}</section>
     </>}
   </main>;
 }

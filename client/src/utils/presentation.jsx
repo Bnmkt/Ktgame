@@ -1,6 +1,9 @@
 import { BadgeCheck, Play, Trophy } from "lucide-react";
 import { gameTitle } from "../features/games/config.js";
 import { casinoDate } from "./dates.js";
+import { useLocale } from "../locales/LocaleProvider.jsx";
+
+const currentRegion = () => typeof document !== "undefined" && document.documentElement.lang === "en" ? "en-GB" : "fr-BE";
 
 export function gameCategoryLabel(value) {
   return ({ all: "Tous", score: "Score", combination: "Combinaisons", casino: "Casino", duel: "Duel", shedding: "Défausse", "push-your-luck": "Stop ou encore", bluff: "Bluff", draft: "Draft tactique", puzzle: "Puzzle", solitaire: "Solitaire" })[value] ?? value;
@@ -15,28 +18,28 @@ export function gameComplexityLabel(value) {
 }
 
 export function formatDate(value) {
-  return value ? new Intl.DateTimeFormat("fr-BE", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "-";
+  return value ? new Intl.DateTimeFormat(currentRegion(), { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "-";
 }
 
 export function formatTime(value) {
-  return value ? new Intl.DateTimeFormat("fr-BE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value)) : "";
+  return value ? new Intl.DateTimeFormat(currentRegion(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value)) : "";
 }
 
 export function formatTokens(value) {
   return formatCompactNumber(value);
 }
 
-export function formatExactNumber(value, maximumFractionDigits = 20) {
+export function formatExactNumber(value, maximumFractionDigits = 20, region = currentRegion()) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "0";
-  return new Intl.NumberFormat("fr-BE", { maximumFractionDigits }).format(numeric);
+  return new Intl.NumberFormat(region, { maximumFractionDigits }).format(numeric);
 }
 
-export function formatCompactNumber(value, compactFrom = 10000) {
+export function formatCompactNumber(value, compactFrom = 10000, region = currentRegion()) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "0";
   const absolute = Math.abs(numeric);
-  if (absolute < compactFrom) return formatExactNumber(numeric, Number.isInteger(numeric) ? 0 : 2);
+  if (absolute < compactFrom) return formatExactNumber(numeric, Number.isInteger(numeric) ? 0 : 2, region);
   const units = [[1e15, "Q"], [1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]];
   let unitIndex = units.findIndex(([threshold]) => absolute >= threshold);
   if (unitIndex < 0) unitIndex = units.length - 1;
@@ -49,14 +52,15 @@ export function formatCompactNumber(value, compactFrom = 10000) {
     scaled = numeric / divisor;
     maximumFractionDigits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2;
   }
-  return `${new Intl.NumberFormat("fr-BE", { maximumFractionDigits }).format(scaled)}${suffix}`;
+  return `${new Intl.NumberFormat(region, { maximumFractionDigits }).format(scaled)}${suffix}`;
 }
 
 export function CompactNumber({ value, prefix = "", suffix = "", compactFrom = 10000, className = "", label = "" }) {
+  const { region } = useLocale();
   const numeric = Number(value);
   const safeValue = Number.isFinite(numeric) ? numeric : 0;
-  const exact = `${prefix}${formatExactNumber(safeValue)}${suffix}`;
-  return <span className={`compact-number ${className}`.trim()} title={label ? `${label} : ${exact}` : exact} aria-label={label ? `${label} : ${exact}` : exact} data-full-number={exact}>{prefix}{formatCompactNumber(safeValue, compactFrom)}{suffix}</span>;
+  const exact = `${prefix}${formatExactNumber(safeValue, 20, region)}${suffix}`;
+  return <span className={`compact-number ${className}`.trim()} title={label ? `${label} : ${exact}` : exact} aria-label={label ? `${label} : ${exact}` : exact} data-full-number={exact}>{prefix}{formatCompactNumber(safeValue, compactFrom, region)}{suffix}</span>;
 }
 
 export async function copyText(value) {

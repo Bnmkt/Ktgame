@@ -1,3 +1,4 @@
+import { useLocale } from "../locales/LocaleProvider.jsx";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Cookie } from "lucide-react";
 import { api } from "../api.js";
@@ -12,6 +13,7 @@ export function usePrivacyChoice() { return useContext(PrivacyContext)?.choice; 
 export const legalLinks = { terms: "Conditions d'utilisation", legal: "Mentions légales", privacy: "Confidentialité", cookies: "Cookies", parents: "Parents" };
 
 export function PrivacyProvider({ children }) {
+  const { t: localeText } = useLocale();
   const [choice, setChoice] = useState(() => { try { return readConsent(window.localStorage); } catch { return null; } });
   const [open, setOpen] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(choice?.ageConfirmed === true);
@@ -32,20 +34,20 @@ export function PrivacyProvider({ children }) {
   }
   function openPreferences() { setAgeConfirmed(choice?.ageConfirmed === true); setNavigationEnabled(choice?.enabled === true); setAudienceEnabled(audienceAllowed(choice)); setOpen(true); }
   const content = <>
-    <p>Les données nécessaires font fonctionner la connexion, les parties et vos préférences. Elles ne servent pas à la publicité.</p>
-    <label className="privacy-purpose privacy-purpose-choice"><input type="checkbox" checked={navigationEnabled} onChange={(event) => setNavigationEnabled(event.target.checked)} /><div><strong>Succès de navigation · facultatif</strong><p>Autoriser la famille du navigateur, les types de pages visitées, certains indices secrets dans les liens et le temps actif. Pas d'historique détaillé ni d'URL complète enregistrée. Aucun effet sur les parties ou les jetons.</p></div></label>
-    <label className="privacy-purpose privacy-purpose-choice"><input type="checkbox" checked={audienceEnabled} onChange={(event) => setAudienceEnabled(event.target.checked)} /><div><strong>Mesure d’audience Google Analytics · facultatif</strong><p>Permettre à Google de mesurer les visites avec des cookies et des informations générales sur le navigateur et l’appareil. Sans pseudo, email, identifiant de compte ni paramètres des liens. Analytics ne démarre pas avant votre accord. Le gestionnaire Google Tag Manager est toutefois chargé à l’ouverture du site, même sans cet accord. Aucun ciblage publicitaire dans notre intégration Analytics.</p></div></label>
-    <label className="privacy-age"><input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} />J'ai au moins 13 ans et peux consentir à ce suivi facultatif.</label>
-    <p className="privacy-caption">Avant 13 ans, choisissez sans suivi. Votre choix est conservé 180 jours et peut être modifié à tout moment.</p>
-    <div className="privacy-actions"><button type="button" className="secondary" onClick={() => choose(false)}>Tout refuser</button><button type="button" className="secondary" disabled={(navigationEnabled || audienceEnabled) && !ageConfirmed} onClick={() => choose(navigationEnabled, audienceEnabled)}>Enregistrer mes choix</button><button type="button" className="secondary" disabled={!ageConfirmed} onClick={() => choose(true, true)}>Tout accepter</button></div>
-    <a href={appPath("cookies")}>Détails des cookies et stockages</a>
+    <p>{localeText("Les données nécessaires font fonctionner la connexion, les parties et vos préférences. Elles ne servent pas à la publicité.")}</p>
+    <label className="privacy-purpose privacy-purpose-choice"><input type="checkbox" checked={navigationEnabled} onChange={(event) => setNavigationEnabled(event.target.checked)} /><div><strong>{localeText("Succès de navigation · facultatif")}</strong><p>{localeText("Autoriser la famille du navigateur, les types de pages visitées, certains indices secrets dans les liens et le temps actif. Pas d'historique détaillé ni d'URL complète enregistrée. Aucun effet sur les parties ou les jetons.")}</p></div></label>
+    <label className="privacy-purpose privacy-purpose-choice"><input type="checkbox" checked={audienceEnabled} onChange={(event) => setAudienceEnabled(event.target.checked)} /><div><strong>{localeText("Mesure d’audience Google Analytics · facultatif")}</strong><p>{localeText("Permettre à Google de mesurer les visites avec des cookies et des informations générales sur le navigateur et l’appareil. Sans pseudo, email, identifiant de compte ni paramètres des liens. Analytics ne démarre pas avant votre accord. Le gestionnaire Google Tag Manager est toutefois chargé à l’ouverture du site, même sans cet accord. Aucun ciblage publicitaire dans notre intégration Analytics.")}</p></div></label>
+    <label className="privacy-age"><input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} />{localeText("J'ai au moins 13 ans et peux consentir à ce suivi facultatif.")}</label>
+    <p className="privacy-caption">{localeText("Avant 13 ans, choisissez sans suivi. Votre choix est conservé 180 jours et peut être modifié à tout moment.")}</p>
+    <div className="privacy-actions"><button type="button" className="secondary" onClick={() => choose(false)}>{localeText("Tout refuser")}</button><button type="button" className="secondary" disabled={(navigationEnabled || audienceEnabled) && !ageConfirmed} onClick={() => choose(navigationEnabled, audienceEnabled)}>{localeText("Enregistrer mes choix")}</button><button type="button" className="secondary" disabled={!ageConfirmed} onClick={() => choose(true, true)}>{localeText("Tout accepter")}</button></div>
+    <a href={appPath("cookies")}>{localeText("Détails des cookies et stockages")}</a>
   </>;
   return <PrivacyContext.Provider value={{ choice, setError, open: openPreferences }}>
-    {!choice && <section className="privacy-choice-panel" aria-label="Choix de confidentialité"><div className="privacy-choice-inner"><h2><Cookie size={23} />Votre confidentialité</h2>{content}</div></section>}
-    {error && <div className="privacy-sync-error" role="alert">{error}<button type="button" className="secondary" onClick={openPreferences}>Revoir mon choix</button></div>}
+    {!choice && <section className="privacy-choice-panel" aria-label={localeText("Choix de confidentialité")}><div className="privacy-choice-inner"><h2><Cookie size={23} />{localeText("Votre confidentialité")}</h2>{content}</div></section>}
+    {error && <div className="privacy-sync-error" role="alert">{localeText(error)}<button type="button" className="secondary" onClick={openPreferences}>{localeText("Revoir mon choix")}</button></div>}
     {children}
-    <footer className="legal-footer"><nav aria-label="Informations legales"><a href={appPath("games")}>Jeux et règles</a><a href={appPath("faq")}>FAQ</a><a href={appPath("guide")}>Guide du joueur</a><a href={appPath("bugs")}>Suivi des bugs</a><a href={appPath("patchnotes")}>Patchnotes</a><a href={appPath("status")}>État des services</a>{Object.entries(legalLinks).map(([view, label]) => <a key={view} href={appPath(view)}>{label}</a>)}<button type="button" className="secondary" onClick={openPreferences}><Cookie size={15} />Mes préférences</button></nav><small>Jeux gratuits · Jetons virtuels sans valeur monétaire</small></footer>
-    {open && <Dialog title="Mes préférences de confidentialité" className="privacy-dialog" onClose={() => setOpen(false)}>{content}</Dialog>}
+    <footer className="legal-footer"><nav aria-label={localeText("Informations legales")}><a href={appPath("games")}>{localeText("Jeux et règles")}</a><a href={appPath("faq")}>{localeText("FAQ")}</a><a href={appPath("guide")}>{localeText("Guide du joueur")}</a><a href={appPath("bugs")}>{localeText("Suivi des bugs")}</a><a href={appPath("patchnotes")}>{localeText("Patchnotes")}</a><a href={appPath("status")}>{localeText("État des services")}</a>{Object.entries(legalLinks).map(([view, label]) => <a key={view} href={appPath(view)}>{localeText(label)}</a>)}<button type="button" className="secondary" onClick={openPreferences}><Cookie size={15} />{localeText("Mes préférences")}</button></nav><small>{localeText("Jeux gratuits · Jetons virtuels sans valeur monétaire")}</small></footer>
+    {open && <Dialog title={localeText("Mes préférences de confidentialité")} className="privacy-dialog" onClose={() => setOpen(false)}>{content}</Dialog>}
   </PrivacyContext.Provider>;
 }
 

@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bug } from "lucide-react";
@@ -10,6 +11,7 @@ const Context = createContext(null);
 const emptyContext = { page: "", zone: "", game: "", match: "", room: "", event: "", other: "" };
 const volatileReceipts = new Map();
 export function BugReportProvider({ children }) {
+  const { t: localeText } = useLocale();
   const [open, setOpen] = useState(false), [location, setLocation] = useState({ route: { view: "lobby" }, user: null });
   const [portal, setPortal] = useState(() => document.fullscreenElement ?? document.body);
   const [details, setDetails] = useState({});
@@ -36,7 +38,7 @@ export function BugReportProvider({ children }) {
     window.dispatchEvent(new PopStateEvent("popstate"));
     setOpen(false);
   };
-  return <Context.Provider value={value}>{children}{createPortal(<button type="button" className="secondary issue-launcher" style={{ zIndex: open ? 1 : 1005 }} title="Signaler un bug" aria-label="Signaler un bug" aria-expanded={open} onClick={() => setOpen(true)}><Bug size={22} /></button>, portal)}<Suspense fallback={null}><Form open={open} onClose={() => setOpen(false)} onFollow={follow} detectedContext={context} user={location.user} /></Suspense></Context.Provider>;
+  return <Context.Provider value={value}>{children}{createPortal(<button type="button" className="secondary issue-launcher" style={{ zIndex: open ? 1 : 1005 }} title={localeText("Signaler un bug")} aria-label={localeText("Signaler un bug")} aria-expanded={open} onClick={() => setOpen(true)}><Bug size={22} /></button>, portal)}<Suspense fallback={null}><Form open={open} onClose={() => setOpen(false)} onFollow={follow} detectedContext={context} user={location.user} /></Suspense></Context.Provider>;
 }
 export function useBugReportLocation(route, user) {
   const context = useContext(Context);

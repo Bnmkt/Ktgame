@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useEffect, useRef, useState } from "react";
 import { Check, Image as ImageIcon, RotateCcw, Upload } from "lucide-react";
 import { api, API_URL } from "../../api.js";
@@ -9,6 +10,7 @@ import "./game-image-editor.css";
 const centered = { zoom: 1, x: 0.5, y: 0.5 };
 
 export function GameImageEditor({ gameId, gameName, field, value, onApply, onClose }) {
+  const { t: localeText } = useLocale();
   const format = gameArtworkFormats[field];
   const [source, setSource] = useState(null), [crop, setCrop] = useState(centered);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [error, setError] = useState("");
@@ -85,24 +87,24 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
 
   return <Dialog title={`${format.label} · ${gameName}`} className="game-art-editor" layerClassName="game-art-layer" onClose={onClose} dismissible={!busy}>
     <div className="game-art-editor-body">
-      <input ref={input} className="game-art-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Importer une image du jeu" disabled={busy} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
-      <div className="game-art-tools"><button type="button" className="secondary" disabled={busy} onClick={() => input.current.click()}><Upload size={18} />{source ? "Changer l’image" : "Importer une image"}</button><span>{format.width} × {format.height} px</span></div>
-      {loading && <p role="status">Chargement de l’image…</p>}
+      <input ref={input} className="game-art-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label={localeText("Importer une image du jeu")} disabled={busy} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
+      <div className="game-art-tools"><button type="button" className="secondary" disabled={busy} onClick={() => input.current.click()}><Upload size={18} />{source ? localeText("Changer l’image") : localeText("Importer une image")}</button><span>{format.width} × {format.height}{" " + localeText("px")}</span></div>
+      {loading && <p role="status">{localeText("Chargement de l’image…")}</p>}
       {source ? <div className="game-art-workspace">
         <div>
-          <div className="game-art-crop" style={{ aspectRatio: `${format.width} / ${format.height}` }} tabIndex={0} role="group" aria-label="Zone de recadrage" onKeyDown={nudge} onPointerDown={(event) => {
+          <div className="game-art-crop" style={{ aspectRatio: `${format.width} / ${format.height}` }} tabIndex={0} role="group" aria-label={localeText("Zone de recadrage")} onKeyDown={nudge} onPointerDown={(event) => {
             if (busy || loading || event.button !== 0) return;
             event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY };
           }} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
             <img src={source.url} alt="Image à recadrer" draggable={false} style={imageStyle} />
           </div>
-          <label className="game-art-zoom">Zoom <output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.5} max={5} step={0.01} value={bounds.zoom} aria-label="Zoom du recadrage" disabled={busy || loading} onChange={(event) => update({ ...bounds, zoom: Number(event.target.value) })} /></label>
-          <button type="button" className="secondary" disabled={busy || loading} onClick={() => setCrop(centered)}><RotateCcw size={17} />Réinitialiser le cadrage</button>
+          <label className="game-art-zoom">{localeText("Zoom") + " "}<output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.5} max={5} step={0.01} value={bounds.zoom} aria-label={localeText("Zoom du recadrage")} disabled={busy || loading} onChange={(event) => update({ ...bounds, zoom: Number(event.target.value) })} /></label>
+          <button type="button" className="secondary" disabled={busy || loading} onClick={() => setCrop(centered)}><RotateCcw size={17} />{localeText("Réinitialiser le cadrage")}</button>
         </div>
-        <aside className="game-art-preview"><span className="eyebrow">Aperçu</span><div style={{ aspectRatio: `${format.width} / ${format.height}` }}><img src={source.url} alt="Aperçu du recadrage" style={imageStyle} /></div><strong>{gameName}</strong></aside>
-      </div> : !loading && <div className="game-art-empty"><ImageIcon size={44} /><span>{format.label}</span></div>}
-      {error && <p className="error" role="alert">{error}</p>}
+        <aside className="game-art-preview"><span className="eyebrow">{localeText("Aperçu")}</span><div style={{ aspectRatio: `${format.width} / ${format.height}` }}><img src={source.url} alt="Aperçu du recadrage" style={imageStyle} /></div><strong>{gameName}</strong></aside>
+      </div> : !loading && <div className="game-art-empty"><ImageIcon size={44} /><span>{localeText(format.label)}</span></div>}
+      {error && <p className="error" role="alert">{localeText(error)}</p>}
     </div>
-    <div className="game-art-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>Annuler</button><button type="button" disabled={!source || busy || loading} onClick={apply}><Check size={17} />{busy ? "Enregistrement…" : "Appliquer le recadrage"}</button></div>
+    <div className="game-art-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>{localeText("Annuler")}</button><button type="button" disabled={!source || busy || loading} onClick={apply}><Check size={17} />{busy ? localeText("Enregistrement…") : localeText("Appliquer le recadrage")}</button></div>
   </Dialog>;
 }

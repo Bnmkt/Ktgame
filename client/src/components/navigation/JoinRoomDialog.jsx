@@ -1,9 +1,11 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useState } from "react";
 import { DoorOpen, LockKeyhole } from "lucide-react";
 import { api } from "../../api.js";
 import { Dialog } from "../common/Dialog.jsx";
 
 export function JoinRoomDialog({ initialCode = "", userId, onJoined, onClose }) {
+  const { t: localeText } = useLocale();
   const [code, setCode] = useState(initialCode);
   const [password, setPassword] = useState("");
   const [protectedRoom, setProtectedRoom] = useState(false);
@@ -24,12 +26,12 @@ export function JoinRoomDialog({ initialCode = "", userId, onJoined, onClose }) 
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
-  return <Dialog title="Rejoindre avec un code" className="join-code-modal" dismissible={!busy} onClose={onClose}>
+  return <Dialog title={localeText("Rejoindre avec un code")} className="join-code-modal" dismissible={!busy} onClose={onClose}>
     <form onSubmit={join} autoComplete="off">
-      <label>Code de la table<input name="table-reference" required autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" maxLength={16} value={code} disabled={busy} placeholder="Ex. A1B2C3" onChange={(event) => { setCode(event.target.value.toUpperCase()); setPassword(""); setProtectedRoom(false); setError(""); }} /></label>
-      {protectedRoom && <label><span><LockKeyhole size={16} /> Mot de passe de la table</span><input name="table-entry-code" autoFocus required type="password" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} /></label>}
-      {error && <p className="error" role="alert">{error}</p>}
-      <div className="actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>Annuler</button><button type="submit" disabled={busy || !code.trim()}><DoorOpen size={17} />{busy ? "Connexion…" : "Rejoindre"}</button></div>
+      <label>{localeText("Code de la table")}<input name="table-reference" required autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" maxLength={16} value={code} disabled={busy} placeholder={localeText("Ex. A1B2C3")} onChange={(event) => { setCode(event.target.value.toUpperCase()); setPassword(""); setProtectedRoom(false); setError(""); }} /></label>
+      {protectedRoom && <label><span><LockKeyhole size={16} />{" " + localeText("Mot de passe de la table")}</span><input name="table-entry-code" autoFocus required type="password" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} /></label>}
+      {error && <p className="error" role="alert">{localeText(error)}</p>}
+      <div className="actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>{localeText("Annuler")}</button><button type="submit" disabled={busy || !code.trim()}><DoorOpen size={17} />{busy ? localeText("Connexion…") : localeText("Rejoindre")}</button></div>
     </form>
   </Dialog>;
 }

@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { DailyActivityChart } from "./DailyActivityChart.jsx";
 import { GameProgression } from "./GameProgression.jsx";
@@ -22,6 +23,7 @@ export function shortStatLabel(label) {
 }
 
 export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequest, onReport }) {
+  const { t: localeText } = useLocale();
   const [relationship, setRelationship] = useState(profile.relationship ?? {});
   useEffect(() => setRelationship(profile.relationship ?? {}), [profile.id, profile.relationship]);
   const [connectionBusy, setConnectionBusy] = useState("");
@@ -33,11 +35,11 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
   const publicStats = [
     profile.age ? ["age", "Âge", profile.age] : null,
     profile.profile?.gender ? ["gender", "Genre", profile.profile.gender] : null,
-    ["friends", "Amis", <CompactNumber value={profile.friendCount} label="Nombre exact d’amis" />],
-    ["gamesPlayed", "Parties", <CompactNumber value={profile.stats?.gamesPlayed} label="Nombre exact de parties" />],
-    ["wins", "Victoires", <CompactNumber value={profile.stats?.wins} label="Nombre exact de victoires" />],
+    ["friends", "Amis", <CompactNumber value={profile.friendCount} label={localeText("Nombre exact d’amis")} />],
+    ["gamesPlayed", "Parties", <CompactNumber value={profile.stats?.gamesPlayed} label={localeText("Nombre exact de parties")} />],
+    ["wins", "Victoires", <CompactNumber value={profile.stats?.wins} label={localeText("Nombre exact de victoires")} />],
     ["winRate", "Winrate", `${profile.stats?.winRate ?? 0}%`],
-    ["achievements", "Succès", <span title={`${formatExactNumber(profile.stats?.achievementsUnlocked)} succès sur ${formatExactNumber(profile.stats?.achievementsTotal)}`}><CompactNumber value={profile.stats?.achievementsUnlocked} /> / <CompactNumber value={profile.stats?.achievementsTotal} /></span>]
+    ["achievements", "Succès", <span title={localeText("{value0} succès sur {value1}", { value0: formatExactNumber(profile.stats?.achievementsUnlocked), value1: formatExactNumber(profile.stats?.achievementsTotal) })}><CompactNumber value={profile.stats?.achievementsUnlocked} /> / <CompactNumber value={profile.stats?.achievementsTotal} /></span>]
   ].filter((entry) => entry && visibleStatKeys.has(entry[0]));
   async function controlConnection(kind, method) {
     setConnectionBusy(kind);
@@ -54,42 +56,42 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
   }
   return (
     <ModalBackdrop className="modal-backdrop" onClick={onClose}>
-      <div className={profileCosmeticClassName(profile, "modal public-profile-modal")} role="dialog" aria-modal="true" aria-label="Profil public" onClick={(e) => e.stopPropagation()}>
+      <div className={profileCosmeticClassName(profile, "modal public-profile-modal")} role="dialog" aria-modal="true" aria-label={localeText("Profil public")} onClick={(e) => e.stopPropagation()}>
         <ProfileCosmeticEffect user={profile} />
         <ProfileCosmeticFrame user={profile} />
         <div className="public-profile-scroll"><div className="modal-title-row">
           <div className="modal-title-actions">
-            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary" disabled={relationship.isFriend || relationship.requested} onClick={() => onFriendRequest?.(profile.id)}>{relationship.isFriend ? "Ami" : relationship.requested ? "Demande envoyée" : "Ajouter en ami"}</button>}
-            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary icon-toggle" disabled={Boolean(connectionBusy)} aria-pressed={Boolean(relationship.muted)} title={relationship.muted ? "Réactiver les messages" : "Mettre en sourdine"} aria-label={relationship.muted ? "Réactiver les messages de ce joueur" : "Mettre ce joueur en sourdine"} onClick={() => controlConnection("muted", relationship.muted ? "DELETE" : "POST")}>{relationship.muted ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>}
-            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <ConfirmActionButton className="danger-button icon-toggle" disabled={Boolean(connectionBusy)} title="Masquer ce joueur" aria-label="Masquer ce joueur" dialogTitle="Masquer ce joueur ?" message="Vous ne pourrez plus vous ajouter, vous inviter ou échanger des messages. Cette action le retire aussi de vos amis." confirmLabel="Masquer" danger onConfirm={() => controlConnection("hidden", "POST")}><EyeOff size={16} /></ConfirmActionButton>}
-            {currentUser && !currentUser.guest && !relationship.self && relationship.blocked && <button className="secondary" disabled={Boolean(connectionBusy)} onClick={() => controlConnection("hidden", "DELETE")}><Eye size={16} />Réafficher</button>}
-            {currentUser && !currentUser.guest && !relationship.self && <button className="secondary profile-report-button" onClick={() => onReport?.(profile)}><Flag size={16} /> Signaler</button>}
-            <button className="secondary icon-toggle" aria-label="Fermer le profil" onClick={onClose}><X size={18} /></button>
+            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary" disabled={relationship.isFriend || relationship.requested} onClick={() => onFriendRequest?.(profile.id)}>{relationship.isFriend ? localeText("Ami") : relationship.requested ? localeText("Demande envoyée") : localeText("Ajouter en ami")}</button>}
+            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary icon-toggle" disabled={Boolean(connectionBusy)} aria-pressed={Boolean(relationship.muted)} title={relationship.muted ? localeText("Réactiver les messages") : localeText("Mettre en sourdine")} aria-label={relationship.muted ? localeText("Réactiver les messages de ce joueur") : localeText("Mettre ce joueur en sourdine")} onClick={() => controlConnection("muted", relationship.muted ? "DELETE" : "POST")}>{relationship.muted ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>}
+            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <ConfirmActionButton className="danger-button icon-toggle" disabled={Boolean(connectionBusy)} title={localeText("Masquer ce joueur")} aria-label={localeText("Masquer ce joueur")} dialogTitle={localeText("Masquer ce joueur ?")} message={localeText("Vous ne pourrez plus vous ajouter, vous inviter ou échanger des messages. Cette action le retire aussi de vos amis.")} confirmLabel={localeText("Masquer")} danger onConfirm={() => controlConnection("hidden", "POST")}><EyeOff size={16} /></ConfirmActionButton>}
+            {currentUser && !currentUser.guest && !relationship.self && relationship.blocked && <button className="secondary" disabled={Boolean(connectionBusy)} onClick={() => controlConnection("hidden", "DELETE")}><Eye size={16} />{localeText("Réafficher")}</button>}
+            {currentUser && !currentUser.guest && !relationship.self && <button className="secondary profile-report-button" onClick={() => onReport?.(profile)}><Flag size={16} />{" " + localeText("Signaler")}</button>}
+            <button className="secondary icon-toggle" aria-label={localeText("Fermer le profil")} onClick={onClose}><X size={18} /></button>
           </div>
         </div>
         {connectionError && <div className="error" role="alert">{connectionError}</div>}
         <div className={`public-profile-layout ${hasDetails ? "" : "public-profile-layout-solo"}`}>
           <aside>
             <div className={`vip-card member-${profile.cosmetics?.equipped?.memberCard ?? "default"}`}>
-              <span className="vip-label">{memberCardOptions[profile.cosmetics?.equipped?.memberCard ?? "default"]} · Profil public</span>
+              <span className="vip-label">{memberCardOptions[profile.cosmetics?.equipped?.memberCard ?? "default"]}{" " + localeText("· Profil public")}</span>
               <strong><DisplayName user={profile} /></strong>
               <FriendCode code={profile.friendCode} />
-              <div className="vip-stats">{(profile.profileStats?.publicStats ?? []).map((stat, index) => <div className="vip-ratio" key={`${stat.key}-${index}`}><BadgeCheck size={16} /><span title={stat.label}>{shortStatLabel(stat.label)}</span><strong title={String(stat.value)}>{stat.value}</strong></div>)}</div>
+              <div className="vip-stats">{(profile.profileStats?.publicStats ?? []).map((stat, index) => <div className="vip-ratio" key={`${stat.key}-${index}`}><BadgeCheck size={16} /><span title={localeText(stat.label)}>{shortStatLabel(stat.label)}</span><strong title={String(stat.value)}>{stat.value}</strong></div>)}</div>
             </div>
-            {publicStats.length > 0 && <div className="public-profile-grid">{publicStats.map(([key, label, value]) => <div key={key}><span>{label}</span><strong>{value}</strong></div>)}</div>}
-            <div className="profile-cosmetics-preview" aria-label="Dés et cartes équipés">
-              <div><span>Dés</span><Die value={5} kept={false} skin={profile.cosmetics?.equipped?.diceSkin} /></div>
-              <div><span>Cartes</span><div className="skin-preview-row"><PlayingCard card={{ rank: "A", suit: "S" }} skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /><PlayingCard hidden skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /></div></div>
+            {publicStats.length > 0 && <div className="public-profile-grid">{publicStats.map(([key, label, value]) => <div key={key}><span>{localeText(label)}</span><strong>{value}</strong></div>)}</div>}
+            <div className="profile-cosmetics-preview" aria-label={localeText("Dés et cartes équipés")}>
+              <div><span>{localeText("Dés")}</span><Die value={5} kept={false} skin={profile.cosmetics?.equipped?.diceSkin} /></div>
+              <div><span>{localeText("Cartes")}</span><div className="skin-preview-row"><PlayingCard card={{ rank: "A", suit: "S" }} skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /><PlayingCard hidden skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /></div></div>
             </div>
           </aside>
           {hasDetails && <section className="public-profile-side">
             {hasBio && <div className="settings-card">
-              <div className="panel-heading"><span>Bio</span><small>Présentation publique</small></div>
+              <div className="panel-heading"><span>{localeText("Bio")}</span><small>{localeText("Présentation publique")}</small></div>
               <p>{profile.profile.bio}</p>
             </div>}
             {favoriteGames.length > 0 && <div className="settings-card">
-              <div className="panel-heading"><span>Jeux favoris</span><small>{favoriteGames.length} / 5</small></div>
-              <div className="favorite-game-grid">{favoriteGames.map((id) => <span className="favorite-game active" key={id}>{gameTitle(id)}</span>)}</div>
+              <div className="panel-heading"><span>{localeText("Jeux favoris")}</span><small>{favoriteGames.length} / 5</small></div>
+              <div className="favorite-game-grid">{favoriteGames.map((id) => <span className="favorite-game active" key={id}>{localeText(gameTitle(id))}</span>)}</div>
             </div>}
           </section>}
         </div>

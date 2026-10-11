@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useRef, useState } from "react";
 import { ArrowRight, Club, Diamond, Heart, SkipForward, Spade } from "lucide-react";
 import { PlayingCard } from "./GamePieces.jsx";
@@ -12,6 +13,7 @@ const keyFor = (card) => `${card.rank}-${card.suit}`;
 const teamName = (team) => team === 0 ? "Bleue" : "Rouge";
 
 export function BeloteBoard({ state, user, onAction, spectator = false }) {
+  const { t: localeText } = useLocale();
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const myTurn = !spectator && !state.finished && state.players[state.currentPlayerIndex]?.id === user.id;
@@ -28,32 +30,32 @@ export function BeloteBoard({ state, user, onAction, spectator = false }) {
     try { await onAction(action); } finally { pending.current = false; setBusy(false); }
   }
   return <div className="belote-board">
-    <header className="belote-summary"><span>Donne {state.round} · {state.modifiers.frenchRules ? "Française" : "Belge"}</span><strong>{state.trump ? <>Atout {suits[state.trump].symbol} {suits[state.trump].name}</> : "Prise d'atout"}</strong><span>{bidding ? state.phase === "forced-bid" ? "Prise forcée" : `Tour ${state.bidRound} / 2` : `Pli ${state.trickNumber} / 8`}</span></header>
-    <div className="belote-score-strip">{[0, 1].map((team) => <div className={`team-${team}`} key={team}><span><i />{teamName(team)}</span><strong>{state.teamScores[team]} <small>/ {state.targetScore}</small></strong><span>{state.cardPoints[team]} pts sur la donne</span><span>{state.trickCounts[team]} plis</span></div>)}</div>
-    <section className="belote-table" aria-label="Table de belote deux contre deux">
+    <header className="belote-summary"><span>{localeText("Donne") + " "}{state.round} · {state.modifiers.frenchRules ? localeText("Française") : localeText("Belge")}</span><strong>{state.trump ? <>{localeText("Atout") + " "}{suits[state.trump].symbol} {suits[state.trump].name}</> : localeText("Prise d'atout")}</strong><span>{bidding ? state.phase === "forced-bid" ? localeText("Prise forcée") : localeText("Tour {value0} / 2", { value0: state.bidRound }) : localeText("Pli {value0} / 8", { value0: state.trickNumber })}</span></header>
+    <div className="belote-score-strip">{[0, 1].map((team) => <div className={`team-${team}`} key={team}><span><i />{teamName(team)}</span><strong>{state.teamScores[team]} <small>/ {state.targetScore}</small></strong><span>{state.cardPoints[team]}{" " + localeText("pts sur la donne")}</span><span>{state.trickCounts[team]}{" " + localeText("plis")}</span></div>)}</div>
+    <section className="belote-table" aria-label={localeText("Table de belote deux contre deux")}>
       <div className="belote-table-felt" aria-hidden="true" />
       {state.players.map((player, index) => {
         const position = positionFor(player.id), team = index % 2;
         const count = state.hands[player.id]?.length ?? 0;
         const active = !state.finished && state.currentPlayerIndex === index;
-        return <section key={player.id} className={`belote-seat seat-${position} team-${team} ${active ? "active" : ""}`} aria-label={`${player.pseudo}, équipe ${teamName(team)}`}>
+        return <section key={player.id} className={`belote-seat seat-${position} team-${team} ${active ? "active" : ""}`} aria-label={localeText("{value0}, équipe {value1}", { value0: player.pseudo, value1: teamName(team) })}>
           <div className="belote-seat-name"><i /><DisplayName user={player} /></div>
-          <small>{!spectator && player.id === user.id ? "Vous" : team === selfIndex % 2 && !spectator ? "Partenaire" : teamName(team)}{player.isBot ? " · IA" : ""}{state.takerId === player.id ? " · Preneur" : ""}</small>
-          <div className="belote-card-fan" aria-label={`${count} cartes cachées`}>{Array.from({ length: Math.min(3, count) }, (_, i) => <PlayingCard key={i} hidden animate={false} skin={player.cosmetics?.equipped?.cardSkin ?? "default"} />)}</div>
-          <span className="belote-seat-count">{count} cartes</span>
+          <small>{!spectator && player.id === user.id ? localeText("Vous") : team === selfIndex % 2 && !spectator ? localeText("Partenaire") : teamName(team)}{player.isBot ? localeText(" · IA") : ""}{state.takerId === player.id ? localeText(" · Preneur") : ""}</small>
+          <div className="belote-card-fan" aria-label={localeText("{value0} cartes cachées", { value0: count })}>{Array.from({ length: Math.min(3, count) }, (_, i) => <PlayingCard key={i} hidden animate={false} skin={player.cosmetics?.equipped?.cardSkin ?? "default"} />)}</div>
+          <span className="belote-seat-count">{count}{" " + localeText("cartes")}</span>
         </section>;
       })}
       <div className={`belote-table-center ${!shownTrick.length && !bidding ? "empty-trick" : ""}`}>
-        {bidding ? <div className="belote-upcard"><span>Retournée</span><PlayingCard card={state.turnedCard} skin={skin} /><strong>{state.phase === "forced-bid" ? "Prise forcée" : `Tour ${state.bidRound}`}</strong></div> : <>
-          <span className="belote-trick-label">{state.trick.length ? "Pli en cours" : state.lastTrick ? "Dernier pli" : "Entame"}</span>
-          <div className={`belote-trick-grid ${!state.trick.length ? "previous-trick" : ""}`} aria-label="Cartes du pli">{shownTrick.map((play) => <div key={play.playerId} className={`belote-trick-card played-${positionFor(play.playerId)}`} title={state.players.find((player) => player.id === play.playerId)?.pseudo}><PlayingCard card={play.card} skin={state.players.find((player) => player.id === play.playerId)?.cosmetics?.equipped?.cardSkin ?? "default"} /></div>)}</div>
+        {bidding ? <div className="belote-upcard"><span>{localeText("Retournée")}</span><PlayingCard card={state.turnedCard} skin={skin} /><strong>{state.phase === "forced-bid" ? localeText("Prise forcée") : localeText("Tour {value0}", { value0: state.bidRound })}</strong></div> : <>
+          <span className="belote-trick-label">{state.trick.length ? localeText("Pli en cours") : state.lastTrick ? localeText("Dernier pli") : localeText("Entame")}</span>
+          <div className={`belote-trick-grid ${!state.trick.length ? "previous-trick" : ""}`} aria-label={localeText("Cartes du pli")}>{shownTrick.map((play) => <div key={play.playerId} className={`belote-trick-card played-${positionFor(play.playerId)}`} title={state.players.find((player) => player.id === play.playerId)?.pseudo}><PlayingCard card={play.card} skin={state.players.find((player) => player.id === play.playerId)?.cosmetics?.equipped?.cardSkin ?? "default"} /></div>)}</div>
           {!state.trick.length && state.lastTrick && <small className="belote-trick-winner">{state.players.find((player) => player.id === state.lastTrick.winnerId)?.pseudo} · +{state.lastTrick.points}</small>}
         </>}
       </div>
     </section>
-    {bidding && !spectator && <div className="belote-bidding"><div className="belote-bid-actions">{Object.entries(suits).filter(([suit]) => state.phase === "forced-bid" || (state.bidRound === 1 ? suit === state.turnedCard.suit : suit !== state.turnedCard.suit)).map(([suit, info]) => { const Icon = suitIcons[suit]; return <button key={suit} disabled={!myTurn || busy} onClick={() => act({ type: "take", suit })}><Icon size={18} />Prendre {info.name}</button>; })}{state.phase !== "forced-bid" && <button className="secondary" disabled={!myTurn || busy} onClick={() => act({ type: "pass" })}><SkipForward size={18} />Passer</button>}</div></div>}
-    {state.lastRound && <section className="belote-round-score"><strong>Donne {state.lastRound.round} · {({ reussi: "contrat réussi", chute: "chute", capot: "capot", litige: "litige" })[state.lastRound.result]}</strong><span>Bleue : +{state.lastRound.awarded[0]} · Rouge : +{state.lastRound.awarded[1]}{state.pendingPoints ? ` · ${state.pendingPoints} en réserve` : ""}</span>{state.phase === "round-end" && !spectator && <button disabled={!myTurn || busy} onClick={() => act({ type: "next-deal" })}><ArrowRight size={18} />Donne suivante</button>}</section>}
-    {!state.finished && hand.length > 0 && <section className={`belote-hand-zone team-${selfIndex % 2}`}><h3><i />Ta main</h3><div className="belote-hand">{hand.map((card) => <button key={keyFor(card)} type="button" className={myTurn && legal.has(keyFor(card)) ? "belote-playable" : ""} disabled={!myTurn || busy || !legal.has(keyFor(card))} aria-label={`Jouer ${card.rank} de ${suits[card.suit].name}`} onClick={() => act({ type: "play", card })}><PlayingCard card={card} skin={skin} animate={false} /></button>)}</div></section>}
-    {Object.values(state.announcements ?? {}).some((entries) => entries.length) && <section className="belote-announcements"><h3>{state.announcementsRevealed ? "Annonces révélées" : "Tes annonces"}</h3>{Object.entries(state.announcements).filter(([, entries]) => entries.length).map(([id, entries]) => <div key={id}><DisplayName user={state.players.find((player) => player.id === id)} /><span>{entries.map((entry) => `${entry.label} (${entry.valid === false ? "annulée" : entry.points})`).join(" · ")}</span></div>)}</section>}
+    {bidding && !spectator && <div className="belote-bidding"><div className="belote-bid-actions">{Object.entries(suits).filter(([suit]) => state.phase === "forced-bid" || (state.bidRound === 1 ? suit === state.turnedCard.suit : suit !== state.turnedCard.suit)).map(([suit, info]) => { const Icon = suitIcons[suit]; return <button key={suit} disabled={!myTurn || busy} onClick={() => act({ type: "take", suit })}><Icon size={18} />{localeText("Prendre") + " "}{info.name}</button>; })}{state.phase !== "forced-bid" && <button className="secondary" disabled={!myTurn || busy} onClick={() => act({ type: "pass" })}><SkipForward size={18} />{localeText("Passer")}</button>}</div></div>}
+    {state.lastRound && <section className="belote-round-score"><strong>{localeText("Donne") + " "}{state.lastRound.round} · {({ reussi: "contrat réussi", chute: "chute", capot: "capot", litige: "litige" })[state.lastRound.result]}</strong><span>{localeText("Bleue : +")}{state.lastRound.awarded[0]}{" " + localeText("· Rouge : +")}{state.lastRound.awarded[1]}{state.pendingPoints ? localeText(" · {value0} en réserve", { value0: state.pendingPoints }) : ""}</span>{state.phase === "round-end" && !spectator && <button disabled={!myTurn || busy} onClick={() => act({ type: "next-deal" })}><ArrowRight size={18} />{localeText("Donne suivante")}</button>}</section>}
+    {!state.finished && hand.length > 0 && <section className={`belote-hand-zone team-${selfIndex % 2}`}><h3><i />{localeText("Ta main")}</h3><div className="belote-hand">{hand.map((card) => <button key={keyFor(card)} type="button" className={myTurn && legal.has(keyFor(card)) ? "belote-playable" : ""} disabled={!myTurn || busy || !legal.has(keyFor(card))} aria-label={localeText("Jouer {value0} de {value1}", { value0: card.rank, value1: suits[card.suit].name })} onClick={() => act({ type: "play", card })}><PlayingCard card={card} skin={skin} animate={false} /></button>)}</div></section>}
+    {Object.values(state.announcements ?? {}).some((entries) => entries.length) && <section className="belote-announcements"><h3>{state.announcementsRevealed ? localeText("Annonces révélées") : localeText("Tes annonces")}</h3>{Object.entries(state.announcements).filter(([, entries]) => entries.length).map(([id, entries]) => <div key={id}><DisplayName user={state.players.find((player) => player.id === id)} /><span>{entries.map((entry) => `${entry.label} (${entry.valid === false ? "annulée" : entry.points})`).join(" · ")}</span></div>)}</section>}
   </div>;
 }

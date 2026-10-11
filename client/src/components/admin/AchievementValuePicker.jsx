@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useMemo, useState } from "react";
 import { BadgeCheck, Check, Gamepad2, Package, Search } from "lucide-react";
 import { Dialog } from "../common/Dialog.jsx";
@@ -19,6 +20,7 @@ function ChoiceIcon({ choice }) {
 }
 
 export function AchievementValuePicker({ choices, value, multiple = false, onChange, label = "Choisir les elements", allowEmpty = false, emptyLabel = "Aucune condition" }) {
+  const { t: localeText } = useLocale();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState([]);
   const [search, setSearch] = useState("");
@@ -39,21 +41,21 @@ export function AchievementValuePicker({ choices, value, multiple = false, onCha
     setDraft((current) => current.includes(id) ? current.filter((entry) => entry !== id) : multiple ? [...current, id] : [id]);
   }
   return <>
-    <button type="button" className="secondary achievement-picker-trigger" aria-label={label} onClick={() => { setDraft(multiple ? selected : selected.slice(0, 1)); setFocused(selected[0] ?? null); setSearch(""); setCategory(""); setOpen(true); }}>
-      <Search size={16} /><span>{names.length ? names.slice(0, 2).join(", ") + (names.length > 2 ? ` (+${names.length - 2})` : "") : label}</span>
+    <button type="button" className="secondary achievement-picker-trigger" aria-label={localeText(label)} onClick={() => { setDraft(multiple ? selected : selected.slice(0, 1)); setFocused(selected[0] ?? null); setSearch(""); setCategory(""); setOpen(true); }}>
+      <Search size={16} /><span>{names.length ? names.slice(0, 2).join(", ") + (names.length > 2 ? ` (+${names.length - 2})` : "") : localeText(label)}</span>
     </button>
-    {open && <Dialog title={label} className="achievement-picker" layerClassName="achievement-picker-layer" onClose={() => setOpen(false)}>
-      <div className="achievement-picker-filters"><label>Rechercher<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nom, description ou identifiant" /></label><label>Categorie<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Toutes</option>{categories.map((name) => <option key={name}>{name}</option>)}</select></label></div>
+    {open && <Dialog title={localeText(label)} className="achievement-picker" layerClassName="achievement-picker-layer" onClose={() => setOpen(false)}>
+      <div className="achievement-picker-filters"><label>{localeText("Rechercher")}<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={localeText("Nom, description ou identifiant")} /></label><label>{localeText("Categorie")}<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">{localeText("Toutes")}</option>{categories.map((name) => <option key={name}>{name}</option>)}</select></label></div>
       <div className="achievement-picker-body">
         <div ref={pages.anchor}>
           <div className="achievement-picker-grid">{pages.rows.map((choice) => <button key={choice.value} type="button" className={`secondary achievement-picker-option ${draft.includes(choice.value) ? "selected" : ""}`} aria-pressed={draft.includes(choice.value)} onClick={() => toggle(choice.value)}>
-            <span className="achievement-picker-symbol"><ChoiceIcon choice={choice} />{draft.includes(choice.value) && <Check size={17} />}</span><strong>{choice.label}</strong><small>{choice.category}</small>{choice.description && <span className="achievement-picker-description">{choice.description}</span>}
+            <span className="achievement-picker-symbol"><ChoiceIcon choice={choice} />{draft.includes(choice.value) && <Check size={17} />}</span><strong>{localeText(choice.label)}</strong><small>{choice.category}</small>{choice.description && <span className="achievement-picker-description">{choice.description}</span>}
           </button>)}</div>
-          <Pagination {...pages} pageSizes={[12, 24, 48]} label="Pages des elements a choisir" />
+          <Pagination {...pages} pageSizes={[12, 24, 48]} label={localeText("Pages des elements a choisir")} />
         </div>
-        {preview && <aside className="achievement-picker-preview">{preview.item ? <CosmeticPreview user={previewUser} item={preview.item} /> : <><ChoiceIcon choice={preview} /><h3>{preview.label}</h3><p>{preview.description}</p><small>{preview.category}</small></>}</aside>}
+        {preview && <aside className="achievement-picker-preview">{preview.item ? <CosmeticPreview user={previewUser} item={preview.item} /> : <><ChoiceIcon choice={preview} /><h3>{localeText(preview.label)}</h3><p>{preview.description}</p><small>{preview.category}</small></>}</aside>}
       </div>
-      <footer className="achievement-picker-footer"><span role="status">{draft.length} selectionne{draft.length > 1 ? "s" : ""}</span><div className="actions"><button type="button" className="secondary" onClick={() => setOpen(false)}>Annuler</button>{allowEmpty && <button type="button" className="secondary" onClick={() => setDraft([])}>{emptyLabel}</button>}<button type="button" disabled={!allowEmpty && !draft.length} onClick={() => { onChange(multiple ? draft : draft[0] ?? ""); setOpen(false); }}><Check size={16} /> Appliquer la selection</button></div></footer>
+      <footer className="achievement-picker-footer"><span role="status">{draft.length}{" " + localeText("selectionne")}{draft.length > 1 ? localeText("s") : ""}</span><div className="actions"><button type="button" className="secondary" onClick={() => setOpen(false)}>{localeText("Annuler")}</button>{allowEmpty && <button type="button" className="secondary" onClick={() => setDraft([])}>{emptyLabel}</button>}<button type="button" disabled={!allowEmpty && !draft.length} onClick={() => { onChange(multiple ? draft : draft[0] ?? ""); setOpen(false); }}><Check size={16} />{" " + localeText("Appliquer la selection")}</button></div></footer>
     </Dialog>}
   </>;
 }

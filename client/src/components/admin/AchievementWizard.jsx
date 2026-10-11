@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Check, Coins, Dice5, Flame, Gamepad2, Gift, Save, Settings2, ShoppingBag, Target, Trophy, X } from "lucide-react";
@@ -8,6 +9,7 @@ import { AchievementRewards } from "./AchievementRewards.jsx";
 const icons = { trophy: Trophy, gamepad: Gamepad2, flame: Flame, coins: Coins, target: Target, dice: Dice5, badge: BadgeCheck, calendar: CalendarDays, gift: Gift, shop: ShoppingBag };
 
 export function AchievementWizard({ games, achievements, shop = [], saving, error, onSave, onAdvanced, onClose }) {
+  const { t: localeText } = useLocale();
   const [step, setStep] = useState(0);
   const [config, setConfig] = useState({ gameId: "", objective: "wins", amount: 10, repetitions: 1, featId: "" });
   const [title, setTitle] = useState("");
@@ -33,57 +35,57 @@ export function AchievementWizard({ games, achievements, shop = [], saving, erro
   const titleFallback = goal?.label ?? "Nouveau succès";
 
   return <ModalBackdrop className="modal-backdrop" onClick={() => !saving && onClose()}><form className="modal admin-editor achievement-rule-editor achievement-wizard" role="dialog" aria-modal="true" aria-labelledby="achievement-wizard-title" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === "Escape" && !saving) onClose(); }} onSubmit={(event) => { event.preventDefault(); if (step < 2) { if (valid) setStep(step + 1); } else if (valid && title.trim()) onSave(draft); }}>
-    <div className="modal-title-row"><div><span className="eyebrow">Nouveau succès</span><h2 id="achievement-wizard-title">{["Quel défi proposer ?", "Définir le défi", "Prêt à être débloqué"][step]}</h2></div><button type="button" className="secondary icon-toggle" disabled={saving} onClick={onClose} aria-label="Fermer"><X size={18} /></button></div>
+    <div className="modal-title-row"><div><span className="eyebrow">{localeText("Nouveau succès")}</span><h2 id="achievement-wizard-title">{["Quel défi proposer ?", "Définir le défi", "Prêt à être débloqué"][step]}</h2></div><button type="button" className="secondary icon-toggle" disabled={saving} onClick={onClose} aria-label={localeText("Fermer")}><X size={18} /></button></div>
     <div className="achievement-editor-scroll" ref={scrollRef}>
-      <nav className="achievement-wizard-steps" aria-label="Étapes de création">{["Objectif", "Conditions", "Présentation"].map((label, index) => <button type="button" key={label} aria-current={step === index ? "step" : undefined} disabled={saving || (index > step && !valid)} onClick={() => setStep(index)}><span>{index < step ? <Check size={15} /> : index + 1}</span>{label}</button>)}</nav>
+      <nav className="achievement-wizard-steps" aria-label={localeText("Étapes de création")}>{["Objectif", "Conditions", "Présentation"].map((label, index) => <button type="button" key={label} aria-current={step === index ? "step" : undefined} disabled={saving || (index > step && !valid)} onClick={() => setStep(index)}><span>{index < step ? <Check size={15} /> : index + 1}</span>{localeText(label)}</button>)}</nav>
       <div className="achievement-wizard-layout">
         <section className="achievement-wizard-fields">
           {step === 0 && <>
-            <label>Jeu concerné<select autoFocus value={config.gameId} onChange={(event) => choose("wins", event.target.value)}><option value="">Casino · tous les jeux</option>{games.map((game) => <option key={game.id} value={game.id}>{game.name}</option>)}</select></label>
-            <fieldset className="achievement-goals"><legend>Le joueur doit…</legend>{goals.map((item) => { const Icon = icons[item.icon]; return <label key={item.id} className={config.objective === item.id ? "selected" : ""}><input type="radio" name="achievement-goal" value={item.id} checked={config.objective === item.id} onChange={() => choose(item.id)} /><Icon size={20} /><span><strong>{item.label}</strong><small>{item.example}</small></span></label>; })}</fieldset>
+            <label>{localeText("Jeu concerné")}<select autoFocus value={config.gameId} onChange={(event) => choose("wins", event.target.value)}><option value="">{localeText("Casino · tous les jeux")}</option>{games.map((game) => <option key={game.id} value={game.id}>{localeText(game.name)}</option>)}</select></label>
+            <fieldset className="achievement-goals"><legend>{localeText("Le joueur doit…")}</legend>{goals.map((item) => { const Icon = icons[item.icon]; return <label key={item.id} className={config.objective === item.id ? "selected" : ""}><input type="radio" name="achievement-goal" value={item.id} checked={config.objective === item.id} onChange={() => choose(item.id)} /><Icon size={20} /><span><strong>{localeText(item.label)}</strong><small>{item.example}</small></span></label>; })}</fieldset>
           </>}
           {step === 1 && <>
-            <h3>{goal.label}</h3>
+            <h3>{localeText(goal.label)}</h3>
             {goal.id === "siteVisit" && <>
-              <label>Page a visiter<select value={config.page || "lobby"} onChange={(event) => change("page", event.target.value)}>{Object.entries({ lobby: "Accueil", profile: "Profil", shop: "Boutique", leaderboard: "Classements", room: "Table", spectator: "Spectateur", event: "Evenement", admin: "Administration" }).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label>Objet a porter<AchievementValuePicker choices={itemChoices(shop)} value={config.equippedItem || ""} label="Choisir un objet a porter" allowEmpty onChange={(value) => change("equippedItem", value)} /></label>
-              <label>Navigateur<select value={config.browser || ""} onChange={(event) => change("browser", event.target.value)}><option value="">Tous</option>{["firefox", "edge", "chrome", "safari", "other"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-              <label>Type d'indice dans le lien<select value={config.markerKey || "secret"} onChange={(event) => change("markerKey", event.target.value)}><option value="secret">Secret</option><option value="challenge">Defi</option></select></label>
-              <label>Indice dans le lien (facultatif)<input maxLength={48} value={config.marker || ""} placeholder="answer-42" onChange={(event) => change("marker", event.target.value)} /></label>
-              {config.marker && <p className="achievement-rule-note">Lien : ?{config.markerKey || "secret"}={config.marker}</p>}
+              <label>{localeText("Page a visiter")}<select value={config.page || "lobby"} onChange={(event) => change("page", event.target.value)}>{Object.entries({ lobby: "Accueil", profile: "Profil", shop: "Boutique", leaderboard: "Classements", room: "Table", spectator: "Spectateur", event: "Evenement", admin: "Administration" }).map(([value, label]) => <option key={value} value={value}>{localeText(label)}</option>)}</select></label>
+              <label>{localeText("Objet a porter")}<AchievementValuePicker choices={itemChoices(shop)} value={config.equippedItem || ""} label={localeText("Choisir un objet a porter")} allowEmpty onChange={(value) => change("equippedItem", value)} /></label>
+              <label>{localeText("Navigateur")}<select value={config.browser || ""} onChange={(event) => change("browser", event.target.value)}><option value="">{localeText("Tous")}</option>{["firefox", "edge", "chrome", "safari", "other"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <label>{localeText("Type d'indice dans le lien")}<select value={config.markerKey || "secret"} onChange={(event) => change("markerKey", event.target.value)}><option value="secret">{localeText("Secret")}</option><option value="challenge">{localeText("Defi")}</option></select></label>
+              <label>{localeText("Indice dans le lien (facultatif)")}<input maxLength={48} value={config.marker || ""} placeholder={localeText("answer-42")} onChange={(event) => change("marker", event.target.value)} /></label>
+              {config.marker && <p className="achievement-rule-note">{localeText("Lien : ?")}{config.markerKey || localeText("secret")}={config.marker}</p>}
             </>}
-            {goal.id === "ownItem" && <label>Objet a posseder<AchievementValuePicker choices={itemChoices(shop)} value={config.ownedItem || ""} label="Choisir un objet a posseder" onChange={(value) => change("ownedItem", value)} /></label>}
-            {["siteVisit", "activeTime", "visitDays", "tableTime", "roundTime"].includes(goal.id) && <p className="achievement-rule-note">Requiert le suivi facultatif des succès de navigation. Aucun gain de jetons ni avantage de jeu ne doit dépendre de ce choix.</p>}
-            {goal.id === "tableTime" && <p className="achievement-rule-note">Le temps actif du joueur comprend l'attente et les parties sur cette table. Changer de table remet ce compteur à zéro ; le mode spectateur ne compte pas.</p>}
-            {goal.id === "roundTime" && <p className="achievement-rule-note">Une manche correspond au round du jeu, à une main au poker, ou à la partie entière si le jeu n'a pas de rounds. Le compteur repart à zéro à la manche suivante et lors d'un replay.</p>}
+            {goal.id === "ownItem" && <label>{localeText("Objet a posseder")}<AchievementValuePicker choices={itemChoices(shop)} value={config.ownedItem || ""} label={localeText("Choisir un objet a posseder")} onChange={(value) => change("ownedItem", value)} /></label>}
+            {["siteVisit", "activeTime", "visitDays", "tableTime", "roundTime"].includes(goal.id) && <p className="achievement-rule-note">{localeText("Requiert le suivi facultatif des succès de navigation. Aucun gain de jetons ni avantage de jeu ne doit dépendre de ce choix.")}</p>}
+            {goal.id === "tableTime" && <p className="achievement-rule-note">{localeText("Le temps actif du joueur comprend l'attente et les parties sur cette table. Changer de table remet ce compteur à zéro ; le mode spectateur ne compte pas.")}</p>}
+            {goal.id === "roundTime" && <p className="achievement-rule-note">{localeText("Une manche correspond au round du jeu, à une main au poker, ou à la partie entière si le jeu n'a pas de rounds. Le compteur repart à zéro à la manche suivante et lors d'un replay.")}</p>}
             {goal.amount && <label>{goal.unit}<input autoFocus type="number" min="1" max="1000000000" step="1" value={config.amount} onChange={(event) => change("amount", event.target.value)} required /></label>}
-            {goal.id === "feat" && <><label>Exploit<select value={config.featId} onChange={(event) => change("featId", event.target.value)}>{feats.map((feat) => <option key={feat.id} value={feat.id}>{feat.title}</option>)}</select></label><p>{feats.find((feat) => feat.id === config.featId)?.description}</p></>}
-            {goal.repeatable && <label>Nombre de parties où réussir ce défi<input type="number" min="1" max="1000000000" step="1" required value={config.repetitions} onChange={(event) => change("repetitions", event.target.value)} /></label>}
-            {goal.id === "streak" && <p className="achievement-rule-note">Une partie sans victoire{config.gameId ? " dans ce jeu" : ""} remet la série à zéro.</p>}
-            {goal.id === "dailyStreak" && <p className="achievement-rule-note">Un jour sans récupération du bonus remet la série à zéro.</p>}
-            {goal.repeatable && <p className="achievement-rule-note">Vérifié à la fin de chaque partie. Une partie réussie compte une seule fois.</p>}
+            {goal.id === "feat" && <><label>{localeText("Exploit")}<select value={config.featId} onChange={(event) => change("featId", event.target.value)}>{feats.map((feat) => <option key={feat.id} value={feat.id}>{feat.title}</option>)}</select></label><p>{feats.find((feat) => feat.id === config.featId)?.description}</p></>}
+            {goal.repeatable && <label>{localeText("Nombre de parties où réussir ce défi")}<input type="number" min="1" max="1000000000" step="1" required value={config.repetitions} onChange={(event) => change("repetitions", event.target.value)} /></label>}
+            {goal.id === "streak" && <p className="achievement-rule-note">{localeText("Une partie sans victoire")}{config.gameId ? localeText(" dans ce jeu") : ""}{" " + localeText("remet la série à zéro.")}</p>}
+            {goal.id === "dailyStreak" && <p className="achievement-rule-note">{localeText("Un jour sans récupération du bonus remet la série à zéro.")}</p>}
+            {goal.repeatable && <p className="achievement-rule-note">{localeText("Vérifié à la fin de chaque partie. Une partie réussie compte une seule fois.")}</p>}
             {problem && <p className="error" role="alert">{problem}</p>}
           </>}
           {step === 2 && <>
-            <label>Nom du succès<input autoFocus required maxLength={100} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={titleFallback} /></label>
-            <label>Description pour les joueurs<textarea required maxLength={300} value={draft.description} onChange={(event) => setCustomDescription(event.target.value)} /></label>
+            <label>{localeText("Nom du succès")}<input autoFocus required maxLength={100} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={titleFallback} /></label>
+            <label>{localeText("Description pour les joueurs")}<textarea required maxLength={300} value={draft.description} onChange={(event) => setCustomDescription(event.target.value)} /></label>
             <AchievementRewards value={rewards} onChange={setRewards} shop={shop} games={games} />
             <div className="achievement-publication-options">
-              <label><input type="checkbox" checked={milestone} onChange={(event) => setMilestone(event.target.checked)} /><span><strong>Milestone</strong><small>Peut être affiché sur la member card.</small></span></label>
-              <label><input type="checkbox" checked={secret} onChange={(event) => setSecret(event.target.checked)} /><span><strong>Succès secret</strong><small>Masqué jusqu'à son obtention.</small></span></label>
-              <label><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span><strong>Activer dès l'enregistrement</strong><small>{enabled ? "Les joueurs pourront le débloquer." : "Conservé en brouillon."}</small></span></label>
+              <label><input type="checkbox" checked={milestone} onChange={(event) => setMilestone(event.target.checked)} /><span><strong>{localeText("Milestone")}</strong><small>{localeText("Peut être affiché sur la member card.")}</small></span></label>
+              <label><input type="checkbox" checked={secret} onChange={(event) => setSecret(event.target.checked)} /><span><strong>{localeText("Succès secret")}</strong><small>{localeText("Masqué jusqu'à son obtention.")}</small></span></label>
+              <label><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span><strong>{localeText("Activer dès l'enregistrement")}</strong><small>{enabled ? localeText("Les joueurs pourront le débloquer.") : localeText("Conservé en brouillon.")}</small></span></label>
             </div>
           </>}
         </section>
-        <aside className="achievement-wizard-preview" aria-label="Aperçu du succès" aria-live="polite">
-          <span className="eyebrow">{generated?.group ?? "Succès"}</span><BadgeCheck size={30} /><h3>{title || titleFallback}</h3>
-          <p>{draft.description || "Choisis les conditions du défi."}</p>
-          {customDescription !== null && customDescription !== generated?.description && <div className="achievement-preview-rule"><strong>Condition réelle</strong><p>{generated?.description}</p></div>}
-          <div className="achievement-preview-tags"><span>{secret ? "Secret" : "Visible"}</span>{milestone && <span>Milestone</span>}<span>{enabled ? "Actif" : "Brouillon"}</span></div>
+        <aside className="achievement-wizard-preview" aria-label={localeText("Aperçu du succès")} aria-live="polite">
+          <span className="eyebrow">{generated?.group ?? localeText("Succès")}</span><BadgeCheck size={30} /><h3>{title || titleFallback}</h3>
+          <p>{draft.description || localeText("Choisis les conditions du défi.")}</p>
+          {customDescription !== null && customDescription !== generated?.description && <div className="achievement-preview-rule"><strong>{localeText("Condition réelle")}</strong><p>{generated?.description}</p></div>}
+          <div className="achievement-preview-tags"><span>{secret ? localeText("Secret") : localeText("Visible")}</span>{milestone && <span>{localeText("Milestone")}</span>}<span>{enabled ? localeText("Actif") : localeText("Brouillon")}</span></div>
         </aside>
       </div>
-      {error && <p className="error" role="alert">{error}</p>}
+      {error && <p className="error" role="alert">{localeText(error)}</p>}
     </div>
-    <footer className="achievement-wizard-footer"><button type="button" className="secondary" disabled={!valid || saving} onClick={() => onAdvanced({ ...draft, title: title || titleFallback })} title="Ouvrir toutes les conditions et comparaisons"><Settings2 size={16} /><span>Personnaliser la règle</span></button><div className="actions">{step > 0 && <button type="button" className="secondary" disabled={saving} onClick={() => setStep(step - 1)}><ArrowLeft size={16} />Retour</button>}<button type="submit" disabled={!valid || saving || (step === 2 && !title.trim())}>{step === 2 ? <Save size={17} /> : <ArrowRight size={17} />}{saving ? "Enregistrement…" : step === 2 ? "Enregistrer" : "Continuer"}</button></div></footer>
+    <footer className="achievement-wizard-footer"><button type="button" className="secondary" disabled={!valid || saving} onClick={() => onAdvanced({ ...draft, title: title || titleFallback })} title={localeText("Ouvrir toutes les conditions et comparaisons")}><Settings2 size={16} /><span>{localeText("Personnaliser la règle")}</span></button><div className="actions">{step > 0 && <button type="button" className="secondary" disabled={saving} onClick={() => setStep(step - 1)}><ArrowLeft size={16} />{localeText("Retour")}</button>}<button type="submit" disabled={!valid || saving || (step === 2 && !title.trim())}>{step === 2 ? <Save size={17} /> : <ArrowRight size={17} />}{saving ? localeText("Enregistrement…") : step === 2 ? localeText("Enregistrer") : localeText("Continuer")}</button></div></footer>
   </form></ModalBackdrop>;
 }

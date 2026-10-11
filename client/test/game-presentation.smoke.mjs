@@ -6,12 +6,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import express from "../../server/node_modules/express/index.js";
 import { PRIVACY_VERSION } from "../src/privacy/consent.js";
 import { defaultPublicSettings } from "../src/config/site.js";
+import { catalogs } from "../src/locales/catalog.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const dependencies = path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
 const { chromium } = await import(pathToFileURL(path.join(dependencies, "playwright/index.mjs")));
 const { PlaywrightBlocker } = await import(pathToFileURL(path.join(dependencies, "@ghostery/adblocker-playwright/dist/esm/index.js")));
-const directory = path.join(root, "docs/previews/game-featured-20261011");
+const directory = path.join(root, "docs/previews/locales-20261011", new Date().toISOString().replace(/[:.]/g, "-"));
 fs.mkdirSync(directory, { recursive: true });
 const app = express();
 app.use(express.static(path.join(root, "client/dist"), { index: false }));
@@ -25,19 +26,22 @@ const games = [
   { id: "blackjack", name: "Blackjack", type: "cards", minPlayers: 1, maxPlayers: 6, description: "Vise 21 sans le dépasser.", audience: "solo-multi", category: "score", complexity: "easy", coverImage: "/ktga-preview.png", descriptiveImage: "/ktga-preview.png" }
 ];
 let browser; const errors = [], checks = [];
-async function setup(viewport, { logged = false, admin = false, guests = true, ranked = false, closed = false, coverImage, descriptiveImage } = {}) {
+async function setup(viewport, { logged = false, admin = false, editor = false, browserLocale = "fr", accountLocale = "", guests = true, ranked = false, closed = false, coverImage, descriptiveImage } = {}) {
   const context = await browser.newContext({ viewport });
   await context.addInitScript((version) => {
     localStorage.setItem("ktga-privacy-choice", JSON.stringify({ version, chosenAt: Date.now(), enabled: false }));
     localStorage.setItem("ktga-install-choice", "ignored");
   }, PRIVACY_VERSION);
+  await context.addInitScript((language) => { if (!localStorage.getItem("ktga-locale")) localStorage.setItem("ktga-locale", language); }, browserLocale);
   const page = await context.newPage();
   page.on("pageerror", (error) => errors.push(error.message));
   const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
   await blocker.enableBlockingInPage(page);
-  let user = logged ? { id: "player", pseudo: "Bnmkt", admin, tokens: 1000, profile: { favoriteGames: ["421"] }, cosmetics: { equipped: {} } } : null;
+  let user = logged ? { id: "player", pseudo: "Bnmkt", admin, editor, tokens: 1000, profile: { locale: accountLocale, favoriteGames: ["421"] }, cosmetics: { equipped: {} } } : null;
   let settings = { ...defaultPublicSettings, featuredGameId: "yahtzee", guestAccessEnabled: guests };
-  const requests = [], uploads = [], settingsUpdates = [];
+  const requests = [], uploads = [], settingsUpdates = [], localeUpdates = [];
+  const sources = JSON.parse(fs.readFileSync(path.join(root, "client/src/locales/fr.json")));
+  const overrides = { fr: {}, en: {} }, revisions = { fr: 0, en: 0 };
   await page.route("**/api/**", (route) => {
     const key = new URL(route.request().url()).pathname;
     requests.push(`${route.request().method()} ${key}`);
@@ -54,7 +58,21 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
     }
     if (key.startsWith("/api/game-images/")) return route.fulfill({ contentType: "image/png", headers: imageHeaders, body: uploads.at(-1)?.bytes ?? fs.readFileSync(path.join(root, "client/public/ktga-preview.png")) });
     let status = 200, data = [];
-    if (key === "/api/config") data = settings;
+    if (key.startsWith("/api/locales/")) data = { messages: overrides[key.split("/").at(-1)], fallback: overrides.fr };
+    else if (key.startsWith("/api/admin/locales/")) {
+      const language = key.split("/").at(-1);
+      if (route.request().method() === "PATCH") {
+        const body = route.request().postDataJSON(); assert.equal(body.revision, String(revisions[language]));
+        Object.assign(overrides[language], body.messages); revisions[language]++;
+        for (const source of Object.keys(body.messages)) sources[source] ??= source;
+      }
+      data = { locale: language, revision: String(revisions[language]), messages: { ...(language === "fr" ? sources : catalogs.en), ...overrides[language] }, sources };
+    }
+    else if (key === "/api/me/locale") {
+      const body = route.request().postDataJSON(); localeUpdates.push(body);
+      user = { ...user, profile: { ...user.profile, locale: body.locale } }; data = user;
+    }
+    else if (key === "/api/config") data = settings;
     else if (key === "/api/games") data = games.map((game) => ({ ...game, ...(coverImage === undefined ? {} : { coverImage }), ...(descriptiveImage === undefined ? {} : { descriptiveImage }) }));
     else if (key === "/api/admin") data = { users: [], games, shop: [], achievements: [], pricing: {}, permissions: {}, overview: {}, settings };
     else if (key === "/api/admin/settings" && route.request().method() === "PATCH") {
@@ -72,13 +90,93 @@ async function setup(viewport, { logged = false, admin = false, guests = true, r
     else if (key === "/api/tribunal/availability") data = { available: false };
     else if (key === "/api/notifications") data = [];
     else if (key === "/api/ranked") data = { games: [] };
+    else if (key === "/api/ranked/history") data = { rows: [] };
     return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data), headers: { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true" } });
   });
   await page.route(/https:\/\/[^/]*(googletagmanager\.com|google-analytics\.com)\//, (route) => route.fulfill({ contentType: "text/javascript", body: "" }));
-  return { page, context, requests, uploads, settingsUpdates };
+  return { page, context, requests, uploads, settingsUpdates, localeUpdates };
 }
 try {
   browser = await chromium.launch({ channel: "msedge", headless: true });
+  for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }]]) {
+    const fixture = await setup(viewport); const { page, context } = fixture;
+    await page.goto(origin);
+    await page.locator(".locale-visitor select").selectOption("en");
+    await page.locator("form").getByRole("button", { name: "Sign in", exact: true }).waitFor();
+    assert.equal(await page.locator("html").getAttribute("lang"), "en");
+    assert.equal(await page.evaluate(() => localStorage.getItem("ktga-locale")), "en");
+    assert.equal(fixture.localeUpdates.length, 0, "Anonymous visitors do not update an account");
+    await page.getByRole("button", { name: "Register", exact: true }).click();
+    await page.getByLabel("Confirm password", { exact: true }).waitFor();
+    assert.ok(await page.getByText("At least 10 characters", { exact: true }).isVisible());
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    await page.screenshot({ path: path.join(directory, `${name}-locale-registration-en.png`), fullPage: true });
+    await page.reload();
+    await page.locator("form").getByRole("button", { name: "Sign in", exact: true }).waitFor();
+    await page.locator(".locale-visitor select").selectOption("fr");
+    await page.getByRole("button", { name: "Se connecter", exact: true }).waitFor();
+    await context.close();
+
+    const account = await setup(viewport, { logged: true, admin: true, accountLocale: "en" });
+    await account.page.goto(`${origin}/profil`);
+    await account.page.getByRole("heading", { name: "My account", exact: true }).waitFor().catch(async (error) => {
+      fs.writeFileSync(path.join(directory, "locale-profile-failure.json"), JSON.stringify({ errors, body: await account.page.locator("body").innerText(), requests: account.requests }, null, 2));
+      throw error;
+    });
+    assert.equal(await account.page.locator(".locale-header select").inputValue(), "en", "The account preference wins over the browser default");
+    await account.page.locator(".locale-profile select").selectOption("fr");
+    await account.page.getByRole("heading", { name: "Mon compte", exact: true }).waitFor();
+    await account.page.waitForFunction(() => !document.querySelector(".locale-profile select").disabled);
+    assert.equal(account.localeUpdates.at(-1).locale, "fr");
+    assert.equal(await account.page.locator("#account-gender option[value=Homme]").innerText(), "Homme");
+    await account.page.locator(".locale-header select").selectOption("en");
+    await account.page.waitForFunction(() => !document.querySelector(".locale-profile select").disabled);
+    assert.equal(await account.page.locator("#account-gender option[value=Homme]").innerText(), "Male", "Only the label changes, not the stored value");
+    await account.page.reload();
+    await account.page.getByRole("heading", { name: "My account", exact: true }).waitFor();
+    assert.equal(await account.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    assert.ok(await account.page.locator(".locale-header .locale-picker img").isVisible(), "The language picker survives a mainstream blocker");
+    const flag = await account.page.locator(".locale-header").boundingBox();
+    const headerBox = await account.page.locator(".casino-header").boundingBox();
+    assert.ok(headerBox.x + headerBox.width - flag.x - flag.width <= 20, "The flag stays at the far right of the header");
+    const nameBox = await account.page.locator(".casino-accountbar .display-name-text").first().boundingBox();
+    assert.ok(nameBox.height < 35, "The language control must not compress the nickname into a vertical column");
+    await account.page.screenshot({ path: path.join(directory, `${name}-locale-profile-en.png`), fullPage: true });
+    await account.context.close();
+    checks.push(`${name}: FR/EN registration, account/profile persistence, unchanged form values and content blocker`);
+  }
+  {
+    const { page, context } = await setup({ width: 1440, height: 1000 }, { logged: true, editor: true });
+    await page.goto(`${origin}/admin`);
+    await page.locator(".admin-sidebar").getByRole("button", { name: /^Langues et traductions/ }).click();
+    await page.locator(".admin-content .locale-admin").waitFor();
+    const search = page.getByRole("searchbox", { name: "Rechercher un texte" });
+    await search.fill("Créer une table");
+    const entry = page.locator(".locale-admin-entry").filter({ has: page.locator("p", { hasText: /^Créer une table$/ }) });
+    await entry.getByRole("textbox").fill("Open a game table");
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "Traductions enregistrées." }).waitFor();
+    await page.locator(".locale-header select").selectOption("en");
+    await page.getByRole("heading", { name: "Languages and translations", exact: true }).waitFor();
+    assert.equal(await entry.getByRole("textbox").inputValue(), "Open a game table");
+    await page.getByLabel("Add a French source text", { exact: true }).fill("Bienvenue dans le guide personnalisé");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.locator(".locale-admin-entry textarea").fill("Welcome to the custom guide");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "Translations saved." }).waitFor();
+    await page.locator('.locale-admin input[type=file]').setInputFiles({ name: "invalid.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ locale: "en", messages: { "{value0} joueurs": "Players without the variable" } })) });
+    await page.getByRole("alert").filter({ hasText: /variables/ }).waitFor();
+    await page.locator('.locale-admin input[type=file]').setInputFiles({ name: "valid.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ locale: "en", messages: { "Créer une table": "<img src=x onerror=alert(1)>" } })) });
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "Translations saved." }).waitFor();
+    assert.equal(await page.locator(".locale-admin img").count(), 0, "Translations remain plain text in the editor");
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON", exact: true }).click();
+    assert.equal((await downloadPromise).suggestedFilename(), "ktga-en.json");
+    await page.screenshot({ path: path.join(directory, "locale-editor-en.png"), fullPage: true });
+    await context.close();
+    checks.push("Editor: locale administration, revisioned save, custom sources, import validation and JSON export");
+  }
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }]]) {
     let { page, context } = await setup(viewport);
     await page.goto(origin);

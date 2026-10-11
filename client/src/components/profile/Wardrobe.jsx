@@ -1,3 +1,4 @@
+import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useState } from "react";
 import { Check, ChevronRight, Search, ShoppingBag } from "lucide-react";
 import { api } from "../../api.js";
@@ -19,16 +20,18 @@ const categories = [
 ];
 
 function ItemVisual({ category, value, user }) {
+  const { t: localeText } = useLocale();
   if (category.type === "icons") return <CosmeticIcon value={value} />;
   if (category.type === "nameEffects") return <span className={`display-name name-${value}`}><span className="display-name-text">{user.pseudo}</span></span>;
   if (category.type === "diceSkins") return <Die value={5} skin={value} animate={false} />;
   if (category.type === "cardSkins") return <div className="wardrobe-card-pair"><PlayingCard card={{ rank: "A", suit: "H" }} skin={value} animate={false} /><PlayingCard hidden skin={value} animate={false} /></div>;
-  if (category.type === "memberCards") return <div className={`vip-card wardrobe-member member-${value}`}><span className="vip-label">KTGA.ME</span><strong>{user.pseudo}</strong></div>;
+  if (category.type === "memberCards") return <div className={`vip-card wardrobe-member member-${value}`}><span className="vip-label">{localeText("KTGA.ME")}</span><strong>{user.pseudo}</strong></div>;
   const previewUser = { ...user, cosmetics: { ...user.cosmetics, equipped: { ...user.cosmetics?.equipped, profileBanner: "default", profileFrame: "none", profileEffect: "none", [category.key]: value } } };
   return <ProfileCosmeticShell user={previewUser} className="wardrobe-profile-sample"><span>{user.pseudo}</span></ProfileCosmeticShell>;
 }
 
 export function Wardrobe({ user, setUser, catalog, onOpenShop }) {
+  const { t: localeText } = useLocale();
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -51,24 +54,24 @@ export function Wardrobe({ user, setUser, catalog, onOpenShop }) {
     finally { setBusy(false); }
   }
   return <>
-    <div className="wardrobe-heading"><h2>Style</h2><button type="button" className="secondary" onClick={onOpenShop}><ShoppingBag size={17} /> Boutique</button></div>
-    {user.guest ? <p>La personnalisation est réservée aux comptes enregistrés.</p> : <div className="wardrobe-grid">{categories.map((category) => {
+    <div className="wardrobe-heading"><h2>{localeText("Style")}</h2><button type="button" className="secondary" onClick={onOpenShop}><ShoppingBag size={17} />{" " + localeText("Boutique")}</button></div>
+    {user.guest ? <p>{localeText("La personnalisation est réservée aux comptes enregistrés.")}</p> : <div className="wardrobe-grid">{categories.map((category) => {
       const value = user.cosmetics?.equipped?.[category.key] ?? category.fallback;
       return <section className="wardrobe-slot" key={category.key}>
         <button type="button" className="secondary wardrobe-open" aria-haspopup="dialog" onClick={() => { setSelected(category); setQuery(""); setFilter("all"); setError(""); }}><span>{category.action}</span><ChevronRight size={17} /></button>
         <div className={`wardrobe-current wardrobe-visual-${category.type}`}><ItemVisual category={category} value={value} user={user} /></div>
-        <div className="wardrobe-current-label"><strong>{nameFor(category, value)}</strong><small><Check size={13} /> Équipé · {ownedValues(category).length} disponible(s)</small></div>
+        <div className="wardrobe-current-label"><strong>{nameFor(category, value)}</strong><small><Check size={13} />{" " + localeText("Équipé ·") + " "}{ownedValues(category).length}{" " + localeText("disponible(s)")}</small></div>
       </section>;
     })}</div>}
     {selected && <Dialog title={selected.action} className="wardrobe-modal" onClose={() => setSelected(null)} dismissible={!busy}>
-      <label className="connections-search"><Search size={18} /><span className="sr-only">Rechercher dans la collection</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher dans ma collection" /></label>
-      {filters.length > 1 && <nav className="shop-subselector" aria-label="Catégorie de personnalisation"><button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>Tous</button>{filters.map((category) => <button key={category} className={filter === category ? "active" : ""} onClick={() => setFilter(category)}>{shopCategoryLabel(category)}</button>)}</nav>}
-      {error && <div className="error" role="alert">{error}</div>}
+      <label className="connections-search"><Search size={18} /><span className="sr-only">{localeText("Rechercher dans la collection")}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={localeText("Rechercher dans ma collection")} /></label>
+      {filters.length > 1 && <nav className="shop-subselector" aria-label={localeText("Catégorie de personnalisation")}><button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{localeText("Tous")}</button>{filters.map((category) => <button key={category} className={filter === category ? "active" : ""} onClick={() => setFilter(category)}>{localeText(shopCategoryLabel(category))}</button>)}</nav>}
+      {error && <div className="error" role="alert">{localeText(error)}</div>}
       <div className="wardrobe-choices">{visible.map((item) => {
         const equipped = item.value === (user.cosmetics?.equipped?.[selected.key] ?? selected.fallback);
-        return <button type="button" className={`wardrobe-choice ${equipped ? "active" : ""}`} key={item.value} disabled={busy} aria-pressed={equipped} onClick={() => equip(item.value)}><span className={`wardrobe-current wardrobe-visual-${selected.type}`}><ItemVisual category={selected} value={item.value} user={user} /></span><strong>{item.name}</strong><small>{equipped ? <><Check size={13} /> Équipé</> : shopCategoryLabel(item.category)}</small></button>;
-      })}{!visible.length && <p className="empty-state">Aucun élément ne correspond à la recherche.</p>}</div>
-      <div className="wardrobe-footer"><small>{visible.length} élément(s)</small><button type="button" className="secondary" disabled={busy} onClick={() => { setSelected(null); onOpenShop(); }}><ShoppingBag size={17} /> Découvrir la boutique</button></div>
+        return <button type="button" className={`wardrobe-choice ${equipped ? "active" : ""}`} key={item.value} disabled={busy} aria-pressed={equipped} onClick={() => equip(item.value)}><span className={`wardrobe-current wardrobe-visual-${selected.type}`}><ItemVisual category={selected} value={item.value} user={user} /></span><strong>{item.name}</strong><small>{equipped ? <><Check size={13} />{" " + localeText("Équipé")}</> : localeText(shopCategoryLabel(item.category))}</small></button>;
+      })}{!visible.length && <p className="empty-state">{localeText("Aucun élément ne correspond à la recherche.")}</p>}</div>
+      <div className="wardrobe-footer"><small>{visible.length}{" " + localeText("élément(s)")}</small><button type="button" className="secondary" disabled={busy} onClick={() => { setSelected(null); onOpenShop(); }}><ShoppingBag size={17} />{" " + localeText("Découvrir la boutique")}</button></div>
     </Dialog>}
   </>;
 }

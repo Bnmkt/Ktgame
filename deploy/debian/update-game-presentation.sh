@@ -8,7 +8,10 @@ exec 9>/run/ktga-deployment.lock
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 files=(
   server/src/index.js server/src/services/public-pages.js server/src/services/room-entry.js
-  server/src/services/game-images.js
+  server/src/services/game-images.js server/src/services/account-domain.js server/src/services/locales.js
+  client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
+  client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
+  client/src/components/admin/LocaleAdmin.jsx
   client/src/App.jsx client/src/config/site.js client/src/seo/render.jsx
   client/src/styles.css client/src/navigation/casino.css
   client/src/pages/AdminPage.jsx client/src/pages/AuthPage.jsx client/src/pages/LobbyPage.jsx
@@ -82,6 +85,7 @@ console.log("Requested featured game configured.");
 JS
 fi
 for file in "${files[@]}"; do install -D -m 0644 -o deploy -g deploy "$stage/$file" "/opt/ktga/$file"; done
+rsync -a --chown=deploy:deploy --chmod=D755,F644 "$stage/client/src/" /opt/ktga/client/src/
 # Keep previous hashed assets for tabs already open.
 rsync -a --chown=root:root --chmod=D755,F644 "$stage/client/dist/" /var/www/ktga/
 rsync -a --delete --chown=deploy:deploy --chmod=D755,F644 "$stage/client/dist-ssr/" /opt/ktga/client/dist-ssr/
@@ -95,6 +99,7 @@ done
 curl -fsS https://api.ktga.me/api/config | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(!Object.hasOwn(JSON.parse(s),"featuredGameId"))process.exit(1)})'
 curl -fsS https://api.ktga.me/api/games | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(!JSON.parse(s).every(g=>typeof g.coverImage==="string"&&typeof g.descriptiveImage==="string"))process.exit(1)})'
 curl -fsS https://www.ktga.me/manifest.webmanifest >/dev/null
+curl -fsS https://www.ktga.me/api/locales/fr | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(JSON.parse(s).locale!=="fr")process.exit(1)})'
 node --input-type=module <<'JS'
 const games = await (await fetch("https://www.ktga.me/api/games")).json();
 const paths = new Set(games.flatMap((game) => [game.coverImage, game.descriptiveImage]).filter((value) => /^\/api\/game-images\/[a-f0-9]{64}\.png$/.test(value)));
