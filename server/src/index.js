@@ -1,6 +1,7 @@
 import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
+import { createLocaleStore, registerLocaleRoutes, validLocale } from "./services/locales.js";
 import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
 import { createRoomRuntime } from "./services/room-runtime.js";
@@ -862,6 +863,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use("/api/admin/help", express.json({ limit: "2mb" }));
+app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use(express.json());
 app.use("/api", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
 app.use("/api/auth", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: AUTH_RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
@@ -1902,7 +1904,7 @@ function auth(req, res, next) {
     if (moderation?.type === "hard") return res.status(403).json({ code: "HARD_BAN", error: "Ce compte est temporairement inaccessible.", reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" });
     const parentalRevocation = activeParentalRevocation(persistentUser);
     if (parentalRevocation) return res.status(403).json({ code: "PARENTAL_ACCESS_REVOKED", error: "L’accès à ce compte a été suspendu par le responsable légal.", reason: parentalRevocation.reason ?? "", endsAt: parentalRevocation.revokedUntil });
-    const accountSetupRoute = req.path === "/api/me" || req.path === "/api/me/email";
+    const accountSetupRoute = req.path === "/api/me" || req.path === "/api/me/email" || req.path === "/api/me/locale";
     if (persistentUser && !validEmail(persistentUser.email) && !accountSetupRoute) return res.status(403).json({ code: "EMAIL_UPGRADE_REQUIRED", error: "Ajoute une adresse email valide pour continuer." });
     if (persistentUser && platformSettings().emailVerificationRequired && validEmail(persistentUser.email) && !persistentUser.emailVerifiedAt && !accountSetupRoute) return res.status(403).json({ code: "EMAIL_VERIFICATION_REQUIRED", error: "Valide ton adresse email pour continuer." });
     if (persistentUser && isUnder13(persistentUser) && req.method !== "GET" && !req.path.endsWith("/guardian-activity")) {
@@ -2479,6 +2481,7 @@ app.post("/api/auth/request-parental-reactivation", async (req, res) => {
 
 app.post("/api/auth/register", async (req, res) => {
   const settings = platformSettings();
+  const locale = validLocale(req.body.locale) ? req.body.locale : "fr";
   if (!settings.registrationsEnabled) return res.status(403).json({ error: "Les inscriptions sont temporairement fermées." });
   const pseudo = String(req.body.pseudo ?? "").trim();
   const email = normalizeEmail(req.body.email);
@@ -2514,7 +2517,7 @@ app.post("/api/auth/register", async (req, res) => {
     let authorization;
     try { authorization = registrationAuthorization(db, req.body); } catch (error) { return { error: error.message }; }
     const testAdminEmail = NODE_ENV === "test" ? normalizeEmail(process.env.TEST_ADMIN_EMAIL) : "";
-    const user = ensureUserSocial({ id: randomUUID(), pseudo, email, emailVerifiedAt: null, passwordHash, passwordPolicyVersion: 1, tokens: settings.signupTokens, guest: false, admin: Boolean(testAdminEmail && testAdminEmail === email), editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, profile: { displayName: pseudo, birthDate: authorization.birthDate }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
+    const user = ensureUserSocial({ id: randomUUID(), pseudo, email, emailVerifiedAt: null, passwordHash, passwordPolicyVersion: 1, tokens: settings.signupTokens, guest: false, admin: Boolean(testAdminEmail && testAdminEmail === email), editor: false, active: true, createdAt: new Date().toISOString(), lastDailyClaim: null, profile: { displayName: pseudo, birthDate: authorization.birthDate, locale }, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
     user.registrationAuthorization = authorization;
     db.users.push(user);
     db.transactions.push({ id: randomUUID(), userId: user.id, amount: settings.signupTokens, balance: user.tokens, gameId: null, roomId: null, reason: "signup-bonus", createdAt: new Date().toISOString() });
@@ -5063,6 +5066,21 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 });
 
 registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
+const localeStore = await createLocaleStore({ directory: path.join(path.dirname(databaseFilename), "locales") });
+registerLocaleRoutes({ app, auth, requireBackOffice, store: localeStore });
+app.patch("/api/me/locale", auth, (req, res) => {
+  if (req.auth.guest) return res.status(400).json({ error: "Les invités ne peuvent pas modifier un compte." });
+  if (!validLocale(req.body.locale)) return res.status(400).json({ error: "Langue non prise en charge." });
+  const user = updateDb((db) => {
+    const found = db.users.find((entry) => entry.id === req.auth.id);
+    if (!found) return null;
+    ensureUserSocial(found);
+    found.profile.locale = req.body.locale;
+    return found;
+  }, { users: [req.auth.id], rooms: [] });
+  if (!user) return res.status(404).json({ error: "Compte introuvable." });
+  res.json(sanitizeUser(user));
+});
 app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
   for (const field of ["descriptiveImage", "coverImage"]) {
     if (Object.hasOwn(req.body, field) && String(req.body[field] ?? "").trim() && !/^n\/?a$/i.test(String(req.body[field]).trim()) && !gameImageUrl(req.body[field])) return res.status(400).json({ error: "L’image doit utiliser une URL HTTPS ou un chemin absolu (/images/…)." });

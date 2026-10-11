@@ -48,6 +48,7 @@ export function createAccountDomain({ configurationCache, platformSettings, rank
       birthDate: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : "",
       gender: String(profile.gender ?? "").slice(0, 32),
       bio: normalizePlainText(profile.bio, 180),
+      locale: ["fr", "en"].includes(profile.locale) ? profile.locale : "",
       titleGameId: games.some((game) => game.id === profile.titleGameId) ? profile.titleGameId : "",
       titleLevel: Number.isSafeInteger(profile.titleLevel) && profile.titleLevel >= 0 && profile.titleLevel <= 1000 ? profile.titleLevel : 0,
       titleHidden: Boolean(profile.titleHidden),
@@ -101,7 +102,7 @@ export function createAccountDomain({ configurationCache, platformSettings, rank
 
   function publicProfileFor(user) {
     const profile = normalizePublicProfile(user.profile, user.pseudo);
-    const { birthDate: _birthDate, ...publicProfile } = profile;
+    const { birthDate: _birthDate, locale: _locale, ...publicProfile } = profile;
     return publicProfile;
   }
 

@@ -19,9 +19,9 @@ async function request(id, route, method = "GET", body) {
 before(async () => {
   const db = new DatabaseSync(path.join(directory, "main.sqlite"));
   db.exec("CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO meta VALUES('legacy-json-migrated','true'); CREATE TABLE users(id TEXT PRIMARY KEY,data TEXT NOT NULL,pseudo TEXT NOT NULL,email TEXT,guest INTEGER)");
-  for (const id of ["player", "friend", "admin"]) {
+  for (const id of ["player", "friend", "admin", "editor"]) {
     const user = { id, pseudo: id, email: `${id}@example.test`, active: true, admin: id === "admin", tokens: 100000,
-      emailVerifiedAt: new Date().toISOString(), passwordHash: "not-used", profile: { birthDate: "1990-01-01" } };
+      emailVerifiedAt: new Date().toISOString(), editor: id === "editor", passwordHash: "not-used", profile: { birthDate: "1990-01-01" } };
     db.prepare("INSERT INTO users VALUES(?,?,?,?,0)").run(id, JSON.stringify(user), id, user.email);
   }
   db.close();
@@ -70,6 +70,29 @@ test("game images and featured choice persist and invitation preview cannot bypa
     assert.equal((await request("friend", `/api/rooms/${code}/join`, "POST", { password: "table-code" })).status, 200);
   } finally { await request("player", `/api/rooms/${code}`, "DELETE"); }
   assert.equal((await request(null, `/api/table-entry/${code}`)).status, 404);
+});
+
+test("locale preferences stay private and only back-office accounts can edit language files", async () => {
+  assert.equal((await request(null, "/api/locales/en")).status, 200);
+  assert.equal((await request(null, "/api/locales/xx")).status, 404);
+  assert.equal((await request(null, "/api/admin/locales/en")).status, 401);
+  assert.equal((await request("player", "/api/admin/locales/en")).status, 403);
+  const original = await request("editor", "/api/admin/locales/en");
+  assert.equal(original.status, 200);
+  const updated = await request("editor", "/api/admin/locales/en", "PATCH", { revision: original.data.revision, messages: { "Créer une table": "Open a table" } });
+  assert.equal(updated.status, 200);
+  assert.equal((await request(null, "/api/locales/en")).data.messages["Créer une table"], "Open a table");
+  assert.equal((await request("admin", "/api/admin/locales/en", "PATCH", { revision: original.data.revision, messages: {} })).status, 409);
+  assert.equal((await request("player", "/api/me/locale", "PATCH", { locale: "xx" })).status, 400);
+  const preference = await request("player", "/api/me/locale", "PATCH", { locale: "en" });
+  assert.equal(preference.status, 200, JSON.stringify(preference.data));
+  assert.equal(preference.data.profile.locale, "en");
+  assert.equal(preference.data.tokens, 100000);
+  assert.equal(preference.data.admin, false);
+  assert.ok(!Object.hasOwn(preference.data, "passwordHash"));
+  assert.equal((await request("player", "/api/me")).data.profile.locale, "en");
+  assert.equal((await request("friend", "/api/users/player/public")).data.profile.locale, undefined);
+  assert.equal((await request("player", "/api/me", "PATCH", { bio: "Still English" })).data.profile.locale, "en");
 });
 
 test("existing room API runs through two Game Workers without exposing worker metadata", async () => {

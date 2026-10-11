@@ -1,0 +1,36 @@
+.locale-picker { flex-shrink: 0; position: relative; }
+.locale-control { display: flex; align-items: center; gap: 6px; min-height: 40px; border: 1px solid #516052; border-radius: 6px; padding: 0 7px; background: #18201c; }
+.locale-control img { flex-shrink: 0; object-fit: cover; }
+.locale-control select { color: #eddba1; background: transparent; border: 0; min-width: 48px; width: auto; padding: 7px 0; font: inherit; font-weight: 700; color-scheme: dark; }
+.locale-profile label { display: grid; gap: 8px; }
+.locale-profile .locale-control { max-width: 280px; }
+.locale-profile select { flex: 1; }
+.locale-save-error { position: absolute; top: 100%; right: 0; width: 240px; padding: 10px; color: #ffb6b6; background: #151d18; border: 1px solid #a05454; z-index: 12; }
+.locale-visitor { position: absolute; top: 12px; right: 16px; z-index: 11; }
+.locale-header { position: absolute; top: 14px; right: 16px; }
+.casino-header .casino-header-inner { padding-right: 160px; }
+body:has(.casino-header) .locale-visitor { display: none; }
+.locale-admin-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 16px 0; }
+.locale-admin-toolbar label { display: grid; gap: 6px; }
+.locale-admin-toolbar input, .locale-admin-toolbar select { min-height: 40px; }
+.locale-admin-toolbar input:not([type="checkbox"]):not([type="file"]), .locale-admin-toolbar select { border: 1px solid #54634f; border-radius: 6px; background: #fcf8ee; color: #1a251f; padding: 8px 10px; max-width: 100%; }
+.locale-admin-toolbar label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; }
+.locale-admin-toolbar input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; accent-color: #d5ae4c; }
+.locale-admin-summary { color: #bdc9bb; margin: 0 0 18px; }
+.locale-admin-list { display: grid; gap: 16px; }
+.locale-admin-entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; border-top: 1px solid #344139; padding-top: 16px; }
+.locale-admin-entry p { white-space: pre-wrap; overflow-wrap: anywhere; color: #cbd3c7; margin: 0; }
+.locale-admin-entry label { display: grid; gap: 8px; min-width: 0; }
+.locale-admin-entry textarea { width: 100%; min-height: 80px; font: inherit; }
+.locale-admin-entry small { color: #d9c47e; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .casino-header .casino-header-inner { padding-right: 24px; }
+}
+@media (max-width: 760px) {
+  .locale-header { top: 12px; right: 14px; }
+  .casino-header .casino-header-inner { padding-right: 14px; }
+  .casino-header .casino-accountbar .casino-logout { grid-column: 4; }
+  .casino-header .casino-accountbar { grid-template-columns: minmax(0, 1fr) 42px 44px 42px; }
+  .casino-header .identity-pill .display-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .locale-admin-entry { grid-template-columns: 1fr; }
+}
