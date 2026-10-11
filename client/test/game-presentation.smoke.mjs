@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const dependencies = path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
 const { chromium } = await import(pathToFileURL(path.join(dependencies, "playwright/index.mjs")));
 const { PlaywrightBlocker } = await import(pathToFileURL(path.join(dependencies, "@ghostery/adblocker-playwright/dist/esm/index.js")));
-const directory = path.join(root, "docs/previews/game-featured-20261010");
+const directory = path.join(root, "docs/previews/game-featured-20261011");
 fs.mkdirSync(directory, { recursive: true });
 const app = express();
 app.use(express.static(path.join(root, "client/dist"), { index: false }));
@@ -21,7 +21,8 @@ await new Promise((resolve) => server.once("listening", resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const games = [
   { id: "yahtzee", name: "Yahtzee", type: "dice", minPlayers: 1, maxPlayers: 6, description: "Treize catégories, cinq dés et une dernière chance.", audience: "solo-multi", category: "score", complexity: "easy", coverImage: "/ktga-preview.png", descriptiveImage: "/ktga-preview.png" },
-  { id: "421", name: "421", type: "dice", minPlayers: 2, maxPlayers: 6, description: "La meilleure combinaison remporte la manche.", audience: "multi", category: "score", complexity: "easy" }
+  { id: "421", name: "421", type: "dice", minPlayers: 2, maxPlayers: 6, description: "La meilleure combinaison remporte la manche.", audience: "multi", category: "score", complexity: "easy" },
+  { id: "blackjack", name: "Blackjack", type: "cards", minPlayers: 1, maxPlayers: 6, description: "Vise 21 sans le dépasser.", audience: "solo-multi", category: "score", complexity: "easy", coverImage: "/ktga-preview.png", descriptiveImage: "/ktga-preview.png" }
 ];
 let browser; const errors = [], checks = [];
 async function setup(viewport, { logged = false, admin = false, guests = true, ranked = false, closed = false, coverImage, descriptiveImage } = {}) {
@@ -93,9 +94,9 @@ try {
     await page.screenshot({ path: path.join(directory, `${name}-home.png`), fullPage: true });
     await page.getByRole("link", { name: "Tous les jeux", exact: true }).click();
     await page.getByRole("heading", { name: "Choisir un jeu", exact: true }).waitFor();
-    await page.waitForFunction(() => document.querySelectorAll(".public-game-entry").length === 2);
-    assert.equal(await page.locator(".public-game-entry").count(), 2);
-    assert.equal(await page.locator(".public-game-entry .game-artwork-media img").count(), 1);
+    await page.waitForFunction(() => document.querySelectorAll(".public-game-entry").length === 3);
+    assert.equal(await page.locator(".public-game-entry").count(), 3);
+    assert.equal(await page.locator(".public-game-entry .game-artwork-media img").count(), 2);
     assert.equal(await page.locator(".public-game-entry .public-game-pieces").count(), 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.screenshot({ path: path.join(directory, `${name}-catalog.png`), fullPage: true });
@@ -106,9 +107,17 @@ try {
     await page.getByRole("button", { name: "Tous les jeux", exact: true }).waitFor();
     assert.equal(await page.locator(".game-card").count(), 1);
     await page.getByRole("button", { name: "Tous les jeux", exact: true }).click();
-    await page.waitForFunction(() => document.querySelectorAll(".game-card").length === 2 && document.querySelector(".game-card h3")?.innerText.includes("421"));
+    await page.waitForFunction(() => document.querySelectorAll(".game-card").length === 3 && document.querySelector(".game-card h3")?.innerText.includes("421"));
     assert.match(await page.locator(".game-card").first().innerText(), /421/, "Favorites remain first in the full selection");
-    assert.equal(await page.locator(".game-card .game-artwork-backdrop img").count(), 1);
+    assert.equal(await page.locator(".game-card .game-artwork-backdrop img").count(), 2);
+    for (const [type, color] of [["dice", "rgb(137, 147, 153)"], ["cards", "rgb(184, 73, 93)"]]) {
+      const card = page.locator(`.game-card.${type}`).filter({ has: page.locator('.game-artwork-media') }).first();
+      assert.equal(await card.evaluate((node) => getComputedStyle(node).borderTopColor), color);
+      const metadata = await card.locator('.game-entry-meta').boundingBox(), image = await card.locator('.game-artwork-media').boundingBox();
+      assert.ok(metadata.y + metadata.height <= image.y, "The type icon and player count must appear above the image");
+      assert.equal(await card.locator('.game-entry-kind > svg').count(), 1);
+      assert.match(await card.locator('.game-entry-count').innerText(), /joueurs/);
+    }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.screenshot({ path: path.join(directory, `${name}-lobby.png`), fullPage: true });
     await context.close();

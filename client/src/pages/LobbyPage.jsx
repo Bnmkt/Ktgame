@@ -3,13 +3,12 @@ import { io } from "socket.io-client";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
 import { GameArtwork } from "../components/game/GameArtwork.jsx";
 import { featuredGame } from "../features/games/presentation.js";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Spade, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
 import { applyRoomPatch } from "../features/games/room-feed.js";
 import { rankedGames, RankBadge } from "../features/games/RankedPlay.jsx";
 import { JoinRoomDialog } from "../components/navigation/JoinRoomDialog.jsx";
-import { PlayingCard } from "../components/game/GamePieces.jsx";
 import { RulesModal } from "../components/game/GameSupport.jsx";
 import { GameRoomsModal } from "../components/navigation/GameRoomsModal.jsx";
 import { defaultPublicSettings, gameRules } from "../config/site.js";
@@ -198,8 +197,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
             {displayedGames.map((game) => (
               <article key={game.id} className={`game-card premium-card ${game.type} ${playMode==="ranked"?"ranked-game-card":""}`}>
                 <GameArtwork source={showCatalog ? game.descriptiveImage : game.coverImage} backdrop eager={!showCatalog} />
-                <span className="player-badge">{playMode==="ranked"?`${rankedStatus?.games.find((row)=>row.id===game.id)?.players ?? "…"} joueurs`:`${game.minPlayers}-${game.maxPlayers}`}</span>
-                {showCatalog && <GameArtwork source={game.coverImage} fallback={<div className="game-icon">{game.type === "dice" ? <Dice5 /> : <PlayingCard card={{ rank: "A", suit: "S" }} />}</div>} />}
+                <header className="game-entry-meta"><span className="game-entry-kind">{game.type === "dice" ? <Dice5 size={20} /> : <Spade size={20} />}<span>{game.type === "dice" ? "Dés" : "Cartes"}</span></span><span className="game-entry-count"><Users size={16} />{playMode === "ranked" ? `${rankedStatus?.games.find((row) => row.id === game.id)?.players ?? "…"} joueurs` : `${game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`} joueurs`}</span></header>
+                {showCatalog && <GameArtwork source={game.coverImage} />}
                 <h3>{game.name}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label="Favori" fill="currentColor" />}</h3>
                 <p>{game.description || gameRules[game.id]?.goal}</p>
                 <div className="card-meta"><span>{gameCategoryLabel(game.category)}</span><span>{gameComplexityLabel(game.complexity)}</span>{playMode==="ranked"?<RankBadge rank={rankedStatus?.games.find((row)=>row.id===game.id)?.rank}/>:<span>{rooms.filter((room) => room.gameId === game.id && !room.ranked).length} tables publiques</span>}</div>

@@ -3,10 +3,21 @@
 .game-artwork-backdrop { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
 .game-artwork-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, #08100d55, #08100de8 75%); }
 .game-card > .game-artwork-backdrop ~ * { position: relative; z-index: 1; }
-.game-card > .game-artwork-backdrop ~ .player-badge { position: absolute; }
+.game-grid .game-card.cards { border-color: #b8495d; }
+.game-grid .game-card.dice { border-color: #899399; }
+.game-card.cards::after { border-color: #b8495d80; }
+.game-card.dice::after { border-color: #89939980; }
+.game-card.cards.premium-card::before { background: #b8495d; }
+.game-card.dice.premium-card::before { background: #899399; }
+.game-entry-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-width: 0; }
+.game-entry-kind, .game-entry-count { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #ede7db; }
+.game-entry-count { flex-shrink: 0; }
+.game-entry-kind > svg { width: 34px; height: 34px; padding: 6px; background: #121a19; border: 1px solid #899399; border-radius: 4px; flex-shrink: 0; }
+.game-card.cards .game-entry-kind > svg { border-color: #b8495d; color: #ee899d; }
+.game-card.dice .game-entry-kind > svg { color: #c5d0d7; }
 .game-grid.game-grid-featured { grid-template-columns: minmax(0, 1fr); max-width: 1040px; margin-inline: auto; }
 .game-grid-featured .game-card { min-height: 320px; padding: 28px; justify-items: center; text-align: center; }
-.game-grid-featured .game-card h3 { font-size: 28px; color: #edcb76; }
+.game-grid-featured .game-card h3 { font-size: 28px; color: #edcb76; justify-content: center; }
 .game-grid-featured .game-card p { max-width: 680px; margin: 0; }
 .game-grid-featured .game-table-actions { max-width: 640px; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)) 40px; }
 .game-grid-featured .game-table-actions > button:first-child { grid-column: auto; }
