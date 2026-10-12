@@ -9,9 +9,9 @@ import "./game-image-editor.css";
 
 const centered = { zoom: 1, x: 0.5, y: 0.5 };
 
-export function GameImageEditor({ gameId, gameName, field, value, onApply, onClose }) {
+export function GameImageEditor({ gameId, gameName, field, value, onApply, onClose, uploadPath, imageLabel }) {
   const { t: localeText } = useLocale();
-  const format = gameArtworkFormats[field];
+  const format = imageLabel ? { ...gameArtworkFormats[field], label: imageLabel } : gameArtworkFormats[field];
   const [source, setSource] = useState(null), [crop, setCrop] = useState(centered);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [error, setError] = useState("");
   const input = useRef(null), sourceUrl = useRef(""), generation = useRef(0), drag = useRef(null);
@@ -79,7 +79,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
     setBusy(true); setError("");
     try {
       const blob = await encodeArtworkCrop(source.image, crop, format);
-      const result = await api(`/api/admin/games/${encodeURIComponent(gameId)}/images/${field}`, { method: "POST", body: blob, headers: { "Content-Type": "image/png" }, deduplicate: false });
+      const result = await api(uploadPath ?? `/api/admin/games/${encodeURIComponent(gameId)}/images/${field}`, { method: "POST", body: blob, headers: { "Content-Type": "image/png" }, deduplicate: false });
       onApply(result.image);
     } catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
@@ -87,7 +87,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
 
   return <Dialog title={`${format.label} · ${gameName}`} className="game-art-editor" layerClassName="game-art-layer" onClose={onClose} dismissible={!busy}>
     <div className="game-art-editor-body">
-      <input ref={input} className="game-art-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label={localeText("Importer une image du jeu")} disabled={busy} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
+      <input ref={input} className="game-art-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label={imageLabel ? localeText("Importer une image") : localeText("Importer une image du jeu")} disabled={busy} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
       <div className="game-art-tools"><button type="button" className="secondary" disabled={busy} onClick={() => input.current.click()}><Upload size={18} />{source ? localeText("Changer l’image") : localeText("Importer une image")}</button><span>{format.width} × {format.height}{" " + localeText("px")}</span></div>
       {loading && <p role="status">{localeText("Chargement de l’image…")}</p>}
       {source ? <div className="game-art-workspace">

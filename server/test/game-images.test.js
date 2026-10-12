@@ -66,6 +66,11 @@ test("image upload is admin-only; public reads are immutable and safely addresse
     assert.match(response.headers.get("cache-control"), /immutable/);
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), png());
+    for (const authorization of [null, "player", "admin"]) {
+      const background = await fetch(`${origin}/api/admin/lobby-notice/image`, { method: "POST", headers: { "Content-Type": "image/png", ...(authorization ? { Authorization: authorization } : {}) }, body: png() });
+      assert.equal(background.status, authorization === "admin" ? 201 : authorization ? 403 : 401);
+      if (authorization === "admin") assert.equal((await background.json()).image, image);
+    }
     assert.equal((await fetch(`${origin}/api/game-images/invalid.png`)).status, 404);
   } finally { await new Promise((resolve) => server.close(resolve)); removeTestDirectory(directory); }
 });

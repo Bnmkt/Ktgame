@@ -9,9 +9,13 @@ test("a revision changes only when the administrator actually changes the notice
   const edited = updateLobbyNotice(original, { ...original, content: "# Nouveau contenu" }, 1000);
   assert.equal(Date.parse(edited.updatedAt), 1001);
   assert.notEqual(updateLobbyNotice(edited, { ...edited, enabled: false }, 1000).updatedAt, edited.updatedAt);
+  const withImage = updateLobbyNotice(edited, { ...edited, backgroundImage: "/api/game-images/example.png" }, 2000);
+  assert.notEqual(withImage.updatedAt, edited.updatedAt);
+  assert.equal(withImage.backgroundImage, "/api/game-images/example.png");
+  assert.throws(() => updateLobbyNotice(edited, { ...edited, backgroundImage: "javascript:alert(1)" }));
 });
 
 test("notice limits and visibility are validated; old settings default to hidden", () => {
-  assert.deepEqual(normalizeLobbyNotice(), { enabled: false, title: "", content: "", updatedAt: "" });
+  assert.deepEqual(normalizeLobbyNotice(), { enabled: false, title: "", content: "", backgroundImage: "", updatedAt: "" });
   for (const value of [null, [], { enabled: "yes", title: "", content: "ok" }, { enabled: true, title: "", content: " " }, { enabled: false, title: "x".repeat(101), content: "" }, { enabled: false, title: "", content: "x".repeat(20001) }]) assert.throws(() => updateLobbyNotice({}, value));
 });

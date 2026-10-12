@@ -28,6 +28,10 @@ export function createGameImageStore(directory) {
 
 export function registerGameImageRoutes({ app, auth, requireAdmin, directory, games }) {
   const store = createGameImageStore(directory);
+  app.post("/api/admin/lobby-notice/image", auth, requireAdmin, express.raw({ type: "image/png", limit: "3mb" }), (req, res) => {
+    try { res.status(201).json(store.save(req.body, "coverImage")); }
+    catch (error) { res.status(400).json({ error: error.message }); }
+  });
   app.post("/api/admin/games/:id/images/:field", auth, requireAdmin, express.raw({ type: "image/png", limit: "3mb" }), (req, res) => {
     if (!games.some((game) => game.id === req.params.id)) return res.status(404).json({ error: "Jeu introuvable." });
     try { res.status(201).json(store.save(req.body, req.params.field)); }

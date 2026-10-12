@@ -1,12 +1,13 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useMemo, useState } from "react";
-import { AlertTriangle, Bot, Clock3, Coins, Gift, Landmark, Mail, Megaphone, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
+import { AlertTriangle, Bot, Clock3, Coins, Gift, ImagePlus, Landmark, Mail, Megaphone, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { CompactNumber, formatCompactNumber } from "../../utils/presentation.jsx";
 import { bonusProgression, bonusRuleEffect, normalizeBonusSettings } from "../../features/bonus/config.js";
 import { ProgressionSettings } from "./ProgressionSettings.jsx";
-import { MarkdownContent } from "../patchnotes/MarkdownContent.jsx";
+import { LobbyNotice } from "../navigation/LobbyNotice.jsx";
+import { GameImageEditor } from "./GameImageEditor.jsx";
 import "../navigation/lobby-notice.css";
 
 const operationLabels = { add: "Ajouter", multiply: "Multiplier", set: "Définir" };
@@ -46,6 +47,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }
   const { t: localeText } = useLocale();
   const [section, setSection] = useState("identity");
   const [noticePreview, setNoticePreview] = useState(false);
+  const [noticeImageOpen, setNoticeImageOpen] = useState(false);
   const notice = draft.lobbyNotice ?? { enabled: false, title: "", content: "", updatedAt: "" };
   const updateNotice = (key, value) => setDraft((current) => ({ ...current, lobbyNotice: { ...(current.lobbyNotice ?? notice), [key]: value } }));
   const config = normalizeBonusSettings(draft);
@@ -89,8 +91,11 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }
       <div className="settings-group-heading"><Megaphone/><div><h3>{localeText("Annonce du casino")}</h3></div></div>
       <label className="lobby-notice-visibility"><strong>{localeText("Afficher l’annonce")}</strong><input type="checkbox" checked={notice.enabled} onChange={(event) => updateNotice("enabled", event.target.checked)}/></label>
       <label>{localeText("Titre de l’annonce")}<input maxLength={100} value={notice.title} onChange={(event) => updateNotice("title", event.target.value)}/></label>
+      <label>{localeText("Image de fond")}<input maxLength={2048} value={notice.backgroundImage ?? ""} onChange={(event) => updateNotice("backgroundImage", event.target.value)}/></label>
+      <div className="lobby-notice-image-actions"><button type="button" className="secondary" onClick={() => setNoticeImageOpen(true)}><ImagePlus size={16}/>{localeText("Importer / recadrer")}</button><button type="button" className="secondary" disabled={!notice.backgroundImage} onClick={() => updateNotice("backgroundImage", "")}><Trash2 size={16}/>{localeText("Retirer l’image")}</button></div>
+      {noticeImageOpen && <GameImageEditor gameName={localeText("Annonce")} field="coverImage" imageLabel={localeText("Image de fond")} uploadPath="/api/admin/lobby-notice/image" value={notice.backgroundImage} onApply={(image) => { updateNotice("backgroundImage", image); setNoticeImageOpen(false); }} onClose={() => setNoticeImageOpen(false)}/>}
       <div className="segmented-tabs lobby-notice-preview"><button type="button" className={!noticePreview ? "active" : ""} onClick={() => setNoticePreview(false)}>{localeText("Rédaction")}</button><button type="button" className={noticePreview ? "active" : ""} onClick={() => setNoticePreview(true)}>{localeText("Aperçu")}</button></div>
-      {!noticePreview ? <label>{localeText("Contenu de l’annonce (Markdown)")}<textarea required={notice.enabled} maxLength={20000} value={notice.content} onChange={(event) => updateNotice("content", event.target.value)}/></label> : <div className="lobby-notice-preview"><h4>{notice.title || localeText("Annonce")}</h4><MarkdownContent>{notice.content}</MarkdownContent></div>}
+      {!noticePreview ? <label>{localeText("Contenu de l’annonce (Markdown)")}<textarea required={notice.enabled} maxLength={20000} value={notice.content} onChange={(event) => updateNotice("content", event.target.value)}/></label> : <div className="lobby-notice-preview"><LobbyNotice notice={notice} preview/></div>}
     </section>}
 
     {section === "economy" && <div className="casino-settings-panel economy-bonus-panel">

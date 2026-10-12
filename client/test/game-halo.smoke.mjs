@@ -32,7 +32,7 @@ try {
       localStorage.setItem("ktga-install-choice", "ignored");
     }, PRIVACY_VERSION);
     const page = await context.newPage();
-    let notice = { enabled: true, title: "Bienvenue au casino", content: "**Nouvelle annonce**\n\nUn lancer @!ktga-dice-6 et [les règles](/jeux).", updatedAt: "2026-10-12T12:00:00.000Z" }, dismissedAt = "";
+    let notice = { enabled: true, title: "Bienvenue au casino", backgroundImage: "/ktga-preview.png", content: "**Nouvelle annonce**\n\nUn lancer @!ktga-dice-6 et [les règles](/jeux). " + "Le casino vous accueille pour partager des parties entre amis et découvrir les jeux. ".repeat(12) + "\n\n![Vue du casino](/ktga-preview.png)", updatedAt: "2026-10-12T12:00:00.000Z" }, dismissedAt = "";
     page.on("pageerror", error => errors.push(error.message));
     await blocker.enableBlockingInPage(page);
     await page.route("**/api/**", route => {
@@ -62,9 +62,19 @@ try {
     const block = page.getByRole("region", { name: "Annonce", exact: true });
     await block.waitFor();
     assert.equal(await block.locator(".ktga-inline-dice .pip").count(), 6);
-    assert.equal(await block.getByRole("link", { name: "les règles" }).count(), 1);
+    assert.equal(await block.locator(".lobby-notice-snippet").evaluate(node => getComputedStyle(node).webkitLineClamp), "3");
+    assert.equal(await block.locator(".lobby-notice-art img").count(), 2);
+    assert.equal(await block.locator(".lobby-notice-art img").last().evaluate(img => getComputedStyle(img).filter), "blur(16px)");
+    assert.equal(await block.getByRole("link", { name: "les règles" }).count(), 0);
     await page.evaluate(() => window.scrollTo(0, 0));
     await block.screenshot({ path: path.join(directory, `${name}-notice.png`) });
+    const collapsed = (await block.boundingBox()).height;
+    await block.getByRole("button", { name: "Lire la suite" }).click();
+    assert.equal(await block.getByRole("link", { name: "les règles" }).count(), 1);
+    await block.getByRole("img", { name: "Vue du casino" }).evaluate(img => img.decode());
+    assert.ok((await block.boundingBox()).height > collapsed);
+    await block.screenshot({ path: path.join(directory, `${name}-notice-expanded.png`) });
+    await block.getByRole("button", { name: "Réduire l’annonce" }).click();
     const dismissal = page.waitForResponse(response => response.url().includes("/api/me/lobby-notice/dismiss") && response.status() === 200);
     await block.getByRole("button", { name: "Fermer l’annonce" }).click();
     await dismissal;
