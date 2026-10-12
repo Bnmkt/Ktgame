@@ -27,6 +27,7 @@ function forfeit(room,db,id,reason="abandon") {
         }
       }
     }
+    if (room.state.players.length && room.state.players.every((player)=>player.isBot)) { room.state.finished=true; room.state.winners=[]; }
     room.pacing=null;
     room.ranked.actionAt=Date.now(); room.ranked.turnActor=null;
     finishRoomIfNeeded(room,db);
@@ -40,7 +41,7 @@ function tickRoom(room, db, isWatching, now = Date.now()) {
   let changed = false;
   room.ranked.offline ??= {};
   for (const player of room.ranked.roster) {
-    if (!stillPlaying(room, player.id) || room.finished) continue;
+    if (player.isBot || !stillPlaying(room, player.id) || room.finished) continue;
     if (isWatching(room.id, player.id)) {
       if (room.ranked.offline[player.id] !== undefined && room.state.players[room.state.currentPlayerIndex]?.id === player.id) {
         room.ranked.actionAt = now;
@@ -56,7 +57,7 @@ function tickRoom(room, db, isWatching, now = Date.now()) {
     const actor = room.state.players[room.state.currentPlayerIndex]?.id;
     if (room.ranked.turnActor !== actor) { room.ranked.turnActor = actor; room.ranked.actionAt = now; }
     const deadline = Math.min(room.ranked.actionAt + rules.afkSeconds * 1000, room.gameId === "texas-holdem" ? room.state.turnDeadline ?? Infinity : Infinity);
-    if (actor && !room.ranked.offline[actor] && now >= deadline) changed = forfeit(room, db, actor, "afk") || changed;
+    if (actor && !room.state.players.find((player)=>player.id===actor)?.isBot && !room.ranked.offline[actor] && now >= deadline) changed = forfeit(room, db, actor, "afk") || changed;
   }
   const after = [room.ranked.actionAt, room.ranked.turnActor, room.ranked.paused,
     Object.entries(room.ranked.offline).map(([id, at]) => `${id}:${at}`).join("|")];

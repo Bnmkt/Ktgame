@@ -4,7 +4,7 @@ import { createRoomDirectory } from "./room-directory.js";
 import { selectedCollectionRows } from "../storage/selected-rows.js";
 
 const conflict = () => Object.assign(new Error("La table a change pendant le traitement. Reessaie."), { code: "GAME_CONFLICT" });
-const userFields = ["id", "pseudo", "tokens", "guest", "active", "gameXp", "moderation"];
+const userFields = ["id", "pseudo", "tokens", "guest", "active", "admin", "gameXp", "moderation"];
 function workerAccount(user, presentation) {
   return { ...Object.fromEntries(userFields.filter((field) => user[field] !== undefined).map((field) => [field, user[field]])),
     profile: { displayName: user.profile?.displayName, birthDate: user.profile?.birthDate }, cosmetics: { equipped: user.cosmetics?.equipped },

@@ -424,7 +424,7 @@ export function createRoomRuntime(dependencies) {
     const settings = platformSettings(db);
     if (room.players.some((player)=>db.rooms.some((other)=>other.id!==room.id && other.ranked && !other.finished && other.ranked.roster.some((p)=>p.id===player.id && !other.ranked.forfeits[p.id])))) return "Un joueur participe déjà à une partie classée.";
     if (!room.ranked) room.stake = Math.max(room.gameId === "texas-holdem" ? settings.minPokerBuyIn : settings.minRoomStake, Number(room.stake) || 0);
-    if (room.ranked && room.players.some((p)=>p.guest || p.isBot)) return "Bots et invités interdits en classé.";
+    if (room.ranked && room.players.some((p)=>p.isBot ? !db.users.some((user)=>user.id===room.ranked.botCompletion?.by && user.admin) || !room.ranked.roster.some((row)=>row.id===p.id && row.isBot) : p.guest)) return "Bots et invités non autorisés en classé.";
     for (const player of room.players.filter((p) => !p.isBot)) {
       const levelError = roomLevelError(db.users.find((user) => user.id === player.id) ?? player, room, settings.gameProgression);
       if (levelError) return `${player.pseudo} : ${levelError}`;

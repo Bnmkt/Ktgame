@@ -207,7 +207,7 @@ test("all seven real engines produce a complete competitive ranking without bot 
     while (!state.finished && turns++<20000) {
       if (gameId==="texas-holdem" && state.nextHandAt) {tickPokerState(state,state.nextHandAt+1);continue;}
       const actor=state.players[state.currentPlayerIndex];
-      const action=gameId==="texas-holdem" ? {type:"all-in"} : actions[gameId](state,actor);
+      const action=gameId==="texas-holdem" ? (state.stacks[actor.id]+(state.streetBets[actor.id] ?? 0)<=state.maximumBet ? {type:"all-in"} : state.currentBet>(state.streetBets[actor.id] ?? 0) ? {type:"fold"} : {type:"check"}) : actions[gameId](state,actor);
       validateRankedAction(state,actor.id,action);applyAction(state,actor.id,action);
     }
     assert.equal(state.finished,true,gameId);
@@ -254,4 +254,22 @@ test("midnight departure advances contract and draft phases without granting aut
   assert.throws(()=>validateRankedAction(state,"a",{type:"choose-contract",contract:"fake"}));
   assert.throws(()=>validateRankedAction(state,"a",{type:"draft",index:-1}));
   assert.throws(()=>validateRankedAction(state,"a",{type:"draft",index:"0"}));
+});
+
+test("virtual ranked bots use their assigned rating and never create or advance accounts",()=>{
+  const config={...normalizeRankedConfig().games.yahtzee,placementGames:0};
+  const user={id:"human",gameElo:{yahtzee:{elo:1000,games:30,wins:0}}};
+  const room={gameId:"yahtzee",state:{finished:true,scores:{human:{chance:30},bot:{chance:5}}},ranked:{matchId:"bot-match",config,roster:[{id:"human"},{id:"bot",isBot:true,elo:1400}],forfeits:{},botCompletion:{by:"human"}}};
+  const users=[user],history={};const rows=settleRanked(room,users,history);
+  assert.equal(rows.find((row)=>row.userId==="bot").before,1400);
+  assert.ok(rows[0].delta>16);assert.equal(users.length,1);
+  assert.ok(Math.abs(rows.reduce((sum,row)=>sum+row.delta,0))<.001);
+  const updated=user.gameElo.yahtzee.elo;settleRanked(room,users,{});assert.equal(user.gameElo.yahtzee.elo,updated);
+  assert.equal(history.ranked.botCompletion.by,"human");
+  const own=rankedResultFor(rows[0],"human",config.ranks),other=rankedResultFor(rows[0],"observer",config.ranks);
+  assert.ok(Number.isFinite(own.beforeProgression.progress));assert.equal(other.beforeProgression,undefined);assert.equal(other.before,undefined);
+  const placing={id:"new"};room.ranked={...room.ranked,settled:false,results:undefined,matchId:"placement-bot",config:{...config,placementGames:5},roster:[{id:"new"},{id:"bot",isBot:true,elo:1400}]};room.state.scores={new:{chance:30},bot:{chance:5}};
+  const placed=settleRanked(room,[placing],{});
+  assert.equal(placed.find((row)=>row.userId==="new").placement.games,1);
+  assert.equal(placed.find((row)=>row.userId==="bot").placement,undefined);
 });

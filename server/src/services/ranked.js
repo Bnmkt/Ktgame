@@ -61,7 +61,7 @@ export function competitiveFor(user, gameId, config, privateView = false) {
 }
 export function rankedResultFor(row, viewerId, ranks) {
   return { userId: row.userId, position: row.position, team: row.team, beforeRank: row.beforeRank ?? rankFor(row.before,ranks), afterRank: row.afterRank ?? rankFor(row.after,ranks),
-    ...(row.userId === viewerId ? { ...(row.placement && !row.placement.completed ? {} : { before: row.before, after: row.after, delta: row.delta }), placement:row.placement, cancelled:row.cancelled, penalty: row.penalty, reason: row.reason, progression: row.progression ?? (row.placement && !row.placement.completed ? null : rankProgress(row.after,ranks)) } : {}) };
+    ...(row.userId === viewerId ? { ...(row.placement && !row.placement.completed ? {} : { before: row.before, after: row.after, delta: row.delta }), placement:row.placement, cancelled:row.cancelled, penalty: row.penalty, reason: row.reason, beforeProgression:row.beforeRank?.id==="unranked" ? null : rankProgress(row.before,ranks), progression: row.progression ?? (row.placement && !row.placement.completed ? null : rankProgress(row.after,ranks)) } : {}) };
 }
 export function equippedRankedBadge(user, config) {
   const gameId=user?.profile?.rankedBadgeGameId;
@@ -83,7 +83,7 @@ export function publicRanked(room, viewerId) {
   if (!room.ranked) return null;
   const { config, matchId, roster, results, cancelled } = room.ranked;
   return { matchId, turn: rankedTurnTiming(room), config: { abandonPenalty: config.abandonPenalty, afkPenalty: config.afkPenalty, abandonPolicy:config.abandonPolicy ?? "penalty", disconnectPolicy:config.disconnectPolicy ?? "penalty", spectators: config.spectators },
-    roster: roster.map(({ id, pseudo, team, rank }) => ({ id, pseudo, team, rank })),
+    roster: roster.map(({ id, pseudo, team, rank, isBot }) => ({ id, pseudo, team, rank, ...(isBot ? {isBot:true} : {}) })),
     ...(results ? { results: results.map((row) => rankedResultFor(row, viewerId,config.ranks)) } : {}),
     ...(cancelled ? { cancelled: { reason: cancelled.reason, at: cancelled.at } } : {}) };
 }
@@ -231,22 +231,23 @@ export function settleRanked(room, users, history, previousSettlement = null) {
     return [];
   }
   const config=room.ranked.config;
+  const ratingUser = (row) => row.isBot ? {gameElo:{[room.gameId]:{elo:Number.isFinite(row.elo)?row.elo:config.initialElo,games:Math.max(26,config.placementGames),wins:0}}} : users.find((user)=>user.id===row.id);
   const positions=competitivePositions(room).map((row)=>{
-    const user=users.find((u)=>u.id===row.id),previous=eloFor(user,room.gameId,config);
+    const user=ratingUser(row),previous=eloFor(user,room.gameId,config);
     return {...row,elo:matchmakingElo(user,room.gameId,config),placementPending:!placementStatus(previous,config).completed,games:previous.games,reason:room.ranked.forfeits?.[row.id] ?? "result"};
   });
   const changes=calculateElo(positions,config,room.gameId);
   const results=changes.map((row)=> {
-    const user=users.find((u)=>u.id===row.id);
+    const user=ratingUser(row);
     const previous=eloFor(user,room.gameId,config), beforePlacement=placementStatus(previous,config);
     const evidence=!beforePlacement.completed && !row.cancelled ? recordPlacement(previous.placement,placementEvidence(row,positions,row.format,config),config) : previous.placement;
     const placement=!beforePlacement.completed ? { ...placementStatus({games:previous.games,placement:evidence},config), wins:evidence?.wins ?? 0,losses:evidence?.losses ?? 0,draws:evidence?.draws ?? 0 } : undefined;
     const after=beforePlacement.completed ? row.after : evidence?.completed ? placementElo(evidence,config) : previous.elo;
-    if (user && !row.cancelled) (user.gameElo ??= {})[room.gameId]={...previous,elo:after,games:previous.games+1,wins:previous.wins+Number(row.position===1 && !row.forfeited),...(evidence ? {placement:evidence} : {})};
+    if (user && !row.isBot && !row.cancelled) (user.gameElo ??= {})[room.gameId]={...previous,elo:after,games:previous.games+1,wins:previous.wins+Number(row.position===1 && !row.forfeited),...(evidence ? {placement:evidence} : {})};
     return { userId:row.id, before:previous.elo, delta:Math.round((after-previous.elo)*100)/100, after, beforeRank:beforePlacement.completed ? rankFor(previous.elo,config.ranks) : UNRANKED,afterRank:!beforePlacement.completed && !evidence?.completed ? UNRANKED : rankFor(after,config.ranks),progression:!beforePlacement.completed && !evidence?.completed ? null : rankProgress(after,config.ranks),...(placement ? {placement} : {}),position:row.position, penalty:beforePlacement.completed ? row.penalty : 0, reason:row.reason, team:row.team ?? null,
-      gameId:room.gameId,matchId:room.ranked.matchId,finishedAt:history.finishedAt ?? new Date().toISOString(),playerCount:row.playerCount,averageElo:row.averageElo,k:row.k,format:row.format,scale:row.scale,cancelled:row.cancelled };
+      ...(row.isBot ? {isBot:true} : {}),gameId:room.gameId,matchId:room.ranked.matchId,finishedAt:history.finishedAt ?? new Date().toISOString(),playerCount:row.playerCount,averageElo:row.averageElo,k:row.k,format:row.format,scale:row.scale,cancelled:row.cancelled };
   });
-  history.ranked={matchId:room.ranked.matchId,results,participants:room.ranked.roster.map((row)=>({id:row.id,team:row.team ?? null})),config};
+  history.ranked={matchId:room.ranked.matchId,results,participants:room.ranked.roster.map((row)=>({id:row.id,team:row.team ?? null,...(row.isBot ? {isBot:true} : {})})),config,...(room.ranked.botCompletion ? {botCompletion:room.ranked.botCompletion} : {})};
   room.ranked.settled=true;
   room.ranked.results=results;
   return results;

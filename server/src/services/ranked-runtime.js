@@ -12,6 +12,7 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
   const { stillPlaying, forfeit } = createRankedRoomRuntime({ cashOutPokerPlayer, removePlayerFromRoomState, finishRoomIfNeeded });
   const queue = new Map();
   const offers = new Map();
+  const participant = (db, entry) => entry.bot ?? db.users.find((user) => user.id === entry.userId);
   const config = (db = readDb()) => rankedConfig ? rankedConfig(db) : normalizeRankedConfig(db.settings?.ranked, games(db), platformSettings(db));
   // Recover unfinished placements from the existing ledger, once, without rewriting old Elo.
   if (rankedRecent && rankedSettlement) {
@@ -57,13 +58,13 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
         minimumPlayers:queueRules.players,maximumPlayers:queueRules.maximumPlayers,
         stage:offer?"confirming":available>=queueRules.players?"filling":"searching",
         fillDeadline:!offer && queueRules.maximumPlayers>queueRules.players && entry.fillStartedAt!==undefined ? entry.fillStartedAt+queueRules.fillWaitSeconds*1000 : null,
-        waiting:offer?.group.length ?? available,remaining:Math.max(0,(offer?.group.length ?? queueRules.maximumPlayers)-(offer?.group.length ?? available))} : null,
+        waiting:offer?.group.length ?? available,canFillBots:Boolean(user?.admin && !offer?.starting && (offer?.group.length ?? available)<queueRules.maximumPlayers),remaining:Math.max(0,(offer?.group.length ?? queueRules.maximumPlayers)-(offer?.group.length ?? available))} : null,
       proposal:offer ? {id:offer.id,gameId:offer.gameId,startsAfter:offer.startsAfter,expiresAt:offer.expiresAt,
-        accepted:offer.ready.has(userId),players:offer.group.map((row)=>({id:row.userId,rank:competitiveFor(db.users.find((user)=>user.id===row.userId),offer.gameId,offer.rules).rank,ready:offer.ready.has(row.userId)}))} : null,
+        accepted:offer.ready.has(userId),players:offer.group.map((row)=>({id:row.userId,isBot:Boolean(row.bot),rank:row.bot ? rankFor(row.elo,offer.rules.ranks) : competitiveFor(participant(db,row),offer.gameId,offer.rules).rank,ready:offer.ready.has(row.userId)}))} : null,
       match:match ? {code:match.code,gameId:match.gameId} : null, serverTime:now };
   }
   function notify(entries) {
-    for (const row of entries) io.to(`account:${row.userId}`).emit("ranked-queue-updated");
+    for (const row of entries) if (!row.bot) io.to(`account:${row.userId}`).emit("ranked-queue-updated");
   }
   function cancelOffer(offer, removed = new Set()) {
     offers.delete(offer.id);
@@ -84,19 +85,20 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
     const {group,gameId,rules}=offer;
     function buildRoom(current) {
       // Confirm eligibility again before any stake is charged.
-      for (const entry of group) { const error=eligibility(current,current.users.find((u)=>u.id===entry.userId),gameId); if (error) throw new Error(error); }
+      if (offer.botCompletion && !current.users.find((user)=>user.id===offer.botCompletion.by)?.admin) throw new Error("L’autorisation administrateur a changé.");
+      for (const entry of group.filter((row)=>!row.bot)) { const error=eligibility(current,participant(current,entry),gameId); if (error) throw new Error(error); }
       const seats=gameId === "belote" ? balancedBeloteSeats(group) : group.map((r)=>r.userId);
       const preset=rules.preset;
       const created={id:randomUUID(),code:roomCode(),gameId,name:`${games(current).find((g)=>g.id===gameId).name} · Classé`,ownerId:"ranked-server",isPublic:rules.spectators,stake:preset.stake,
-        minLevel:1,maxLevel:null,players:seats.map((id)=>roomPlayerFor(current.users.find((u)=>u.id===id))),gameModifiers:preset.gameModifiers,readyPlayerIds:seats,finished:false,createdAt:new Date(now).toISOString(),
+        minLevel:1,maxLevel:null,players:seats.map((id)=>{const entry=group.find((row)=>row.userId===id);return entry.bot ? {...entry.bot} : roomPlayerFor(participant(current,entry));}),gameModifiers:preset.gameModifiers,readyPlayerIds:seats,finished:false,createdAt:new Date(now).toISOString(),
         ...(gameId === "belote" ? {beloteSeats:seats} : {}),
         ...(gameId === "texas-holdem" ? {pokerBlinds:{smallBlind:preset.bigBlind/2,bigBlind:preset.bigBlind,maximumBet:preset.maximumBet},pokerTurnSeconds:preset.turnSeconds} : {}),
-        ranked:{matchId:randomUUID(),config:structuredClone(rules),roster:seats.map((id,index)=>({id,pseudo:roomPlayerFor(current.users.find((u)=>u.id===id)).pseudo,rank:competitiveFor(current.users.find((u)=>u.id===id),gameId,rules).rank,...(gameId === "belote" ? {team:index%2} : {})})),forfeits:{},actionAt:now,startedAt:now}};
+        ranked:{matchId:randomUUID(),config:structuredClone(rules),...(offer.botCompletion ? {botCompletion:offer.botCompletion} : {}),roster:seats.map((id,index)=>{const entry=group.find((row)=>row.userId===id);return {id,pseudo:entry.bot?.pseudo ?? roomPlayerFor(participant(current,entry)).pseudo,...(entry.bot ? {isBot:true,elo:entry.elo} : {}),rank:entry.bot ? rankFor(entry.elo,rules.ranks) : competitiveFor(participant(current,entry),gameId,rules).rank,...(gameId === "belote" ? {team:index%2} : {})};}),forfeits:{},actionAt:now,startedAt:now}};
       return created;
     }
     function announce(room) {
       offers.delete(offer.id);
-      for (const entry of group) { queue.delete(entry.userId); io.to(`account:${entry.userId}`).emit("ranked-match",{code:room.code,gameId}); }
+      for (const entry of group) if (!entry.bot) { queue.delete(entry.userId); io.to(`account:${entry.userId}`).emit("ranked-match",{code:room.code,gameId}); }
       emitRoomUpdate(room); broadcastRooms();
     }
     if (roomDriver) {
@@ -107,13 +109,15 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
       } catch { offer.starting = false; cancelOffer(offer); }
       return;
     }
-    const room = updateDb((current) => {
-      const created = buildRoom(current);
-      current.rooms.push(created);
-      const error = startRoomRound(created, current); if (error) throw new Error(error);
-      return created;
-    }, (db, room) => roomWriteScope(db, [room]));
-    announce(room);
+    try {
+      const room = updateDb((current) => {
+        const created = buildRoom(current);
+        current.rooms.push(created);
+        const error = startRoomRound(created, current); if (error) throw new Error(error);
+        return created;
+      }, (db, room) => roomWriteScope(db, [room]));
+      announce(room);
+    } catch { cancelOffer(offer); }
   }
   function match(now=Date.now()) {
     const db=readDb(), settings=config(db);
@@ -124,7 +128,7 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
     }
     for (const offer of [...offers.values()]) {
       if (offer.starting) continue;
-      if (offer.group.some((row)=>!queue.has(row.userId))) {cancelOffer(offer);continue;}
+      if (offer.group.some((row)=>!row.bot && !queue.has(row.userId))) {cancelOffer(offer);continue;}
       if (now>=offer.startsAfter && offer.ready.size===offer.group.length) {startMatch(offer,now);continue;}
       if (now>=offer.expiresAt) cancelOffer(offer,new Set(offer.group.filter((row)=>!offer.ready.has(row.userId)).map((row)=>row.userId)));
     }
@@ -161,7 +165,7 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
         const clockBefore=JSON.stringify([room.ranked.actionAt,room.ranked.turnActor,room.ranked.paused,room.ranked.offline]);
         room.ranked.offline ??= {};
         for (const player of room.ranked.roster) {
-          if (!stillPlaying(room,player.id) || room.finished) continue;
+          if (player.isBot || !stillPlaying(room,player.id) || room.finished) continue;
           if (isWatching(room.id,player.id)) {
             if (room.ranked.offline[player.id] !== undefined && room.state.players[room.state.currentPlayerIndex]?.id === player.id) {
               room.ranked.actionAt=now;
@@ -179,7 +183,7 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
         const actor=room.state.players[room.state.currentPlayerIndex]?.id;
         if (room.ranked.turnActor!==actor) {room.ranked.turnActor=actor;room.ranked.actionAt=now;}
         const deadline=Math.min(room.ranked.actionAt+rules.afkSeconds*1000,room.gameId === "texas-holdem" ? room.state.turnDeadline ?? Infinity : Infinity);
-        if (actor && !room.ranked.offline[actor] && now>=deadline && forfeit(room,db,actor,"afk")) changed.push(room);
+        if (actor && !room.state.players.find((player)=>player.id===actor)?.isBot && !room.ranked.offline[actor] && now>=deadline && forfeit(room,db,actor,"afk")) changed.push(room);
         if (clockBefore!==JSON.stringify([room.ranked.actionAt,room.ranked.turnActor,room.ranked.paused,room.ranked.offline])) changed.push(room);
       }
     }, (db) => roomWriteScope(db, [...new Set(changed)]));
@@ -203,6 +207,28 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
     } catch(error) {res.status(400).json({error:error.message});}
   });
   app.delete("/api/ranked/queue",auth,(req,res)=>{leaveQueue(req.auth.id);match();res.json(status(readDb(),req.auth.id));});
+  app.post("/api/ranked/queue/fill-bots",auth,requireAdmin,(req,res)=> {
+    const db=readDb(),admin=db.users.find((user)=>user.id===req.auth.id),entry=queue.get(req.auth.id),now=Date.now();
+    if (!admin?.admin) return res.status(403).json({error:"Action réservée aux administrateurs."});
+    if (!entry) return res.status(409).json({error:"Rejoins d’abord une file classée."});
+    const existing=offers.get(entry.offerId),rules=config(db).games[entry.gameId];
+    if (existing?.starting) return res.status(409).json({error:"La table est déjà en cours de création."});
+    const group=existing ? existing.group.filter((row)=>!row.bot) : queueGroupFor(entry,[...queue.values()].filter((row)=>row.gameId===entry.gameId && !row.offerId),rules,now);
+    if (group.length>=rules.maximumPlayers || existing?.botCompletion) return res.status(409).json({error:"Cette partie est déjà complète."});
+    const invalid=group.find((row)=>eligibility(db,participant(db,row),entry.gameId));
+    if (invalid) return res.status(409).json({error:"Un joueur ne peut plus participer à cette partie."});
+    if (existing) cancelOffer(existing);
+    const elo=group.reduce((sum,row)=>sum+row.elo,0)/group.length;
+    const offer={id:randomUUID(),gameId:entry.gameId,group:[...group],rules:structuredClone(rules),ready:new Set(),startsAfter:now+rules.readyWaitSeconds*1000,expiresAt:now+rules.readyTimeoutSeconds*1000,botCompletion:{by:admin.id,at:new Date(now).toISOString()}};
+    while (offer.group.length<rules.maximumPlayers) {
+      const id=`ranked-bot-${randomUUID()}`;
+      offer.group.push({userId:id,elo,bot:{id,pseudo:`Bot ${offer.group.length+1}`,isBot:true,guest:true,tokens:Math.max(rules.preset.stake,platformSettings(db).signupTokens || 0)}});
+      offer.ready.add(id);
+    }
+    offers.set(offer.id,offer);
+    for (const row of group) row.offerId=offer.id;
+    notify(group);res.json(status(db,admin.id));
+  });
   app.post("/api/ranked/ready",auth,(req,res)=> {
     const entry=queue.get(req.auth.id),offer=offers.get(entry?.offerId),now=Date.now();
     if(!offer || offer.id!==req.body.proposalId || now>=offer.expiresAt) return res.status(409).json({error:"Cette proposition de partie a expiré."});
@@ -257,7 +283,7 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
     const room=updateDb((db)=> {
       const room=db.rooms.find((r)=>r.code===req.params.code && r.ranked && !r.finished);if(!room)return null;
       room.ranked.cancelled={reason,by:req.auth.id,at:new Date().toISOString()};
-      for(const player of room.ranked.roster) {const refund=room.stake-(room.state.departedPayouts?.[player.id] ?? 0);if(refund>0)addTokens(db,player.id,refund,{gameId:room.gameId,roomId:room.id,reason:"ranked-technical-refund"});}
+      for(const player of room.ranked.roster.filter((row)=>!row.isBot)) {const refund=room.stake-(room.state.departedPayouts?.[player.id] ?? 0);if(refund>0)addTokens(db,player.id,refund,{gameId:room.gameId,roomId:room.id,reason:"ranked-technical-refund"});}
       room.state.finished=true;room.state.winners=[];room.pacing=null;finishRoomIfNeeded(room,db);return room;
     });
     if(!room)return res.status(404).json({error:"Partie classée introuvable."});emitRoomUpdate(room);broadcastRooms();res.json({ok:true});

@@ -2204,11 +2204,11 @@ function finishRoomIfNeeded(room, db, { ranking } = {}) {
     return;
   }
   if (room.ranked?.cancelled) {
-    db.history.push({id:randomUUID(),roomId:room.id,code:room.code,name:room.name,gameId:room.gameId,players:room.ranked.roster.map((p)=>({id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? "Joueur",isBot:false})),winners:[],ranking:[],pot:0,finishedAt:new Date().toISOString(),ranked:{matchId:room.ranked.matchId,cancelled:room.ranked.cancelled}});
+    db.history.push({id:randomUUID(),roomId:room.id,code:room.code,name:room.name,gameId:room.gameId,players:room.ranked.roster.map((p)=>({id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? p.pseudo ?? "Joueur",isBot:Boolean(p.isBot)})),winners:[],ranking:[],pot:0,finishedAt:new Date().toISOString(),ranked:{matchId:room.ranked.matchId,cancelled:room.ranked.cancelled}});
     return;
   }
   const paidPlayers = room.players.filter((p) => !p.isBot);
-  const pot = room.stake * (room.ranked ? room.ranked.roster.length : paidPlayers.length);
+  const pot = room.stake * (room.ranked ? room.ranked.roster.filter((player)=>!player.isBot).length : paidPlayers.length);
   const winners = room.state.winners ?? [];
   const achievementEvents = roomAchievementEvents(room);
   if (room.state.gameId === "blackjack") {
@@ -2238,7 +2238,7 @@ function finishRoomIfNeeded(room, db, { ranking } = {}) {
   room.state.ranking = ranking ?? roomRanking(room);
   room.state.roomPayouts = roomPayouts;
   syncRoomPlayerTokens(room, db);
-  const historyPlayers=room.ranked ? room.ranked.roster.map((p)=>room.players.find((player)=>player.id===p.id) ?? {id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? p.pseudo ?? "Joueur",isBot:false}) : room.players;
+  const historyPlayers=room.ranked ? room.ranked.roster.map((p)=>room.players.find((player)=>player.id===p.id) ?? {id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? p.pseudo ?? "Joueur",isBot:Boolean(p.isBot)}) : room.players;
   const historyRow = { id: randomUUID(), roomId: room.id, code: room.code, name: room.name, gameId: room.gameId, players: historyPlayers.map((p) => ({ id: p.id, pseudo: p.pseudo, isBot: p.isBot })), winners, ranking: room.state.ranking, payouts: roomPayouts, blackjackPayouts: room.state.gameId === "blackjack" ? room.state.payouts ?? {} : {}, pot, achievementEvents, finishedAt: new Date().toISOString() };
   if (room.gameId === "belote") historyRow.leaderboardScores = Object.fromEntries(room.state.players.map((player, index) => [player.id, room.state.teamScores[index % 2]]));
   db.history.push(historyRow);
@@ -5478,8 +5478,10 @@ const rankedRuntime = createRankedRuntime({ app, auth, requireAdmin, readDb, upd
   addTokens, sanitizeFriendUser, emitRoomUpdate, broadcastRooms, io,
   roomDriver: gameGateway ? {
     async start(template) {
-      const result = await gameGateway.execute(template.id, "start-ranked", { template });
-      if (result.status >= 400) throw new Error("Ranked start rejected.");
+      try {
+        const result = await gameGateway.execute(template.id, "start-ranked", { template });
+        if (result.status >= 400) throw new Error(result.response?.error ?? "GAME_INVALID");
+      } catch (error) { console.error("Game Worker ranked start failed:", error.code ?? error.message); throw error; }
     },
     cancel: (room, reason, actor) => gameGateway.execute(room.id, "cancel-ranked", { reason, actor })
   } : null,

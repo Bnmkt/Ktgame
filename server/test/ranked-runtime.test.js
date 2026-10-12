@@ -53,6 +53,43 @@ function queueFixture(settings={}) {
   return {db,runtime,call};
 }
 
+test("only an admin can fill missing seats, bots auto-confirm and humans must confirm",(t)=> {
+  let now=1000;t.mock.method(Date,"now",()=>now);
+  const {db,runtime,call}=queueFixture({ranked:{games:{yahtzee:{players:2,maximumPlayers:4}}}});
+  db.users[0].admin=true;
+  assert.equal(call("post","/api/ranked/queue/fill-bots","b").code,403);
+  assert.equal(call("post","/api/ranked/queue/fill-bots","a").code,409);
+  call("post","/api/ranked/queue","a",{gameId:"yahtzee"});
+  call("post","/api/ranked/queue","b",{gameId:"yahtzee"});
+  const response=call("post","/api/ranked/queue/fill-bots","a");
+  assert.equal(response.code,200);assert.equal(response.data.proposal.players.length,4);
+  assert.equal(response.data.proposal.players.filter((row)=>row.isBot && row.ready).length,2);
+  assert.equal(response.data.proposal.players.filter((row)=>!row.isBot && !row.ready).length,2);
+  assert.equal(call("post","/api/ranked/queue/fill-bots","a").code,409);
+  call("post","/api/ranked/ready","a",{proposalId:response.data.proposal.id});
+  now=31000;runtime.tick(now);assert.equal(db.rooms.length,0);
+  call("post","/api/ranked/ready","b",{proposalId:response.data.proposal.id});
+  assert.equal(db.rooms.length,1);assert.equal(db.users.length,6);
+  const room=db.rooms[0];assert.equal(room.players.filter((row)=>row.isBot).length,2);
+  assert.equal(room.ranked.botCompletion.by,"a");
+  assert.ok(room.ranked.roster.filter((row)=>row.isBot).every((row)=>row.elo===1000));
+  now+=130000;runtime.tick(now);assert.ok(room.ranked.roster.filter((row)=>row.isBot).every((row)=>!room.ranked.forfeits[row.id]));
+});
+
+test("filling a pending proposal renews human confirmation and refusal removes virtual seats",(t)=> {
+  let now=1000;t.mock.method(Date,"now",()=>now);
+  const {db,runtime,call}=queueFixture({ranked:{games:{yahtzee:{players:2,maximumPlayers:4,fillWaitSeconds:0}}}});
+  db.users[0].admin=true;
+  call("post","/api/ranked/queue","a",{gameId:"yahtzee"});
+  const old=call("post","/api/ranked/queue","b",{gameId:"yahtzee"}).data.proposal;
+  call("post","/api/ranked/ready","b",{proposalId:old.id});
+  const current=call("post","/api/ranked/queue/fill-bots","a").data.proposal;
+  assert.notEqual(current.id,old.id);assert.equal(current.players.find((row)=>row.id==="b").ready,false);
+  call("delete","/api/ranked/queue","b");
+  assert.equal(call("get","/api/ranked","a").data.proposal,null);
+  now=50000;runtime.tick(now);assert.equal(db.rooms.length,0);assert.equal(db.users.length,6);
+});
+
 test("filled queues require every acceptance and at least thirty seconds, exactly once",(t)=> {
   let now=1000;t.mock.method(Date,"now",()=>now);
   const {db,runtime,call}=queueFixture();

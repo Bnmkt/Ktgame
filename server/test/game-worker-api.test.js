@@ -46,6 +46,36 @@ after(async () => {
   assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir())); assert.ok(path.basename(directory).startsWith("ktga-game-worker-api-"));
   fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
+
+test("ranked bot completion is admin-only and starts and settles through the owning worker", async () => {
+  assert.equal((await request("player","/api/ranked/queue/fill-bots","POST")).status,403);
+  assert.equal((await request("editor","/api/ranked/queue/fill-bots","POST")).status,403);
+  assert.equal((await request(null,"/api/ranked/queue/fill-bots","POST")).status,401);
+  const original=(await request("admin","/api/admin/ranked")).data.settings;
+  const settings=structuredClone(original);settings.games.yahtzee.players=2;settings.games.yahtzee.maximumPlayers=2;
+  await request("admin","/api/admin/ranked","PUT",settings);
+  try {
+    assert.equal((await request("admin","/api/ranked/queue","POST",{gameId:"yahtzee"})).status,200);
+    const filled=await request("admin","/api/ranked/queue/fill-bots","POST");
+    assert.equal(filled.status,200);assert.equal(filled.data.proposal.players.filter((row)=>row.isBot).length,1);
+    assert.equal(filled.data.proposal.accepted,false);
+    const proposal=filled.data.proposal;
+    await request("admin","/api/ranked/ready","POST",{proposalId:proposal.id});
+    await new Promise((resolve)=>setTimeout(resolve,Math.max(0,proposal.startsAfter-Date.now())+1500));
+    let match;
+    for (let attempt=0;attempt<50 && !match;attempt++) {match=(await request("admin","/api/ranked")).data.match;if(!match)await new Promise((resolve)=>setTimeout(resolve,200));}
+    assert.ok(match,output.slice(-1200));
+    const room=(await request("admin",`/api/rooms/${match.code}`)).data;
+    assert.ok(room.state);assert.equal(room.ranked.roster.filter((row)=>row.isBot).length,1);
+    assert.equal((await request("admin",`/api/rooms/${match.code}/leave`,"POST")).status,200);
+    const history=(await request("admin","/api/ranked/history")).data.rows.filter((row)=>row.matchId===room.ranked.matchId);
+    assert.equal(history.length,1);assert.equal(history[0].placement.games,1);
+    const inspection=new DatabaseSync(path.join(directory,"main.sqlite"),{readOnly:true});
+    try { assert.equal(inspection.prepare("SELECT games FROM user_game_elo WHERE user_id='admin' AND game_id='yahtzee'").get().games,1); } finally {inspection.close();}
+    const observation=(await request("player",`/api/rooms/${match.code}`)).data;
+    assert.ok(observation.ranked.results.every((row)=>row.before===undefined && row.beforeProgression===undefined));
+  } finally { await request("admin","/api/ranked/queue","DELETE");await request("admin","/api/admin/ranked","PUT",original); }
+});
 test("game images and featured choice persist and invitation preview cannot bypass protected tables", async () => {
   const game = (await request(null, "/api/games")).data.find((entry) => entry.id === "yahtzee");
   for (const actor of [null, "player"]) assert.equal((await request(actor, "/api/admin/games/yahtzee", "PATCH", { ...game, coverImage: "/images/test.webp" })).status, actor ? 403 : 401);
@@ -96,6 +126,7 @@ test("locale preferences stay private and only back-office accounts can edit lan
 });
 
 test("existing room API runs through two Game Workers without exposing worker metadata", async () => {
+  const initial=(await request("admin","/api/admin/health")).data.gameWorkers;
   const create = async (name) => {
     const result = await request("player", "/api/rooms", "POST", { gameId: "yahtzee", name, stake: 10 });
     assert.equal(result.status, 200, JSON.stringify(result.data)); assert.ok(!result.data.gameWorker); return result.data;
@@ -112,8 +143,8 @@ test("existing room API runs through two Game Workers without exposing worker me
   assert.equal((await request("friend", `/api/rooms/${first.code}/action`, "POST", { type: "roll" })).status, 409);
   if (score.data.pacing) assert.equal((await request("friend", `/api/rooms/${first.code}/pacing/skip`, "POST", { pacingId: score.data.pacing.id })).status, 200);
   const health = await request("admin", "/api/admin/health");
-  assert.equal(health.status, 200); assert.equal(health.data.gameWorkers.rooms, 2);
-  assert.deepEqual(health.data.gameWorkers.workers.map((worker) => worker.assignedRooms), [1, 1]);
+  assert.equal(health.status, 200); assert.equal(health.data.gameWorkers.rooms, initial.rooms + 2);
+  assert.deepEqual(health.data.gameWorkers.workers.map((worker,index) => worker.assignedRooms-initial.workers[index].assignedRooms), [1, 1]);
   assert.ok(health.data.gameWorkers.workers.every((worker) => worker.pid && worker.pid !== health.data.process.pid));
   assert.ok(health.data.gameWorkers.actions.count >= 7);
   assert.equal(health.data.services.rooms.mode, "game-process"); assert.ok(health.data.services.rooms.completed >= 7);

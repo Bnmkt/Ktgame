@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createGameRoomKernel } from "../src/services/game-room-kernel.js";
 import { games } from "../src/games/shared.js";
 import { normalizeProgressionConfig } from "../src/services/game-progression.js";
+import { normalizeRankedConfig, RANKED_GAMES } from "../src/services/ranked.js";
 
 const platform = { minRoomStake: 10, minPokerBuyIn: 100, signupTokens: 10000, pokerDefaultBigBlind: 10,
   pokerTurnSeconds: 300, botThinkingSeconds: 0, turnEndDelaySeconds: 1, roundResultsSeconds: 0,
@@ -41,6 +42,25 @@ test("all existing games can start in the same isolated runtime", async () => {
     assert.equal(result.status, 200, `${game.id}: ${JSON.stringify(result.response)}`);
     assert.equal(result.room.state.gameId, game.id);
     assert.ok(result.effects.some((effect) => effect.kind === "tokens"));
+  }
+});
+
+test("the worker accepts authorized virtual bots in every ranked engine but rejects ordinary bot injection",async()=> {
+  for (const gameId of RANKED_GAMES) {
+    const config=normalizeRankedConfig().games[gameId],f=fixture(gameId);
+    f.context.users=[{...user,admin:true}];
+    const players=[{...user},...Array.from({length:config.players-1},(_,i)=>({id:`bot-${i}`,pseudo:`Bot ${i+1}`,isBot:true,guest:true,tokens:10000}))];
+    const template={id:"room",code:"BOTTEST",gameId,ownerId:"ranked-server",stake:config.preset.stake,players,readyPlayerIds:players.map((p)=>p.id),gameModifiers:config.preset.gameModifiers,ranked:{config,botCompletion:{by:user.id},roster:players.map((p,i)=>({id:p.id,isBot:Boolean(p.isBot),...(gameId==="belote"?{team:i%2}:{})})),forfeits:{},actionAt:Date.now()}};
+    const input={roomId:"room",epoch:"epoch",version:0,commandId:"start",configurationId:"1",command:"start-ranked",context:f.context,template};
+    const result=await f.kernel.prepare(input);
+    assert.equal(result.status,200,`${gameId}: ${JSON.stringify(result.response)}`);
+    assert.equal(result.room.state.players.filter((p)=>p.isBot).length,players.length-1);
+    f.kernel.commit({...input,version:result.version});
+    const cancelled=await f.kernel.prepare({...input,version:result.version,commandId:'cancel',command:'cancel-ranked',reason:'Technical test cancellation'});
+    assert.equal(cancelled.status,200);
+    assert.deepEqual(cancelled.effects.filter(effect=>effect.kind==='tokens').map(effect=>effect.userId),template.stake>0 ? [user.id] : [],'Cancellation refunds real accounts only');
+    const denied=fixture(gameId);input.context=denied.context;input.commandId="forbidden";
+    assert.equal((await denied.kernel.prepare(input)).status,400);
   }
 });
 test("Yahtzee roll and scoring preserve pacing and achievement events", async () => {

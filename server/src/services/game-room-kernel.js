@@ -134,7 +134,7 @@ export function createGameRoomKernel() {
     if (input.command === "start-ranked") {
       const created = structuredClone(input.template);
       if (!created?.ranked || created.id !== input.roomId || entry.room) throw fault("GAME_INVALID");
-      if (created.players.some(({ id }) => !player(id) || player(id).active === false || player(id).guest || !feature(player(id), "rooms:join").allowed || !feature(player(id), `game:${created.gameId}`).allowed)) throw fault("GAME_AUTH_REVOKED");
+      if (created.players.filter((row)=>!row.isBot).some(({ id }) => !player(id) || player(id).active === false || player(id).guest || !feature(player(id), "rooms:join").allowed || !feature(player(id), `game:${created.gameId}`).allowed)) throw fault("GAME_AUTH_REVOKED");
       db.rooms.unshift(created);
       const error = runtime.startRoomRound(created, db);
       if (error) { status = 400; response = { error }; }
@@ -143,7 +143,7 @@ export function createGameRoomKernel() {
     } else if (input.command === "cancel-ranked") {
       if (!room?.ranked || room.finished || !input.reason) throw fault("GAME_INVALID");
       room.ranked.cancelled = { reason: input.reason, by: context.actor.id, at: new Date().toISOString() };
-      for (const player of room.ranked.roster) {
+      for (const player of room.ranked.roster.filter((row)=>!row.isBot)) {
         const refund = room.stake - (room.state.departedPayouts?.[player.id] ?? 0);
         if (refund > 0) addTokens(db, player.id, refund, { gameId: room.gameId, roomId: room.id, reason: "ranked-technical-refund" });
       }
