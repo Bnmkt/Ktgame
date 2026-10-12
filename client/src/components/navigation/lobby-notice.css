@@ -1,0 +1,15 @@
+.lobby-notice { margin-bottom: 24px; padding: 20px 24px; border-block: 1px solid #695733; background: #111b18; color: #eee7d7; min-width: 0; }
+.lobby-notice > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.lobby-notice > header > div { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lobby-notice > header svg { color: #e3bd58; flex-shrink: 0; }
+.lobby-notice h2 { margin: 0; font-size: 20px; color: #ecd075; overflow-wrap: anywhere; }
+.lobby-notice > header > button { flex-shrink: 0; }
+.lobby-notice-content img, .lobby-notice-preview img { max-width: 100%; height: auto; }
+.lobby-notice-editor { min-width: 0; }
+.lobby-notice-editor > label { display: grid; gap: 8px; margin-top: 16px; }
+.lobby-notice-editor textarea { width: 100%; min-height: 300px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.lobby-notice-visibility { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.lobby-notice-visibility input { width: 20px; height: 20px; accent-color: #d5ac3f; }
+.lobby-notice-preview { margin-top: 20px; padding-top: 20px; border-top: 1px solid #3d4842; min-width: 0; }
+.lobby-notice-preview > h4 { margin: 0 0 16px; color: #ecd075; font-size: 18px; }
+@media (max-width: 700px) { .lobby-notice { padding: 16px; } }

@@ -76,6 +76,24 @@ test("ranked bot completion is admin-only and starts and settles through the own
     assert.ok(observation.ranked.results.every((row)=>row.before===undefined && row.beforeProgression===undefined));
   } finally { await request("admin","/api/ranked/queue","DELETE");await request("admin","/api/admin/ranked","PUT",original); }
 });
+test("lobby notices are admin-managed, versioned and dismissible per account", async () => {
+  const old = (await request("admin", "/api/config")).data.lobbyNotice;
+  const notice = { enabled: true, title: "Bienvenue", content: "**Annonce** @!ktga-dice-6" };
+  try {
+    assert.equal((await request("player", "/api/admin/settings", "PATCH", { lobbyNotice: notice })).status, 403);
+    const saved = await request("admin", "/api/admin/settings", "PATCH", { lobbyNotice: notice });
+    assert.equal(saved.status, 200);
+    const version = saved.data.lobbyNotice.updatedAt;
+    assert.equal((await request("player", "/api/me/lobby-notice/dismiss", "POST", { updatedAt: version })).status, 200);
+    assert.equal((await request("player", "/api/me")).data.lobbyNoticeDismissedAt, version);
+    assert.notEqual((await request("friend", "/api/me")).data.lobbyNoticeDismissedAt, version);
+    assert.equal((await request("admin", "/api/admin/settings", "PATCH", { lobbyNotice: notice })).data.lobbyNotice.updatedAt, version);
+    const edited = await request("admin", "/api/admin/settings", "PATCH", { lobbyNotice: { ...notice, content: "**Annonce modifiée**" } });
+    assert.notEqual(edited.data.lobbyNotice.updatedAt, version);
+    assert.equal((await request("player", "/api/me/lobby-notice/dismiss", "POST", { updatedAt: version })).status, 409);
+    assert.equal((await request("admin", "/api/admin/settings", "PATCH", { lobbyNotice: { ...notice, enabled: false } })).data.lobbyNotice.enabled, false);
+  } finally { await request("admin", "/api/admin/settings", "PATCH", { lobbyNotice: old }); }
+});
 test("game images and featured choice persist and invitation preview cannot bypass protected tables", async () => {
   const game = (await request(null, "/api/games")).data.find((entry) => entry.id === "yahtzee");
   for (const actor of [null, "player"]) assert.equal((await request(actor, "/api/admin/games/yahtzee", "PATCH", { ...game, coverImage: "/images/test.webp" })).status, actor ? 403 : 401);

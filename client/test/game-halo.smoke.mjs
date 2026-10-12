@@ -32,13 +32,19 @@ try {
       localStorage.setItem("ktga-install-choice", "ignored");
     }, PRIVACY_VERSION);
     const page = await context.newPage();
+    let notice = { enabled: true, title: "Bienvenue au casino", content: "**Nouvelle annonce**\n\nUn lancer @!ktga-dice-6 et [les règles](/jeux).", updatedAt: "2026-10-12T12:00:00.000Z" }, dismissedAt = "";
     page.on("pageerror", error => errors.push(error.message));
     await blocker.enableBlockingInPage(page);
     await page.route("**/api/**", route => {
       const key = new URL(route.request().url()).pathname;
+      if (key === "/api/me/lobby-notice/dismiss") {
+        assert.equal(route.request().postDataJSON().updatedAt, notice.updatedAt);
+        dismissedAt = notice.updatedAt;
+        return route.fulfill({ contentType: "application/json", body: JSON.stringify({ dismissedAt }) });
+      }
       const responses = {
-        "/api/me": { id: "player", pseudo: "Testeur", guest, tokens: 1000, profile: { favoriteGames: [] }, cosmetics: { equipped: {} } },
-        "/api/config": { ...defaultPublicSettings, featuredGameId: "yahtzee" },
+        "/api/me": { id: "player", pseudo: "Testeur", guest, lobbyNoticeDismissedAt: dismissedAt, tokens: 1000, profile: { favoriteGames: [] }, cosmetics: { equipped: {} } },
+        "/api/config": { ...defaultPublicSettings, featuredGameId: "yahtzee", lobbyNotice: notice },
         "/api/games": [game], "/api/friends": { friends: [] }, "/api/community-events/carousel": { events: [] },
         "/api/tribunal/availability": { available: false }, "/api/ranked": { games: [] }, "/api/ranked/history": { rows: [] }
       };
@@ -53,8 +59,23 @@ try {
     assert.equal(await card.locator(".game-artwork-soft-edge > img:not(.game-artwork-glow)").evaluate(img => getComputedStyle(img).filter), "none");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await card.screenshot({ path: path.join(directory, `${name}.png`) });
+    const block = page.getByRole("region", { name: "Annonce", exact: true });
+    await block.waitFor();
+    assert.equal(await block.locator(".ktga-inline-dice .pip").count(), 6);
+    assert.equal(await block.getByRole("link", { name: "les règles" }).count(), 1);
+    await block.screenshot({ path: path.join(directory, `${name}-notice.png`) });
+    const dismissal = page.waitForResponse(response => response.url().includes("/api/me/lobby-notice/dismiss") && response.status() === 200);
+    await block.getByRole("button", { name: "Fermer l’annonce" }).click();
+    await dismissal;
+    await block.waitFor({ state: "detached" });
+    await page.waitForFunction(() => !document.querySelector(".lobby-notice"));
+    await page.reload(); await card.waitFor(); assert.equal(await block.count(), 0);
+    notice = { ...notice, updatedAt: "2026-10-12T12:01:00.000Z", content: "**Annonce modifiée** @!ktga-dice-6" };
+    await page.reload(); await block.waitFor();
+    notice.enabled = false;
+    await page.reload(); await card.waitFor(); assert.equal(await block.count(), 0);
     await context.close();
   }
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ errors, directory, result: "Sharp game images with image-based halo for players and guests" }));
+  console.log(JSON.stringify({ errors, directory, result: "Sharp game images; enriched notice Markdown, dismissal across reloads, renewed revision and admin visibility for players and guests" }));
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

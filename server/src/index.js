@@ -6,6 +6,7 @@ import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
 import { createRoomRuntime } from "./services/room-runtime.js";
 import "dotenv/config";
+import { normalizeLobbyNotice, updateLobbyNotice } from "./services/lobby-notice.js";
 import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
 import { activeModeration, activeParentalRevocation, createParentalControlStore, defaultMinorRestrictions, exactAge, featureAccess, isUnder13, minorRestrictionOptions, normalizeMinorRestrictions, registrationMarker, turnsThirteenAt } from "./services/parental-controls.js";
@@ -500,6 +501,7 @@ function normalizePlatformSettings(value = {}) {
     siteIcon: String(value.siteIcon ?? defaultPlatformSettings.siteIcon).trim().slice(0, 6000) || defaultPlatformSettings.siteIcon,
     siteSubtitle: String(value.siteSubtitle ?? defaultPlatformSettings.siteSubtitle).trim().slice(0, 120) || defaultPlatformSettings.siteSubtitle,
     featuredGameId: games.some((game) => game.id === value.featuredGameId) ? value.featuredGameId : "",
+    lobbyNotice: normalizeLobbyNotice(value.lobbyNotice),
     registrationsEnabled: value.registrationsEnabled !== false,
     guestAccessEnabled: value.guestAccessEnabled !== false,
     emailVerificationRequired: value.emailVerificationRequired === true,
@@ -4804,6 +4806,7 @@ app.delete("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
 
 app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   try {
+    if (req.body.lobbyNotice !== undefined) updateLobbyNotice(platformSettings().lobbyNotice, req.body.lobbyNotice);
     if (req.body.gameProgression !== undefined) normalizeProgressionConfig(req.body.gameProgression, games.map((game) => game.id));
     if (req.body.contactEmail !== undefined) {
       if (typeof req.body.contactEmail !== "string") throw new Error("Adresse de contact invalide.");
@@ -4812,12 +4815,28 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   }
   catch (error) { return res.status(400).json({ error: error.message }); }
   if (req.body.emailVerificationRequired === true && !emailDeliveryConfigured()) return res.status(400).json({ error: "Configure SMTP_HOST et EMAIL_FROM avant d'activer la validation des emails." });
+  const previousNoticeRevision = platformSettings().lobbyNotice.updatedAt;
   const settings = updateDb((db) => {
     db.settings ??= {};
-    db.settings.platform = normalizePlatformSettings({ ...platformSettings(db), ...req.body });
+    const previous = platformSettings(db);
+    db.settings.platform = normalizePlatformSettings({ ...previous, ...req.body,
+      lobbyNotice: req.body.lobbyNotice === undefined ? previous.lobbyNotice : updateLobbyNotice(previous.lobbyNotice, req.body.lobbyNotice) });
     return db.settings.platform;
   });
+  if (settings.lobbyNotice.updatedAt !== previousNoticeRevision) io.to("casino-lobby").emit("lobby-notice-updated", settings.lobbyNotice);
   res.json({ ...settings, supportEmail: settings.contactEmail, emailVerificationAvailable: emailDeliveryConfigured() });
+});
+
+app.post("/api/me/lobby-notice/dismiss", auth, (req, res) => {
+  const notice = platformSettings().lobbyNotice;
+  if (!notice.enabled || !notice.updatedAt || req.body.updatedAt !== notice.updatedAt) return res.status(409).json({ error: "L’annonce a changé. Actualise la page pour lire sa nouvelle version." });
+  const user = updateDb((db) => {
+    const found = db.users.find((row) => row.id === req.auth.id);
+    if (found) found.lobbyNoticeDismissedAt = notice.updatedAt;
+    return found;
+  }, { users: [req.auth.id], rooms: [], settings: false });
+  if (!user) return res.status(404).json({ error: "Compte introuvable." });
+  res.json({ dismissedAt: user.lobbyNoticeDismissedAt });
 });
 
 app.post("/api/admin/progression/preview", auth, requireAdmin, (req, res) => {
@@ -5814,6 +5833,7 @@ io.on("connection", (socket) => {
   // Unknown clients retain the old lobby subscription until they enter a table.
   if (!["conversation", "table", "event"].includes(socket.handshake.auth?.stream)) {
     socket.join("casino-lobby");
+    socket.emit("lobby-notice-updated", platformSettings().lobbyNotice);
     if (socket.handshake.auth?.lobbyDeltas === true) socket.join("casino-lobby-incremental");
     socket.emit("rooms", sanitizeRooms(readDb().rooms.filter((room) => room.isPublic && !room.finished)));
   }

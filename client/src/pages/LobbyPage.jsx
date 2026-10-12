@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
 import { GameArtwork } from "../components/game/GameArtwork.jsx";
+import { LobbyNotice } from "../components/navigation/LobbyNotice.jsx";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Spade, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
@@ -59,6 +60,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const [joinOpen, setJoinOpen] = useState(false);
   const [error, setError] = useState("");
   const [eventCarousel, setEventCarousel] = useState({ events: [], focusIndex: 0 });
+  const [notice, setNotice] = useState(settings.lobbyNotice);
+  useEffect(() => { setNotice((current) => current?.updatedAt > settings.lobbyNotice?.updatedAt ? current : settings.lobbyNotice); }, [settings.lobbyNotice]);
   const [eventIndex, setEventIndex] = useState(0);
   const accountRestrictions = user.minor?.restrictions ?? [];
   const roomsRestricted = accountRestrictions.includes("rooms");
@@ -76,6 +79,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
     api("/api/games").then(setGames);
     const socket = io(SOCKET_URL, { path: SOCKET_PATH, auth: { stream: "lobby", lobbyDeltas: true } });
     const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
+    socket.on("lobby-notice-updated", setNotice);
     socket.on("rooms", setRooms);
     socket.on("rooms-patch", (patch) => setRooms((current) => applyRoomPatch(current, patch)));
     socket.on("connect_error", () => api("/api/rooms").then((rows) => { if (!socket.connected) setRooms(rows); }).catch(() => {}));
@@ -152,6 +156,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       <div className="page-heading lobby-heading"><div><span className="eyebrow">{localeText("Le casino")}</span><h1>{localeText("À quelle table joues-tu ?")}</h1></div></div>
       {error && !selectedGame && <div className="error">{localeText(error)}</div>}
       {(user.minor?.restricted || user.moderation?.type === "soft") && <div className="account-limitation-notice"><ShieldCheck size={18} /><span><strong>{localeText("Accès adapté")}</strong>{localeText("Certaines fonctions et certains jeux ne sont pas disponibles pour ce compte.")}</span></div>}
+      <LobbyNotice notice={notice} user={user} setUser={setUser}/>
       {activeCarouselEvent && <section className="lobby-event-carousel" aria-label={localeText("Événements communautaires")}>
         <button className="secondary icon-toggle event-carousel-arrow" disabled={eventIndex === 0} onClick={() => setEventIndex((index) => Math.max(0, index - 1))} aria-label={localeText("Événement précédent")}><ChevronLeft /></button>
         <div className="event-carousel-viewport"><div className="event-carousel-track">{visibleEventCards.map(({ event: carouselEvent, index, offset }) => {

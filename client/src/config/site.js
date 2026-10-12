@@ -4,6 +4,7 @@ export const defaultPublicSettings = {
   siteName: "KTGA.ME",
   siteIcon: "landmark",
   featuredGameId: "",
+  lobbyNotice: { enabled: false, title: "", content: "", updatedAt: "" },
   siteSubtitle: "Casino privé multijoueur, jetons, dés et cartes.",
   registrationsEnabled: true,
   guestAccessEnabled: true,

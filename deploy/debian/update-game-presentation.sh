@@ -13,6 +13,7 @@ files=(
   server/src/services/room-runtime.js server/src/services/game-gateway.js server/src/services/game-room-kernel.js
   server/src/db.js server/src/services/leaderboards.js server/src/storage/leaderboard-seasons.js
   server/src/services/personal-archive-worker.js
+  server/src/services/lobby-notice.js
   client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx

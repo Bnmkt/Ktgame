@@ -1,11 +1,13 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useMemo, useState } from "react";
-import { AlertTriangle, Bot, Clock3, Coins, Gift, Landmark, Mail, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
+import { AlertTriangle, Bot, Clock3, Coins, Gift, Landmark, Mail, Megaphone, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { CompactNumber, formatCompactNumber } from "../../utils/presentation.jsx";
 import { bonusProgression, bonusRuleEffect, normalizeBonusSettings } from "../../features/bonus/config.js";
 import { ProgressionSettings } from "./ProgressionSettings.jsx";
+import { MarkdownContent } from "../patchnotes/MarkdownContent.jsx";
+import "../navigation/lobby-notice.css";
 
 const operationLabels = { add: "Ajouter", multiply: "Multiplier", set: "Définir" };
 
@@ -43,6 +45,9 @@ function BonusChart({ settings }) {
 export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }) {
   const { t: localeText } = useLocale();
   const [section, setSection] = useState("identity");
+  const [noticePreview, setNoticePreview] = useState(false);
+  const notice = draft.lobbyNotice ?? { enabled: false, title: "", content: "", updatedAt: "" };
+  const updateNotice = (key, value) => setDraft((current) => ({ ...current, lobbyNotice: { ...(current.lobbyNotice ?? notice), [key]: value } }));
   const config = normalizeBonusSettings(draft);
   const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
   const updateRule = (id, field, value) => update("dailyBonusRules", config.rules.map((rule) => rule.id === id ? { ...rule, [field]: value } : rule));
@@ -56,6 +61,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }
       <button type="button" className={section === "economy" ? "active" : ""} onClick={() => setSection("economy")}><Coins size={17} />{localeText("Économie et bonus")}</button>
       <button type="button" className={section === "pacing" ? "active" : ""} onClick={() => setSection("pacing")}><Clock3 size={17} />{localeText("Rythme des parties")}</button>
       <button type="button" className={section === "progression" ? "active" : ""} onClick={() => setSection("progression")}><TrendingUp size={17} />{localeText("XP et titres")}</button>
+      <button type="button" className={section === "notice" ? "active" : ""} onClick={() => setSection("notice")}><Megaphone size={17}/>{localeText("Annonce")}</button>
     </nav>
 
     {section === "identity" && <div className="casino-settings-panel identity-access-panel">
@@ -78,6 +84,14 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }
         </div>
       </section>
     </div>}
+
+    {section === "notice" && <section className="settings-group lobby-notice-editor">
+      <div className="settings-group-heading"><Megaphone/><div><h3>{localeText("Annonce du casino")}</h3></div></div>
+      <label className="lobby-notice-visibility"><strong>{localeText("Afficher l’annonce")}</strong><input type="checkbox" checked={notice.enabled} onChange={(event) => updateNotice("enabled", event.target.checked)}/></label>
+      <label>{localeText("Titre de l’annonce")}<input maxLength={100} value={notice.title} onChange={(event) => updateNotice("title", event.target.value)}/></label>
+      <div className="segmented-tabs lobby-notice-preview"><button type="button" className={!noticePreview ? "active" : ""} onClick={() => setNoticePreview(false)}>{localeText("Rédaction")}</button><button type="button" className={noticePreview ? "active" : ""} onClick={() => setNoticePreview(true)}>{localeText("Aperçu")}</button></div>
+      {!noticePreview ? <label>{localeText("Contenu de l’annonce (Markdown)")}<textarea required={notice.enabled} maxLength={20000} value={notice.content} onChange={(event) => updateNotice("content", event.target.value)}/></label> : <div className="lobby-notice-preview"><h4>{notice.title || localeText("Annonce")}</h4><MarkdownContent>{notice.content}</MarkdownContent></div>}
+    </section>}
 
     {section === "economy" && <div className="casino-settings-panel economy-bonus-panel">
       <section className="settings-group economy-settings-group">
