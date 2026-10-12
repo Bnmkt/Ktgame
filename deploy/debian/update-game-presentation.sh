@@ -9,6 +9,8 @@ flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 files=(
   server/src/index.js server/src/services/public-pages.js server/src/services/room-entry.js
   server/src/services/game-images.js server/src/services/account-domain.js server/src/services/locales.js
+  server/src/services/ranked.js server/src/services/ranked-runtime.js server/src/services/ranked-room-runtime.js
+  server/src/services/room-runtime.js server/src/services/game-gateway.js server/src/services/game-room-kernel.js
   client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx

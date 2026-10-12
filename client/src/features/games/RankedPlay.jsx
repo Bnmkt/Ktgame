@@ -1,12 +1,13 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useEffect, useRef, useState } from "react";
-import { Check, Clock3, LogOut, Swords, UserRound } from "lucide-react";
+import { Bot, Check, Clock3, LogOut, Swords, UserRound } from "lucide-react";
 import { RankInsignia } from "./RankInsignia.jsx";
 import { rankedPreparation } from "./ranked-queue-state.js";
 import { api } from "../../api.js";
 import { appPath } from "../../navigation/routes.js";
 import { gameTitle, gameModifierDefinitions } from "./config.js";
 import { Dialog } from "../../components/common/Dialog.jsx";
+import { ConfirmActionButton } from "../../components/common/ConfirmAction.jsx";
 import "./ranked.css";
 
 export const rankedGames = ["belote","texas-holdem","president","liars-dice","velvet-ruse","yahtzee","midnight-dice"];
@@ -70,7 +71,17 @@ export function RankedResult({result,autoScroll=true}) {
   if(result.placement) return <section ref={panel} className="ranked-result" aria-label={localeText("Tes parties de placement")}><span className="eyebrow">{result.cancelled ? localeText("Partie annulée") : result.placement.completed ? localeText("Placement terminé") : localeText("Parties de placement")}</span><div><RankBadge rank={result.afterRank}/>{result.placement.completed && <strong>{result.after}{" " + localeText("Elo")}</strong>}</div><progress max={result.placement.required} value={result.placement.games} aria-label={localeText("Parties de placement terminées")}/><p>{result.placement.games} / {result.placement.required}{" " + localeText("parties")}</p><small>{result.placement.wins}{" " + localeText("victoire(s) ·") + " "}{result.placement.losses}{" " + localeText("défaite(s) ·") + " "}{result.placement.draws}{" " + localeText("égalité(s)")}</small></section>;
   return <section ref={panel} className="ranked-result" aria-label={localeText("Ta progression classée")}><span className="eyebrow">{localeText("Ta progression")}</span><div><RankBadge rank={result.beforeRank}/><span>→</span><RankBadge rank={result.afterRank}/><strong className={result.delta<0?"ranked-loss":"ranked-gain"}>{result.delta>0?"+":""}{Number(result.delta.toFixed(2))}{" " + localeText("Elo")}</strong></div><p>{result.before} → {result.after}{" " + localeText("Elo")}</p>{result.progression && <><progress max={100} value={result.progression.progress} aria-label={localeText("Progression vers la division suivante")}/><small>{result.progression.next ? localeText("Prochain rang : {value0}", { value0: result.progression.next }) : localeText("Rang le plus élevé")}</small></>}</section>;
 }
-function ReadyMatch({proposal,serverTime,userId,busy,error,onReady,onDecline}) {
+function FillRankedBots({allowed,onData,onError}) {
+  const {t}=useLocale();
+  const [busy,setBusy]=useState(false);
+  if (!allowed) return null;
+  return <ConfirmActionButton className="secondary ranked-fill-bots" disabled={busy} dialogTitle={t("Compléter la classée avec des bots ?")} message={t("Les places libres seront occupées par des bots. Cette partie comptera pour l’Elo et les placements. Tous les joueurs humains devront confirmer à nouveau.")} confirmLabel={t("Compléter avec des bots")} onConfirm={async()=>{
+    setBusy(true);onError("");
+    try {onData(await api("/api/ranked/queue/fill-bots",{method:"POST"}));window.dispatchEvent(new Event("ktga-ranked-updated"));}
+    catch(error){onError(error.message);}finally{setBusy(false);}
+  }}><Bot size={18}/>{t("Compléter avec des bots")}</ConfirmActionButton>;
+}
+function ReadyMatch({proposal,serverTime,userId,busy,error,onReady,onDecline,fillControl}) {
   const { t: localeText } = useLocale();
   const [now,setNow]=useState(Date.now());
   const offset=useRef(serverTime-Date.now());
@@ -81,8 +92,9 @@ function ReadyMatch({proposal,serverTime,userId,busy,error,onReady,onDecline}) {
   return <Dialog title={localeText("Partie classée trouvée")} hideTitle className="ranked-ready-dialog" dismissible={false} onClose={()=>{}}>
     <QueueHeading gameId={proposal.gameId} rank={proposal.players.find((player)=>player.id===userId)?.rank}/>
     <div className="ranked-search-progress">{phase==="preparing" ? <><span className="ranked-large-clock">{duration(start)}</span><strong>{localeText("Préparation de la partie")}</strong><p>{remaining ? localeText("{value0} confirmation(s) restante(s)", { value0: remaining }) : localeText("Tous les joueurs sont prêts")}</p></> : <strong className="ranked-transition-label" role="status">{phase==="creating" ? localeText("Création de la table…") : phase==="expired" ? localeText("Retour dans la file…") : localeText("Confirmation des joueurs")}</strong>}{phase==="confirming" && <p>{remaining}{" " + localeText("confirmation(s) restante(s)")}</p>}{(phase==="preparing" || phase==="confirming") && <small>{localeText("Confirmation avant") + " "}{duration(expires)}</small>}</div>
-    <div className="ranked-ready-seats" aria-label={localeText("Confirmations des joueurs")}>{proposal.players.map((player,index)=><div key={player.id} className={player.ready?"is-ready":""} aria-label={localeText("Joueur {value0}{value1} : {value2}", { value0: index+1, value1: player.id===userId?", toi":"", value2: player.ready?"prêt":"en attente" })}><span className="ranked-ready-avatar"><UserRound size={28}/>{player.ready && <Check size={15}/>}</span><strong>{player.id===userId?localeText("Toi"):localeText("Joueur {value0}", { value0: index+1 })}</strong><small>{player.ready?localeText("Prêt"):localeText("En attente")}</small></div>)}</div>
+    <div className="ranked-ready-seats" aria-label={localeText("Confirmations des joueurs")}>{proposal.players.map((player,index)=><div key={player.id} className={player.ready?"is-ready":""} aria-label={localeText("Joueur {value0}{value1} : {value2}", { value0: index+1, value1: player.id===userId?", toi":"", value2: player.ready?"prêt":"en attente" })}><span className="ranked-ready-avatar">{player.isBot ? <Bot size={28}/> : <UserRound size={28}/>}{player.ready && <Check size={15}/>}</span><strong>{player.isBot ? localeText("Bot {number}",{number:index+1}) : player.id===userId?localeText("Toi"):localeText("Joueur {value0}", { value0: index+1 })}</strong><small>{player.ready?localeText("Prêt"):localeText("En attente")}</small></div>)}</div>
     {error && <p className="error" role="alert">{localeText(error)}</p>}
+    {fillControl}
     <div className="ranked-queue-actions"><button type="button" disabled={busy || proposal.accepted || expires===0} onClick={onReady}><Check size={18}/>{proposal.accepted?localeText("Tu es prêt"):localeText("Accepter et rejoindre")}</button><button type="button" className="danger" disabled={busy} onClick={onDecline}><LogOut size={18}/>{localeText("Quitter la file")}</button></div>
   </Dialog>;
 }
@@ -99,6 +111,7 @@ export function RankedQueue({game,user,onQueued}) {
   return <section className="ranked-queue-surface"><QueueHeading gameId={game.id} rank={entry?.rank}/>
     {queue ? <><QueueDetails queue={queue} serverTime={data.serverTime}/><div className="ranked-queue-actions"><button type="button" className="danger" disabled={busy} onClick={()=>change("DELETE")}><LogOut size={18}/>{localeText("Quitter la file")}</button></div></> : <><p className="ranked-entry-summary">{entry ? entry.maximumPlayers>entry.players ? localeText("{value0} à {value1}", { value0: entry.players, value1: entry.maximumPlayers }) : entry.players : "…"}{" " + localeText("joueurs")}{game.id==="texas-holdem"?localeText(" · Cave fixe : {value0}", { value0: entry?.preset.stake.toLocaleString("fr-FR") ?? "…" }):""}</p><button type="button" disabled={busy || !entry?.enabled || user.guest || Boolean(data?.match)} onClick={()=>change("POST")}><Swords size={18}/>{user.guest ? localeText("Compte enregistré requis") : entry?.enabled === false ? localeText("Classé indisponible") : localeText("Rejoindre la file")}</button></>}
     <RankedRules entry={entry} gameId={game.id}/>
+    <FillRankedBots allowed={user.admin && queue?.canFillBots} onData={setData} onError={setError}/>
     {error && <p className="error" role="alert">{localeText(error)}</p>}
   </section>;
 }
@@ -118,7 +131,7 @@ export function RankedCoordinator({user,onOpenRoom}) {
   if (!data?.queue) return null;
   return <>
     {!waitingOpen && !data.proposal && <aside className="ranked-waiting-indicator" aria-label={localeText("File classée")}><button type="button" className="secondary" onClick={()=>setWaitingOpen(true)}><Swords size={18}/>{localeText(gameTitle(data.queue.gameId))}{" " + localeText("· recherche en cours")}</button><button type="button" className="danger icon-toggle" title={localeText("Quitter la file classée")} aria-label={localeText("Quitter la file classée")} disabled={busy} onClick={()=>respond(false)}><LogOut size={17}/></button></aside>}
-    {data.proposal ? <ReadyMatch key={data.proposal.id} proposal={data.proposal} serverTime={data.serverTime} userId={user.id} busy={busy} error={error} onReady={()=>respond(true)} onDecline={()=>respond(false)}/> : waitingOpen && <Dialog title={localeText("Recherche classée")} hideTitle className="ranked-ready-dialog" onClose={()=>setWaitingOpen(false)}><QueueHeading gameId={data.queue.gameId} rank={data.games.find((row)=>row.id===data.queue.gameId)?.rank}/><QueueDetails queue={data.queue} serverTime={data.serverTime}/>{error && <p className="error" role="alert">{localeText(error)}</p>}<div className="ranked-queue-actions"><button type="button" className="danger" disabled={busy} onClick={()=>respond(false)}><LogOut size={18}/>{localeText("Quitter la file")}</button></div></Dialog>}
+    {data.proposal ? <ReadyMatch key={data.proposal.id} proposal={data.proposal} serverTime={data.serverTime} userId={user.id} busy={busy} error={error} onReady={()=>respond(true)} onDecline={()=>respond(false)} fillControl={<FillRankedBots allowed={user.admin && data.queue.canFillBots} onData={setData} onError={setError}/>}/> : waitingOpen && <Dialog title={localeText("Recherche classée")} hideTitle className="ranked-ready-dialog" onClose={()=>setWaitingOpen(false)}><QueueHeading gameId={data.queue.gameId} rank={data.games.find((row)=>row.id===data.queue.gameId)?.rank}/><QueueDetails queue={data.queue} serverTime={data.serverTime}/>{error && <p className="error" role="alert">{localeText(error)}</p>}<FillRankedBots allowed={user.admin && data.queue.canFillBots} onData={setData} onError={setError}/><div className="ranked-queue-actions"><button type="button" className="danger" disabled={busy} onClick={()=>respond(false)}><LogOut size={18}/>{localeText("Quitter la file")}</button></div></Dialog>}
   </>;
 }
 export function RankedProfile({rows=[]}) {

@@ -4,19 +4,23 @@ import { Die, PlayingCard } from "./GamePieces.jsx";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { yahtzeeTotal } from "./GameSupport.jsx";
 import { PublicDiceBoard, publicDiceGames } from "./PublicDiceBoard.jsx";
+import { CardMotionSurface } from "./CardMotionSurface.jsx";
 
-export function SpectatorBoard({ state, user }) {
+export function SpectatorBoard(props) {
+  return <CardMotionSurface version={props.state} actorId={props.state.players[props.state.currentPlayerIndex]?.id}><SpectatorContent {...props}/></CardMotionSurface>;
+}
+function SpectatorContent({ state, user }) {
   const { t: localeText } = useLocale();
   if (state.gameId === "belote") return <BeloteBoard state={state} user={user} spectator />;
   if (publicDiceGames.has(state.gameId)) return <PublicDiceBoard state={state} />;
   const skin = user.cosmetics?.equipped?.cardSkin ?? "default";
-  const cards = (list = [], label = "Cartes publiques") => <div className="spectator-cards" aria-label={localeText(label)}>{list.map((card, index) => <PlayingCard key={index} card={card?.hidden ? null : card} skin={skin} />)}</div>;
+  const cards = (list = [], label = "Cartes publiques") => <div className="spectator-cards" data-card-arrival={state.gameId==="president"?"played":undefined} aria-label={localeText(label)}>{list.map((card, index) => <PlayingCard key={index} card={card?.hidden ? null : card} skin={skin} />)}</div>;
   const score = (player) => {
     if (state.gameId === "yahtzee") return yahtzeeTotal(state.scores?.[player.id] ?? {});
     return state.scores?.[player.id] ?? state.stacks?.[player.id] ?? state.prestige?.[player.id] ?? state.cardCounts?.[player.id] ?? state.diceCounts?.[player.id] ?? "-";
   };
   return <div className="spectator-board">
-    <div className="spectator-players">{state.players.map((player, index) => <article key={player.id} className={index === state.currentPlayerIndex && !state.finished ? "active" : ""}><DisplayName user={player} /><strong>{score(player)}</strong>{state.hands?.[player.id]?.length > 0 && <small>{state.hands[player.id].length} {state.gameId === "liars-dice" ? localeText("dés cachés") : localeText("cartes en main")}</small>}{state.bets?.[player.id] !== undefined && <small>{localeText("Mise :") + " "}{state.bets[player.id]}</small>}</article>)}</div>
+    <div className="spectator-players">{state.players.map((player, index) => <article key={player.id} data-card-owner={player.id} className={index === state.currentPlayerIndex && !state.finished ? "active" : ""}><DisplayName user={player} /><strong>{score(player)}</strong>{state.hands?.[player.id]?.length > 0 && <small>{state.hands[player.id].length} {state.gameId === "liars-dice" ? localeText("dés cachés") : localeText("cartes en main")}</small>}{state.bets?.[player.id] !== undefined && <small>{localeText("Mise :") + " "}{state.bets[player.id]}</small>}</article>)}</div>
     {state.dice?.length > 0 && <div className="dice-row" aria-label={localeText("Dés publics")}>{state.dice.map((value, index) => <Die key={index} value={value} skin={state.players[state.currentPlayerIndex]?.cosmetics?.equipped?.diceSkin} />)}</div>}
     {state.rollsLeft !== undefined && <p>{state.rollsLeft}{" " + localeText("lancer(s) restant(s)")}</p>}
     {state.turnScore !== undefined && <p>{localeText("Points du tour :") + " "}{state.turnScore}</p>}

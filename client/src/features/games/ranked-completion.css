@@ -1,0 +1,41 @@
+.ranked-recap-layer { z-index: 24; }
+.ranked-recap-modal { --recap-accent: #e9c35e; --recap-glow: #caa44c66; max-width: 560px; width: min(560px, 94vw); max-height: 92dvh; overflow-y: auto; background: #111c18; border: 1px solid var(--recap-accent); padding: 32px; text-align: center; position: relative; }
+.ranked-recap-heading span { font-size: 13px; color: #b8c7bd; }
+.ranked-recap-heading h2 { font-size: 30px; margin: 10px 32px 0; color: var(--recap-accent); }
+.ranked-recap-stage { height: 230px; position: relative; display: grid; place-items: center; overflow: hidden; }
+.ranked-recap-preload { position: absolute; visibility: hidden; pointer-events: none; }
+.ranked-recap-emblem { z-index: 1; filter: drop-shadow(0 0 15px var(--recap-glow)); animation: recap-arrive .7s ease-out both; }
+.ranked-recap-emblem .ranked-insignia { width: 160px; height: 160px; }
+.ranked-recap-emblem .ranked-insignia img, .ranked-recap-emblem .ranked-insignia svg { width: 100%; height: 100%; object-fit: contain; }
+.ranked-recap-rays { position: absolute; inset: 0; opacity: 0; }
+.ranked-recap-rays i { position: absolute; left: calc(50% - 1px); top: calc(50% - 8px); height: 16px; width: 2px; background: var(--recap-accent); transform: rotate(var(--ray)) translateY(-90px); }
+.recap-transform .ranked-recap-rays, .recap-settled .ranked-recap-rays { opacity: 1; }
+.recap-transform .ranked-recap-rays i { animation: recap-streak .95s ease-out var(--delay) both; }
+.recap-promotion.recap-transform .ranked-recap-emblem, .recap-reveal.recap-transform .ranked-recap-emblem { animation: recap-crown 1.1s cubic-bezier(.16,.82,.3,1) both; }
+.recap-travel.recap-promotion .ranked-recap-emblem, .recap-travel.recap-reveal .ranked-recap-emblem { transform: scale(.85); filter: drop-shadow(0 0 30px var(--recap-glow)); transition: transform .9s, filter .9s; }
+.ranked-recap-change { position: absolute; bottom: 12px; z-index: 2; color: var(--recap-accent); }
+.ranked-recap-name { font-size: 26px; color: #f3ead2; margin: 0 0 14px; }
+.ranked-recap-transition { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; color: #a8b9b0; font-size: 14px; }
+.ranked-recap-transition strong { color: var(--recap-accent); }
+.ranked-recap-progress { height: 12px; overflow: hidden; background: #263d32; border: 1px solid #52745f; margin: 22px 0 16px; border-radius: 3px; }
+.ranked-recap-progress i { display: block; height: 100%; background: var(--recap-accent); transition: width 1.4s cubic-bezier(.2,.7,.2,1); box-shadow: 0 0 12px var(--recap-glow); }
+.recap-transform .ranked-recap-progress i { transform-origin: left; animation: recap-track 1.2s ease-out both; }
+.ranked-recap-rating { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; font-variant-numeric: tabular-nums; }
+.ranked-recap-rating span { display: grid; gap: 3px; color: #bdc9c1; font-size: 13px; }
+.ranked-recap-rating strong { font-size: 24px; color: #f4edd8; }
+.ranked-recap-rating b { font-size: 20px; }
+.ranked-recap-placement { display: flex; align-items: center; justify-content: center; gap: 8px; color: #c2d5ce; }
+.ranked-recap-modal footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.ranked-recap-modal button { min-height: 42px; }
+.recap-demotion, .recap-loss { --recap-accent: #ed8793; --recap-glow: #cf687555; }
+.recap-demotion.recap-travel .ranked-recap-emblem { transform: translateY(14px) scale(.9); opacity: .4; transition: transform 1s, opacity 1s; }
+.recap-demotion.recap-transform .ranked-recap-emblem { animation-name: recap-demote; }
+.recap-placement { --recap-accent: #82c8bf; --recap-glow: #58998f55; }
+.ranked-recap-replay { margin: 12px 0; }
+@keyframes recap-arrive { from { opacity: 0; transform: translateY(12px) scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes recap-track { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes recap-crown { 0% { opacity: 0; transform: translateY(35px) scale(.45) rotate(-12deg); } 65% { opacity: 1; transform: translateY(-6px) scale(1.12) rotate(3deg); } 100% { opacity: 1; transform: none; } }
+@keyframes recap-demote { 0% { opacity: 0; transform: translateY(-40px) scale(.65) rotate(8deg); } 70% { opacity: 1; transform: translateY(6px) scale(1.04); } 100% { opacity: 1; transform: none; } }
+@keyframes recap-streak { from { opacity: 1; transform: rotate(var(--ray)) translateY(-70px) scaleY(1); } to { opacity: 0; transform: rotate(var(--ray)) translateY(-130px) scaleY(.3); } }
+@media (max-width: 600px) { .ranked-recap-modal { padding: 24px 18px; } .ranked-recap-heading h2 { font-size: 24px; } .ranked-recap-stage { height: 190px; } .ranked-recap-emblem .ranked-insignia { width: 130px; height: 130px; } }
+@media (prefers-reduced-motion: reduce) { .ranked-recap-modal *, .ranked-recap-modal *::before { animation: none !important; transition: none !important; } .ranked-recap-rays { display: none; } }

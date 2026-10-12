@@ -2,13 +2,13 @@ import { useLocale } from "../../locales/LocaleProvider.jsx";
 import React from "react";
 import { suits } from "../../features/games/config.js";
 
-export function PlayingCard({ card, hidden = false, skin = "default", style, animate = true, inline = false }) {
+export function PlayingCard({ card, hidden = false, skin = "default", style, animate = true, inline = false, playerId, motionKey }) {
   const { t: localeText } = useLocale();
   const CardElement = inline ? "span" : "div";
-  if (!card || hidden) return <CardElement className={`playing-card card-back ${animate ? "deal-card" : ""} card-skin-${skin}`} style={style}><span>?</span></CardElement>;
+  if (!card || hidden) return <CardElement data-card-piece="" data-card-covered="" data-card-player={playerId} data-card-track={motionKey} className={`playing-card card-back ${animate ? "deal-card" : ""} card-skin-${skin}`} style={style}><span>?</span></CardElement>;
   const suit = suits[card.suit] ?? suits.S;
   return (
-    <CardElement className={`playing-card ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={style} title={localeText("{value0} de {value1}", { value0: card.rank, value1: suit.name })}>
+    <CardElement data-card-piece="" data-card-face={`${card.deckId ?? 0}:${card.rank}:${card.suit}`} data-card-track={motionKey} data-card-player={playerId} className={`playing-card ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={style} title={localeText("{value0} de {value1}", { value0: card.rank, value1: suit.name })}>
       <strong>{card.rank}</strong>
       <span>{suit.symbol}</span>
     </CardElement>
