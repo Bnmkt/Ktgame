@@ -63,6 +63,7 @@ try {
     await block.waitFor();
     assert.equal(await block.locator(".ktga-inline-dice .pip").count(), 6);
     assert.equal(await block.getByRole("link", { name: "les règles" }).count(), 1);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await block.screenshot({ path: path.join(directory, `${name}-notice.png`) });
     const dismissal = page.waitForResponse(response => response.url().includes("/api/me/lobby-notice/dismiss") && response.status() === 200);
     await block.getByRole("button", { name: "Fermer l’annonce" }).click();
