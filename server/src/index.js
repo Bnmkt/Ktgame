@@ -67,7 +67,7 @@ import {
   purchaseCommunityEventActions,
   validateCommunityEvent
 } from "./services/community-events.js";
-import { databaseFilename, databaseHealth, databaseEntityRevision, databaseSettingsRevision, databaseSettingsReadRevision, rankedRows, rankedRecent, rankedMetrics, rankedSettlement, readDb, setCatalogSource, setRoomMutationGuard, updateDb as mutateDb, writeDb as persistDb } from "./db.js";
+import { databaseFilename, databaseHealth, databaseEntityRevision, databaseSettingsRevision, databaseSettingsReadRevision, rankedRows, rankedRecent, rankedMetrics, rankedSettlement, seasonLeaderboard, leaderboardSeasonIds, readDb, setCatalogSource, setRoomMutationGuard, updateDb as mutateDb, writeDb as persistDb } from "./db.js";
 import { RANKED_GAMES, competitiveFor, eloFor, equippedRankedBadge, normalizeRankedConfig, publicRanked, rankedResultFor, settleRanked as applyRankedSettlement, validateRankedAction } from "./services/ranked.js";
 import { createRankedRuntime } from "./services/ranked-runtime.js";
 import { registerRankInsigniaRoutes } from "./services/rank-insignia-images.js";
@@ -3020,12 +3020,15 @@ app.post("/api/tribunal/cases/:id/vote", auth, (req, res) => {
 app.get("/api/leaderboards", auth, (req, res) => configurationCache.read(() => {
   const db = readDb();
   try {
-    const result = buildLeaderboard(db, req.query, req.auth.id, new Date(), games.map((game) => game.id));
+    const now = new Date();
+    const result = seasonLeaderboard(req.query, req.auth.id, now) ?? buildLeaderboard(db, req.query, req.auth.id, now, games.map((game) => game.id));
+    result.seasons = [...new Set([...result.seasons, ...leaderboardSeasonIds()])].sort().reverse();
     const identities = new Map();
     const decorate = (row) => {
       if (!row) return null;
       if (!identities.has(row.id)) {
-        const safe = sanitizeFriendUser(db.users.find((user) => user.id === row.id), db);
+        const account = db.users.find((user) => user.id === row.id);
+        const safe = account ? sanitizeFriendUser(account, db) : { id: row.id, pseudo: "Compte supprimé" };
         identities.set(row.id, { id: safe.id, pseudo: safe.pseudo, cosmetics: safe.cosmetics, profileStats: safe.profileStats });
       }
       return { ...row, user: identities.get(row.id) };

@@ -4,7 +4,7 @@ import { bestScore, lowerScores } from "./leaderboard-score.js";
 import { prepared } from "../storage/statements.js";
 
 const scoreLabels = { president: "Place finale", "texas-holdem": "Tapis final", bataille: "Cartes restantes", "liars-dice": "Des restants", "shut-the-box": "Points restants", "golf-solitaire": "Cartes restantes", accordion: "Piles restantes" };
-const seasonFor = (day) => `${day.slice(0, 4)}-Q${Math.ceil(Number(day.slice(5, 7)) / 3)}`;
+export const seasonFor = (day) => `${day.slice(0, 4)}-Q${Math.ceil(Number(day.slice(5, 7)) / 3)}`;
 const validDay = (day) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isFinite(Date.parse(`${day}T12:00:00Z`)) && new Date(`${day}T12:00:00Z`).toISOString().slice(0, 10) === day;
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 
@@ -27,13 +27,13 @@ export function leaderboardPeriod(query, now = new Date()) {
   return { period, season, start, end, today, currentSeason, label: `T${quarter} ${year}` };
 }
 
-export function buildLeaderboard(db, query = {}, viewerId = "", now = new Date(), gameIds = []) {
+export function buildLeaderboard(db, query = {}, viewerId = "", now = new Date(), gameIds = [], options = {}) {
   const period = leaderboardPeriod(query, now);
   const gameId = query.game || "all", metric = query.metric || "balance";
   if (gameId !== "all" && !gameIds.includes(gameId)) throw new Error("Jeu invalide.");
   if (!["wins", "gains", "record", "score", "balance"].includes(metric)) throw new Error("Classement invalide.");
   if ((metric === "score" && gameId === "all") || (metric === "balance" && gameId !== "all")) throw new Error("Ce classement ne correspond pas au jeu selectionne.");
-  const eligible = new Map(db.users.filter((user) => !user.guest && !user.isBot && user.active !== false).map((user) => [user.id, user]));
+  const eligible = new Map(db.users.filter((user) => !user.guest && !user.isBot && (options.historicalAccounts || user.active !== false)).map((user) => [user.id, user]));
   const stats = new Map(), seasons = new Set([period.currentSeason]);
   if (period.season) seasons.add(period.season);
   const inPeriod = (day) => day && (!period.start || day >= period.start) && (!period.end || day < period.end) && day <= period.today;
@@ -49,6 +49,9 @@ export function buildLeaderboard(db, query = {}, viewerId = "", now = new Date()
   const where = clauses.join(" AND ");
   if (indexed) {
     const sql = db.history.sqlite;
+    if (options.historicalAccounts) for (const row of prepared(sql, `SELECT DISTINCT user_id AS id FROM history_members m WHERE ${where}`).iterate(...params)) {
+      if (!eligible.has(row.id) && !db.users.some((user) => user.id === row.id)) eligible.set(row.id, { id: row.id });
+    }
     for (const row of prepared(sql, `SELECT user_id AS id, count(*) AS games, sum(won) AS wins, sum(gain) AS gains, max(gain) AS record, ${gameId === "all" ? "NULL" : `${lowerScores.has(gameId) ? "min" : "max"}(score)`} AS score FROM history_members m WHERE ${where} GROUP BY user_id`).iterate(...params)) {
       if (eligible.has(row.id)) stats.set(row.id, { ...row, achievedAt: null });
     }
@@ -63,6 +66,7 @@ export function buildLeaderboard(db, query = {}, viewerId = "", now = new Date()
     if (!inPeriod(day) || (gameId !== "all" && match.gameId !== gameId)) continue;
     const ids = new Set((match.players ?? []).filter((player) => !player.isBot).map((player) => player.id));
     for (const id of ids) {
+      if (options.historicalAccounts && !eligible.has(id) && !db.users.some((user) => user.id === id)) eligible.set(id, { id });
       if (!eligible.has(id)) continue;
       const row = get(id);
       row.games++;
@@ -78,25 +82,37 @@ export function buildLeaderboard(db, query = {}, viewerId = "", now = new Date()
     }
   }
   const balances = new Map();
+  const openingBalances = new Map();
   const closed = period.end && period.end <= period.today;
   if (indexed && metric === "balance" && closed) {
     const statement = db.transactions.sqlite.prepare("SELECT balance, created_at AS createdAt FROM transactions WHERE user_id = ? AND day <> '' AND day < ? AND balance IS NOT NULL ORDER BY julianday(created_at) DESC, rowid DESC LIMIT 1");
+    const next = db.transactions.sqlite.prepare("SELECT balance,amount,created_at AS createdAt FROM transactions WHERE user_id = ? AND day >= ? AND balance IS NOT NULL ORDER BY julianday(created_at),rowid LIMIT 1");
     for (const id of eligible.keys()) {
       const transaction = statement.get(id, period.end);
       if (transaction) balances.set(id, transaction);
+      else {
+        const opening = next.get(id, period.end);
+        if (opening && finite(opening.amount)) openingBalances.set(id, { balance: opening.balance - opening.amount, createdAt: opening.createdAt });
+      }
     }
   }
   for (const transaction of indexed ? db.transactions.pending : db.transactions) {
     const day = casinoDateKey(transaction.createdAt);
     if (day && day <= period.today) seasons.add(seasonFor(day));
-    if (metric !== "balance" || !closed || !day || day >= period.end || !finite(transaction.balance)) continue;
+    if (metric !== "balance" || !closed || !day || !finite(transaction.balance)) continue;
+    if (day >= period.end) {
+      const previous = openingBalances.get(transaction.userId);
+      if (finite(transaction.amount) && (previous === undefined || Date.parse(transaction.createdAt) < Date.parse(previous.createdAt))) openingBalances.set(transaction.userId, { balance: transaction.balance - transaction.amount, createdAt: transaction.createdAt });
+      continue;
+    }
     const previous = balances.get(transaction.userId);
     if (!previous || Date.parse(transaction.createdAt) >= Date.parse(previous.createdAt)) balances.set(transaction.userId, transaction);
   }
   if (metric === "balance") for (const user of eligible.values()) {
     const created = casinoDateKey(user.createdAt);
     if (created && period.end && created >= period.end) continue;
-    const value = closed ? balances.get(user.id)?.balance : user.tokens;
+    const opening = openingBalances.get(user.id);
+    const value = closed && !options.closingBalances ? balances.get(user.id)?.balance ?? opening?.balance : user.tokens;
     if (finite(value)) get(user.id).balance = value;
   }
   const ascending = metric === "score" && lowerScores.has(gameId);
@@ -116,7 +132,7 @@ export function buildLeaderboard(db, query = {}, viewerId = "", now = new Date()
   }
   return {
     gameId, metric, period, ascending, scoreLabel: scoreLabels[gameId] ?? "Points", total: ranked.length,
-    seasons: [...seasons].sort().reverse(), rows: ranked.slice(0, 100), self: ranked.find((row) => row.id === viewerId) ?? null,
+    seasons: [...seasons].sort().reverse(), rows: options.allRows ? ranked : ranked.slice(0, 100), self: ranked.find((row) => row.id === viewerId) ?? null,
     generatedAt: now.toISOString(), balanceAt: closed ? shiftDateKey(period.end, -1) : period.today
   };
 }

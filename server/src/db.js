@@ -9,6 +9,8 @@ import { queryRankedMetrics } from "./services/ranked-metrics.js";
 import { prepared } from "./storage/statements.js";
 import { selectedCollectionRows } from "./storage/selected-rows.js";
 import { sqliteSettings } from "./storage/sqlite-settings.js";
+import { createLeaderboardSeasons } from "./storage/leaderboard-seasons.js";
+import { games } from "./games/shared.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
@@ -400,6 +402,8 @@ if (schemaVersion !== "2") {
 normalizedStorage.ensureShape();
 normalizedStorage.ensureTimeZone();
 let cachedDb = loadDatabase();
+const leaderboardSeasons = createLeaderboardSeasons(sqlite, games.map((game) => game.id), loadDatabase);
+leaderboardSeasons.synchronize();
 // Après un redémarrage propre, les anciennes pages WAL ne doivent pas rester
 // inutilement attachées au fichier actif.
 sqlite.exec("PRAGMA wal_checkpoint(TRUNCATE)");
@@ -419,8 +423,11 @@ export function databaseSettingsReadRevision() { return settingsMutationDepth ? 
 // ne lisent que les données validées et ne possèdent pas les écritures.
 // Toutes les mutations passent ensuite par writeDb/updateDb pour être persistées.
 export function readDb() {
+  leaderboardSeasons.synchronize();
   return cachedDb;
 }
+export function seasonLeaderboard(query, viewerId, now) { return leaderboardSeasons.read(query, viewerId, now); }
+export function leaderboardSeasonIds() { return leaderboardSeasons.seasons(); }
 export function rankedRows(gameId, minimumGames, limit = 100, placementGames = 0) {
   return sqlite.prepare("SELECT e.user_id AS id,e.elo,e.games,e.wins FROM user_game_elo e JOIN users u ON u.id=e.user_id LEFT JOIN user_ranked_placements p ON p.user_id=e.user_id AND p.game_id=e.game_id WHERE e.game_id=? AND e.games>=? AND (?=0 OR json_extract(p.data,'$.completed')=1 OR p.data IS NULL AND e.games>=?) AND u.guest=0 AND json_extract(u.data,'$.active') IS NOT 0 ORDER BY e.elo DESC,e.games DESC,e.user_id LIMIT ?").all(gameId,minimumGames,placementGames,placementGames,limit);
 }
@@ -436,6 +443,7 @@ export function rankedSettlement(matchId) {
 }
 
 export function writeDb(db, selection = {}) {
+  leaderboardSeasons.synchronize();
   mutationDepth++;
   const mayChangeSettings = selection.settings !== false;
   if (mayChangeSettings) settingsMutationDepth++;
@@ -570,7 +578,7 @@ export function databaseHealth() {
     "users", "rooms", "history", "transactions", "community_events",
     "community_event_participants", "community_event_actions",
     "community_event_pot_entries", "community_event_rewards", "community_event_effects",
-    "achievement_catalog", "item_catalog", "user_achievements", "achievement_progress", "user_inventory", "user_game_xp", "achievement_reward_receipts", "history_members"
+    "achievement_catalog", "item_catalog", "user_achievements", "achievement_progress", "user_inventory", "user_game_xp", "achievement_reward_receipts", "history_members", "leaderboard_seasons", "leaderboard_boards", "leaderboard_entries"
   ];
   return {
     engine: "SQLite",
