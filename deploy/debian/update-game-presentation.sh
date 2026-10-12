@@ -11,6 +11,8 @@ files=(
   server/src/services/game-images.js server/src/services/account-domain.js server/src/services/locales.js
   server/src/services/ranked.js server/src/services/ranked-runtime.js server/src/services/ranked-room-runtime.js
   server/src/services/room-runtime.js server/src/services/game-gateway.js server/src/services/game-room-kernel.js
+  server/src/db.js server/src/services/leaderboards.js server/src/storage/leaderboard-seasons.js
+  server/src/services/personal-archive-worker.js
   client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx

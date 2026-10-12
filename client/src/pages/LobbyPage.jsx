@@ -194,7 +194,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
               <article key={game.id} className={`game-card premium-card ${game.type} ${playMode==="ranked"?"ranked-game-card":""}`}>
                 <GameArtwork source={game.descriptiveImage} backdrop />
                 <header className="game-entry-meta"><span className="game-entry-kind">{game.type === "dice" ? <Dice5 size={20} /> : <Spade size={20} />}<span>{game.type === "dice" ? localeText("Dés") : localeText("Cartes")}</span></span><span className="game-entry-count"><Users size={16} />{playMode === "ranked" ? localeText("{value0} joueurs", { value0: rankedStatus?.games.find((row) => row.id === game.id)?.players ?? "…" }) : localeText("{value0} joueurs", { value0: game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}` })}</span></header>
-                <GameArtwork source={game.coverImage} />
+                <GameArtwork source={game.coverImage} halo />
                 <h3>{localeText(game.name)}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label={localeText("Favori")} fill="currentColor" />}</h3>
                 <p>{localeText(game.description || gameRules[game.id]?.goal)}</p>
                 <div className="card-meta"><span>{localeText(gameCategoryLabel(game.category))}</span><span>{localeText(gameComplexityLabel(game.complexity))}</span>{playMode==="ranked"?<RankBadge rank={rankedStatus?.games.find((row)=>row.id===game.id)?.rank}/>:<span>{rooms.filter((room) => room.gameId === game.id && !room.ranked).length}{" " + localeText("tables publiques")}</span>}</div>

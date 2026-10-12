@@ -16,6 +16,9 @@
 .game-card.cards .game-entry-kind > svg { border-color: #b8495d; color: #ee899d; }
 .game-card.dice .game-entry-kind > svg { color: #c5d0d7; }
 .game-card > .game-artwork-media { aspect-ratio: 16 / 7; border-radius: 4px; }
+.game-grid .game-artwork-soft-edge { position: relative; isolation: isolate; overflow: visible; background: transparent; }
+.game-grid .game-artwork-soft-edge .game-artwork-glow { position: absolute; inset: -12px; width: calc(100% + 24px); height: calc(100% + 24px); filter: blur(18px); opacity: .55; pointer-events: none; z-index: -1; }
+.game-grid .game-artwork-soft-edge > img:not(.game-artwork-glow) { position: relative; border-radius: inherit; }
 .game-catalog-toggle { white-space: nowrap; }
 .game-media-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .game-media-fields label { min-width: 0; }
