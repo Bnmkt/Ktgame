@@ -103,6 +103,7 @@ export function createGameGateway(dependencies) {
       if (result.room) directory.committed(room);
       for (const effect of result.effects) if (effect.kind === "notification") invalidateInbox(effect.userId);
       return room ? { finished: room.finished, ranked: room.ranked, players: room.players,
+        completionByUser: room.completionByUser ?? {},
         achievementUnlocksByUser: room.achievementUnlocksByUser ?? {}, achievementRuleProgress: room.achievementRuleProgress ?? {},
         ...(room.state ? { ranking: room.state.ranking, roomPayouts: room.state.roomPayouts } : {}) } : {};
     },

@@ -48,6 +48,7 @@ export function create421State(players, options = {}) {
     roundHistory: [],
     currentCombination: null,
     paidRerollsUsed: {},
+    paidRerollSpent: {},
     lastDiceByPlayer: {},
     logs: [],
     finished: false,
@@ -75,6 +76,7 @@ export function apply421Action(state, actorId, action) {
     if (used >= (state.modifiers?.paidRerollsPerTurn ?? 2)) throw new Error("Limite de relances payantes atteinte pour ce tour.");
     const price = paidRerollPrice421(state, actorId);
     (state.paidRerollsUsed ??= {})[actorId] = used + 1;
+    if (state.paidRerollSpent) state.paidRerollSpent[actorId] = (state.paidRerollSpent[actorId] ?? 0) + price;
     state.rollsLeft = 1;
     appendLog(state, actorId, `achète une relance supplémentaire pour ${price} jetons.`, "bet");
   }

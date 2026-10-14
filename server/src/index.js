@@ -1421,7 +1421,7 @@ function sanitizeRoom(room, viewerId = "", db = readDb(), forceSpectator = false
 }
 function serializeRoom(room, viewerId, db, forceSpectator, playerPresentations = new Map()) {
   if (!room) return room;
-  const { passwordHash: _passwordHash, gameWorker: _gameWorker, ...safeRoom } = room;
+  const { passwordHash: _passwordHash, gameWorker: _gameWorker, completionByUser: _completionByUser, ...safeRoom } = room;
   const spectating = forceSpectator || !room.players.some((player) => player.id === viewerId);
   const sanitizedPlayers = new Map();
   const sanitizeRoomPlayer = (player) => {
@@ -1493,6 +1493,7 @@ function serializeRoom(room, viewerId, db, forceSpectator, playerPresentations =
     players: safeRoom.players.map(sanitizeRoomPlayer),
     state: safeState,
     spectator: spectating,
+    completion: room.finished && !spectating ? room.completionByUser?.[viewerId] ?? null : null,
     minLevel: room.minLevel ?? 1, maxLevel: room.maxLevel ?? null,
     ...(room.gameId === "belote" ? { beloteSeats: beloteSeats(room) } : {}),
     minPlayers: game?.minPlayers ?? 1,
@@ -2198,6 +2199,11 @@ function cleanupEmptyRooms(db) {
 
 function finishRoomIfNeeded(room, db, { ranking } = {}) {
   if (!room.state?.finished || room.finished) return;
+  const completionConfig = !room.ranked ? progressionConfig(db) : null;
+  const previousProgressByUser = new Map(!room.ranked ? room.players.filter((player) => !player.isBot).flatMap((player) => {
+    const user = db.users.find((entry) => entry.id === player.id);
+    return user && !user.guest ? [[player.id, gameProgress(user, room.gameId, completionConfig)]] : [];
+  }) : []);
   room.finished = true;
   const pendingReceipt = room.ranked && db.history.pending?.find((row)=>row.ranked?.matchId===room.ranked.matchId && row.ranked.results?.length);
   const receipt = room.ranked && (pendingReceipt?.ranked ?? rankedSettlement(room.ranked.matchId));
@@ -2248,6 +2254,7 @@ function finishRoomIfNeeded(room, db, { ranking } = {}) {
   for (const player of room.players.filter((p) => !p.isBot && !room.ranked?.forfeits?.[p.id])) {
     const user = db.users.find((u) => u.id === player.id);
     const config = progressionConfig(db), xpRules = gameXpRules(config, room.gameId);
+    const previousProgress = previousProgressByUser.get(player.id);
     const amount = xpRules.completionXp + (winners.includes(player.id) ? xpRules.victoryXp : 0);
     const xp = awardGameXp(user, room.gameId, amount, config);
     if (xp) {
@@ -2257,6 +2264,14 @@ function finishRoomIfNeeded(room, db, { ranking } = {}) {
     processAchievementEvent(db, player.id, gameFinishedAchievementEvent(room, player, achievementEvents, roomPayouts, pot), room);
     appendRoomAchievementUnlocks(room, player.id, unlockEligibleAchievements(user, db));
     triggerRandomAchievement(db, player.id, room);
+    if (previousProgress && !room.ranked) {
+      const progress = gameProgress(user, room.gameId, config);
+      (room.completionByUser ??= {})[player.id] = {
+        xp: { amount: progress.xp - previousProgress.xp, level: progress.level, previousLevel: previousProgress.level,
+          mastery: progress.mastery, previousMastery: previousProgress.mastery, masteryLabel: progress.masteryLabel,
+          title: progress.title, levelXp: progress.levelXp, nextXp: progress.nextXp }
+      };
+    }
   }
 }
 

@@ -216,7 +216,7 @@ export function createGameRoomKernel() {
       if (entry.prepared?.commandId !== input.commandId || input.version !== entry.version + 1) throw fault("GAME_CONFLICT");
       const next = entry.prepared.result.room;
       if (next && input.financial) {
-        for (const key of ["finished", "ranked", "players", "achievementUnlocksByUser", "achievementRuleProgress"]) {
+        for (const key of ["finished", "ranked", "players", "completionByUser", "achievementUnlocksByUser", "achievementRuleProgress"]) {
           if (Object.hasOwn(input.financial, key)) next[key] = structuredClone(input.financial[key]);
         }
         if (next.state) for (const key of ["ranking", "roomPayouts"]) if (Object.hasOwn(input.financial, key)) next.state[key] = structuredClone(input.financial[key]);

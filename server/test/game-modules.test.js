@@ -91,8 +91,12 @@ test("421 propose des relances payantes progressives après les lancers gratuits
   apply421Action(state, "p1", { type: "roll", keepIndexes: [] });
   apply421Action(state, "p1", { type: "buy-reroll" });
   assert.equal(state.paidRerollsUsed.p1, 2);
+  assert.equal(state.paidRerollSpent.p1, 75);
   apply421Action(state, "p1", { type: "roll", keepIndexes: [] });
   assert.throws(() => apply421Action(state, "p1", { type: "buy-reroll" }), /Limite/);
+  apply421Action(state, "p1", { type: "bank" });
+  assert.equal(state.paidRerollsUsed.p1, 0);
+  assert.equal(state.paidRerollSpent.p1, 75);
 });
 
 test("Cul de Chouette garde ses figures et termine au nombre de manches configuré", () => {

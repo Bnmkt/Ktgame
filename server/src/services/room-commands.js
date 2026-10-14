@@ -61,7 +61,7 @@ export function createRoomCommands(dependencies) {
   const user = getUser(req.auth.id);
   const db = readDb();
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
-  const game = room && games.find((g) => g.id === room.gameId);
+  const game = room && configuredGames(db).find((g) => g.id === room.gameId);
   if (room?.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===req.auth.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});
   if (!user || !room || !game) return res.status(404).json({ error: "Table introuvable." });
   const roomAccess = userFeatureAccess(user, "rooms:join", db);
@@ -70,7 +70,8 @@ export function createRoomCommands(dependencies) {
   if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
   if (room.players.some((p) => p.id === user.id)) return res.json(sanitizeRoom(room, req.auth.id));
   if (room.passwordHash && !maySpectate(room, user.id) && !(await bcrypt.compare(String(req.body.password ?? ""), room.passwordHash))) return res.status(403).json({ error: "Mot de passe de table requis ou invalide." });
-  if (room.state) {
+  // A completed classic game can accept next-round seats without rewriting its settled roster.
+  if (room.state && !(room.finished && room.state.finished && !room.ranked)) {
     grantSpectatorAccess(room, user.id);
     return res.json(sanitizeRoom(room, user.id, db, true));
   }
@@ -79,7 +80,7 @@ export function createRoomCommands(dependencies) {
   const levelError = roomLevelError(user, room, progressionConfig(db));
   if (levelError) return res.status(403).json({ error: levelError });
   room.players.push(roomPlayerFor(user));
-  if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
+  if (room.gameId === "belote" && !room.state) room.beloteSeats = beloteSeats(room);
   writeRoomDb(db, room);
   broadcastRooms();
   emitRoomUpdate(room);
@@ -295,6 +296,7 @@ export function createRoomCommands(dependencies) {
   if (!room) return res.status(404).json({ error: "Replay indisponible." });
   room.state = null;
   room.pacing = null;
+  delete room.completionByUser;
   const humans = room.players.filter((player) => !player.isBot);
   room.readyPlayerIds = humans.length === 1 ? [humans[0].id] : [];
   room.finished = false;

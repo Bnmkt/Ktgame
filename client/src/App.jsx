@@ -349,7 +349,7 @@ export default function App() {
       <Suspense fallback={<main className="app-shell"><section className="panel route-loading" role="status">{localeText("Chargement de l’interface…")}</section></main>}>
         {roomCode && <div hidden={view !== "room" || route.id !== roomCode}><Room key={roomCode} code={roomCode} user={user} setUser={setUser} onBack={returnToCasino} onExcluded={handleExclusion} onAchievements={notifyAchievements} /></div>}
         {view === "room" && route.id !== roomCode && <JoinTable key={route.id} code={route.id} user={user} onJoined={openCasinoRoom} onBack={() => goTo("lobby")} />}
-        {view === "spectator" && <SpectatorPage key={route.id} code={route.id} user={user} onBack={() => goTo("lobby")} onJoin={() => goTo("room", route.id)} />}
+        {view === "spectator" && <SpectatorPage key={route.id} code={route.id} user={user} onBack={() => goTo("lobby")} onJoin={openCasinoRoom} />}
         {view === "event" && !blockedView && <CommunityEventPage key={route.id} slug={route.id} user={user} setUser={setUser} onBack={() => goTo("lobby")} />}
         {view === "leaderboard" && <LeaderboardPage user={user} />}
         {view === "tribunal" && <TribunalPage />}

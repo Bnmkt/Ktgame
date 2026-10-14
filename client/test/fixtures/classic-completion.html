@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Apercu des resultats classiques</title></head>
+<body><div id="root"></div><script type="module">
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { LocaleProvider } from "/src/locales/LocaleProvider.jsx";
+import { ClassicCompletion } from "/src/components/room/ClassicCompletion.jsx";
+import "/src/styles.css";
+const players = [{ id: "self", pseudo: "Bnmkt", cosmetics: { equipped: { icon: "chip", nameEffect: "gold" } } },
+  { id: "other", pseudo: "Partenaire", cosmetics: { equipped: { icon: "dice" } } }, { id: "bot", pseudo: "Bot 1", isBot: true }];
+const room = { id: "preview", activityMatchId: "preview", gameId: "yahtzee", stake: 100, players, finished: true,
+  state: { gameId: "yahtzee", finished: true, players, winners: ["self"], ranking: players.map((player, index) => ({ id: player.id, score: [312, 286, 214][index] })), roomPayouts: { self: 140, other: 60 } },
+  completion: { xp: { amount: 150, level: 10, previousLevel: 9, mastery: 0, previousMastery: 0, title: "Brelan", levelXp: 140, nextXp: 640 } } };
+createRoot(document.getElementById("root")).render(React.createElement(LocaleProvider, { server: true },
+  React.createElement("main", { style: { maxWidth: 850, padding: 16, margin: "24px auto" } },
+    React.createElement(ClassicCompletion, { room, userId: "self", isOwner: false, onLeave: () => location.assign("/") }))));
+</script></body>
+</html>

@@ -1,0 +1,66 @@
+.classic-completion { position: relative; border-block: 1px solid #665936; padding: 24px; background: #101b1a; min-width: 0; }
+.classic-completion-content { display: grid; align-content: start; gap: 22px; min-width: 0; }
+.classic-completion-body { display: grid; align-content: start; gap: 22px; min-width: 0; }
+.classic-completion-heading .eyebrow { color: #c9b56f; }
+.classic-completion-headline { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
+.classic-completion-headline h2 { color: #f7e6b6; font-size: 26px; line-height: 1.2; margin: 0; }
+.classic-completion-headline p { color: #becbc7; font-size: 14px; margin: 6px 0 0; }
+.classic-completion-emblem { display: grid; flex: 0 0 68px; width: 68px; height: 68px; place-items: center; border: 1px solid #716443; border-radius: 50%; background: #25302a; color: #dec16b; }
+.completion-victory .classic-completion-emblem { color: #ffe18a; background: #3e3520; box-shadow: 0 0 24px #e3ba4b25; animation: completion-emblem-enter .6s ease-out both; }
+.classic-completion-metrics { display: flex; flex-wrap: wrap; gap: 18px 28px; padding-block: 18px; border-block: 1px solid #34423d; }
+.classic-completion-metrics > div { display: grid; align-content: start; gap: 5px; min-width: 110px; flex: 1; }
+.classic-completion-metrics small, .classic-completion-metrics span { color: #b6c5bf; font-size: 12px; }
+.classic-completion-metrics strong { display: flex; align-items: center; gap: 8px; color: #fff2ce; font-size: 30px; line-height: 1.2; overflow-wrap: anywhere; }
+.classic-completion-metrics strong .compact-number { font-size: inherit; color: inherit; }
+.classic-completion-metrics .completion-gain strong { color: #85d9ad; }
+.classic-completion-metrics .completion-loss strong { color: #f3a4a8; }
+.classic-completion-xp { display: grid; gap: 10px; }
+.classic-completion-xp-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #dbc577; font-size: 14px; }
+.classic-completion-xp-heading > span { color: #e5e9e1; margin-left: auto; }
+.classic-completion-xp progress { appearance: none; display: block; border: 0; border-radius: 3px; overflow: hidden; background: #35433d; width: 100%; height: 8px; accent-color: #d7b450; }
+.classic-completion-xp progress::-webkit-progress-bar { background: #35433d; }
+.classic-completion-xp progress::-webkit-progress-value { background: #d7b450; }
+.classic-completion-xp progress::-moz-progress-bar { background: #d7b450; }
+.classic-completion-xp-details { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #c1d0c9; font-size: 13px; }
+.classic-completion-unlock { color: #85d9ad; font-weight: 700; margin: 0; font-size: 15px; }
+.classic-completion-ranking-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.classic-completion-ranking h3 { font-size: 16px; color: #f1e8d4; margin: 0; }
+.classic-completion-ranking-heading small { color: #b6c5bf; font-size: 12px; text-align: right; }
+.classic-completion-ranking ol { display: grid; gap: 4px; list-style: none; padding: 0; margin: 0; }
+.classic-completion-ranking li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; min-height: 54px; border-radius: 6px; border: 1px solid transparent; border-bottom-color: #2c3936; }
+.classic-completion-ranking li.is-winner { background: #d0a74812; border-color: #71613a; }
+.classic-completion-ranking li.is-current { box-shadow: inset 3px 0 #69bbab; }
+.classic-completion-position { display: grid; place-items: center; font-size: 13px; color: #d5b867; }
+.classic-completion-player { min-width: 0; display: grid; gap: 3px; }
+.classic-completion-player .display-name { max-width: 100%; }
+.classic-completion-player small { color: #aabab3; font-size: 11px; }
+.classic-completion-ranking li > strong { font-size: 18px; color: #f3e9cf; }
+.classic-completion-accounting { border-top: 1px solid #34423d; padding-top: 12px; font-size: 13px; color: #bdcdc5; }
+.classic-completion-accounting summary { cursor: pointer; padding-block: 6px; }
+.classic-completion-accounting dl { display: grid; gap: 8px; margin-bottom: 0; }
+.classic-completion-accounting dl > div { display: flex; justify-content: space-between; gap: 16px; }
+.classic-completion-accounting dd { margin: 0; color: #e8e5d8; }
+.classic-completion-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 10px; border-top: 1px solid #34423d; padding-top: 18px; }
+.classic-completion-actions small { color: #bac9c2; margin-right: auto; font-size: 13px; }
+.classic-completion-actions button { min-height: 42px; }
+.classic-completion-review { margin-top: 12px; font-size: 12px; }
+.classic-completion-layer { z-index: 1400; }
+.classic-completion-modal { width: min(620px, calc(100vw - 28px)); max-width: 620px; max-height: calc(100dvh - 28px); overflow: hidden; padding: 28px; background: #101b1a; }
+.classic-completion-modal .classic-completion-content { display: flex; flex-direction: column; max-height: calc(100dvh - 86px); min-height: 0; }
+.classic-completion-modal .classic-completion-body { min-height: 0; overflow-y: auto; padding-right: 6px; }
+.classic-completion-modal .classic-completion-heading { padding-right: 24px; }
+.classic-completion-modal .classic-completion-actions { flex-shrink: 0; }
+@keyframes completion-emblem-enter { from { transform: scale(.85); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .completion-victory .classic-completion-emblem { animation: none; } }
+@media (max-width: 600px) {
+  .classic-completion, .classic-completion-modal { padding: 18px; }
+  .classic-completion-content, .classic-completion-body { gap: 18px; }
+  .classic-completion-headline { gap: 12px; }
+  .classic-completion-headline h2 { font-size: 22px; overflow-wrap: anywhere; }
+  .classic-completion-emblem { flex-basis: 52px; width: 52px; height: 52px; }
+  .classic-completion-modal .classic-completion-content { max-height: calc(100dvh - 66px); }
+  .classic-completion-metrics { gap: 16px; }
+  .classic-completion-metrics strong { font-size: 25px; }
+  .classic-completion-ranking li { padding: 8px; gap: 8px; }
+  .classic-completion-actions > button { flex: 1 1 160px; }
+}

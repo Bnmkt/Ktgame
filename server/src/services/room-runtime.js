@@ -438,6 +438,7 @@ export function createRoomRuntime(dependencies) {
     syncRoomPlayerTokens(room, db);
     room.finished = false;
     room.pacing = null;
+    delete room.completionByUser;
     room.timing = {
       botThinkingMs: settings.botThinkingSeconds * 1000,
       turnEndDelayMs: settings.turnEndDelaySeconds * 1000,

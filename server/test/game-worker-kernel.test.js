@@ -35,6 +35,21 @@ test("a room is fenced and a prepared action is not committed by a retry", async
   assert.equal((await f.kernel.prepare(input)).duplicate, true);
   assert.equal(f.kernel.commit({ ...input, version: 1 }).duplicate, true);
 });
+
+test("personal completion receipts survive worker commits and clear on a new game", async () => {
+  const f = fixture();
+  const created = await f.command("POST /api/rooms", {}, false);
+  const receipt = { player: { xp: { amount: 50, level: 2 } } };
+  f.kernel.commit({ ...created.input, version: created.result.version, financial: { completionByUser: receipt } });
+  const input = { ...created.input, version: created.result.version, commandId: "inspect", command: "tick" };
+  const draft = await f.kernel.prepare(input);
+  assert.deepEqual(draft.room.completionByUser, receipt);
+  f.kernel.abort(input);
+  const start = { ...input, commandId: "new-game", command: "POST /api/rooms/:code/start", params: { code: created.result.room.code } };
+  const started = await f.kernel.prepare(start);
+  assert.equal(started.status, 200);
+  assert.equal(started.room.completionByUser, undefined);
+});
 test("all existing games can start in the same isolated runtime", async () => {
   for (const game of games) {
     const f = fixture(game.id); await f.command("POST /api/rooms");
