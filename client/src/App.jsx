@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Coins, Shield, ShieldAlert, Users, X } from "lucide-react";
 import { api, installButtonActionFeedback, setToken } from "./api.js";
 import { defaultPublicSettings } from "./config/site.js";
+import { completeDiscordReturn } from "./features/accounts/discord-login.js";
 import { DisplayName, cosmeticCssRules, setCosmeticCatalogItems } from "./components/cosmetics/Cosmetics.jsx";
 import { CasinoHeader } from "./components/navigation/CasinoHeader.jsx";
 import { DailyBonusButton } from "./components/navigation/DailyBonusButton.jsx";
@@ -52,6 +53,7 @@ export default function App() {
   const { bindAccount } = useLocale();
   useEffect(() => { bindAccount(user, setUser); }, [user?.id, bindAccount]);
   const [accountReady, setAccountReady] = useState(false);
+  const [discordResult, setDiscordResult] = useState(null);
   const [accountRecovery, setAccountRecovery] = useState(() => new URL(window.location.href).searchParams.has("reset-password"));
   const [publicSettings, setPublicSettings] = useState({ ...defaultPublicSettings, ...publicPageData?.settings });
   const [publicGames, setPublicGames] = useState(publicPageData?.games ?? []);
@@ -99,7 +101,19 @@ export default function App() {
     }
     let cancelled = false;
     setAccountReady(false);
-    api("/api/me").then((account) => { if (!cancelled) { setUser(account); setAccountReady(true); } }).catch((error) => { if (!cancelled) { setToken(""); setAccountReady(error.status === 401); } });
+    const discordCompletion = completeDiscordReturn();
+    if (discordCompletion) {
+      discordCompletion.then((result) => {
+        if (cancelled) return;
+        if (result.token) setToken(result.token);
+        if (result.user) setUser(result.user);
+        setDiscordResult(result); setAccountReady(true);
+      }).catch(async (error) => {
+        const account = await api("/api/me").catch(() => null);
+        if (cancelled) return;
+        setUser(account); setDiscordResult({ error }); setAccountReady(true);
+      });
+    } else api("/api/me").then((account) => { if (!cancelled) { setUser(account); setAccountReady(true); } }).catch((error) => { if (!cancelled) { setToken(""); setAccountReady(error.status === 401); } });
     return () => { cancelled = true; };
   }, [accountRecovery]);
   useEffect(() => { api("/api/config").then((settings) => setPublicSettings({ ...defaultPublicSettings, ...settings })).catch(() => {}); }, []);
@@ -329,18 +343,20 @@ export default function App() {
   if (view === "status") return <Suspense fallback={<main className="status-page" role="status">{localeText("Chargement de l’état des services…")}</main>}><StatusPage siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
   if (view === "patchnotes") return <Suspense fallback={<main className="patchnotes-page" role="status">{localeText("Chargement des patchnotes…")}</main>}><PatchnotesPage siteName={publicSettings.siteName} user={user} onBack={() => goTo("lobby")} initialCatalog={publicPageData?.catalog} initialNote={publicPageData?.note} initialVersion={route.id || publicPageData?.note?.version} /></Suspense>;
   if (accountRecovery || !user || user.requiresEmailUpgrade || user.requiresEmailVerification) return <><Auth
-    onAuth={setUser}
+    onAuth={(account) => { setUser(account); setDiscordResult(null); }}
     onClearSession={() => { setToken(""); setUser(null); }}
     onRecoveryComplete={() => setAccountRecovery(false)}
     currentUser={user}
     pendingRoomCode={pendingRoomCode}
     settings={publicSettings}
+    discordResult={discordResult}
   />{view === "lobby" && !accountRecovery && <PublicGamesOverview games={publicGames} siteName={publicSettings.siteName} featuredGameId={publicSettings.featuredGameId} compact />}</>;
   const accountRestrictions = user.minor?.restrictions ?? [];
   const blockedView = view === "shop" && accountRestrictions.includes("shop") || view === "event" && (accountRestrictions.includes("community-events") || user.moderation?.type === "soft");
   return (
     <>
       {cosmeticStyles && <style>{cosmeticStyles}</style>}
+      {discordResult && !discordResult.mfaRequired && <Dialog onClose={() => setDiscordResult(null)} labelledBy="account-link-result"><h2 id="account-link-result">Discord</h2><p>{discordResult.error ? localeText(discordResult.error.message) : discordResult.linked ? localeText("Compte Discord associé.") : localeText("Connexion Discord réussie.")}</p><button type="button" onClick={() => setDiscordResult(null)}>{localeText("Fermer")}</button></Dialog>}
       <AchievementToasts notifications={notifications} onClose={(id) => setNotifications((list) => list.filter((notification) => notification.id !== id))} />
       <CasinoHeader user={user} siteName={publicSettings.siteName} siteIcon={publicSettings.siteIcon} view={view} roomCode={roomCode} eventSlug={communityEventSlug} tribunalAvailable={tribunalAvailable} onNavigate={navigate} onLogout={logout}>
       <div className="casino-wallet"><CompactNumber value={user.tokens} label={localeText("Solde exact")} /><Coins size={18} /></div><DailyBonusButton user={user} setUser={setUser} settings={publicSettings} onAchievements={notifyAchievements} onFeedback={setBonusFeedback} /><div className="identity-pill"><DisplayName user={user} />{user.guest && <small>{localeText("Invité")}</small>}{(user.admin || user.editor) && <a href={appPath("admin")} className={`secondary icon-toggle casino-management-link ${view === "admin" ? "active" : ""}`} title={user.admin ? localeText("Administration") : localeText("Studio")} aria-label={user.admin ? localeText("Administration") : localeText("Studio")} onClick={(event) => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate("admin"); } }}><Shield size={18} /></a>}</div>{!user.guest && <button type="button" className={`secondary icon-toggle conversation-toggle ${socialOpen ? "active" : ""} ${conversationUnread ? "conversation-toggle-unread" : ""}`} title={conversationUnread ? localeText("Social · {value0} messages non lus", { value0: conversationUnread }) : localeText("Social")} aria-label={conversationUnread ? localeText("Ouvrir Social, {value0} messages non lus", { value0: conversationUnread }) : localeText("Ouvrir Social")} aria-expanded={socialOpen} onClick={() => { setSocialOpen((value) => !value); setNotificationsOpen(false); }}><Users size={18} />{conversationUnread > 0 && <span className="conversation-toggle-count" aria-hidden="true">{conversationUnread > 99 ? "99+" : conversationUnread}</span>}</button>}{!user.guest && <NotificationCenter items={inboxNotifications} open={notificationsOpen} onToggle={() => { setNotificationsOpen((value) => !value); setSocialOpen(false); }} onDelete={deleteInboxNotification} onClear={clearInboxNotifications} onAction={actOnInboxNotification} />}

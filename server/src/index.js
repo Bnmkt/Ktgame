@@ -6,6 +6,9 @@ import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
 import { createRoomRuntime } from "./services/room-runtime.js";
 import "dotenv/config";
+import { discordConfiguration } from "./services/discord-oauth.js";
+import { registerDiscordRoutes } from "./services/discord-routes.js";
+import { registerDiscordPresence } from "./services/discord-presence.js";
 import { normalizeLobbyNotice, updateLobbyNotice } from "./services/lobby-notice.js";
 import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
@@ -126,6 +129,7 @@ import {
   disableTotp,
   issueMfaEmailCode,
   mfaSummary,
+  mfaChallengeAccount,
   passwordPolicyError,
   regenerateRecoveryCodes,
   recordAuthFailure,
@@ -192,6 +196,7 @@ const defaultPlatformSettings = Object.freeze({
   registrationsEnabled: true,
   guestAccessEnabled: true,
   emailVerificationRequired: false,
+  discordLoginEnabled: false,
   minorRestrictions: defaultMinorRestrictions,
   signupTokens: DEFAULT_TOKENS,
   dailyTokens: DAILY_TOKENS,
@@ -505,6 +510,7 @@ function normalizePlatformSettings(value = {}) {
     registrationsEnabled: value.registrationsEnabled !== false,
     guestAccessEnabled: value.guestAccessEnabled !== false,
     emailVerificationRequired: value.emailVerificationRequired === true,
+    discordLoginEnabled: value.discordLoginEnabled === true,
     minorRestrictions: normalizeMinorRestrictions(value.minorRestrictions),
     signupTokens: integer("signupTokens", defaultPlatformSettings.signupTokens, 0, 10000000),
     dailyTokens: integer("dailyTokens", defaultPlatformSettings.dailyTokens, 0, 1000000),
@@ -2402,7 +2408,7 @@ updateDb((db) => {
 
 setCatalogSource((db) => ({ achievements: achievementCatalog(db, { includeDisabled: true }), items: configuredShop(db) }));
 
-app.get("/api/config", (_req, res) => res.json({ ...platformSettings(), emailVerificationAvailable: emailDeliveryConfigured() }));
+app.get("/api/config", (_req, res) => res.json({ ...platformSettings(), emailVerificationAvailable: emailDeliveryConfigured(), discordLoginAvailable: platformSettings().discordLoginEnabled && discordConfiguration().available }));
 
 app.get("/api/games", (_req, res) => res.json(configuredGames().filter((game) => game.enabled !== false)));
 
@@ -2554,29 +2560,7 @@ app.post("/api/auth/register", async (req, res) => {
   res.status(201).json({ token, user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
 });
 
-app.post("/api/auth/login", async (req, res) => {
-  cleanupSecurityState();
-  const identifier = String(req.body.login ?? req.body.pseudo ?? "").trim();
-  const password = String(req.body.password ?? "");
-  let db = readDb();
-  const normalizedIdentifier = normalizeEmail(identifier);
-  let user = db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizedIdentifier : entry.pseudo.toLowerCase() === identifier.toLowerCase());
-  const failureKey = authFailureKey(identifier, req);
-  const currentLock = authLockStatus(user, failureKey);
-  if (currentLock.locked) return sendAuthLocked(res, currentLock);
-  const verifiedHash = user?.passwordHash, verifiedUserId = user?.id;
-  const matches = user ? await bcrypt.compare(password, verifiedHash) : false;
-  // Account restrictions and passwords may change while the CPU worker runs.
-  db = readDb();
-  user = verifiedUserId ? db.users.find((entry) => entry.id === verifiedUserId) : null;
-  const refreshedLock = authLockStatus(user, failureKey);
-  if (refreshedLock.locked) return sendAuthLocked(res, refreshedLock);
-  if (!user || !matches || user.passwordHash !== verifiedHash) {
-    const lock = recordAuthFailure(user, failureKey);
-    if (user) writeDb(db, { users: [user.id], rooms: [] });
-    if (lock.locked) return sendAuthLocked(res, lock);
-    return res.status(401).json({ error: "Identifiants invalides.", remainingBeforeLock: Math.max(0, 3 - lock.failures) });
-  }
+async function beginAccountLogin(req, res, db, user, method, failureKey) {
   if (user.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
   const moderation = activeModeration(user);
   if (moderation?.type === "hard") return res.status(403).json({ code: "HARD_BAN", error: "Ce compte est temporairement inaccessible.", reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" });
@@ -2610,7 +2594,7 @@ app.post("/api/auth/login", async (req, res) => {
   if (summary.enabled) {
     const emailAvailable = validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured() && (user.admin || summary.emailEnabled);
     let challenge;
-    try { challenge = createMfaChallenge(user, authFingerprint(req), emailAvailable); }
+    try { challenge = createMfaChallenge(user, authFingerprint(req), emailAvailable, Date.now(), method); }
     catch { return res.status(503).json({ code: "MFA_METHOD_UNAVAILABLE", error: "Aucune méthode de double authentification n’est utilisable. Contacte l’administration." }); }
     let emailCodeSent = false;
     if (!summary.totpEnabled && challenge.methods.includes("email")) {
@@ -2625,8 +2609,40 @@ app.post("/api/auth/login", async (req, res) => {
     }
     return res.status(202).json({ mfaRequired: true, challengeId: challenge.id, methods: challenge.methods, email: emailAvailable ? maskedEmail(user.email) : "", emailCodeSent, expiresAt: challenge.expiresAt });
   }
-  res.json(completeAccountLogin(db, user, "password", failureKey, res));
+  res.json(completeAccountLogin(db, user, method, failureKey, res));
+}
+
+app.post("/api/auth/login", async (req, res) => {
+  cleanupSecurityState();
+  const identifier = String(req.body.login ?? req.body.pseudo ?? "").trim();
+  const password = String(req.body.password ?? "");
+  let db = readDb();
+  const normalizedIdentifier = normalizeEmail(identifier);
+  let user = db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizedIdentifier : entry.pseudo.toLowerCase() === identifier.toLowerCase());
+  const failureKey = authFailureKey(identifier, req);
+  const currentLock = authLockStatus(user, failureKey);
+  if (currentLock.locked) return sendAuthLocked(res, currentLock);
+  const verifiedHash = user?.passwordHash, verifiedUserId = user?.id;
+  const matches = user ? await bcrypt.compare(password, verifiedHash) : false;
+  // Account restrictions and passwords may change while the CPU worker runs.
+  db = readDb();
+  user = verifiedUserId ? db.users.find((entry) => entry.id === verifiedUserId) : null;
+  const refreshedLock = authLockStatus(user, failureKey);
+  if (refreshedLock.locked) return sendAuthLocked(res, refreshedLock);
+  if (!user || !matches || user.passwordHash !== verifiedHash) {
+    const lock = recordAuthFailure(user, failureKey);
+    if (user) writeDb(db, { users: [user.id], rooms: [] });
+    if (lock.locked) return sendAuthLocked(res, lock);
+    return res.status(401).json({ error: "Identifiants invalides.", remainingBeforeLock: Math.max(0, 3 - lock.failures) });
+  }
+  return beginAccountLogin(req, res, db, user, "password", failureKey);
 });
+
+registerDiscordRoutes({ app, auth, platformSettings, readDb, sanitizeUser, bcrypt, isUnder13, requestCookie,
+  publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, recordAuthFailure, sendAuthLocked, writeDb,
+  secureCookies: NODE_ENV === "production" || Boolean(HTTPS_KEY_PATH || HTTPS_PFX_PATH) });
+registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence, io, roomPresence, configuredGames,
+  configuration: discordConfiguration, accountBlocked: (user) => Boolean(activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) });
 
 app.post("/api/auth/mfa/email", async (req, res) => {
   const issued = issueMfaEmailCode(String(req.body.challengeId ?? ""), authFingerprint(req), JWT_SECRET);
@@ -2643,12 +2659,12 @@ app.post("/api/auth/mfa/verify", (req, res) => {
   const db = readDb();
   const challengeId = String(req.body.challengeId ?? "");
   const method = String(req.body.method ?? "");
-  const userId = String(req.body.userId ?? "");
-  const challengeUser = db.users.find((entry) => entry.id === userId);
-  // The challenge does not expose its account id. Try only the authenticated identifier supplied by the login screen.
-  const identifier = String(req.body.login ?? "").trim();
-  const user = challengeUser ?? db.users.find((entry) => validEmail(entry.email) ? normalizeEmail(entry.email) === normalizeEmail(identifier) : entry.pseudo.toLowerCase() === identifier.toLowerCase());
+  const challenge = mfaChallengeAccount(challengeId, authFingerprint(req));
+  const user = challenge && db.users.find((entry) => entry.id === challenge.userId);
   if (!user) return res.status(400).json({ error: "Code invalide ou tentative expirée." });
+  if (user.active === false || activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) return res.status(403).json({ error: "L’accès à ce compte n’est plus autorisé." });
+  if (Number(user.passwordPolicyVersion) !== 1 || platformSettings(db).emailVerificationRequired && validEmail(user.email) && !user.emailVerifiedAt) return res.status(403).json({ error: "La sécurité du compte a changé. Recommence la connexion." });
+  const identifier = user.email || user.pseudo;
   const failureKey = authFailureKey(identifier || user.email || user.pseudo, req);
   const currentLock = authLockStatus(user, failureKey);
   if (currentLock.locked) return sendAuthLocked(res, currentLock);
@@ -2658,7 +2674,7 @@ app.post("/api/auth/mfa/verify", (req, res) => {
     if (lock.locked) return sendAuthLocked(res, lock);
     return res.status(401).json({ error: "Code invalide ou tentative expirée.", remainingBeforeLock: Math.max(0, 3 - lock.failures) });
   }
-  res.json(completeAccountLogin(db, user, `password+${method}`, failureKey, res));
+  res.json(completeAccountLogin(db, user, `${challenge.loginMethod}+${method}`, failureKey, res));
 });
 
 app.post("/api/auth/verify-email", (req, res) => {
@@ -4409,7 +4425,7 @@ app.get("/api/admin", auth, requireBackOffice, (req, res) => {
     achievementRuleSchemas: isAdministrator ? achievementRuleSchemas(configuredGames(db), configuredShop(db), achievementCatalog(db, { includeDisabled: true })) : null,
     pricing: shopPricingMatrix(db),
     permissions,
-    settings: { ...settings, emailVerificationAvailable: emailDeliveryConfigured() },
+    settings: { ...settings, emailVerificationAvailable: emailDeliveryConfigured(), discordConfigured: discordConfiguration().available },
     overview: isAdministrator ? adminOverview(db) : { catalog: { shopItems: configuredShop(db).length, customShopItems: db.settings?.customShopItems?.length ?? 0 } }
   });
 });
@@ -4830,6 +4846,7 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   }
   catch (error) { return res.status(400).json({ error: error.message }); }
   if (req.body.emailVerificationRequired === true && !emailDeliveryConfigured()) return res.status(400).json({ error: "Configure SMTP_HOST et EMAIL_FROM avant d'activer la validation des emails." });
+  if (req.body.discordLoginEnabled === true && !discordConfiguration().available) return res.status(400).json({ error: "Configure DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET et DISCORD_REDIRECT_URI sur le serveur avant d’activer Discord." });
   const previousNoticeRevision = platformSettings().lobbyNotice.updatedAt;
   const settings = updateDb((db) => {
     db.settings ??= {};
@@ -4839,7 +4856,7 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
     return db.settings.platform;
   });
   if (settings.lobbyNotice.updatedAt !== previousNoticeRevision) io.to("casino-lobby").emit("lobby-notice-updated", settings.lobbyNotice);
-  res.json({ ...settings, supportEmail: settings.contactEmail, emailVerificationAvailable: emailDeliveryConfigured() });
+  res.json({ ...settings, supportEmail: settings.contactEmail, emailVerificationAvailable: emailDeliveryConfigured(), discordConfigured: discordConfiguration().available });
 });
 
 app.post("/api/me/lobby-notice/dismiss", auth, (req, res) => {

@@ -9,6 +9,8 @@ export const defaultPublicSettings = {
   registrationsEnabled: true,
   guestAccessEnabled: true,
   emailVerificationRequired: false,
+  discordLoginEnabled: false,
+  discordLoginAvailable: false,
   emailVerificationAvailable: false,
   supportEmail: "contact@netdis.org",
   contactEmail: "contact@netdis.org",

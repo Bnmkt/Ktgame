@@ -3,6 +3,7 @@ import { BadgeCheck, CalendarDays, Eye, KeyRound, Mail, Save, ShieldCheck, Star,
 import { PasswordField } from "../common/PasswordField.jsx";
 import { DataRequestPanel } from "./DataRequestPanel.jsx";
 import { AccountSecurity } from "./AccountSecurity.jsx";
+import { AccountConnections } from "./AccountConnections.jsx";
 import { GameProgression } from "./GameProgression.jsx";
 import { RankBadge } from "../../features/games/RankedPlay.jsx";
 import { localDate } from "../../utils/dates.js";
@@ -44,6 +45,7 @@ export function AccountWorkspace({ user, form, setForm, favorites, games, toggle
       {tab === "security" && <div className="account-workspace-form"><section className="account-workspace-section"><header><Mail size={19} /><h3>{localeText("Adresse de connexion")}</h3><span className={user.emailVerified ? "is-verified" : ""}>{user.emailVerified ? localeText("Vérifiée") : localeText("À vérifier")}</span></header><form className="account-workspace-row" onSubmit={(event) => { event.preventDefault(); onSaveEmail(); }}><label htmlFor="account-email">{localeText("Adresse email")}<small>{localeText("Privée")}</small></label><div><input id="account-email" required type="email" autoComplete="email" value={form.login} onChange={change("login")} /><button type="submit" className="secondary account-workspace-email-action" disabled={Boolean(saving) || !form.login || form.login === user.login && user.emailVerified}><Mail size={16} />{form.login === user.login ? localeText("Renvoyer la vérification") : localeText("Modifier l’adresse")}</button></div></form></section>
         <section className="account-workspace-section"><header><KeyRound size={19} /><h3>{localeText("Mot de passe")}</h3></header><form className="account-workspace-password" onSubmit={(event) => { event.preventDefault(); if (form.password === confirmation) onSavePassword(); }}><PasswordField label={localeText("Nouveau mot de passe")} autoComplete="new-password" minLength={10} maxLength={128} required value={form.password} onChange={change("password")} /><small>{localeText("10 caractères minimum, une lettre, un chiffre, une majuscule et un caractère spécial.")}</small><PasswordField label={localeText("Confirmer le nouveau mot de passe")} autoComplete="new-password" required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} feedback={confirmation ? { matches: form.password === confirmation } : null} /><button type="submit" className="secondary" disabled={Boolean(saving) || !form.password || form.password !== confirmation}><KeyRound size={17} />{localeText("Modifier le mot de passe")}</button></form></section>
         <section className="account-workspace-section"><header><ShieldCheck size={19} /><h3>{localeText("Double authentification")}</h3></header><AccountSecurity user={user} onUser={onUser} onError={onError} onMessage={onMessage} /></section>
+        <AccountConnections user={user} onUser={onUser} onError={onError} onMessage={onMessage}/>
       </div>}
     </>}
   </div>;

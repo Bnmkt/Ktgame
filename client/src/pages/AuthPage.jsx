@@ -8,6 +8,8 @@ import { EnrollmentFields } from "../privacy/EnrollmentFields.jsx";
 import { PRIVACY_VERSION } from "../privacy/consent.js";
 import { Dialog } from "../components/common/Dialog.jsx";
 import { PasswordField } from "../components/common/PasswordField.jsx";
+import { startDiscordLogin } from "../features/accounts/discord-login.js";
+import "../components/profile/account-connections.css";
 
 const volatileRegistrationDeviceId = crypto.randomUUID();
 
@@ -39,7 +41,7 @@ function registrationDeviceId() {
   } catch { return volatileRegistrationDeviceId; }
 }
 
-export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, pendingRoomCode, settings = defaultPublicSettings }) {
+export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, pendingRoomCode, discordResult, settings = defaultPublicSettings }) {
   const { t: localeText, locale } = useLocale();
   const [passwordResetToken, setPasswordResetToken] = useState(() => typeof window === "undefined" ? "" : new URL(window.location.href).searchParams.get("reset-password") ?? "");
   const [mode, setMode] = useState(passwordResetToken ? "reset-password" : "login");
@@ -59,6 +61,21 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
   const [restrictedAccess, setRestrictedAccess] = useState(null);
   const [mfa, setMfa] = useState(null);
   const [mfaCode, setMfaCode] = useState("");
+  useEffect(() => {
+    if (discordResult?.mfaRequired) {
+      setMfa({ ...discordResult, method: discordResult.methods.includes("totp") ? "totp" : discordResult.methods[0] });
+      setMfaCode(""); setMode("mfa");
+    } else if (discordResult?.error) {
+      const err = discordResult.error;
+      setError(err.message);
+      if (["HARD_BAN", "PARENTAL_ACCESS_REVOKED"].includes(err.code)) setRestrictedAccess({ title: err.code === "HARD_BAN" ? "Accès temporairement bloqué" : "Accès suspendu par le responsable légal", reason: err.data?.reason ?? "", endsAt: err.data?.endsAt ?? "", parental: err.code === "PARENTAL_ACCESS_REVOKED" });
+    }
+  }, [discordResult]);
+  async function connectDiscord() {
+    setBusy("discord"); setError("");
+    try { await startDiscordLogin(pendingRoomCode); }
+    catch (err) { setError(err.message); setBusy(""); }
+  }
   const registrationPasswordReady = passwordRequirements.every((requirement) => requirement.test(register.password));
 
   useEffect(() => { api("/api/health").then(() => setServerStatus("ok")).catch(() => setServerStatus("down")); }, []);
@@ -240,6 +257,7 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
       {pendingRoomCode && <section className="table-entry-notice" aria-label={localeText("Invitation à une table")}><p><Link size={18} /> {tableEntry?.requestedCode === pendingRoomCode && tableEntry.closed ? tableEntry.error : tableEntry?.hostName ? localeText("Invitation à la partie de {value0}", { value0: tableEntry.hostName }) : localeText("Invitation à la table {value0}", { value0: pendingRoomCode })}</p>{tableEntry?.requiresPassword && <small>{localeText("Le code d’accès de cette table sera demandé après la connexion.")}</small>}{settings.guestAccessEnabled && tableEntry?.requestedCode === pendingRoomCode && !tableEntry.error && !tableEntry.ranked && !passwordResetToken && mode === "login" && <button type="button" onClick={() => { setError(""); setMode("guest"); }}><DoorOpen size={18} /><span>{localeText("Pas encore de compte ? Choisis ton pseudo et rejoins") + " "}{tableEntry.hostName ? localeText("la partie de {value0}", { value0: tableEntry.hostName }) : localeText("la partie")}.</span></button>}{tableEntry?.ranked && <small>{localeText("Un compte enregistré est nécessaire pour le classé.")}</small>}</section>}
       {!passwordResetToken && !["forgot-password", "mfa"].includes(mode) && <div className="tabs segmented-tabs"><button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}><LogIn size={18} />{" " + localeText("Connexion")}</button>{settings.registrationsEnabled && <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}><UserPlus size={18} />{" " + localeText("Inscription")}</button>}{settings.guestAccessEnabled && <button className={mode === "guest" ? "active" : ""} onClick={() => setMode("guest")}><DoorOpen size={18} />{" " + localeText("Invité")}</button>}</div>}
       {verification && <VerificationNotice value={verification} pending={busy === "resend"} onResend={resendVerification} canResend={verification.type === "pending" && Boolean(pendingEmail)} />}
+      {mode === "login" && settings.discordLoginAvailable && <button type="button" className="secondary account-link-entry" disabled={Boolean(busy)} onClick={connectDiscord}><LogIn size={18} />{busy === "discord" ? localeText("Connexion…") : localeText("Se connecter avec Discord")}</button>}
       {mode === "login" && <form className="form-stack" onSubmit={(event) => { event.preventDefault(); submit("login"); }}><label>{localeText("Adresse email")}<input required autoComplete="username" value={login.identifier} onChange={(event) => setLogin({ ...login, identifier: event.target.value })} placeholder={localeText("nom@exemple.be")} /></label><small className="legacy-login-hint">{localeText("Ancien compte sans email ? Utilise une dernière fois ton ancien identifiant.")}</small><PasswordField label={localeText("Mot de passe")} required autoComplete="current-password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} placeholder={localeText("Votre mot de passe")} /><button type="submit" disabled={busy === "login"}>{busy === "login" ? localeText("Connexion…") : localeText("Se connecter")}</button><button type="button" className="secondary" onClick={() => { setError(""); setVerification(null); setRecoveryEmail(login.identifier.includes("@") ? login.identifier : ""); setMode("forgot-password"); }}><KeyRound size={17} />{" " + localeText("Mot de passe oublié ?")}</button></form>}
       {mode === "mfa" && mfa && <form className="form-stack auth-mfa" onSubmit={verifyMfa}><div className="account-setup-heading"><ShieldAlert size={25} /><div><span className="eyebrow">{localeText("Connexion sécurisée")}</span><h2>{localeText("Deuxième étape")}</h2></div></div><p className="account-setup-copy">{localeText("Confirme cette connexion avec une méthode associée à ton compte.")}</p>{mfa.methods.length > 1 && <div className="segmented-tabs mfa-methods">{mfa.methods.map((method) => <button key={method} type="button" className={mfa.method === method ? "active" : ""} onClick={() => { setMfa({ ...mfa, method }); setMfaCode(""); }}>{method === "totp" ? localeText("Application") : method === "email" ? localeText("Email") : localeText("Code de secours")}</button>)}</div>}<label>{mfa.method === "recovery" ? localeText("Code de secours") : localeText("Code à 6 chiffres")}<input required autoFocus inputMode={mfa.method === "recovery" ? "text" : "numeric"} autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} placeholder={mfa.method === "recovery" ? localeText("XXXXXX-XXXXXX") : "000000"} /></label>{mfa.method === "email" && <><small>{localeText("Le code est envoyé à") + " "}{mfa.email || localeText("l’adresse vérifiée du compte")}{" " + localeText("et expire avec cette tentative.")}</small><button type="button" className="secondary" disabled={busy === "mfa-email"} onClick={sendMfaEmail}><RefreshCw size={17} />{busy === "mfa-email" ? localeText("Envoi…") : mfa.emailCodeSent ? localeText("Renvoyer le code") : localeText("Envoyer le code")}</button></>}<button type="submit" disabled={busy === "mfa" || !mfaCode.trim()}>{busy === "mfa" ? localeText("Vérification…") : localeText("Confirmer la connexion")}</button><button type="button" className="secondary" onClick={() => { setMfa(null); setMfaCode(""); setError(""); setMode("login"); }}>{localeText("Annuler")}</button></form>}
       {mode === "forgot-password" && <form className="form-stack" onSubmit={requestPasswordReset}><div className="account-setup-heading"><KeyRound size={25} /><div><span className="eyebrow">{localeText("Récupération du compte")}</span><h2>{localeText("Mot de passe oublié")}</h2></div></div><p className="account-setup-copy">{localeText("Saisis l’adresse email du compte. Un lien valable 30 minutes te permettra de choisir un nouveau mot de passe.")}</p><label>{localeText("Adresse email")}<input required type="email" autoComplete="email" value={recoveryEmail} onChange={(event) => setRecoveryEmail(event.target.value)} placeholder={localeText("nom@exemple.be")} /></label><button type="submit" disabled={busy === "password-reset-request"}><MailCheck size={17} />{busy === "password-reset-request" ? localeText("Envoi…") : localeText("Envoyer le lien")}</button><button type="button" className="secondary" onClick={() => { setError(""); setMode("login"); }}>{localeText("Retour à la connexion")}</button></form>}

@@ -1,0 +1,6 @@
+.account-link-entry { width: 100%; margin-bottom: 16px; }
+.account-link-panel p { line-height: 1.6; overflow-wrap: anywhere; }
+.account-link-presence { margin-top: 24px; padding-top: 20px; border-top: 1px solid #504733; }
+.account-link-presence h4 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.account-link-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 0; }
+.account-link-switch input { flex: 0 0 auto; width: 20px; height: 20px; }

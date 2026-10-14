@@ -61,6 +61,8 @@ sqlite.exec(`
     guest INTEGER NOT NULL DEFAULT 0
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_pseudo_lower ON users(lower(pseudo));
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_discord_id ON users(json_extract(data, '$.discord.id'))
+    WHERE json_extract(data, '$.discord.id') IS NOT NULL;
 
   CREATE TABLE IF NOT EXISTS rooms (
     id TEXT PRIMARY KEY,

@@ -13,6 +13,8 @@ files=(
   server/src/services/room-runtime.js server/src/services/game-gateway.js server/src/services/game-room-kernel.js
   server/src/services/room-commands.js server/src/games/engines/four-twenty-one.js
   server/src/db.js server/src/services/leaderboards.js server/src/storage/leaderboard-seasons.js
+  server/src/services/account-security.js server/src/services/discord-oauth.js
+  server/src/services/discord-routes.js server/src/services/discord-presence.js
   server/src/services/personal-archive-worker.js
   server/src/services/lobby-notice.js
   client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
@@ -44,7 +46,8 @@ if (!env.SQLITE_PATH?.startsWith("/var/lib/ktga/")) throw new Error("Unexpected 
 const db = new DatabaseSync(env.SQLITE_PATH, { readOnly: true });
 const count = db.prepare("SELECT count(*) AS count FROM rooms WHERE coalesce(json_extract(data, '$.finished'),0)=0").get().count;
 db.close();
-if (count) { console.error("Active tables: deployment postponed."); process.exit(1); }
+if (count && process.env.KTGA_ALLOW_ACTIVE_TABLES !== "1") { console.error("Active tables: deployment postponed."); process.exit(1); }
+if (count) console.log(`Explicitly authorized restart with ${count} open table(s).`);
 JS
 }
 checkTables
@@ -91,6 +94,23 @@ console.log("Requested featured game configured.");
 JS
 fi
 for file in "${files[@]}"; do install -D -m 0644 -o deploy -g deploy "$stage/$file" "/opt/ktga/$file"; done
+if [[ ${KTGA_DISCORD_ENABLE:-0} == 1 ]]; then
+  node --input-type=module <<'JS'
+import fs from "node:fs";
+import { createRequire } from "node:module";
+import { DatabaseSync } from "node:sqlite";
+import { discordConfiguration } from "/opt/ktga/server/src/services/discord-oauth.js";
+const require = createRequire("/opt/ktga/server/package.json");
+const env = require("dotenv").parse(fs.readFileSync("/etc/ktga/server.env"));
+if (!env.SQLITE_PATH?.startsWith("/var/lib/ktga/") || !discordConfiguration(env).available) throw new Error("Discord configuration incomplete.");
+const db = new DatabaseSync(env.SQLITE_PATH);
+try {
+  db.prepare("INSERT OR IGNORE INTO meta(key,value) VALUES('admin-settings','{}')").run();
+  db.prepare("UPDATE meta SET value = json_set(value, '$.platform.discordLoginEnabled', json('true')) WHERE key = 'admin-settings'").run();
+} finally { db.close(); }
+console.log("Discord login enabled.");
+JS
+fi
 rsync -a --chown=deploy:deploy --chmod=D755,F644 "$stage/client/src/" /opt/ktga/client/src/
 # Keep previous hashed assets for tabs already open.
 rsync -a --chown=root:root --chmod=D755,F644 "$stage/client/dist/" /var/www/ktga/

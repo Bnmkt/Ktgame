@@ -171,13 +171,20 @@ export function verifyUserMfa(user, method, code, encryptionSecret, now = Date.n
   return false;
 }
 
-export function createMfaChallenge(user, fingerprint, emailAvailable, now = Date.now()) {
+export function createMfaChallenge(user, fingerprint, emailAvailable, now = Date.now(), loginMethod = "password") {
+  cleanupSecurityState(now);
   const summary = mfaSummary(user);
   const methods = [summary.totpEnabled ? "totp" : "", emailAvailable ? "email" : "", summary.recoveryCodesRemaining ? "recovery" : ""].filter(Boolean);
   if (!methods.length) throw new Error("MFA_METHOD_UNAVAILABLE");
   const id = randomBytes(24).toString("base64url");
-  challenges.set(id, { userId: user.id, fingerprint: digest(fingerprint), methods, emailCodeHash: "", emailSentAt: 0, attempts: 0, expiresAt: now + CHALLENGE_LIFETIME_MS });
+  challenges.set(id, { userId: user.id, sessionVersion: Number(user.sessionVersion) || 0, loginMethod, discordId: loginMethod === "discord" ? user.discord?.id : null, fingerprint: digest(fingerprint), methods, emailCodeHash: "", emailSentAt: 0, attempts: 0, expiresAt: now + CHALLENGE_LIFETIME_MS });
   return { id, methods, expiresAt: new Date(now + CHALLENGE_LIFETIME_MS).toISOString() };
+}
+
+export function mfaChallengeAccount(challengeId, fingerprint, now = Date.now()) {
+  const challenge = challenges.get(challengeId);
+  if (!challenge || challenge.expiresAt <= now || !safeEqual(challenge.fingerprint, digest(fingerprint))) return null;
+  return { userId: challenge.userId, loginMethod: challenge.loginMethod, sessionVersion: challenge.sessionVersion };
 }
 
 export function issueMfaEmailCode(challengeId, fingerprint, pepper, now = Date.now()) {
@@ -192,7 +199,8 @@ export function issueMfaEmailCode(challengeId, fingerprint, pepper, now = Date.n
 
 export function consumeMfaChallenge(challengeId, fingerprint, method, code, user, encryptionSecret, now = Date.now()) {
   const challenge = challenges.get(challengeId);
-  if (!challenge || challenge.userId !== user?.id || challenge.expiresAt <= now || !challenge.methods.includes(method) || !safeEqual(challenge.fingerprint, digest(fingerprint))) return false;
+  if (!challenge || challenge.userId !== user?.id || challenge.sessionVersion !== (Number(user.sessionVersion) || 0) || challenge.expiresAt <= now || !challenge.methods.includes(method) || !safeEqual(challenge.fingerprint, digest(fingerprint))) return false;
+  if (challenge.loginMethod === "discord" && (!challenge.discordId || challenge.discordId !== user.discord?.id)) return false;
   challenge.attempts += 1;
   if (challenge.attempts > 10) { challenges.delete(challengeId); return false; }
   const valid = method === "email"
