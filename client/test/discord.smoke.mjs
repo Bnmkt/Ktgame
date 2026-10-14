@@ -58,6 +58,15 @@ try {
     await page.route(origin+"/connection-fixture",route=>route.fulfill({contentType:"text/html",body:profileHtml}));
     await page.goto(origin+"/connection-fixture"); await page.getByRole("button",{name:"Associer Discord",exact:true}).waitFor();
     assert.ok(await page.getByRole("button",{name:"Associer Discord",exact:true}).isVisible());
+    const download = page.getByRole("link",{name:"Télécharger le compagnon",exact:true});
+    assert.ok(await download.isVisible());
+    const archive = await fetch(origin + await download.getAttribute("href"));
+    assert.equal(archive.status,200); assert.equal(Buffer.from(await archive.arrayBuffer()).subarray(0,2).toString(),"PK");
+    await page.getByRole("button",{name:"Installation et démarrage",exact:true}).click();
+    await page.getByRole("heading",{name:"Le compagnon Discord",exact:true}).waitFor();
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+    await page.screenshot({path:path.join(directory,`${viewport.width}-companion-help.png`),fullPage:true});
+    await page.getByRole("button",{name:"Fermer",exact:true}).last().click();
     assert.ok(await page.getByRole("checkbox").isVisible());
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
     await page.screenshot({path:path.join(directory,`${viewport.width}-profile.png`),fullPage:true});

@@ -12,6 +12,7 @@ server/tools/
 artifacts/
 desktop/.deps/
 desktop/build/
+client/public/downloads/ktga-discord-companion.zip
 /data/
 
 server/data/*

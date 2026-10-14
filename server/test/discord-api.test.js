@@ -83,8 +83,9 @@ test("Discord login/link preserves real session restrictions and administrator M
     assert.equal((await flow(identities.revoked)).status, 403);
     const paired = await request("/api/me/discord/presence/pair", "POST", {}, player.data.token); assert.equal(paired.status, 403);
     assert.equal((await request("/api/me/discord/presence", "PATCH", { enabled: true }, player.data.token)).status, 200);
-    const pair = await request("/api/me/discord/presence/pair", "POST", {}, player.data.token); assert.equal(pair.status, 200);
+    const pair = await request("/api/me/discord/presence/pair", "POST", { remember: true }, player.data.token); assert.equal(pair.status, 200);
     const connection = await request("/api/auth/discord/presence/connect", "POST", { code: pair.data.code }); assert.equal(connection.status, 200);
+    assert.equal(connection.data.remember, true); assert.ok(Date.parse(connection.data.expiresAt) - Date.now() > 29 * 86400000);
     assert.equal((await request("/api/me", "GET", null, connection.data.token)).status, 401);
     assert.equal((await request("/api/discord/presence/activity", "GET", null, player.data.token)).status, 401);
     assert.equal((await request("/api/discord/presence/activity", "GET", null, connection.data.token)).data.activity, null);

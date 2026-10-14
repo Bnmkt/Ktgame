@@ -8,7 +8,7 @@ import { createRoomRuntime } from "./services/room-runtime.js";
 import "dotenv/config";
 import { discordConfiguration } from "./services/discord-oauth.js";
 import { registerDiscordRoutes } from "./services/discord-routes.js";
-import { registerDiscordPresence } from "./services/discord-presence.js";
+import { createDiscordPresence, registerDiscordPresence } from "./services/discord-presence.js";
 import { normalizeLobbyNotice, updateLobbyNotice } from "./services/lobby-notice.js";
 import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
@@ -2642,6 +2642,7 @@ registerDiscordRoutes({ app, auth, platformSettings, readDb, sanitizeUser, bcryp
   publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, recordAuthFailure, sendAuthLocked, writeDb,
   secureCookies: NODE_ENV === "production" || Boolean(HTTPS_KEY_PATH || HTTPS_PFX_PATH) });
 registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence, io, roomPresence, configuredGames,
+  presence: createDiscordPresence({ filename: path.join(path.dirname(databaseFilename), "discord-presence.sqlite") }),
   configuration: discordConfiguration, accountBlocked: (user) => Boolean(activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) });
 
 app.post("/api/auth/mfa/email", async (req, res) => {

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link2, LogIn, Monitor, Unlink } from "lucide-react";
-import { api } from "../../api.js";
+import { Download, HelpCircle, Link2, LogIn, Monitor, Unlink } from "lucide-react";
+import { api, BASE_PATH } from "../../api.js";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { PasswordField } from "../common/PasswordField.jsx";
+import { Dialog } from "../common/Dialog.jsx";
 import "./account-connections.css";
 
 export function AccountConnections({ user, onUser, onError, onMessage }) {
@@ -12,6 +13,8 @@ export function AccountConnections({ user, onUser, onError, onMessage }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [pair, setPair] = useState(null);
+  const [remember, setRemember] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
     let active = true;
     api("/api/me/discord").then((value) => { if (active) setConnection(value); }).catch((error) => { if (active) onError(error.message); });
@@ -45,7 +48,7 @@ export function AccountConnections({ user, onUser, onError, onMessage }) {
   }
   async function pairCompanion() {
     setBusy(true); onError("");
-    try { setPair(await api("/api/me/discord/presence/pair", { method: "POST", body: "{}" })); }
+    try { setPair(await api("/api/me/discord/presence/pair", { method: "POST", body: JSON.stringify({ remember }) })); }
     catch (error) { onError(error.message); }
     finally { setBusy(false); }
   }
@@ -56,9 +59,12 @@ export function AccountConnections({ user, onUser, onError, onMessage }) {
       {(connection.available || connection.linked) && <form onSubmit={changeLink} className="account-workspace-password"><PasswordField label={t("Mot de passe actuel")} required autoComplete="current-password" maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)}/><button type="submit" className="secondary" disabled={busy || !password}>{connection.linked ? <Unlink size={17}/> : <LogIn size={17}/>} {t(connection.linked ? "Dissocier Discord" : "Associer Discord")}</button></form>}
       {!connection.available && !connection.linked && <small>{t(!connection.ageAllowed ? "Disponible à partir de 13 ans, avec une date de naissance renseignée." : "La connexion Discord n’est pas encore activée.")}</small>}
     </>}
-    <div className="account-link-presence"><h4><Monitor size={17}/> {t("Présence de jeu sur Discord")}</h4><p>{t("Le navigateur seul ne peut pas publier ta présence Discord. Un compagnon local optionnel est prévu pour partager uniquement le jeu et son état, jamais tes cartes, tes messages ou le code de ta table.")}</p>
+    <div className="account-link-presence"><h4><Monitor size={17}/> {t("Présence de jeu sur Discord")}</h4><p>{t("Le navigateur seul ne peut pas publier ta présence Discord. Utilise le compagnon optionnel pour partager uniquement le jeu et son état, jamais tes cartes, tes messages ou le code de ta table.")}</p>
+      <div className="account-link-actions"><a className="button secondary" href={`${BASE_PATH}/downloads/ktga-discord-companion.zip`} download="ktga-discord-companion.zip"><Download size={17}/>{t("Télécharger le compagnon")}</a><button type="button" className="secondary" onClick={() => setHelpOpen(true)}><HelpCircle size={17}/>{t("Installation et démarrage")}</button></div>
+      <small>{t("Windows et Linux · Node.js 22+ et Discord sur le PC nécessaires.")}</small>
       {presence?.available && <label className="account-link-switch"><span>{t("Autoriser le compagnon à afficher mon activité")}</span><input type="checkbox" checked={presence.enabled} disabled={busy} onChange={changePresence}/></label>}
-      {presence?.enabled && <><button type="button" className="secondary" disabled={busy} onClick={pairCompanion}><Link2 size={16}/> {t("Connecter le compagnon")}</button>{pair && <p><strong>{pair.code}</strong><br/><small>{t("Code privé à saisir dans le compagnon. Valable 5 minutes, utilisable une seule fois.")}</small></p>}</>}
+      {presence?.enabled && <><label className="account-link-switch"><span>{t("Mémoriser ce compagnon pendant 30 jours")}</span><input type="checkbox" checked={remember} disabled={busy} onChange={(event) => setRemember(event.target.checked)}/></label><button type="button" className="secondary" disabled={busy} onClick={pairCompanion}><Link2 size={16}/> {t("Connecter le compagnon")}</button>{pair && <p><strong>{pair.code}</strong><br/><small>{t("Code privé à saisir dans le compagnon. Valable 5 minutes, utilisable une seule fois.")}</small></p>}</>}
     </div>
+    {helpOpen && <Dialog labelledBy="account-companion-help" onClose={() => setHelpOpen(false)}><h2 id="account-companion-help">{t("Le compagnon Discord")}</h2><p>{t("Extrais le ZIP téléchargé et installe Node.js 22 ou plus récent si nécessaire.")} <a href="https://nodejs.org/" target="_blank" rel="noopener noreferrer">Node.js</a></p><ol className="account-link-instructions"><li>{t("Ouvre Discord sur ton PC et autorise la présence dans ton profil KTGA.")}</li><li>{t("Pour le démarrage automatique, coche la mémorisation de 30 jours avant de générer ton code.")}</li><li>{t("Sous Windows, ouvre lancer.cmd pour une session manuelle, ou activer-demarrage.cmd pour le démarrage automatique.")}</li><li>{t("Saisis le code privé lorsque le compagnon le demande.")}</li></ol><p>{t("Sous Linux :")}</p><pre className="account-link-command">node discord-presence.mjs --enable-startup</pre><p>{t("Le démarrage se fait à l’ouverture de ta session, sans ouvrir Discord ni ton navigateur. Le compagnon attend leur disponibilité.")}</p><p>{t("Pour désactiver le lancement : desactiver-demarrage.cmd sous Windows, ou --disable-startup sous Linux. Désactiver la présence dans le profil révoque son accès.")}</p><p>{t("L’accès mémorisé expire après 30 jours. Sans mémorisation, il expire après 12 heures.")}</p><button type="button" onClick={() => setHelpOpen(false)}>{t("Fermer")}</button></Dialog>}
   </section>;
 }

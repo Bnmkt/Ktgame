@@ -1,0 +1,32 @@
+KTGA.ME - Compagnon Discord optionnel
+
+Prérequis : Node.js 22 ou plus récent (https://nodejs.org/) et Discord sur le PC.
+Ce compagnon ne demande jamais le mot de passe KTGA ou Discord.
+
+1. Extraire tout le ZIP dans un dossier.
+2. Ouvrir Profil > Compte > Connexion et sécurité > Discord sur KTGA.ME.
+3. Autoriser le compagnon à afficher l'activité.
+4. Pour le démarrage automatique, cocher "Mémoriser ce compagnon pendant 30 jours".
+5. Cliquer sur "Connecter le compagnon" pour obtenir un code privé de 5 minutes.
+6. Sous Windows : ouvrir lancer.cmd, ou activer-demarrage.cmd pour l'arrière-plan.
+7. Saisir le code dans le terminal.
+
+Démarrage automatique :
+- Windows : activer-demarrage.cmd l'active pour l'utilisateur Windows courant.
+  desactiver-demarrage.cmd le retire. Aucune permission administrateur nécessaire.
+- Linux : node discord-presence.mjs --enable-startup
+  Retirer avec : node discord-presence.mjs --disable-startup
+  Le lancement se fait à l'ouverture de la session du bureau.
+- Le compagnon attend le site et Discord. Il ne démarre pas Discord ni le navigateur.
+- L'accès mémorisé expire après 30 jours : générer un nouveau code et relancer.
+- Sans mémorisation : node discord-presence.mjs (accès de 12 heures, Ctrl+C pour arrêter).
+
+Protection et révocation :
+- Windows : l'accès mémorisé est chiffré avec DPAPI pour l'utilisateur courant.
+- Linux : fichier privé accessible uniquement à l'utilisateur (permissions 0600).
+- Aucune clé de l'application Discord ni mot de passe n'est incluse dans ce ZIP.
+- Le serveur ne conserve que l'empreinte du jeton limité à la présence.
+- Désactiver la présence dans le profil révoque l'accès du compagnon.
+- Le nom du jeu et son état sont partagés, jamais les cartes, messages ou codes de table.
+- Les fichiers installés sont dans LOCALAPPDATA\KTGACompanion sous Windows,
+  ou XDG_STATE_HOME/ktga-companion (par défaut ~/.local/state/ktga-companion) sous Linux.

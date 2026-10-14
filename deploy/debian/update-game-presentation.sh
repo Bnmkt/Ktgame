@@ -17,6 +17,10 @@ files=(
   server/src/services/discord-routes.js server/src/services/discord-presence.js
   server/src/services/personal-archive-worker.js
   server/src/services/lobby-notice.js
+  client/scripts/build.mjs client/scripts/build-companion.mjs
+  desktop/companion/discord-presence.mjs desktop/companion/companion-installation.mjs
+  desktop/companion/lancer.cmd desktop/companion/activer-demarrage.cmd
+  desktop/companion/desactiver-demarrage.cmd desktop/companion/LIRE-MOI.txt
   client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx
@@ -53,7 +57,11 @@ JS
 checkTables
 backup=/var/backups/ktga/presentation-$(date -u +%Y%m%dT%H%M%SZ)-$$
 install -d -m 0700 "$backup"
-tar -czf "$backup/code.tar.gz" -C /opt/ktga server/src client/src client/dist-ssr deploy/debian
+backupFiles=(server/src client/src client/dist-ssr deploy/debian)
+for directory in client/scripts desktop/companion; do
+  if [[ -d /opt/ktga/$directory ]]; then backupFiles+=("$directory"); fi
+done
+tar -czf "$backup/code.tar.gz" -C /opt/ktga "${backupFiles[@]}"
 tar -czf "$backup/frontend.tar.gz" -C /var/www/ktga .
 stopped=false
 rollback() {
@@ -125,6 +133,7 @@ done
 curl -fsS https://api.ktga.me/api/config | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(!Object.hasOwn(JSON.parse(s),"featuredGameId"))process.exit(1)})'
 curl -fsS https://api.ktga.me/api/games | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(!JSON.parse(s).every(g=>typeof g.coverImage==="string"&&typeof g.descriptiveImage==="string"))process.exit(1)})'
 curl -fsS https://www.ktga.me/manifest.webmanifest >/dev/null
+curl -fsS https://www.ktga.me/downloads/ktga-discord-companion.zip >/dev/null
 curl -fsS https://www.ktga.me/api/locales/fr | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(JSON.parse(s).locale!=="fr")process.exit(1)})'
 node --input-type=module <<'JS'
 const games = await (await fetch("https://www.ktga.me/api/games")).json();
