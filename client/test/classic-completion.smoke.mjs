@@ -112,7 +112,12 @@ try {
     assert.equal(await page.locator(".round-results-modal, .board-result, .leaderboard").count(), 0);
     await modal.getByRole("button", { name: "Fermer", exact: true }).click();
     assert.equal(await page.locator(".classic-completion").count(), 1);
-    assert.equal(await page.locator(".yahtzee-score-panel").count(), 1);
+    if (viewport.width <= 760) {
+      await page.getByRole("toolbar").getByRole("button", { name: "Scores", exact: true }).click();
+      const scores = page.getByRole("dialog", { name: "Scores", exact: true });
+      assert.equal(await scores.locator(".yahtzee-score-panel").count(), 1);
+      await scores.getByRole("button", { name: "Fermer", exact: true }).click();
+    } else assert.equal(await page.locator(".yahtzee-score-panel").count(), 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.screenshot({ path: path.join(directory, `${name}-real-room.png`) });
     if (name === "compact") {

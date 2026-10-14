@@ -1,10 +1,13 @@
-import { Dice5, Landmark, LogOut, Scale, ShoppingBag, Sparkles, Trophy, User } from "lucide-react";
+import { Dice5, Landmark, LogOut, Menu, Scale, Shield, ShoppingBag, Sparkles, Trophy, User } from "lucide-react";
+import { useState } from "react";
+import { Dialog } from "../common/Dialog.jsx";
 import { appPath } from "../../navigation/routes.js";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { LanguagePicker , useLocale } from "../../locales/LocaleProvider.jsx";
 
 export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
   const { t: localeText } = useLocale();
+  const [menuOpen, setMenuOpen] = useState(false);
   const restrictions = user.minor?.restrictions ?? [];
   const limited = (feature) => restrictions.includes(feature) || (user.moderation?.type === "soft" && ["friends", "community-events"].includes(feature));
   const destinations = [
@@ -19,13 +22,17 @@ export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSl
   function follow(event, destination) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
+    setMenuOpen(false);
     onNavigate(destination);
   }
+  const mainDestinations = destinations.filter(([key]) => ["lobby", "shop", "leaderboard", "profile"].includes(key));
+  const moreActive = !mainDestinations.some(([key]) => key === view);
+  const link = ([key, label, Icon]) => <a key={key} href={appPath(key, key === "room" ? roomCode : key === "event" ? eventSlug : "")} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={(event) => follow(event, key)}><Icon size={20}/><span>{localeText(label)}</span></a>;
   return <header className="casino-header">
     <div className="casino-header-inner">
       <a className="casino-brand" href={appPath("lobby")} onClick={(event) => follow(event, "lobby")}><CosmeticIcon value="site" source={siteIcon} /> <span>{siteName}</span></a>
       <nav className="casino-navigation" aria-label={localeText("Navigation du casino")}>
-        {destinations.map(([key, label, Icon]) => <a key={key} href={appPath(key, key === "room" ? roomCode : key === "event" ? eventSlug : "")} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={(event) => follow(event, key)}><Icon size={18} /><span>{localeText(label)}</span></a>)}
+        {destinations.map(link)}
       </nav>
       <div className="casino-accountbar">
         {children}
@@ -33,5 +40,10 @@ export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSl
       </div>
     </div>
     <div className="locale-header"><LanguagePicker /></div>
+    <nav className="casino-mobile-navigation" aria-label={localeText("Navigation mobile")} style={{ "--mobile-destinations": mainDestinations.length + 1 }}>
+      {mainDestinations.map(link)}
+      <button type="button" className={menuOpen || moreActive ? "active" : ""} aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={21}/><span>{localeText("Menu")}</span></button>
+    </nav>
+    {menuOpen && <Dialog title={localeText("Menu du casino")} className="casino-mobile-menu" layerClassName="casino-mobile-menu-layer" onClose={() => setMenuOpen(false)}><nav aria-label={localeText("Toutes les destinations")}>{destinations.map(link)}{(user.admin || user.editor) && link(["admin", user.admin ? "Administration" : "Studio", Shield])}</nav><div className="casino-mobile-menu-footer"><LanguagePicker/><button type="button" className="secondary" onClick={() => { setMenuOpen(false); onLogout(); }}><LogOut size={18}/>{localeText("Déconnexion")}</button></div></Dialog>}
   </header>;
 }

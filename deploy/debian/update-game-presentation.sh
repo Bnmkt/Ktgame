@@ -18,7 +18,7 @@ files=(
   client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx
-  client/src/App.jsx client/src/config/site.js client/src/seo/render.jsx
+  client/index.html client/src/App.jsx client/src/config/site.js client/src/seo/render.jsx
   client/src/styles.css client/src/navigation/casino.css
   client/src/pages/AdminPage.jsx client/src/pages/AuthPage.jsx client/src/pages/LobbyPage.jsx
   client/src/pages/PublicGamesPage.jsx client/src/pages/public-games.css

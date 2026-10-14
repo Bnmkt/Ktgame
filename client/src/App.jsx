@@ -26,6 +26,7 @@ import "./navigation/casino.css";
 import "./components/social/social.css";
 import { InstallNotice } from "./pwa/InstallNotice.jsx";
 import { LanguagePicker, LocaleProvider, useLocale } from "./locales/LocaleProvider.jsx";
+import "./navigation/mobile-casino.css";
 
 const Admin = lazy(() => import("./pages/AdminPage.jsx").then((module) => ({ default: module.Admin })));
 const LegalPage = lazy(() => import("./privacy/LegalPage.jsx").then((module) => ({ default: module.LegalPage })));

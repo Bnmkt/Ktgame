@@ -754,5 +754,12 @@
   "piles restantes": "remaining piles",
   "cartes restantes": "remaining cards",
   "Rejoindre automatiquement à la fin": "Automatically join when the game ends",
-  "Les parties classées se rejoignent depuis la file d'attente.": "Join ranked games through the matchmaking queue."
+  "Les parties classées se rejoignent depuis la file d'attente.": "Join ranked games through the matchmaking queue.",
+  "Navigation mobile": "Mobile navigation",
+  "Menu du casino": "Casino menu",
+  "Toutes les destinations": "All destinations",
+  "Niveaux admis": "Allowed levels",
+  "Autres paramètres": "Other settings",
+  "Consulter": "View",
+  "Informations de la table": "Table information"
 }

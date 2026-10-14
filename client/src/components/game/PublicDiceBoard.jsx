@@ -3,6 +3,8 @@ import { DiceThrowTray, Die } from "./GamePieces.jsx";
 import { yahtzeePotentialScore } from "./GameSupport.jsx";
 import { OtherPlayerRolls, ScorePanel } from "../room/RoomPanels.jsx";
 import { gameTitle, scoreCategories } from "../../features/games/config.js";
+import { ScoreDisclosure } from "../room/ScoreDisclosure.jsx";
+import "../room/mobile-room.css";
 import { farkleSuggestions, shutTileCombinations } from "../../features/games/farkle/model.js";
 
 export const publicDiceGames = new Set(["yahtzee", "421", "cul-de-chouette", "farkle", "shut-the-box"]);
@@ -29,6 +31,6 @@ export function PublicDiceBoard({ state }) {
       {state.bust && <p>{localeText("Aucune combinaison possible")}</p>}
     </>}
     <OtherPlayerRolls state={state} userId="" />
-    <section className="public-dice-scores"><h3>{localeText("Scores")}</h3><ScorePanel state={state} userId="" /></section>
+    <ScoreDisclosure className="public-dice-scores"><ScorePanel state={state} userId="" /></ScoreDisclosure>
   </div>;
 }
