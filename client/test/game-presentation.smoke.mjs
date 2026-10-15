@@ -307,6 +307,7 @@ try {
     await page.screenshot({ path: path.join(directory, `${name}-settings.png`), fullPage: true });
     await section("games", "Jeux");
     await page.getByRole("row").filter({ hasText: "yahtzee" }).getByRole("button", { name: "Modifier", exact: true }).click();
+    await page.getByRole("tab", { name: "Visuels", exact: true }).click();
     for (const label of ["Image descriptive", "Bannière"]) {
       await page.locator(".game-media-field").filter({ has: page.locator("strong", { hasText: label }) }).getByRole("button", { name: "Modifier / recadrer", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: `${label} · Yahtzee`, exact: true });

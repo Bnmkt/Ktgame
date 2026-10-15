@@ -93,6 +93,7 @@ try {
     if(viewport.width<700) await page.locator('.admin-mobile-nav select').selectOption('games');
     else await page.locator('.admin-sidebar').getByRole('button',{name:/^Jeux/}).click();
     await page.getByRole('row').filter({hasText:'yahtzee'}).getByRole('button',{name:'Modifier',exact:true}).click();
+    await page.getByRole('tab',{name:'Visuels',exact:true}).click();
     const iconField=page.locator('.game-media-square');await iconField.scrollIntoViewIfNeeded();
     assert.equal(await iconField.getByText('Icône Discord',{exact:true}).isVisible(),true);
     await iconField.getByRole('button',{name:'Ajouter une image',exact:true}).click();
@@ -105,8 +106,8 @@ try {
     assert.ok(overflow.scroll<=overflow.width+1,JSON.stringify(overflow));
     await crop.getByRole('button',{name:'Appliquer le recadrage',exact:true}).click();await crop.waitFor({state:'hidden'});assert.ok(uploaded);
     await iconField.locator('img').waitFor();
-    await page.locator('.admin-editor-actions').getByRole('button',{name:'Enregistrer',exact:true}).click();
-    await page.locator('.admin-editor').waitFor({state:'hidden'});assert.equal(game.discordIconImage,'/api/game-images/discord-icon.png');
+    await page.locator('.game-settings-actions').getByRole('button',{name:'Enregistrer',exact:true}).click();
+    await page.locator('.game-settings-dialog').waitFor({state:'hidden'});assert.equal(game.discordIconImage,'/api/game-images/discord-icon.png');
     await context.close();
   }
   assert.deepEqual(errors,[]);

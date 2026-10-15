@@ -1,11 +1,10 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { BugReportsAdmin } from "../features/bugs/BugReportsAdmin.jsx";
-import { Bug, FlaskConical, ImagePlus, Languages } from "lucide-react";
+import { Bug, FlaskConical, Languages } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, Copy, Gamepad2, HeartPulse, LayoutDashboard, Lock, Newspaper, Plus, RefreshCw, Save, Scale, Search, Settings, Shield, ShieldCheck, ShoppingBag, Spade, Sparkles, Trophy, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, Copy, Gamepad2, HeartPulse, LayoutDashboard, Lock, Newspaper, Plus, RefreshCw, Scale, Search, Settings, Shield, ShieldCheck, ShoppingBag, Sparkles, Trophy, Users, X } from "lucide-react";
 import { api } from "../api.js";
-import { GameArtwork } from "../components/game/GameArtwork.jsx";
 import { GameImageEditor } from "../components/admin/GameImageEditor.jsx";
 import { ConfirmActionButton, ConfirmDialog } from "../components/common/ConfirmAction.jsx";
 import { currentCosmeticCss, defaultIconKey, defaultVisualDesign, shopTypeLabel } from "../components/cosmetics/Cosmetics.jsx";
@@ -20,7 +19,7 @@ import { AchievementsAdmin } from "../components/admin/AchievementsAdmin.jsx";
 import { ParentalApprovals } from "../components/admin/ParentalApprovals.jsx";
 import { Pagination } from "../components/feedback/Feedback.jsx";
 import { usePagination } from "../components/common/usePagination.js";
-import { GameDefaults } from "../components/admin/GameDefaults.jsx";
+import { GameEditor } from "../components/admin/GameEditor.jsx";
 import { ShopStudio } from "../components/admin/ShopStudio.jsx";
 import { PatchnotesAdmin } from "../components/admin/PatchnotesAdmin.jsx";
 import { AdminOverview } from "../components/admin/AdminOverview.jsx";
@@ -319,10 +318,11 @@ export function Admin({ user, onBack, onSettingsChange }) {
       </div>
 
       {editing?.kind === "user" && <UserEditor row={editing.item} currentUser={user} games={data.games} settings={settingsDraft} onClose={() => setEditing(null)} onSaved={() => load(false)} notifySuccess={notifySuccess} reportError={setError} />}
-      {editing && editing.kind !== "user" && <ModalBackdrop className="modal-backdrop" onClick={() => setEditing(null)}>
+      {editing?.kind === "game" && <GameEditor key={editing.item.id} game={editing.item} games={data.games} saving={saving === "editor"} error={error} onChange={updateItem} onSave={save} onClose={() => setEditing(null)} onEditImage={setGameImageField} />}
+      {isShopEditor && <ModalBackdrop className="modal-backdrop" onClick={() => { if (saving !== "editor") setEditing(null); }}>
         <form className={`modal admin-editor ${editing.kind.includes("shop") ? "shop-admin-editor" : ""}`} onSubmit={(event) => { event.preventDefault(); save(); }} onClick={(event) => event.stopPropagation()}>
           <div className="modal-title-row"><div><span className="eyebrow">{localeText("Édition")}</span><h2>{editorTitle}</h2><small>{editing.item.id}</small></div><button type="button" className="secondary icon-toggle" onClick={() => setEditing(null)} aria-label={localeText("Fermer")}><X size={18} /></button></div>
-          {isShopEditor ? <ShopStudio
+          <ShopStudio
             item={editing.item}
             kind={editing.kind}
             user={user}
@@ -338,16 +338,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
             onDuplicate={() => setConfirmAction({ title: "Dupliquer cet objet ?", message: `Une copie de « ${editing.item.name} » sera ajoutée à la boutique avec les réglages actuellement affichés.`, label: "Dupliquer l’objet", danger: false, run: () => duplicateShopItem(editing.item) })}
             onDelete={() => requestAdminAction({ title: "Supprimer cet objet ?", message: `${editing.item.name} sera retiré de la boutique.`, label: "Supprimer l’objet", path: `/api/admin/shop/${editing.item.id}`, method: "DELETE" })}
             onCancel={() => setEditing(null)}
-          /> : <div className="admin-editor-fields">
-              {editing.kind === "game" && <>
-                <GameDefaults game={editing.item} onChange={(value) => updateItem("defaultModifiers", value)} />
-                <section className="admin-form-section"><div className="admin-form-section-title"><Gamepad2 /><div><h3>{localeText("Images du jeu")}</h3></div></div><div className="game-media-fields">{[["descriptiveImage", "Image descriptive"], ["coverImage", "Bannière"], ["discordIconImage", "Icône Discord"]].map(([field, label]) => <div className={`game-media-field${field === "discordIconImage" ? " game-media-square" : ""}`} key={field}><strong>{localeText(label)}</strong><GameArtwork source={editing.item[field]} /><small>{localeText(field === "descriptiveImage" ? "Fond du cadre de sélection." : field === "coverImage" ? "Jeu à l’affiche et catalogue public." : "Petite icône dans la présence Discord. La bannière du jeu est utilisée comme image principale.")}</small><div className="game-media-actions"><button type="button" className="secondary" onClick={() => setGameImageField(field)}><ImagePlus size={16} />{editing.item[field] ? localeText("Modifier / recadrer") : localeText("Ajouter une image")}</button><button type="button" className="secondary icon-toggle" title={localeText("Retirer : {value0}", { value0: label })} aria-label={localeText("Retirer : {value0}", { value0: label })} disabled={!editing.item[field]} onClick={() => updateItem(field, "")}><X size={16} /></button></div></div>)}</div></section>
-                <section className="admin-form-section"><div className="admin-form-section-title"><Gamepad2 /><div><h3>{localeText("Présentation")}</h3><p>{localeText("Ces informations sont visibles sur la page d’accueil.")}</p></div></div><label>{localeText("Nom du jeu")}<input required value={editing.item.name} onChange={(e) => updateItem("name", e.target.value)} /></label><label>{localeText("Description publique")}<textarea required value={editing.item.description ?? ""} onChange={(e) => updateItem("description", e.target.value)} maxLength={240} /><small>{editing.item.description?.length ?? 0}{localeText("/240 caractères")}</small></label></section>
-                <section className="admin-form-section"><div className="admin-form-section-title"><Settings /><div><h3>{localeText("Classement et disponibilité")}</h3><p>{localeText("Le type technique et le nombre de joueurs sont définis par le moteur du jeu.")}</p></div></div><div className="admin-field-grid"><label>{localeText("Catégorie")}<select value={editing.item.category ?? "score"} onChange={(e) => updateItem("category", e.target.value)}>{[...new Set(data.games.map((game) => game.category))].map((value) => <option key={value} value={value}>{localeText(gameCategoryLabel(value))}</option>)}</select></label><label>{localeText("Public")}<select value={editing.item.audience ?? "multi"} onChange={(e) => updateItem("audience", e.target.value)}><option value="solo">{localeText("Solo")}</option><option value="multi">{localeText("Multijoueur")}</option><option value="solo-multi">{localeText("Solo et multijoueur")}</option></select></label><label>{localeText("Complexité")}<select value={editing.item.complexity ?? "intermediate"} onChange={(e) => updateItem("complexity", e.target.value)}><option value="easy">{localeText("Accessible")}</option><option value="intermediate">{localeText("Intermédiaire")}</option><option value="advanced">{localeText("Avancé")}</option></select></label></div><div className="admin-field-grid"><label>{localeText("Pot d’entrée")}<input type="number" min="0" value={editing.item.entryPot ?? 0} onChange={(e) => updateItem("entryPot", Number(e.target.value))} /></label><label>{localeText("Position sur l’accueil")}<input type="number" min="1" max={data.games.length} value={editing.item.position ?? 1} onChange={(e) => updateItem("position", Number(e.target.value))} /></label></div><div className="admin-toggle-row"><label><input type="checkbox" checked={editing.item.enabled !== false} onChange={(e) => updateItem("enabled", e.target.checked)} />{" " + localeText("Jeu publié sur l’accueil")}</label></div><div className="admin-tag-preview"><span>{localeText(gameCategoryLabel(editing.item.category))}</span><span>{localeText(gameAudienceLabel(editing.item.audience))}</span><span>{localeText(gameComplexityLabel(editing.item.complexity))}</span><span>{editing.item.minPlayers}-{editing.item.maxPlayers}{" " + localeText("joueurs")}</span></div></section>
-                {editing.item.id === "texas-holdem" && <section className="admin-form-section poker-game-settings"><div className="admin-form-section-title"><Spade /><div><h3>{localeText("Paramètres des tables")}</h3><p>{localeText("Valeurs proposées lors de la création d’une table de Texas Hold’em.")}</p></div></div><div className="admin-field-grid"><label>{localeText("Cave minimale")}<input type="number" min="1000" max="10000000" value={editing.item.minPokerBuyIn} onChange={(event) => updateItem("minPokerBuyIn", Number(event.target.value))} /></label><label>{localeText("Grosse blinde par défaut")}<input type="number" min="2" max={editing.item.minPokerBuyIn} step="2" value={editing.item.pokerDefaultBigBlind} onChange={(event) => updateItem("pokerDefaultBigBlind", Number(event.target.value))} /></label><label>{localeText("Temps par tour (secondes)")}<input type="number" min="30" max="600" value={editing.item.pokerTurnSeconds} onChange={(event) => updateItem("pokerTurnSeconds", Number(event.target.value))} /></label></div><div className="blind-ratio settings-blind-preview"><span>{localeText("Petite blinde")}<strong>{Math.floor((Number(editing.item.pokerDefaultBigBlind) || 2) / 2)}</strong></span><b>½</b><span>{localeText("Grosse blinde")}<strong>{editing.item.pokerDefaultBigBlind}</strong></span></div><small className="field-help">{localeText("La petite blinde vaut toujours la moitié de la grosse blinde. Ces valeurs concernent les prochaines tables.")}</small></section>}
-              </>}
-          </div>}
-          {!isShopEditor && <div className="actions admin-editor-actions"><button type="submit" disabled={saving === "editor"}><Save size={18} /> {saving === "editor" ? localeText("Enregistrement…") : localeText("Enregistrer")}</button><button type="button" className="secondary" onClick={() => setEditing(null)}>{localeText("Annuler")}</button></div>}
+          />
         </form>
       </ModalBackdrop>}
       {gameImageField && editing?.kind === "game" && <GameImageEditor key={`${editing.item.id}-${gameImageField}`} gameId={editing.item.id} gameName={editing.item.name} field={gameImageField} value={editing.item[gameImageField]} onApply={(image) => { updateItem(gameImageField, image); setGameImageField(""); }} onClose={() => setGameImageField("")} />}
