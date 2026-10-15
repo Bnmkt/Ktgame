@@ -21,8 +21,8 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
     if (!file) return;
     request ??= ++generation.current;
     setError(""); setLoading(false);
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) {
-      setError("Choisis une image PNG, JPEG ou WebP de 10 Mo maximum."); return;
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type) || file.size > (file.type === "image/gif" ? 3 : 10) * 1024 * 1024) {
+      setError("PNG, JPEG ou WebP : 10 Mo maximum. GIF animé : 3 Mo maximum."); return;
     }
     setLoading(true);
     const url = URL.createObjectURL(file), image = new window.Image();
@@ -32,7 +32,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
       if (request !== generation.current) { URL.revokeObjectURL(url); return; }
       if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
       sourceUrl.current = url;
-      setSource({ url, image, width: image.naturalWidth, height: image.naturalHeight }); setCrop(centered);
+      setSource({ url, image, file, animated: file.type === "image/gif", width: image.naturalWidth, height: image.naturalHeight }); setCrop(centered);
     } catch (failure) {
       URL.revokeObjectURL(url);
       if (request === generation.current) setError(failure.message || "L’image ne peut pas être ouverte.");
@@ -59,7 +59,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
   } : null;
   const update = (next) => setCrop((previous) => ({ ...previous, ...next }));
   function move(event) {
-    if (!drag.current || busy || loading) return;
+    if (!drag.current || busy || loading || source?.animated) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const dx = event.clientX - drag.current.x, dy = event.clientY - drag.current.y;
     drag.current = { x: event.clientX, y: event.clientY };
@@ -70,7 +70,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
   }
   function nudge(event) {
     const direction = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key];
-    if (!direction || busy || loading) return;
+    if (!direction || busy || loading || source?.animated) return;
     event.preventDefault();
     update({ x: bounds.x + direction[0] * bounds.width / source.width * 0.02, y: bounds.y + direction[1] * bounds.height / source.height * 0.02 });
   }
@@ -78,33 +78,33 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
     if (!source || busy || loading) return;
     setBusy(true); setError("");
     try {
-      const blob = await encodeArtworkCrop(source.image, crop, format);
-      const result = await api(uploadPath ?? `/api/admin/games/${encodeURIComponent(gameId)}/images/${field}`, { method: "POST", body: blob, headers: { "Content-Type": "image/png" }, deduplicate: false });
+      const blob = source.animated ? source.file : await encodeArtworkCrop(source.image, crop, format);
+      const result = await api(uploadPath ?? `/api/admin/games/${encodeURIComponent(gameId)}/images/${field}`, { method: "POST", body: blob, headers: { "Content-Type": source.animated ? "image/gif" : "image/png" }, deduplicate: false });
       onApply(result.image);
     } catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
   }
 
-  return <Dialog title={`${format.label} · ${gameName}`} className="game-art-editor" layerClassName="game-art-layer" onClose={onClose} dismissible={!busy}>
+  return <Dialog title={`${localeText(format.label)} · ${gameName}`} className="game-art-editor" layerClassName="game-art-layer" onClose={onClose} dismissible={!busy}>
     <div className="game-art-editor-body">
-      <input ref={input} className="game-art-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label={imageLabel ? localeText("Importer une image") : localeText("Importer une image du jeu")} disabled={busy} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
+      <input ref={input} className="game-art-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label={imageLabel ? localeText("Importer une image") : localeText("Importer une image du jeu")} disabled={busy} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
       <div className="game-art-tools"><button type="button" className="secondary" disabled={busy} onClick={() => input.current.click()}><Upload size={18} />{source ? localeText("Changer l’image") : localeText("Importer une image")}</button><span>{format.width} × {format.height}{" " + localeText("px")}</span></div>
       {loading && <p role="status">{localeText("Chargement de l’image…")}</p>}
       {source ? <div className="game-art-workspace">
         <div>
           <div className="game-art-crop" style={{ aspectRatio: `${format.width} / ${format.height}` }} tabIndex={0} role="group" aria-label={localeText("Zone de recadrage")} onKeyDown={nudge} onPointerDown={(event) => {
-            if (busy || loading || event.button !== 0) return;
+            if (busy || loading || source.animated || event.button !== 0) return;
             event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY };
           }} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
             <img src={source.url} alt="Image à recadrer" draggable={false} style={imageStyle} />
           </div>
-          <label className="game-art-zoom">{localeText("Zoom") + " "}<output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.5} max={5} step={0.01} value={bounds.zoom} aria-label={localeText("Zoom du recadrage")} disabled={busy || loading} onChange={(event) => update({ ...bounds, zoom: Number(event.target.value) })} /></label>
-          <button type="button" className="secondary" disabled={busy || loading} onClick={() => setCrop(centered)}><RotateCcw size={17} />{localeText("Réinitialiser le cadrage")}</button>
+          <label className="game-art-zoom">{localeText("Zoom") + " "}<output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.5} max={5} step={0.01} value={bounds.zoom} aria-label={localeText("Zoom du recadrage")} disabled={busy || loading || source.animated} onChange={(event) => update({ ...bounds, zoom: Number(event.target.value) })} /></label>
+          <button type="button" className="secondary" disabled={busy || loading || source.animated} onClick={() => setCrop(centered)}><RotateCcw size={17} />{localeText("Réinitialiser le cadrage")}</button>
         </div>
         <aside className="game-art-preview"><span className="eyebrow">{localeText("Aperçu")}</span><div style={{ aspectRatio: `${format.width} / ${format.height}` }}><img src={source.url} alt="Aperçu du recadrage" style={imageStyle} /></div><strong>{gameName}</strong></aside>
       </div> : !loading && <div className="game-art-empty"><ImageIcon size={44} /><span>{localeText(format.label)}</span></div>}
       {error && <p className="error" role="alert">{localeText(error)}</p>}
     </div>
-    <div className="game-art-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>{localeText("Annuler")}</button><button type="button" disabled={!source || busy || loading} onClick={apply}><Check size={17} />{busy ? localeText("Enregistrement…") : localeText("Appliquer le recadrage")}</button></div>
+    <div className="game-art-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>{localeText("Annuler")}</button><button type="button" disabled={!source || busy || loading} onClick={apply}><Check size={17} />{busy ? localeText("Enregistrement…") : source?.animated ? localeText("Importer le GIF animé") : localeText("Appliquer le recadrage")}</button></div>
   </Dialog>;
 }

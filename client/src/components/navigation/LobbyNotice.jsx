@@ -31,7 +31,7 @@ export function LobbyNotice({ notice, user = {}, setUser, preview = false }) {
   return <section className={`lobby-notice${expanded ? " is-expanded" : ""}`} aria-label={localeText("Annonce")}>
     {background && failedImage !== imageUrl && <span className="lobby-notice-art" aria-hidden="true"><img src={imageUrl} alt="" decoding="async" referrerPolicy="no-referrer" onError={() => setFailedImage(imageUrl)}/><img src={imageUrl} alt="" decoding="async" referrerPolicy="no-referrer"/></span>}
     <header><div><Megaphone size={20}/><h2>{notice.title || localeText("Annonce")}</h2></div>{!preview && <button type="button" className="secondary icon-toggle" disabled={busy} aria-label={localeText("Fermer l’annonce")} title={localeText("Fermer l’annonce")} onClick={close}><X size={18}/></button>}</header>
-    <div id={bodyId}><MarkdownContent compactPreview={!expanded} className={`lobby-notice-content${expanded ? "" : " lobby-notice-snippet"}`}>{notice.content}</MarkdownContent></div>
+    <div id={bodyId}><MarkdownContent preserveLineBreaks className={`lobby-notice-content${expanded ? "" : " lobby-notice-snippet"}`}>{notice.content}</MarkdownContent></div>
     <footer><button type="button" className="secondary lobby-notice-expand" aria-expanded={expanded} aria-controls={bodyId} onClick={() => setExpandedRevision(expanded ? "" : revision)}>{expanded ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}{expanded ? localeText("Réduire l’annonce") : localeText("Lire la suite")}</button></footer>
     {error && <p className="error" role="alert">{localeText(error)}</p>}
   </section>;

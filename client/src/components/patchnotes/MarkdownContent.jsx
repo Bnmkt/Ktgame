@@ -13,10 +13,23 @@ function safeMarkdownUrl(value) {
   return "";
 }
 
-export function MarkdownContent({ children, className = "", inlineImages = true, compactPreview = false }) {
+function remarkLineBreaks() {
+  return (tree) => {
+    function visit(node) {
+      if (!node.children || ["code", "inlineCode", "html"].includes(node.type)) return;
+      node.children = node.children.flatMap((child) => {
+        if (child.type !== "text") { visit(child); return [child]; }
+        return child.value.split(/\r\n?|\n/).flatMap((value, index) => [...(index ? [{ type: "break" }] : []), { type: "text", value }]);
+      });
+    }
+    visit(tree);
+  };
+}
+
+export function MarkdownContent({ children, className = "", inlineImages = true, compactPreview = false, preserveLineBreaks = false }) {
   const { t: localeText } = useLocale();
   return <div className={`patchnote-markdown ${className}`}><ReactMarkdown
-    remarkPlugins={[remarkGfm, remarkKtgaTokens]}
+    remarkPlugins={[remarkGfm, remarkKtgaTokens, ...(preserveLineBreaks ? [remarkLineBreaks] : [])]}
     components={{
       span: ({ children: label, "data-ktga-token": token }) => token ? <MarkdownToken value={token} /> : <span>{localeText(label)}</span>,
       img: ({ src = "", alt = "", title }) => {

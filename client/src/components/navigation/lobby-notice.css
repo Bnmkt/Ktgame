@@ -9,9 +9,7 @@
 .lobby-notice h2 { margin: 0; font-size: 20px; color: #ecd075; overflow-wrap: anywhere; }
 .lobby-notice > header > button { flex-shrink: 0; }
 .lobby-notice-content img, .lobby-notice-preview img { max-width: 100%; height: auto; }
-.lobby-notice-snippet { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: 16px; line-height: 1.6; }
-.lobby-notice-snippet :is(p,h1,h2,h3,h4,h5,h6,blockquote,ul,ol,li,pre,table,thead,tbody,tr,th,td) { display: inline; margin: 0; padding: 0; border: 0; font-size: inherit; line-height: inherit; }
-.lobby-notice-snippet :is(p,h1,h2,h3,h4,h5,h6,li,th,td)::after { content: " "; }
+.lobby-notice-snippet { max-height: 4.8em; overflow: hidden; font-size: 16px; line-height: 1.6; }
 .lobby-notice > footer { display: flex; justify-content: flex-end; margin-top: 12px; }
 .lobby-notice-expand { min-height: 36px; }
 .lobby-notice-image-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
