@@ -203,10 +203,16 @@ test("equipped ranked badge is validated, persisted, projected into chat and rem
   assert.equal((await request("b","/api/me","PATCH",{rankedBadgeGameId:""})).data.rankedBadge,null);
 });
 
-test("midnight ranked keeps contracts private and an abandonment cannot block the market",async()=>{
+test("midnight ranked keeps contracts private and an abandonment cannot block the market",async(t)=>{
+  const original=(await request("admin","/api/admin/ranked")).data.settings;
+  const settings=structuredClone(original);
+  settings.games["midnight-dice"].preset.gameModifiers.uniqueContracts=false;
+  assert.equal((await request("admin","/api/admin/ranked","PUT",settings)).status,200);
+  t.after(async()=>{assert.equal((await request("admin","/api/admin/ranked","PUT",original)).status,200);});
   const code=await confirmedMatch(["a","b","c","d"],"midnight-dice");
   let table=(await request("a",`/api/rooms/${code}`)).data;
   assert.equal(table.stake,0);assert.equal(table.ranked.roster.length,4);
+  assert.equal(table.state.modifiers.uniqueContracts,false);
   const offers=[];
   for(const id of ["a","b","c","d"]) {
     const view=(await request(id,`/api/rooms/${code}`)).data.state;
@@ -218,7 +224,11 @@ test("midnight ranked keeps contracts private and an abandonment cannot block th
   for (const id of ["a","b","c"]) {
     table=(await request(id,`/api/rooms/${code}`)).data;
     if (table.pacing) await request(id,`/api/rooms/${code}/pacing/skip`,"POST",{});
-    assert.equal((await request(id,`/api/rooms/${code}/action`,"POST",{type:"choose-contract",contract:table.state.contractOffers[0]})).status,200);
+    const contract=table.state.contractOffers[0];
+    assert.equal((await request(id,`/api/rooms/${code}/action`,"POST",{type:"choose-contract",contract})).status,200);
+    const own=(await request(id,`/api/rooms/${code}`)).data.state;
+    assert.equal(own.contractOffers.length,3);assert.ok(!own.contractOffers.includes(contract));
+    assert.equal((await request("d",`/api/rooms/${code}`)).data.state.contractOffers.length,4);
   }
   const other=(await request("admin",`/api/rooms/${code}`)).data;
   assert.deepEqual(other.state.contractOffers,[]);assert.equal(other.state.privateContractOffers,undefined);

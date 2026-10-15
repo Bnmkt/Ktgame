@@ -11,7 +11,7 @@ files=(
   server/src/services/game-images.js server/src/services/account-domain.js server/src/services/locales.js
   server/src/services/ranked.js server/src/services/ranked-runtime.js server/src/services/ranked-room-runtime.js
   server/src/services/room-runtime.js server/src/services/game-gateway.js server/src/services/game-room-kernel.js
-  server/src/services/room-commands.js server/src/games/engines/four-twenty-one.js
+  server/src/services/room-commands.js server/src/games/engines/four-twenty-one.js server/src/games/engines/midnight-dice.js
   server/src/db.js server/src/services/leaderboards.js server/src/storage/leaderboard-seasons.js
   server/src/services/account-security.js server/src/services/discord-oauth.js
   server/src/services/discord-routes.js server/src/services/discord-presence.js

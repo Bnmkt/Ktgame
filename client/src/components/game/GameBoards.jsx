@@ -183,7 +183,7 @@ export function BattleBoard({ state, user, onDraw, onPlace }) {
 
 function MidnightContractCatalog({ state, contracts, tierEntries, usedContracts, selecting, onAction }) {
   const { t: localeText } = useLocale();
-  const visibleEntries=Object.entries(midnightContractInfo).filter(([id])=>!selecting || contracts.some(([offered])=>offered===id) && (!state.modifiers.uniqueContracts || usedContracts.length>=contracts.length || !usedContracts.includes(id)));
+  const visibleEntries=Object.entries(midnightContractInfo).filter(([id])=>!selecting || contracts.some(([offered])=>offered===id) && !usedContracts.includes(id));
   const visibleTiers=tierEntries.filter(([tierId])=>visibleEntries.some(([,info])=>info.tier===tierId));
   return <section className={`midnight-codex-panel ${selecting ? "midnight-selection" : ""}`} aria-label={selecting ? localeText("Choisir un mandat") : localeText("Codex des mandats")}>
     <header className="midnight-codex-heading"><div><span className="eyebrow">{selecting ? localeText("Sélection secrète") : localeText("Archives de la table")}</span><p>{localeText("Chaque lancer rapporte sa somme. Réussir le mandat ajoute la prime de son palier.")}</p></div></header>
@@ -195,7 +195,7 @@ function MidnightContractCatalog({ state, contracts, tierEntries, usedContracts,
         const example = midnightContractEvaluation(id, info.example);
         const offered = contracts.some(([contractId]) => contractId === id);
         const used = usedContracts.includes(id);
-        const unavailable = state.modifiers.uniqueContracts && usedContracts.length < contracts.length && used;
+        const unavailable = used;
         const selectable = selecting && offered && !unavailable;
         return <article className={`${offered ? "offered" : ""} ${unavailable ? "used" : ""}`} style={{"--contract-accent":tier.accent}} key={id}><div>{selecting && <span className="midnight-tier-badge">{localeText(tier.label)}</span>}<strong>{localeText(info.label)}</strong><small>{info.hint}</small></div><div className="midnight-codex-example">{info.example.map((value, index) => <Die value={value} kept={false} animate={false} skin="default" key={`${id}-${index}`} />)}</div><footer><span>{offered ? unavailable ? localeText("Rotation actuelle · utilisé") : localeText("Disponible maintenant") : localeText("Hors rotation")}</span><b>{example.base} + {tier.bonus} = {example.points}{" " + localeText("pts")}</b>{selectable && <button type="button" onClick={() => onAction({ type: "choose-contract", contract: id })}>{localeText("Choisir")}</button>}</footer></article>;
       })}</div></section>;

@@ -19,31 +19,89 @@ export const MIDNIGHT_CONTRACT_DEFINITIONS = {
 
 export const MIDNIGHT_CONTRACTS = Object.keys(MIDNIGHT_CONTRACT_DEFINITIONS);
 
-function contractRotation(previous = [], avoided = []) {
+function contractRotation(previous = []) {
   const freshPool = MIDNIGHT_CONTRACTS.filter((contract) => !previous.includes(contract));
   const pool = freshPool.length >= 4 ? freshPool : MIDNIGHT_CONTRACTS;
-  const signature = (contracts) => [...contracts].sort().join("|");
-  const used = new Set(avoided.map(signature));
-  for (let attempt=0;attempt<10;attempt++) {
-    const offer=shuffle(pool).slice(0,4);
-    if (!used.has(signature(offer))) return offer;
-  }
-  for (let offset=0;offset<pool.length;offset++) {
-    const offer=Array.from({length:4},(_,index)=>pool[(offset+index)%pool.length]);
-    if (!used.has(signature(offer))) return offer;
-  }
-  throw new Error("Impossible de proposer des mandats distincts.");
+  return shuffle(pool).slice(0, 4);
 }
 export function midnightContractOffers(state, playerId) {
-  return state.modifiers?.individualContracts ? state.privateContractOffers?.[playerId] ?? state.contractOffers ?? [] : state.contractOffers ?? [];
+  const offers = state.modifiers?.individualContracts ? state.privateContractOffers?.[playerId] ?? state.contractOffers ?? [] : state.contractOffers ?? [];
+  const used = state.usedContracts?.[playerId] ?? [];
+  return offers.filter((contract) => !used.includes(contract));
 }
-function renewIndividualOffers(state) {
-  const previous=state.privateContractOffers ?? {}, selections=[];
-  state.privateContractOffers=Object.fromEntries(state.players.map((player)=>{
-    const offer=contractRotation(previous[player.id] ?? [],selections);
-    selections.push(offer);
-    return [player.id,offer];
-  }));
+
+const contractPotentials = Object.fromEntries(MIDNIGHT_CONTRACTS.map((contract) => {
+  let maximum = 0;
+  for (let first = 1; first <= 6; first++) for (let second = 1; second <= 6; second++) for (let third = 1; third <= 6; third++) {
+    maximum = Math.max(maximum, scoreMidnightContract(contract, [first, second, third]));
+  }
+  return [contract, maximum];
+}));
+
+export function midnightContractPotential(contract) { return contractPotentials[contract] ?? 0; }
+
+// Cache the 495 possible offers, valued from the scoring rules (base + bonus).
+const balancedOffers = [];
+for (let first = 0; first < MIDNIGHT_CONTRACTS.length - 3; first++) {
+  for (let second = first + 1; second < MIDNIGHT_CONTRACTS.length - 2; second++) {
+    for (let third = second + 1; third < MIDNIGHT_CONTRACTS.length - 1; third++) {
+      for (let fourth = third + 1; fourth < MIDNIGHT_CONTRACTS.length; fourth++) {
+        const indices = [first, second, third, fourth], contracts = indices.map((index) => MIDNIGHT_CONTRACTS[index]);
+        const points = contracts.map(midnightContractPotential).sort((left, right) => right - left);
+        balancedOffers.push({ contracts, points, mask: indices.reduce((mask, index) => mask | (1 << index), 0), total: points.reduce((sum, value) => sum + value, 0) });
+      }
+    }
+  }
+}
+
+function renewIndividualOffers(state, firstRound = state.round) {
+  if (!state.players.length) { state.privateContractOffers = {}; return; }
+  const previous = state.privateContractOffers ?? {};
+  const rounds = Math.min(4, state.modifiers.rounds - firstRound + 1);
+  const valuedOffers = balancedOffers.map((offer) => ({ ...offer, potential: offer.points.slice(0, rounds).reduce((sum, value) => sum + value, 0) }));
+  const candidates = state.players.map((player) => {
+    const mask = (previous[player.id] ?? []).reduce((value, contract) => {
+      const index = MIDNIGHT_CONTRACTS.indexOf(contract);
+      return index < 0 ? value : value | (1 << index);
+    }, 0);
+    const fresh = valuedOffers.filter((offer) => !(offer.mask & mask));
+    return shuffle(fresh.length ? fresh : valuedOffers).sort((left, right) => left.potential - right.potential);
+  });
+  const playerOrder = shuffle(state.players.map((_, index) => index)).sort((left, right) => candidates[left].length - candidates[right].length);
+  const potentials = [...new Set(candidates.flat().map((offer) => offer.potential))].sort((left, right) => left - right);
+  const target = valuedOffers.reduce((total, offer) => total + offer.potential, 0) / valuedOffers.length;
+  function assign(lower, upper) {
+    const owners = new Map(), selected = [];
+    function place(player, visited) {
+      for (const offer of candidates[player]) {
+        if (offer.potential < lower) continue;
+        if (offer.potential > upper) break;
+        if (visited.has(offer.mask)) continue;
+        visited.add(offer.mask);
+        const owner = owners.get(offer.mask);
+        if (owner === undefined || place(owner, visited)) {
+          owners.set(offer.mask, player); selected[player] = offer;
+          return true;
+        }
+      }
+      return false;
+    }
+    return playerOrder.every((player) => place(player, new Set())) ? selected : null;
+  }
+  // Find the narrowest feasible score interval while keeping offers distinct and
+  // excluding each player's previous rotation. Randomness only breaks ties.
+  let best = null, upper = 0;
+  for (let lower = 0; lower < potentials.length; lower++) {
+    upper = Math.max(upper, lower);
+    let selected = null;
+    while (upper < potentials.length && !(selected = assign(potentials[lower], potentials[upper]))) upper++;
+    if (!selected) break;
+    const spread = potentials[upper] - potentials[lower];
+    const distance = Math.abs((potentials[upper] + potentials[lower]) / 2 - target);
+    if (!best || spread < best.spread || spread === best.spread && distance < best.distance) best = { spread, distance, selected };
+  }
+  if (!best) throw new Error("Impossible de proposer des mandats distincts.");
+  state.privateContractOffers = Object.fromEntries(state.players.map((player, index) => [player.id, shuffle(best.selected[index].contracts)]));
 }
 
 export function evaluateMidnightContract(contract, dice = []) {
@@ -117,7 +175,7 @@ function resolveRound(state) {
     return;
   }
   if (state.round % 4 === 0) {
-    if (state.modifiers.individualContracts) renewIndividualOffers(state);
+    if (state.modifiers.individualContracts) renewIndividualOffers(state, state.round + 1);
     else state.contractOffers = contractRotation(state.contractOffers);
     state.usedContracts = Object.fromEntries(state.players.map((player) => [player.id, []]));
     appendLog(state, "dealer", state.modifiers.individualContracts ? "renouvelle secrètement les quatre mandats de chaque joueur." : `renouvelle les quatre mandats: ${state.contractOffers.join(", ")}.`);
@@ -162,10 +220,9 @@ export function applyMidnightDiceAction(state, actorId, action) {
     if (state.phase !== "contract") throw new Error("Les mandats ont déjà été choisis pour cette manche.");
     const contract = String(action.contract ?? "");
     const offers=midnightContractOffers(state,actorId);
-    if (!offers.includes(contract)) throw new Error("Ce mandat n'est pas proposé pendant cette rotation.");
     const used = state.usedContracts[actorId] ?? [];
-    if (state.modifiers.uniqueContracts && used.length < offers.length && used.includes(contract)) throw new Error("Ce mandat a déjà été utilisé dans ce cycle.");
-    if (state.modifiers.uniqueContracts && used.length >= offers.length) state.usedContracts[actorId] = [];
+    if (used.includes(contract)) throw new Error("Ce mandat a déjà été utilisé dans ce cycle.");
+    if (!offers.includes(contract)) throw new Error("Ce mandat n'est pas proposé pendant cette rotation.");
     state.secretContracts[actorId] = contract;
     state.usedContracts[actorId] = [...new Set([...(state.usedContracts[actorId] ?? []), contract])];
     appendLog(state, actorId, "choisit secrètement son mandat.");
@@ -225,9 +282,7 @@ export function resumeMidnightAfterDeparture(state) {
 export function midnightDiceBotAction(state, bot) {
   if (state.phase === "contract") {
     const contracts = midnightContractOffers(state,bot.id);
-    const used = state.usedContracts?.[bot.id] ?? [];
-    const available = state.modifiers?.uniqueContracts && used.length < contracts.length ? contracts.filter((contract) => !used.includes(contract)) : contracts;
-    return { type: "choose-contract", contract: available[Math.floor(Math.random() * available.length)] };
+    return contracts.length ? { type: "choose-contract", contract: contracts[Math.floor(Math.random() * contracts.length)] } : null;
   }
   const contract = state.secretContracts?.[bot.id];
   const tray = state.trays?.[bot.id] ?? [];
