@@ -116,13 +116,14 @@ export async function runCompanion() {
         const result = await fetch(`${api}/api/discord/presence/activity`, { headers: { Authorization: `Bearer ${session.token}` }, signal: AbortSignal.any([AbortSignal.timeout(10000), controller.signal]), redirect: "error" });
         if (result.status === 401 || result.status === 403) { forgetConnection(directory, session.token); console.log("Accès expiré ou révoqué. Génère un nouveau code depuis ton profil."); break; }
         if (!result.ok) throw new Error("Connexion au site indisponible");
-        const { activity } = await result.json();
+        const { activity, context } = await result.json();
         failures = 0;
         if (stopped) break;
         if (!rpc.ready) { await rpc.connect(); previous = ""; }
         if (stopped) break;
-        if (activity?.details !== details) { startedAt = Math.floor(Date.now() / 1000); details = activity?.details ?? ""; }
-        const serialized = JSON.stringify(activity);
+        const activityContext = context ?? activity?.details ?? "";
+        if (activityContext !== details) { startedAt = Math.floor(Date.now() / 1000); details = activityContext; }
+        const serialized = JSON.stringify({ activity, context: activityContext });
         if (serialized !== previous) { rpc.update(activity ? { ...activity, timestamps: { start: startedAt } } : null); previous = serialized; }
         if (waiting) { console.log("Connexion rétablie."); waiting = false; }
       } catch {

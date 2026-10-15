@@ -594,7 +594,7 @@ function battleDeckOverview(state, viewerId) {
 
 function configuredGames(db = readDb()) {
   const overrides = db.settings?.games ?? {};
-  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), descriptiveImage: gameImageUrl(overrides[game.id]?.descriptiveImage), coverImage: gameImageUrl(overrides[game.id]?.coverImage), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
+  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), descriptiveImage: gameImageUrl(overrides[game.id]?.descriptiveImage), coverImage: gameImageUrl(overrides[game.id]?.coverImage), discordIconImage: gameImageUrl(overrides[game.id]?.discordIconImage), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
 }
 
 function configuredShop(db = readDb()) {
@@ -2641,7 +2641,7 @@ app.post("/api/auth/login", async (req, res) => {
 registerDiscordRoutes({ app, auth, platformSettings, readDb, sanitizeUser, bcrypt, isUnder13, requestCookie,
   publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, recordAuthFailure, sendAuthLocked, writeDb,
   secureCookies: NODE_ENV === "production" || Boolean(HTTPS_KEY_PATH || HTTPS_PFX_PATH) });
-registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence, io, roomPresence, configuredGames,
+registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence, io, roomPresence, configuredGames, publicWebsiteUrl,
   presence: createDiscordPresence({ filename: path.join(path.dirname(databaseFilename), "discord-presence.sqlite") }),
   configuration: discordConfiguration, accountBlocked: (user) => Boolean(activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) });
 
@@ -5137,7 +5137,7 @@ app.patch("/api/me/locale", auth, (req, res) => {
   res.json(sanitizeUser(user));
 });
 app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
-  for (const field of ["descriptiveImage", "coverImage"]) {
+  for (const field of ["descriptiveImage", "coverImage", "discordIconImage"]) {
     if (Object.hasOwn(req.body, field) && String(req.body[field] ?? "").trim() && !/^n\/?a$/i.test(String(req.body[field]).trim()) && !gameImageUrl(req.body[field])) return res.status(400).json({ error: "L’image doit utiliser une URL HTTPS ou un chemin absolu (/images/…)." });
   }
   if (Object.hasOwn(req.body, "defaultModifiers") && (!req.body.defaultModifiers || typeof req.body.defaultModifiers !== "object" || Array.isArray(req.body.defaultModifiers))) return res.status(400).json({ error: "Parametres par defaut invalides." });
@@ -5148,7 +5148,7 @@ app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
     db.settings.games ??= {};
     db.settings.games[req.params.id] = {
       ...(db.settings.games[req.params.id] ?? {}),
-      ...Object.fromEntries(["descriptiveImage", "coverImage"].filter((field) => Object.hasOwn(req.body, field)).map((field) => [field, gameImageUrl(req.body[field])])),
+      ...Object.fromEntries(["descriptiveImage", "coverImage", "discordIconImage"].filter((field) => Object.hasOwn(req.body, field)).map((field) => [field, gameImageUrl(req.body[field])])),
       ...(Object.hasOwn(req.body, "defaultModifiers") ? { defaultModifiers: req.params.id === "bataille" ? normalizeBattleModifiers(req.body.defaultModifiers) : normalizeGameModifiers(req.params.id, req.body.defaultModifiers) } : {}),
       name: String(req.body.name ?? "").trim().slice(0, 60),
       description: String(req.body.description ?? "").trim().slice(0, 240),

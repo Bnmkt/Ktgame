@@ -3,17 +3,64 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { discordAgeAllowed } from "./discord-oauth.js";
+import { gameImageUrl } from "../../../client/src/features/games/presentation.js";
 
 const hash = (value) => createHash("sha256").update(String(value)).digest("hex");
 
-export function discordActivityFor({ user, online, room, game }) {
+function publicImage(value, websiteUrl, apiUrl) {
+  const source = gameImageUrl(value);
+  if (!source) return "";
+  try {
+    const url = new URL(source, source.startsWith("/api/") ? apiUrl : `${websiteUrl.replace(/\/$/, "")}/`);
+    return url.protocol === "https:" && !url.username && !url.password && url.href.length <= 512 ? url.href : "";
+  } catch { return ""; }
+}
+
+export function discordActivityFor({ user, online, room, game, websiteUrl = "https://www.ktga.me", apiUrl = "https://api.ktga.me" }) {
   if (!online || !user?.discordPresenceEnabled || user.guest || user.active === false) return null;
-  // An explicit allowlist: never include a room name/code, identity, hand, chat or private rank.
-  return {
+  // Public progress only: never spread game state, identities, cards, chat or ratings.
+  const seated = Boolean(room?.players?.some((player) => player.id === user.id));
+  const finished = room?.finished || room?.state?.finished;
+  const labels = [room ? finished ? "Partie terminée" : room.state ? seated ? "En partie" : "Spectateur" : "En salle d’attente" : "Au casino"];
+  if (room) labels.push(room.ranked ? "Classé" : "Classique");
+  if (room?.state && !finished) {
+    const state = room.state;
+    if (Number.isSafeInteger(state.round) && state.round > 0) {
+      const rounds = state.modifiers?.rounds;
+      labels.push(`Manche ${state.round}${Number.isSafeInteger(rounds) && rounds >= state.round ? `/${rounds}` : ""}`);
+    } else if (room.gameId === "texas-holdem") {
+      const street = { preflop: "Préflop", flop: "Flop", turn: "Turn", river: "River", showdown: "Abattage" }[state.street];
+      if (street) labels.push(street);
+    }
+    if (seated && state.players?.[state.currentPlayerIndex]?.id === user.id) labels.push("À mon tour");
+  }
+  const activity = {
     details: room && game ? String(game.name).slice(0, 128) : "KTGA.ME",
-    state: room ? room.finished ? "Partie terminée" : room.state ? "En partie" : "En salle d’attente" : "Au casino",
+    state: labels.join(" · ").slice(0, 128),
     type: 0
   };
+  const logo = publicImage("/pwa/icon-512.png", websiteUrl, apiUrl);
+  const artwork = game && (publicImage(game.coverImage, websiteUrl, apiUrl) || publicImage(game.descriptiveImage, websiteUrl, apiUrl));
+  const icon = game && publicImage(game.discordIconImage, websiteUrl, apiUrl);
+  if (artwork || icon || logo) activity.assets = {
+    large_image: artwork || icon || logo, large_text: room && game ? String(game.name).slice(0, 128) : "KTGA.ME",
+    ...((icon || logo) && { small_image: icon || logo, small_text: room?.ranked ? "KTGA.ME · Classé" : "KTGA.ME" })
+  };
+  const count = room?.players?.length, maximum = room?.ranked?.roster?.length || game?.maxPlayers;
+  if (Number.isSafeInteger(count) && count > 0 && Number.isSafeInteger(maximum) && maximum >= count) activity.party = { size: [count, maximum] };
+  try {
+    const website = new URL(websiteUrl);
+    if (website.protocol === "https:" && !website.username && !website.password) {
+      website.search = ""; website.hash = "";
+      const base = website.href.replace(/\/$/, "");
+      activity.buttons = [{ label: "Jouer sur KTGA.ME", url: base }];
+      // Invitations are opt-in and never expose a protected, private or ranked room.
+      if (user.discordPresenceJoinEnabled === true && seated && !finished && !room.state && room.isPublic === true && !room.passwordHash && !room.ranked && count < maximum && /^[A-Z0-9]{4,12}$/.test(room.code ?? "")) {
+        activity.buttons.unshift({ label: "Rejoindre la table", url: `${base}/table/${room.code}` });
+      }
+    }
+  } catch {}
+  return activity;
 }
 
 export function createDiscordPresence({ now = Date.now, limit = 1000, filename } = {}) {
@@ -71,22 +118,22 @@ export function createDiscordPresence({ now = Date.now, limit = 1000, filename }
 }
 
 export function registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence,
-  io, roomPresence, configuredGames, configuration, accountBlocked, presence = createDiscordPresence() }) {
+  io, roomPresence, configuredGames, configuration, publicWebsiteUrl = () => "https://www.ktga.me", accountBlocked, presence = createDiscordPresence() }) {
   function eligible(user) { return user && !user.guest && !isUnder13(user) && discordAgeAllowed(user) && user.active !== false && !accountBlocked(user); }
   app.get("/api/me/discord/presence", auth, (req, res) => {
     const user = readDb().users.find((entry) => entry.id === req.auth.id);
     res.setHeader("Cache-Control", "no-store");
-    res.json({ enabled: Boolean(user?.discordPresenceEnabled), available: Boolean(eligible(user) && configuration().available), transport: "companion" });
+    res.json({ enabled: Boolean(user?.discordPresenceEnabled), joinEnabled: user?.discordPresenceJoinEnabled === true, available: Boolean(eligible(user) && configuration().available), transport: "companion" });
   });
   app.patch("/api/me/discord/presence", auth, (req, res) => {
     const db = readDb(), user = db.users.find((entry) => entry.id === req.auth.id);
     if (!eligible(user)) return res.status(403).json({ error: "La présence Discord est réservée aux comptes de 13 ans et plus." });
-    if (typeof req.body.enabled !== "boolean") return res.status(400).json({ error: "Choisis d’activer ou de désactiver la présence." });
+    if ((!Object.hasOwn(req.body, "enabled") && !Object.hasOwn(req.body, "joinEnabled")) || ["enabled", "joinEnabled"].some((field) => Object.hasOwn(req.body, field) && typeof req.body[field] !== "boolean")) return res.status(400).json({ error: "Choisis d’activer ou de désactiver la présence." });
     if (req.body.enabled && !configuration().available) return res.status(503).json({ error: "L’application Discord n’est pas configurée." });
-    user.discordPresenceEnabled = req.body.enabled;
-    presence.revoke(user.id);
+    if (Object.hasOwn(req.body, "enabled")) { user.discordPresenceEnabled = req.body.enabled; presence.revoke(user.id); }
+    if (Object.hasOwn(req.body, "joinEnabled")) user.discordPresenceJoinEnabled = req.body.joinEnabled;
     writeDb(db, { users: [user.id], rooms: [] });
-    res.json({ enabled: user.discordPresenceEnabled });
+    res.json({ enabled: Boolean(user.discordPresenceEnabled), joinEnabled: user.discordPresenceJoinEnabled === true });
   });
   app.post("/api/me/discord/presence/pair", auth, (req, res) => {
     const user = readDb().users.find((entry) => entry.id === req.auth.id);
@@ -113,7 +160,8 @@ export function registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13,
       return res.status(401).json({ error: "Compagnon déconnecté." });
     }
     const room = db.rooms.find((entry) => [...(roomPresence.get(entry.id) ?? [])].some((id) => io.sockets.sockets.get(id)?.data.userId === user.id));
-    res.json({ activity: discordActivityFor({ user, online: onlinePresence.has(user.id), room, game: configuredGames(db).find((entry) => entry.id === room?.gameId) }) });
+    const activity = discordActivityFor({ user, online: onlinePresence.has(user.id), room, game: configuredGames(db).find((entry) => entry.id === room?.gameId), websiteUrl: publicWebsiteUrl(), apiUrl: configuration().redirectUri });
+    res.json({ activity, context: activity ? hash(room ? `${room.id}:${room.activityMatchId ?? (room.state ? "playing" : "waiting")}` : "casino") : "" });
   });
   app.delete("/api/discord/presence/session", (req, res) => {
     const header = String(req.headers.authorization ?? "");

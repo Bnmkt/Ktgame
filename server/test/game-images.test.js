@@ -36,6 +36,8 @@ test("game images remove metadata, deduplicate and reject invalid formats", () =
     assert.deepEqual(store.save(png(), "coverImage"), saved);
     assert.equal(fs.readdirSync(directory).length, 1);
     assert.equal(store.save(png(960, 720), "descriptiveImage").height, 720);
+    assert.equal(store.save(png(512, 512), "discordIconImage").width, 512);
+    assert.throws(() => store.save(png(), "discordIconImage"), /dimensions/);
     assert.equal(store.has("../secret"), false);
     assert.equal(store.targetFor("../secret"), null);
     for (const field of ["constructor", "__proto__", "unknown"]) assert.throws(() => store.save(png(), field), /inconnu/);

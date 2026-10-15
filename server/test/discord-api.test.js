@@ -77,6 +77,11 @@ test("Discord login/link preserves real session restrictions and administrator M
     assert.equal(admin.status, 202); assert.equal(admin.data.token, undefined); assert.deepEqual(admin.data.methods, ["totp"]);
     const verified = await request("/api/auth/mfa/verify", "POST", { challengeId: admin.data.challengeId, method: "totp", code: totpCode(totp), userId: "player" });
     assert.equal(verified.status, 200); assert.equal(verified.data.user.id, "admin", "challenge, not client user id, selects account");
+    const game = (await request("/api/games")).data.find(entry => entry.id === "yahtzee");
+    assert.equal((await request("/api/admin/games/yahtzee", "PATCH", { ...game, discordIconImage: "/api/game-images/custom.png" }, player.data.token)).status, 403);
+    assert.equal((await request("/api/admin/games/yahtzee", "PATCH", { ...game, discordIconImage: "javascript:alert(1)" }, verified.data.token)).status, 400);
+    assert.equal((await request("/api/admin/games/yahtzee", "PATCH", { ...game, discordIconImage: "/api/game-images/custom.png" }, verified.data.token)).status, 200);
+    assert.equal((await request("/api/games")).data.find(entry => entry.id === "yahtzee").discordIconImage, "/api/game-images/custom.png");
     assert.equal((await flow(identities.banned)).status, 403);
     assert.equal((await flow(identities.minor)).status, 403);
     assert.equal((await flow(identities.locked)).status, 429);

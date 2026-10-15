@@ -1,7 +1,8 @@
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const gameArtworkFormats = {
   descriptiveImage: { label: "Image descriptive", width: 960, height: 720 },
-  coverImage: { label: "Bannière", width: 1280, height: 560 }
+  coverImage: { label: "Bannière", width: 1280, height: 560 },
+  discordIconImage: { label: "Icône Discord", width: 512, height: 512 }
 };
 
 export function artworkCropBounds(width, height, crop = {}, ratio = 16 / 7) {

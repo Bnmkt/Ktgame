@@ -794,5 +794,13 @@
   "Niveaux admis": "Allowed levels",
   "Autres paramètres": "Other settings",
   "Consulter": "View",
-  "Informations de la table": "Table information"
+  "Informations de la table": "Table information",
+  "Chaque joueur reçoit une sélection secrète distincte, avec un total de points potentiels aussi proche que possible des autres joueurs. Les sélections sont renouvelées toutes les quatre manches.": "Each player receives a distinct secret selection, with total potential points as close as possible to the other players. Selections are renewed every four rounds.",
+  "Un mandat choisi est retiré des choix du joueur jusqu'à la prochaine rotation, même s'il échoue.": "A chosen contract is removed from that player's choices until the next rotation, even if it fails.",
+  "Les sélections sont équilibrées en points potentiels et renouvelées toutes les quatre manches. Un mandat choisi est toujours retiré des choix du joueur jusqu'à la prochaine rotation, même s'il échoue.": "Selections are balanced by potential points and renewed every four rounds. A chosen contract is always removed from that player's choices until the next rotation, even if it fails.",
+  "Icône Discord": "Discord icon",
+  "Petite icône dans la présence Discord. La bannière du jeu est utilisée comme image principale.": "Small icon in Discord presence. The game's cover is used as the main image.",
+  "Le compagnon optionnel affiche le jeu, ses images, le mode, les joueurs et la manche sur Discord. Tes cartes, tes messages et ton classement privé ne sont jamais partagés.": "The optional companion shows the game, artwork, mode, player count and round on Discord. Your cards, messages and private rating are never shared.",
+  "Partager le lien de mes salles d’attente publiques sur Discord": "Share links to my public waiting rooms on Discord",
+  "La présence de jeu nécessite une autorisation distincte et un compagnon local optionnel. Le jeu, ses images, son mode, le nombre de joueurs et la manche sont transmis à Discord, selon vos réglages de visibilité Discord. Les cartes, messages et classements privés restent exclus. Une autorisation supplémentaire permet de partager le lien des salles d’attente publiques, non protégées et non complètes. Désactiver la présence arrête le partage. Les règles de confidentialité de Discord s’appliquent aux données reçues.": "Game presence requires separate permission and an optional local companion. The game, artwork, mode, player count and round are sent to Discord, subject to your Discord visibility settings. Cards, messages and private ratings are excluded. An additional permission allows sharing links to public waiting rooms that are not password-protected or full. Disabling presence stops sharing. Discord's privacy rules apply to the data it receives."
 }

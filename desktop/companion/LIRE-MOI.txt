@@ -27,6 +27,12 @@ Protection et révocation :
 - Aucune clé de l'application Discord ni mot de passe n'est incluse dans ce ZIP.
 - Le serveur ne conserve que l'empreinte du jeton limité à la présence.
 - Désactiver la présence dans le profil révoque l'accès du compagnon.
-- Le nom du jeu et son état sont partagés, jamais les cartes, messages ou codes de table.
+- Le jeu, ses images, son mode, le nombre de joueurs et la manche sont partagés.
+- Les cartes, messages, identités et classements privés ne sont jamais partagés.
+- Le partage du lien de table exige une autorisation distincte dans le profil.
+  Il concerne uniquement les salles d'attente publiques, libres et non protégées.
+  Le bouton disparaît quand la partie commence ou que la salle est complète.
+- Après une mise à jour du compagnon, télécharger le ZIP et relancer
+  activer-demarrage.cmd pour actualiser la copie installée au démarrage.
 - Les fichiers installés sont dans LOCALAPPDATA\KTGACompanion sous Windows,
   ou XDG_STATE_HOME/ktga-companion (par défaut ~/.local/state/ktga-companion) sous Linux.

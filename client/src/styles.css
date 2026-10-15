@@ -3102,6 +3102,7 @@ button.roll-cooldown {
 }
 
 .admin-table td { vertical-align: middle; }
+.admin-table th { position: relative; }
 .admin-table td > strong, .admin-table td > small { display: block; }
 .admin-table td > small { color: #9f947e; line-height: 1.4; margin-top: 4px; }
 .admin-table th:last-child, .admin-table td:last-child { text-align: right; width: 1%; }

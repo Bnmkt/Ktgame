@@ -93,10 +93,42 @@ test("companion credentials are one-time, revocable, session-bound and expire", 
 test("presence shares no identity, private table data, card, rank, or code", () => {
   const context = { user: { id: "secret-user", email: "secret@example.test", discordPresenceEnabled: true }, online: true,
     room: { id: "secret-room", code: "secret-code", name: "private-name", state: { hand: ["secret-card"] }, elo: 1200 }, game: { name: "Yahtzee" } };
-  assert.deepEqual(discordActivityFor(context), { details: "Yahtzee", state: "En partie", type: 0 });
+  const activity = discordActivityFor(context);
+  assert.equal(activity.details, "Yahtzee"); assert.equal(activity.state, "Spectateur · Classique");
+  assert.equal(activity.assets.large_image, "https://www.ktga.me/pwa/icon-512.png");
+  assert.deepEqual(activity.buttons, [{ label: "Jouer sur KTGA.ME", url: "https://www.ktga.me" }]);
+  for (const secret of ["secret-user", "secret@example.test", "secret-room", "secret-code", "private-name", "secret-card", "1200"]) assert.ok(!JSON.stringify(activity).includes(secret));
   assert.equal(discordActivityFor({ ...context, online: false }), null);
   assert.equal(discordActivityFor({ ...context, user: { ...context.user, discordPresenceEnabled: false } }), null);
   assert.equal(discordActivityFor({ ...context, user: { ...context.user, guest: true } }), null);
+});
+
+test("presence uses public game artwork, the custom icon and only allowlisted progress", () => {
+  const context = { user: { id: "player", discordPresenceEnabled: true }, online: true,
+    room: { gameId: "midnight-dice", players: [{ id: "player" }, { id: "other" }], ranked: { elo: 1400 }, state: { players: [{ id: "player" }], currentPlayerIndex: 0, round: 2, modifiers: { rounds: 5 }, secretContracts: { player: "triple" } } },
+    game: { name: "Dés de Minuit", maxPlayers: 8, coverImage: "/api/game-images/cover.png", discordIconImage: "/api/game-images/icon.png" } };
+  const activity = discordActivityFor(context);
+  assert.equal(activity.assets.large_image, "https://api.ktga.me/api/game-images/cover.png");
+  assert.equal(activity.assets.small_image, "https://api.ktga.me/api/game-images/icon.png");
+  assert.deepEqual(activity.party, { size: [2, 8] });
+  assert.equal(activity.state, "En partie · Classé · Manche 2/5 · À mon tour");
+  assert.ok(!JSON.stringify(activity).includes("triple")); assert.ok(!JSON.stringify(activity).includes("1400"));
+  assert.equal(discordActivityFor({ ...context, game: { ...context.game, coverImage: "javascript:alert(1)", descriptiveImage: "/games/preview.png" } }).assets.large_image, "https://www.ktga.me/games/preview.png");
+  assert.equal(discordActivityFor({ ...context, game: { ...context.game, coverImage: "", discordIconImage: "https://cdn.example.test/icon.png" } }).assets.large_image, "https://cdn.example.test/icon.png");
+  assert.equal(discordActivityFor({ ...context, game: { ...context.game, discordIconImage: "https://user:secret@example.test/icon.png" } }).assets.small_image, "https://www.ktga.me/pwa/icon-512.png");
+});
+
+test("joining from Discord requires consent and a public unprotected available waiting room", () => {
+  const context = { user: { id: "player", discordPresenceEnabled: true, discordPresenceJoinEnabled: true }, online: true,
+    room: { code: "AB1234", isPublic: true, players: [{ id: "player" }], state: null, finished: false }, game: { name: "Yahtzee", maxPlayers: 6 } };
+  assert.deepEqual(discordActivityFor(context).buttons[0], { label: "Rejoindre la table", url: "https://www.ktga.me/table/AB1234" });
+  for (const change of [{ isPublic: false }, { passwordHash: "secret" }, { state: {} }, { finished: true }, { ranked: {} }, { players: [{ id: "other" }] }, { code: "../secret" }, { players: Array.from({ length: 6 }, (_, i) => ({ id: i ? `other-${i}` : "player" })) }]) {
+    assert.equal(discordActivityFor({ ...context, room: { ...context.room, ...change } }).buttons.length, 1);
+  }
+  assert.equal(discordActivityFor({ ...context, user: { ...context.user, discordPresenceJoinEnabled: false } }).buttons.length, 1);
+  assert.equal(discordActivityFor({ ...context, websiteUrl: "javascript:alert(1)" }).buttons, undefined);
+  const ended = discordActivityFor({ ...context, room: { ...context.room, state: { finished: true } } });
+  assert.equal(ended.state, "Partie terminée · Classique"); assert.equal(ended.buttons.length, 1);
 });
 
 test("native IPC supports split frames, activity changes and Discord ping", async () => {
@@ -121,10 +153,13 @@ test("native IPC supports split frames, activity changes and Discord ping", asyn
   await new Promise((resolve) => server.listen(address, resolve));
   const rpc = new DiscordIPC(config.clientId, [address]);
   try {
-    await rpc.connect(); rpc.update({ details: "Yahtzee", state: "En partie" }); rpc.update(null);
+    const activity = discordActivityFor({ user: { id: "player", discordPresenceEnabled: true, discordPresenceJoinEnabled: true }, online: true,
+      room: { code: "AB1234", isPublic: true, players: [{ id: "player" }] }, game: { name: "Yahtzee", maxPlayers: 6, coverImage: "https://www.ktga.me/game.png" } });
+    await rpc.connect(); rpc.update(activity); rpc.update(null);
     for (let i = 0; i < 100 && messages.length < 3; i++) await new Promise((resolve) => setTimeout(resolve, 10));
     assert.ok(messages.some((message) => message.opcode === 4 && message.payload.probe));
     assert.equal(messages.filter((message) => message.payload.cmd === "SET_ACTIVITY").length, 2);
+    assert.deepEqual(messages.find((message) => message.payload.args?.activity)?.payload.args.activity, activity);
     assert.ok(messages.some((message) => message.payload.args?.activity === null));
     assert.equal(ipcPaths({}, "win32").length, 10);
   } finally { rpc.close(); for (const socket of sockets) socket.destroy(); await new Promise((resolve) => server.close(resolve)); }
