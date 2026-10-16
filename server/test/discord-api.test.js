@@ -10,7 +10,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { encryptTotpSecret, totpCode } from "../src/services/account-security.js";
 
-test("Discord login/link preserves real session restrictions and administrator MFA", async () => {
+test("Discord activity waives MFA only after a trusted exchange and preserves all access restrictions", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ktga-discord-api-"));
   const secret = "isolated-discord-test-key", totp = "JBSWY3DPEHPK3PXP", password = "FixturePassword1!";
   const db = new DatabaseSync(path.join(directory, "main.sqlite"));
@@ -84,9 +84,9 @@ test("Discord login/link preserves real session restrictions and administrator M
     assert.equal((await activityLogin("")).status, 400); assert.equal((await activityLogin("invalid")).status, 400);
     const embedded = await activityLogin(identities.player); assert.equal(embedded.status, 200); assert.equal(embedded.data.user.id, "player"); assert.ok(embedded.data.token); assert.equal(embedded.data.access_token, undefined);
     assert.equal((await request("/api/me", "GET", null, embedded.data.token, "", activityOrigin)).status, 200);
-    const embeddedMfa = await activityLogin(identities.admin); assert.equal(embeddedMfa.status, 202); assert.equal(embeddedMfa.data.token, undefined); assert.deepEqual(embeddedMfa.data.methods, ["totp"]);
-    const embeddedVerified = await request("/api/auth/mfa/verify", "POST", { challengeId: embeddedMfa.data.challengeId, method: "totp", code: totpCode(totp) }, null, "", activityOrigin);
-    assert.equal(embeddedVerified.status, 200); assert.equal(embeddedVerified.data.user.id, "admin");
+    const embeddedAdmin = await activityLogin(identities.admin); assert.equal(embeddedAdmin.status, 200); assert.ok(embeddedAdmin.data.token); assert.equal(embeddedAdmin.data.user.id, "admin");
+    const activityPassword = await request("/api/auth/login", "POST", { login: "admin@example.test", password, verifiedActivity: true }, null, "", activityOrigin);
+    assert.equal(activityPassword.status, 202); assert.equal(activityPassword.data.token, undefined);
     for (const id of ["banned", "minor", "revoked"]) assert.equal((await activityLogin(identities[id])).status, 403);
     assert.equal((await activityLogin(identities.locked)).status, 429);
     assert.equal((await request("/api/auth/login", "POST", { login: "minor@example.test", password }, null, "", activityOrigin)).status, 403);

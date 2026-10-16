@@ -2,15 +2,16 @@ import { Component, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ExternalLink, Gamepad2, RefreshCw } from "lucide-react";
 import { CasinoApplication } from "./App.jsx";
-import { LocaleProvider, useLocale } from "./locales/LocaleProvider.jsx";
+import { LanguagePicker, LocaleProvider, useLocale } from "./locales/LocaleProvider.jsx";
 import { isDiscordActivityLocation } from "./features/discord/context.js";
 import { connectActivity, getActivityConfiguration, installActivityLinks, openActivityBrowser } from "./features/discord/runtime.js";
+import { SoundControl } from "./components/feedback/InterfaceSounds.jsx";
 import "./features/discord/activity.css";
 
 function BrowserButton({ onError, ...props }) {
   const { t } = useLocale();
   const [busy, setBusy] = useState(false);
-  return <button type="button" {...props} disabled={busy} onClick={async () => { setBusy(true); try { await openActivityBrowser(); } catch (error) { onError(error.message); } finally { setBusy(false); } }}><ExternalLink size={18}/>{t("Ouvrir dans le navigateur")}</button>;
+  return <button type="button" {...props} disabled={busy} onClick={async () => { setBusy(true); try { await openActivityBrowser(); } catch (error) { onError(error.message); } finally { setBusy(false); } }}><ExternalLink size={18}/><span>{t("Ouvrir dans le navigateur")}</span></button>;
 }
 function ActivityRecovery() {
   const { t } = useLocale();
@@ -29,7 +30,7 @@ function ActivityRoot() {
   useEffect(() => {
     let cancelled = false;
     const connect = isDiscordActivityLocation() ? connectActivity() : getActivityConfiguration();
-    connect.then(() => { if (!cancelled) setReady(isDiscordActivityLocation()); }).catch(failure => { if (!cancelled) setError(failure.message); });
+    connect.then(() => { if (!cancelled) { setReady(isDiscordActivityLocation()); setPlaying(isDiscordActivityLocation()); } }).catch(failure => { if (!cancelled) setError(failure.message); });
     return () => { cancelled = true; };
   }, []);
   useEffect(() => {
@@ -40,7 +41,7 @@ function ActivityRoot() {
     const removeLinks = installActivityLinks(failure => setError(failure.message));
     return () => { document.body.classList.remove("activity-session"); document.body.style.removeProperty("--activity-toolbar-height"); observer.disconnect(); removeLinks(); };
   }, [playing]);
-  if (playing) return <CasinoApplication embedded><div ref={toolbar} className="activity-toolbar"><span><Gamepad2 size={18}/>Discord</span><BrowserButton className="secondary" onError={setError}/>{error && <p role="alert">{t(error)}</p>}</div></CasinoApplication>;
+  if (playing) return <CasinoApplication embedded><div ref={toolbar} className="activity-toolbar"><span><img src="/pwa/icon-180.png" width="24" height="24" alt=""/>KTGA.ME<small>Discord</small></span><div className="activity-toolbar-tools"><SoundControl/><LanguagePicker/><BrowserButton className="secondary activity-browser-button" title={t("Ouvrir dans le navigateur")} aria-label={t("Ouvrir dans le navigateur")} onError={setError}/></div>{error && <p role="alert">{t(error)}</p>}</div></CasinoApplication>;
   return <main className="activity-entry"><header><img src="/pwa/icon-180.png" alt="" width="48" height="48"/><span>KTGA.ME</span><small>Discord</small></header><div className="activity-entry-content"><img className="activity-entry-image" src="/ktga-preview.png" alt="KTGA.ME" width="1200" height="630"/><h1>KTGA.ME</h1><p>{t("Où souhaites-tu jouer ?")}</p><div className="activity-entry-actions"><button type="button" disabled={!ready} onClick={() => { setError(""); setPlaying(true); }}><Gamepad2 size={21}/>{t("Jouer dans Discord")}</button><BrowserButton className="secondary" onError={setError}/></div>{!ready && isDiscordActivityLocation() && !error && <p role="status">{t("Connexion à Discord…")}</p>}{!isDiscordActivityLocation() && <p>{t("Lance l’activité depuis Discord pour jouer ici.")}</p>}{error && <p role="alert">{t(error)}</p>}</div><footer>{t("Jeux gratuits · Jetons virtuels sans valeur monétaire")}</footer></main>;
 }
 createRoot(document.getElementById("root")).render(<LocaleProvider><ActivityBoundary><ActivityRoot/></ActivityBoundary></LocaleProvider>);

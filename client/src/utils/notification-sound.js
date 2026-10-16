@@ -1,4 +1,4 @@
-export function createNotificationSound({ tones = [[880, 0, .12, "sine"], [1320, .06, .07, "sine"]] } = {}) {
+export function createNotificationSound({ tones = [[880, 0, .12, "sine"], [1320, .06, .07, "sine"]], throttleMs = 500 } = {}) {
   let context;
   let lastPlayedAt = 0;
   const unlock = () => {
@@ -9,28 +9,28 @@ export function createNotificationSound({ tones = [[880, 0, .12, "sine"], [1320,
       if (context.state === "suspended") context.resume().catch(() => {});
     } catch { /* Browsers can deny audio before the first interaction. */ }
   };
-  const play = async (shouldPlay = () => true) => {
+  const play = async (shouldPlay = () => true, { tones: notes = tones, duration = .55 } = {}) => {
     if (!context && navigator.userActivation?.hasBeenActive) unlock();
     const audio = context;
     if (!audio || audio.state === "closed") return false;
     try { if (audio.state === "suspended") await audio.resume(); }
     catch { return false; }
     if (context !== audio || audio.state !== "running" || !shouldPlay()) return false;
-    if (Date.now() - lastPlayedAt < 500) return true;
+    if (Date.now() - lastPlayedAt < throttleMs) return true;
     lastPlayedAt = Date.now();
     const start = context.currentTime;
-    for (const [frequency, delay, volume, type] of tones) {
+    for (const [frequency, delay, volume, type, length = duration] of notes) {
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = type;
       oscillator.frequency.value = frequency;
       gain.gain.setValueAtTime(0, start + delay);
       gain.gain.linearRampToValueAtTime(volume, start + delay + .008);
-      gain.gain.exponentialRampToValueAtTime(.001, start + delay + .55);
+      gain.gain.exponentialRampToValueAtTime(.001, start + delay + length);
       oscillator.connect(gain);
       gain.connect(context.destination);
       oscillator.start(start + delay);
-      oscillator.stop(start + delay + .56);
+      oscillator.stop(start + delay + length + .01);
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
     }
     return true;

@@ -1,4 +1,10 @@
 {
+  "Associe ton compte Discord pour te connecter sans saisir ton mot de passe.": "Link your Discord account to sign in without entering your password.",
+  "Dans l’activité Discord, un compte associé se connecte automatiquement sans deuxième étape KTGA. Sur le site, la double authentification reste active.": "In the Discord Activity, linked accounts sign in automatically without a second KTGA step. Two-factor authentication remains active on the website.",
+  "Couper les effets sonores": "Mute sound effects",
+  "Activer les effets sonores": "Enable sound effects",
+  "Autre méthode de connexion": "Another sign-in method",
+  "Masquer les autres connexions": "Hide other sign-in methods",
   "Ouvrir dans le navigateur": "Open in browser",
   "Le casino n’a pas pu s’afficher dans Discord.": "The casino could not be displayed in Discord.",
   "Réessayer": "Try again",

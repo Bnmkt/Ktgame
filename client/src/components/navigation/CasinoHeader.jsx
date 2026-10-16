@@ -5,6 +5,7 @@ import { appPath } from "../../navigation/routes.js";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { LanguagePicker , useLocale } from "../../locales/LocaleProvider.jsx";
 import { softBanLimited } from "../../features/accounts/softban.js";
+import { SoundControl } from "../feedback/InterfaceSounds.jsx";
 
 export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
   const { t: localeText } = useLocale();
@@ -40,7 +41,7 @@ export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSl
         <button type="button" className="secondary icon-toggle casino-logout" onClick={onLogout} title={localeText("Déconnexion")} aria-label={localeText("Déconnexion")}><LogOut size={18} /></button>
       </div>
     </div>
-    <div className="locale-header"><LanguagePicker /></div>
+    <div className="locale-header"><SoundControl/><LanguagePicker /></div>
     <nav className="casino-mobile-navigation" aria-label={localeText("Navigation mobile")} style={{ "--mobile-destinations": mainDestinations.length + 1 }}>
       {mainDestinations.map(link)}
       <button type="button" className={menuOpen || moreActive ? "active" : ""} aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={21}/><span>{localeText("Menu")}</span></button>

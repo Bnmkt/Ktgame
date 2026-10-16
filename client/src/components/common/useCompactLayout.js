@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isDiscordActivityLocation } from "../../features/discord/context.js";
 
 export function useCompactLayout() {
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches);
@@ -9,5 +10,5 @@ export function useCompactLayout() {
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
-  return compact;
+  return compact || isDiscordActivityLocation();
 }

@@ -27,7 +27,7 @@ export function spectatorState(state) {
   const result = pick(state, ["gameId", "players", "modifiers", "finished", "winners", "currentPlayerIndex", "round", "phase", "ranking", "roomPayouts", ...(fields[state.gameId] ?? [])]);
   result.hands = hiddenHands(state);
   result.logs = fields[state.gameId] ? (state.logs ?? []).map((log) => {
-    const safe = pick(log, ["id", "at", "actorId", "actor", "type", "text"]);
+    const safe = pick(log, ["id", "at", "actorId", "actor", "type", "text", "cue"]);
     if (state.gameId === "blackjack" && !["result", "reveal", "dealer"].includes(log.type)) safe.text = log.type === "bet" ? "engage une mise." : "joue sa main.";
     return safe;
   }) : [];

@@ -1,7 +1,7 @@
 import { api } from "../../api.js";
 import { activityBrowserUrl, activityNavigationUrl, isDiscordActivityLocation } from "./context.js";
 
-let connection, configuration;
+let connection, configuration, login;
 const timeout = async (promise, milliseconds = 15000) => {
   let timer;
   try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Discord ne répond pas. Réessaie ou ouvre le navigateur.")), milliseconds); })]); }
@@ -23,10 +23,14 @@ export function connectActivity() {
   })();
   return connection;
 }
-export async function loginInActivity() {
+async function exchangeActivityLogin() {
   const sdk = await connectActivity();
   const { code } = await timeout(sdk.commands.authorize({ client_id: sdk.clientId, response_type: "code", state: crypto.randomUUID(), prompt: "none", scope: ["identify"] }), 120000);
   return api("/api/auth/discord/activity", { method: "POST", body: JSON.stringify({ code }) });
+}
+export function loginInActivity() {
+  login ??= exchangeActivityLogin().finally(() => { login = null; });
+  return login;
 }
 export async function openActivityBrowser(location = window.location) {
   const config = await getActivityConfiguration();
@@ -34,7 +38,7 @@ export async function openActivityBrowser(location = window.location) {
   if (!isDiscordActivityLocation()) { window.location.assign(url); return; }
   const sdk = await connectActivity();
   const response = await timeout(sdk.commands.openExternalLink({ url }));
-  if (response.opened === false) throw new Error("L’ouverture du navigateur a été annulée.");
+  if (response?.opened === false) throw new Error("L’ouverture du navigateur a été annulée.");
 }
 export function installActivityLinks(onError) {
   const follow = async event => {

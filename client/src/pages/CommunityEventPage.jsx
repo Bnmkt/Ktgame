@@ -11,6 +11,7 @@ import { eventEffectDescription } from "../features/events/effect-rules.js";
 import { DiceThrowTray, Die, PlayingCard } from "../components/game/GamePieces.jsx";
 import { CompactNumber } from "../utils/presentation.jsx";
 import { eventProgressDisplay } from "../features/events/progress.js";
+import { playGameSound } from "../utils/game-sounds.js";
 
 const suitCodes = { hearts: "H", diamonds: "D", clubs: "C", spades: "S" };
 const statusLabels = { scheduled: "À venir", active: "En cours", finished: "Terminé", cancelled: "Annulé" };
@@ -132,7 +133,7 @@ export function CommunityEventPage({ slug, user, setUser, onBack, onLogout }) {
       const result = await api(path, { method: "POST", body: JSON.stringify(body) });
       setData(result);
       if (result.user) setUser(result.user);
-      if (result.action) setLastAction(result.action);
+      if (result.action) { setLastAction(result.action); playGameSound(result.action.result?.type === "dice" ? "dice" : "card"); }
     } catch (requestError) {
       setError(requestError.message);
     } finally { setBusy(""); }

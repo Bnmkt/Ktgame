@@ -4,6 +4,8 @@ import { api, installButtonActionFeedback, setToken } from "./api.js";
 import { defaultPublicSettings } from "./config/site.js";
 import { softBanLimited } from "./features/accounts/softban.js";
 import { completeDiscordReturn } from "./features/accounts/discord-login.js";
+import { isDiscordActivityLocation } from "./features/discord/context.js";
+import { useInterfaceSounds } from "./components/feedback/InterfaceSounds.jsx";
 import { DisplayName, cosmeticCssRules, setCosmeticCatalogItems } from "./components/cosmetics/Cosmetics.jsx";
 import { CasinoHeader } from "./components/navigation/CasinoHeader.jsx";
 import { DailyBonusButton } from "./components/navigation/DailyBonusButton.jsx";
@@ -48,6 +50,7 @@ const HelpOnboarding = lazy(() => import("./components/help/HelpOnboarding.jsx")
 const publicPageData = readPublicPageData();
 
 export default function App() {
+  useInterfaceSounds();
   const { t: localeText } = useLocale();
   const [user, setUser] = useState(null);
   const { bindAccount } = useLocale();
@@ -113,6 +116,14 @@ export default function App() {
         if (cancelled) return;
         setUser(account); setDiscordResult({ error }); setAccountReady(true);
       });
+    } else if (isDiscordActivityLocation()) {
+      import("./features/discord/runtime.js").then(module => module.loginInActivity()).then(result => {
+        if (cancelled) return;
+        if (result.token) setToken(result.token);
+        if (result.user) setUser(result.user);
+        if (result.mfaRequired) setDiscordResult(result);
+        setAccountReady(true);
+      }).catch(error => { if (!cancelled) { setToken(""); setDiscordResult({ error }); setAccountReady(true); } });
     } else api("/api/me").then((account) => { if (!cancelled) { setUser(account); setAccountReady(true); } }).catch((error) => { if (!cancelled) { setToken(""); setAccountReady(error.status === 401); } });
     return () => { cancelled = true; };
   }, [accountRecovery]);
@@ -342,6 +353,7 @@ export default function App() {
   if (Object.hasOwn(legalLinks, view)) return <Suspense fallback={<main className="legal-page" role="status">{localeText("Chargement…")}</main>}><LegalPage view={view} siteName={publicSettings.siteName} supportEmail={publicSettings.supportEmail} onBack={() => goTo("lobby")} /></Suspense>;
   if (view === "status") return <Suspense fallback={<main className="status-page" role="status">{localeText("Chargement de l’état des services…")}</main>}><StatusPage siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
   if (view === "patchnotes") return <Suspense fallback={<main className="patchnotes-page" role="status">{localeText("Chargement des patchnotes…")}</main>}><PatchnotesPage siteName={publicSettings.siteName} user={user} onBack={() => goTo("lobby")} initialCatalog={publicPageData?.catalog} initialNote={publicPageData?.note} initialVersion={route.id || publicPageData?.note?.version} /></Suspense>;
+  if (isDiscordActivityLocation() && !accountReady && !accountRecovery) return <main className="activity-connecting" role="status"><img src="/pwa/icon-180.png" width="64" height="64" alt=""/><h1>KTGA.ME</h1><p>{localeText("Connexion à Discord…")}</p></main>;
   if (accountRecovery || !user || user.requiresEmailUpgrade || user.requiresEmailVerification) return <><Auth
     onAuth={(account) => { setUser(account); setDiscordResult(null); }}
     onClearSession={() => { setToken(""); setUser(null); }}

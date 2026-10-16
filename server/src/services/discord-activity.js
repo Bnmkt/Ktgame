@@ -35,7 +35,7 @@ export function registerDiscordActivity({ app, clientDist, platformSettings, rea
     if (!discordAgeAllowed(user)) return res.status(403).json({ error: "La connexion Discord est réservée aux comptes de 13 ans et plus avec une date de naissance renseignée." });
     const key = authFailureKey(user.email || user.pseudo, req), lock = authLockStatus(user, key);
     if (lock.locked) return sendAuthLocked(res, lock);
-    return beginAccountLogin(req, res, db, user, "discord", key);
+    return beginAccountLogin(req, res, db, user, "discord", key, { verifiedActivity: true });
   });
   if (!clientDist) return;
   const html = path.resolve(clientDist, "discord-activity/index.html");

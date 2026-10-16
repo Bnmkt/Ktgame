@@ -7,7 +7,7 @@
 @media (max-width: 760px) {
   body:has(.casino-header) { --casino-dock-space: calc(66px + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--casino-dock-space); }
   .casino-header .casino-header-inner { padding: 8px 12px; gap: 6px; }
-  .casino-header .casino-brand { font-size: 18px; min-height: 30px; max-width: calc(100% - 110px); overflow-wrap: anywhere; }
+  .casino-header .casino-brand { font-size: 18px; min-height: 30px; max-width: calc(100% - 160px); overflow-wrap: anywhere; }
   .casino-header .locale-header { top: 6px; right: 12px; }
   .casino-header .locale-control { min-height: 30px; }
   .casino-header .locale-control select { font-size: 12px; padding-block: 4px; }

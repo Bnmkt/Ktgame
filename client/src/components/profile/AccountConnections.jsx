@@ -57,7 +57,8 @@ export function AccountConnections({ user, onUser, onError, onMessage }) {
   return <section className="account-workspace-section account-link-panel">
     <header><Link2 size={19}/><h3>Discord</h3></header>
     {!connection ? <p role="status">{t("Chargement…")}</p> : <>
-      <p>{connection.linked ? t("Compte associé : {value0}", { value0: connection.username }) : t("Associe ton compte Discord pour te connecter sans saisir ton mot de passe. La double authentification reste active.")}</p>
+      <p>{connection.linked ? t("Compte associé : {value0}", { value0: connection.username }) : t("Associe ton compte Discord pour te connecter sans saisir ton mot de passe.")}</p>
+      <small>{t("Dans l’activité Discord, un compte associé se connecte automatiquement sans deuxième étape KTGA. Sur le site, la double authentification reste active.")}</small>
       {isDiscordActivityLocation() && !connection.linked ? <button type="button" className="secondary" onClick={() => openActivityBrowser({ pathname: "/profil" }).catch(error => onError(error.message))}><Link2 size={17}/>{t("Associer Discord dans le navigateur")}</button> : (connection.available || connection.linked) && <form onSubmit={changeLink} className="account-workspace-password"><PasswordField label={t("Mot de passe actuel")} required autoComplete="current-password" maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)}/><button type="submit" className="secondary" disabled={busy || !password}>{connection.linked ? <Unlink size={17}/> : <LogIn size={17}/>} {t(connection.linked ? "Dissocier Discord" : "Associer Discord")}</button></form>}
       {!connection.available && !connection.linked && <small>{t(!connection.ageAllowed ? "Disponible à partir de 13 ans, avec une date de naissance renseignée." : "La connexion Discord n’est pas encore activée.")}</small>}
     </>}

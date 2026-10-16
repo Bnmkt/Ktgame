@@ -13,7 +13,7 @@ export function playerLabel(state, playerId) {
   return player?.pseudo ?? "Joueur";
 }
 
-export function appendLog(state, actorId, text, type = "action") {
+export function appendLog(state, actorId, text, type = "action", cue) {
   state.logs = [
     ...(state.logs ?? []),
     {
@@ -22,6 +22,7 @@ export function appendLog(state, actorId, text, type = "action") {
       actorId,
       actor: actorId === "dealer" ? "Dealer" : playerLabel(state, actorId),
       type,
+      ...(cue ? { cue } : {}),
       text
     }
   ].slice(-80);

@@ -64,5 +64,16 @@ export function applyAction(state, actorId, action) {
   if (!applyGameAction) throw new Error("Jeu inconnu.");
   // Les jeux de casino conservent une action d'affichage volontaire après la fin de la main.
   if (state.finished && !["blackjack", "texas-holdem"].includes(state.gameId)) return state;
-  return applyGameAction(state, actorId, action);
+  const previousLog = state.logs?.at(-1)?.id, round = state.round, marketSize = state.market?.length;
+  const result = applyGameAction(state, actorId, action);
+  const log = result.logs?.at(-1);
+  if (log && log.id !== previousLog) {
+    const dice = action.type === "roll" || result.gameId === "liars-dice" && result.round !== round ||
+      result.gameId === "midnight-dice" && (result.market?.length > (marketSize ?? 0) || action.type === "discard");
+    const card = ["draw", "hit", "double"].includes(action.type) ||
+      result.gameId === "blackjack" && action.type === "bet" ||
+      ["belote", "president", "golf-solitaire", "accordion", "velvet-ruse"].includes(result.gameId) && ["play", "move"].includes(action.type);
+    if (dice || card) log.cue = dice ? "dice" : "card";
+  }
+  return result;
 }

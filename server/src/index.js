@@ -2600,7 +2600,7 @@ app.post("/api/auth/register", async (req, res) => {
   res.status(201).json({ token, user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
 });
 
-async function beginAccountLogin(req, res, db, user, method, failureKey) {
+async function beginAccountLogin(req, res, db, user, method, failureKey, { verifiedActivity = false } = {}) {
   if (req.headers.origin === discordActivityOrigin() && !discordAgeAllowed(user)) return res.status(403).json({ error: "La connexion Discord est réservée aux comptes de 13 ans et plus avec une date de naissance renseignée." });
   if (user.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
   const moderation = activeModeration(user);
@@ -2632,7 +2632,9 @@ async function beginAccountLogin(req, res, db, user, method, failureKey) {
     return res.status(403).json({ code: "PASSWORD_UPGRADE_REQUIRED", email: maskedEmail(user.email), error: "Ce compte utilise une ancienne politique de mot de passe. Un lien de renouvellement a été envoyé." });
   }
   const summary = mfaSummary(user);
-  if (summary.enabled) {
+  // Only the server-verified embedded OAuth exchange can waive KTGA's second step.
+  const activitySignIn = verifiedActivity && method === "discord" && req.headers.origin === discordActivityOrigin();
+  if (summary.enabled && !activitySignIn) {
     const emailAvailable = validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured() && (user.admin || summary.emailEnabled);
     let challenge;
     try { challenge = createMfaChallenge(user, authFingerprint(req), emailAvailable, Date.now(), method); }

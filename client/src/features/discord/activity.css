@@ -8,12 +8,60 @@
 .activity-entry-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 22px 0; }
 .activity-entry-actions button { min-height: 48px; padding: 12px 20px; }
 .activity-entry > footer { text-align: center; font-size: 12px; color: #a8bbb2; padding: 16px 0; }
-.activity-toolbar { position: sticky; top: 0; z-index: 190; min-height: 54px; padding: 6px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; background: #10231b; border-bottom: 1px solid #657454; }
+.activity-toolbar { position: sticky; top: 0; z-index: 40; min-height: 46px; padding: 5px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; background: #10231b; border-bottom: 1px solid #657454; }
 .activity-toolbar > span { display: flex; align-items: center; gap: 8px; color: #b6dbcc; font-size: 13px; }
+.activity-toolbar > span small { color: #9caca7; font-size: 11px; }
+.activity-toolbar-tools { display: flex; align-items: center; gap: 6px; }
+.activity-toolbar-tools .locale-control { min-height: 34px; }
+.activity-toolbar .icon-toggle, .activity-toolbar .activity-browser-button { width: 34px; height: 34px; min-height: 34px; padding: 0; }
+.activity-browser-button > span { display: none; }
 .activity-toolbar button { min-height: 40px; font-size: 12px; }
 .activity-toolbar p { flex-basis: 100%; margin: 4px 0; color: #ffb2b2; }
 .activity-session .casino-header { top: var(--activity-toolbar-height,54px); }
 .activity-session .locale-visitor { top: calc(var(--activity-toolbar-height,54px) + 10px); }
+.activity-session { --casino-dock-space: calc(66px + env(safe-area-inset-bottom, 0px)); }
+.activity-session:has(.casino-header) { padding-bottom: var(--casino-dock-space); }
+.activity-session .casino-header .casino-brand, .activity-session .casino-navigation,
+.activity-session .casino-header .locale-header, .activity-session .locale-visitor { display: none; }
+.activity-session .casino-header .casino-header-inner { max-width: 1120px; padding: 8px 16px; }
+.activity-session .casino-header .casino-accountbar { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.activity-session .casino-header .identity-pill { margin-right: auto; min-width: 0; order: -2; }
+.activity-session .casino-header .casino-wallet { order: -1; }
+.activity-session .casino-header .identity-pill .display-name { font-size: 13px; }
+.activity-session .casino-header .identity-pill .player-game-title { display: none; }
+.activity-session .casino-header .casino-accountbar > button,
+.activity-session .casino-header .notification-center > button { min-height: 36px; height: 36px; }
+.activity-session .casino-mobile-navigation { display: grid; position: fixed; bottom: 0; left: 0; right: 0; grid-template-columns: repeat(var(--mobile-destinations), minmax(0, 1fr)); gap: 2px; height: var(--casino-dock-space); padding: 5px 6px calc(5px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #46563f; background: #101b18; z-index: 30; }
+.activity-session .casino-mobile-navigation a, .activity-session .casino-mobile-navigation button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 5px 2px; border: 0; border-radius: 6px; color: #becbbf; background: transparent; text-decoration: none; font-size: 11px; font-weight: 700; line-height: 1.15; box-shadow: none; }
+.activity-session .casino-mobile-navigation .active { color: #ffe28a; background: #253b2f; }
+.activity-session .casino-mobile-menu { width: min(600px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; }
+.activity-session .app-shell { max-width: 1120px; padding: 16px; }
+.activity-session .page-heading h1 { font-size: 24px; }
+.activity-session .room-app-shell .layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.activity-session .room-app-shell.room-playing .room-side-panels { display: none; }
+.activity-session .room-table-tools { gap: 6px; margin-bottom: 12px; padding-bottom: 12px; }
+.activity-session .room-table-tools button { min-height: 44px; font-size: 12px; }
+.activity-session .room-waiting .status-strip, .activity-session .room-waiting .room-master,
+.activity-session .room-waiting .room-settings-trigger { display: none; }
+.activity-session .room-waiting .table-seats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.activity-session .room-app-shell .board-felt { padding: 12px; gap: 12px; }
+.activity-session .room-app-shell.table-fullscreen { display: block; overflow-y: auto; }
+.activity-session .room-app-shell.table-fullscreen .layout > section { display: block; overflow: visible; }
+.activity-session .room-app-shell.table-fullscreen .board-felt { height: auto; overflow: visible; }
+.activity-session .issue-launcher { bottom: calc(var(--casino-dock-space) + 12px); }
+.activity-session .notification-panel { position: fixed; top: calc(var(--activity-toolbar-height) + 64px); right: 16px; max-height: calc(100dvh - 220px); overflow-y: auto; }
+.activity-connecting { min-height: 60dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+.activity-connecting h1 { margin: 0; color: #f1d581; font-size: 26px; }
+.activity-session .auth-screen { min-height: auto; padding: 24px 16px; }
+.activity-session .auth-panel { width: min(100%, 520px); padding: 24px; }
+.activity-session .auth-panel .auth-brand { font-size: 28px; }
+@media(max-width:600px) {
+  .activity-session .casino-header .casino-accountbar { display: grid; grid-template-columns: 36px 36px minmax(0, 1fr) auto; grid-template-rows: auto 36px; }
+  .activity-session .casino-header .casino-accountbar .identity-pill { grid-column: 1 / 4; grid-row: 1; margin: 0; }
+  .activity-session .casino-header .casino-accountbar .casino-wallet { grid-column: 4; grid-row: 1; }
+  .activity-session .room-table-tools button { font-size: 10px; }
+  .activity-session .room-waiting .table-seats { grid-template-columns: minmax(0, 1fr); }
+}
 .activity-recovery { width: min(720px,100%); margin: auto; padding: 40px 20px; text-align: center; }
 .activity-recovery h1 { color: #f1d581; font-size: 28px; }
 .activity-recovery .actions { justify-content: center; margin-block: 24px; }

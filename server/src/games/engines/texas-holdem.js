@@ -208,7 +208,7 @@ function startNextHand(state) {
   state.handRanks = {};
   state.pots = [];
   state.handNumber = (state.handNumber ?? 1) + 1;
-  appendLog(state, "dealer", `lance la main ${state.handNumber}.`, "dealer");
+  appendLog(state, "dealer", `lance la main ${state.handNumber}.`, "dealer", "card");
   resolveAutoCheckFold(state);
 }
 
@@ -258,7 +258,7 @@ function advanceStreet(state) {
   state.minRaise = state.bigBlind;
   state.actedPlayerIds = [];
   setPokerTurn(state, nextPlayerIndex(state, state.dealerIndex));
-  appendLog(state, "dealer", `distribue le ${state.street}.`, "dealer");
+  appendLog(state, "dealer", `distribue le ${state.street}.`, "dealer", "card");
 }
 
 export function createTexasHoldemState(players, options = {}) {

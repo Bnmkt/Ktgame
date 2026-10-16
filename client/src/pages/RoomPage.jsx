@@ -29,6 +29,7 @@ import { CompactNumber, copyText } from "../utils/presentation.jsx";
 import { hasPlayablePresidentSet } from "../features/games/president.js";
 import { usePresidentAutoPass } from "../components/game/usePresidentAutoPass.js";
 import { useTurnSound } from "../components/game/useTurnSound.js";
+import { useRoomSounds } from "../components/game/useRoomSounds.js";
 import { PokerAllInNotice } from "../components/game/PokerAllInNotice.jsx";
 import { playerActionExpected, turnSoundKey } from "../features/games/turn-notice.js";
 
@@ -166,6 +167,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
   const [diceRollLocked, setDiceRollLocked] = useState(false);
   const diceRollRequestPending = useRef(false);
   const roomShellRef = useRef(null);
+  useRoomSounds(room, roomShellRef);
   const roomSnapshotRef = useRef("");
   const isOwner = room?.ownerId === user.id;
   useEffect(() => { setMobilePanel(""); }, [compact, room?.activityMatchId]);

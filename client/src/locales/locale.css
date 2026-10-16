@@ -7,8 +7,9 @@
 .locale-profile select { flex: 1; }
 .locale-save-error { position: absolute; top: 100%; right: 0; width: 240px; padding: 10px; color: #ffb6b6; background: #151d18; border: 1px solid #a05454; z-index: 12; }
 .locale-visitor { position: absolute; top: 12px; right: 16px; z-index: 11; }
-.locale-header { position: absolute; top: 14px; right: 16px; }
-.casino-header .casino-header-inner { padding-right: 160px; }
+.locale-header { position: absolute; top: 14px; right: 16px; display: flex; align-items: center; gap: 6px; }
+.locale-header .game-sound-control { width: 32px; height: 32px; min-height: 32px; }
+.casino-header .casino-header-inner { padding-right: 200px; }
 body:has(.casino-header) .locale-visitor { display: none; }
 .locale-admin-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 16px 0; }
 .locale-admin-toolbar label { display: grid; gap: 6px; }

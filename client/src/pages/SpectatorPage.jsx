@@ -11,6 +11,7 @@ import { useBugGameContext } from "../features/bugs/BugReportProvider.jsx";
 import { DisplayName } from "../components/cosmetics/Cosmetics.jsx";
 import { gameTitle } from "../features/games/config.js";
 import { RankedTurnTimer } from "../features/games/RankedPlay.jsx";
+import { useRoomSounds } from "../components/game/useRoomSounds.js";
 import "./spectator.css";
 
 export function SpectatorPage({ code, user, onBack, onJoin }) {
@@ -22,6 +23,7 @@ export function SpectatorPage({ code, user, onBack, onJoin }) {
   const [busy, setBusy] = useState(false);
   const [connected, setConnected] = useState(false);
   const [closed, setClosed] = useState(false);
+  useRoomSounds(room, null, !closed);
   const [rules, setRules] = useState(false);
   const [autoJoin, setAutoJoin] = useState(() => {
     try { return localStorage.getItem(`ktga-table-auto-entry:${user.id}`) !== "off"; } catch { return true; }
