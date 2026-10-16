@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { appPath, readRoute } from "./routes.js";
+import { activityNavigationUrl } from "../features/discord/context.js";
 
 export function useCasinoRoute() {
   const [route, setRoute] = useState(() => readRoute(window.location));
@@ -9,7 +10,7 @@ export function useCasinoRoute() {
     const query = new URLSearchParams(window.location.search);
     if (query.has("room") || query.has("event")) {
       const initial = readRoute(window.location);
-      window.history.replaceState({}, "", appPath(initial.view, initial.id));
+      window.history.replaceState({}, "", activityNavigationUrl(appPath(initial.view, initial.id)));
     }
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -17,7 +18,7 @@ export function useCasinoRoute() {
     const target = new URL(appPath(view, id), window.location.origin);
     target.search = search;
     target.hash = hash;
-    const path = target.pathname + target.search + target.hash;
+    const path = activityNavigationUrl(target.pathname + target.search + target.hash);
     if (window.location.pathname + window.location.search + window.location.hash !== path) window.history[replace ? "replaceState" : "pushState"]({}, "", path);
     setRoute(readRoute(window.location));
     window.scrollTo({ top: 0, behavior: "auto" });

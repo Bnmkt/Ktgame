@@ -1,0 +1,20 @@
+.activity-entry { min-height: 100dvh; display: flex; flex-direction: column; padding: 20px; }
+.activity-entry > header { display: flex; align-items: center; gap: 12px; color: #f1d581; font-size: 22px; font-weight: 800; }
+.activity-entry > header small { margin-left: auto; color: #bdccca; font-size: 13px; font-weight: 500; }
+.activity-entry-content { width: min(100%,720px); margin: auto; padding-block: 24px; text-align: center; }
+.activity-entry-image { width: 100%; height: auto; max-height: 42dvh; object-fit: contain; }
+.activity-entry h1 { color: #f1d581; font-size: 32px; margin: 20px 0 8px; }
+.activity-entry-content > p { color: #d0d9d3; line-height: 1.6; }
+.activity-entry-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 22px 0; }
+.activity-entry-actions button { min-height: 48px; padding: 12px 20px; }
+.activity-entry > footer { text-align: center; font-size: 12px; color: #a8bbb2; padding: 16px 0; }
+.activity-toolbar { position: sticky; top: 0; z-index: 190; min-height: 54px; padding: 6px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; background: #10231b; border-bottom: 1px solid #657454; }
+.activity-toolbar > span { display: flex; align-items: center; gap: 8px; color: #b6dbcc; font-size: 13px; }
+.activity-toolbar button { min-height: 40px; font-size: 12px; }
+.activity-toolbar p { flex-basis: 100%; margin: 4px 0; color: #ffb2b2; }
+.activity-session .casino-header { top: var(--activity-toolbar-height,54px); }
+.activity-session .locale-visitor { top: calc(var(--activity-toolbar-height,54px) + 10px); }
+.activity-recovery { width: min(720px,100%); margin: auto; padding: 40px 20px; text-align: center; }
+.activity-recovery h1 { color: #f1d581; font-size: 28px; }
+.activity-recovery .actions { justify-content: center; margin-block: 24px; }
+@media(max-width:400px) { .activity-entry { padding: 16px; } .activity-entry-actions button { width: 100%; } .activity-toolbar { padding-inline: 8px; } }

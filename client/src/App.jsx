@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
 import { Coins, Shield, ShieldAlert, Users, X } from "lucide-react";
 import { api, installButtonActionFeedback, setToken } from "./api.js";
 import { defaultPublicSettings } from "./config/site.js";
@@ -387,7 +386,10 @@ export default function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<LocaleProvider><div className="locale-visitor"><LanguagePicker /></div><PrivacyProvider><BugReportProvider><InstallNotice /><App /></BugReportProvider></PrivacyProvider></LocaleProvider>);
+export function CasinoApplication({ children, embedded = false }) {
+  const content = <><div className="locale-visitor"><LanguagePicker /></div><PrivacyProvider><BugReportProvider>{!embedded && <InstallNotice />}{children}<App /></BugReportProvider></PrivacyProvider></>;
+  return embedded ? content : <LocaleProvider>{content}</LocaleProvider>;
+}
 
 function RestrictedFeature({ onBack }) {
   const { t: localeText } = useLocale();

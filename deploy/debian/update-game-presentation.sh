@@ -15,6 +15,7 @@ files=(
   server/src/db.js server/src/services/leaderboards.js server/src/storage/leaderboard-seasons.js
   server/src/services/account-security.js server/src/services/discord-oauth.js
   server/src/services/discord-routes.js server/src/services/discord-presence.js
+  server/src/services/discord-activity.js
   server/src/services/editor-duplication.js server/src/services/tribunal.js
   server/src/services/softban.js server/src/services/parental-controls.js
   server/src/services/gameplay-reset.js server/src/services/gameplay-reset-routes.js
@@ -28,7 +29,8 @@ files=(
   client/src/locales/fr.json client/src/locales/en.json client/src/locales/catalog.js
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx
-  client/index.html client/src/App.jsx client/src/config/site.js client/src/seo/render.jsx
+  client/index.html client/discord-activity/index.html client/vite.config.js client/package.json client/package-lock.json
+  client/src/main.jsx client/src/App.jsx client/src/config/site.js client/src/seo/render.jsx
   client/src/styles.css client/src/navigation/casino.css
   client/src/pages/AdminPage.jsx client/src/pages/AuthPage.jsx client/src/pages/LobbyPage.jsx
   client/src/pages/PublicGamesPage.jsx client/src/pages/public-games.css
@@ -36,9 +38,9 @@ files=(
   client/src/components/admin/GameImageEditor.jsx client/src/components/admin/game-image-editor.css
   client/src/features/games/artwork-crop.js
   client/src/components/game/game-artwork.css client/src/features/games/presentation.js
-  deploy/debian/update-game-presentation.sh deploy/debian/nginx-https.conf
+  deploy/debian/update-game-presentation.sh deploy/debian/nginx-https.conf deploy/debian/enable-discord-activity.sh
 )
-for file in "${files[@]}" client/dist/index.html client/dist-ssr/render.js; do
+for file in "${files[@]}" client/dist/index.html client/dist/discord-activity/index.html client/dist-ssr/render.js; do
   [[ -f $stage/$file && ! -L $stage/$file ]] || { echo "Missing release file: $file" >&2; exit 1; }
 done
 node --check "$stage/server/src/index.js"
@@ -63,6 +65,9 @@ checkTables
 backup=/var/backups/ktga/presentation-$(date -u +%Y%m%dT%H%M%SZ)-$$
 install -d -m 0700 "$backup"
 backupFiles=(server/src client/src client/dist-ssr deploy/debian)
+for file in client/index.html client/package.json client/package-lock.json client/vite.config.js client/discord-activity; do
+  if [[ -e /opt/ktga/$file ]]; then backupFiles+=("$file"); fi
+done
 for directory in client/scripts desktop/companion; do
   if [[ -d /opt/ktga/$directory ]]; then backupFiles+=("$directory"); fi
 done
@@ -76,6 +81,10 @@ rollback() {
     systemctl stop ktga.service || true
     tar -xzf "$backup/code.tar.gz" -C /opt/ktga
     tar -xzf "$backup/frontend.tar.gz" -C /var/www/ktga
+    if [[ -f $backup/nginx-site.conf ]]; then
+      install -m 0644 "$backup/nginx-site.conf" /etc/nginx/sites-available/ktga
+      nginx -t && systemctl reload nginx || true
+    fi
     systemctl start ktga.service || true
   fi
   exit "$status"
@@ -156,6 +165,9 @@ for ((attempt=0; attempt<45; attempt++)); do
   sleep 1
 done
 [[ $ready == true ]] || { echo 'Service did not become healthy.' >&2; exit 1; }
+bash "$stage/deploy/debian/enable-discord-activity.sh" "$stage/deploy/debian/nginx-https.conf" "$backup"
+curl -fsS https://www.ktga.me/discord-activity/ >/dev/null
+curl -fsS https://www.ktga.me/discord-activity/api/discord/activity/config >/dev/null
 curl -fsS https://api.ktga.me/api/config | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(!Object.hasOwn(JSON.parse(s),"featuredGameId"))process.exit(1)})'
 curl -fsS https://api.ktga.me/api/games | node -e 'let s="";process.stdin.on("data",b=>s+=b).on("end",()=>{if(!JSON.parse(s).every(g=>typeof g.coverImage==="string"&&typeof g.descriptiveImage==="string"))process.exit(1)})'
 curl -fsS https://www.ktga.me/manifest.webmanifest >/dev/null

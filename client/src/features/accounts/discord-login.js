@@ -1,4 +1,5 @@
 import { api } from "../../api.js";
+import { isDiscordActivityLocation } from "../discord/context.js";
 
 const pendingReturn = typeof window !== "undefined" && new URL(window.location.href).searchParams.get("discord") === "complete";
 let completion;
@@ -15,6 +16,7 @@ export function completeDiscordReturn() {
 }
 
 export async function startDiscordLogin(roomCode = "") {
+  if (isDiscordActivityLocation()) return (await import("../discord/runtime.js")).loginInActivity();
   const result = await api("/api/auth/discord/start", { method: "POST", body: JSON.stringify({ roomCode }) });
   const url = new URL(result.url);
   if (url.origin !== "https://discord.com" || url.pathname !== "/oauth2/authorize") throw new Error("Adresse de connexion Discord invalide.");

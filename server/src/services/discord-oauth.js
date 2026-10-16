@@ -23,6 +23,27 @@ export function discordConfiguration(env = process.env) {
 }
 
 // Only transient authorization data lives here. Discord access tokens are never persisted.
+export async function exchangeDiscordCode(code, { configuration = discordConfiguration, fetcher = fetch, embedded = false } = {}) {
+  if (typeof code !== "string" || !code || code.length > 2048) throw new Error("DISCORD_INVALID_CODE");
+  const config = configuration();
+  if (!config.available) throw new Error("DISCORD_UNAVAILABLE");
+  const response = await fetcher("https://discord.com/api/oauth2/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, grant_type: "authorization_code", code, ...(!embedded ? { redirect_uri: config.redirectUri } : {}) }),
+    signal: AbortSignal.timeout(10000), redirect: "error"
+  });
+  if (!response.ok) throw new Error("DISCORD_EXCHANGE_FAILED");
+  const token = await response.json();
+  if (typeof token.access_token !== "string" || !token.access_token || token.token_type?.toLowerCase() !== "bearer") throw new Error("DISCORD_EXCHANGE_FAILED");
+  const profileResponse = await fetcher("https://discord.com/api/v10/users/@me", {
+    headers: { Authorization: `Bearer ${token.access_token}` }, signal: AbortSignal.timeout(10000), redirect: "error"
+  });
+  if (!profileResponse.ok) throw new Error("DISCORD_PROFILE_FAILED");
+  const profile = await profileResponse.json();
+  if (!/^\d{16,22}$/.test(profile.id) || profile.bot) throw new Error("DISCORD_PROFILE_FAILED");
+  return { id: profile.id, username: String(profile.username ?? "").slice(0, 80) };
+}
+
 export function createDiscordOAuth({ configuration = () => discordConfiguration(), fetcher = fetch, now = Date.now, limit = 1000 } = {}) {
   const flows = new Map();
   function prune() {
@@ -47,24 +68,7 @@ export function createDiscordOAuth({ configuration = () => discordConfiguration(
     flow.stage = "exchanging";
     try {
       if (denied) throw new Error("DISCORD_CANCELLED");
-      if (typeof code !== "string" || !code || code.length > 2048) throw new Error("DISCORD_INVALID_CODE");
-      const config = configuration();
-      if (!config.available) throw new Error("DISCORD_UNAVAILABLE");
-      const response = await fetcher("https://discord.com/api/oauth2/token", {
-        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, grant_type: "authorization_code", code, redirect_uri: config.redirectUri }),
-        signal: AbortSignal.timeout(10000), redirect: "error"
-      });
-      if (!response.ok) throw new Error("DISCORD_EXCHANGE_FAILED");
-      const token = await response.json();
-      if (typeof token.access_token !== "string" || !token.access_token || token.token_type?.toLowerCase() !== "bearer") throw new Error("DISCORD_EXCHANGE_FAILED");
-      const profileResponse = await fetcher("https://discord.com/api/v10/users/@me", {
-        headers: { Authorization: `Bearer ${token.access_token}` }, signal: AbortSignal.timeout(10000), redirect: "error"
-      });
-      if (!profileResponse.ok) throw new Error("DISCORD_PROFILE_FAILED");
-      const profile = await profileResponse.json();
-      if (!/^\d{16,22}$/.test(profile.id) || profile.bot) throw new Error("DISCORD_PROFILE_FAILED");
-      flow.profile = { id: profile.id, username: String(profile.username ?? "").slice(0, 80) };
+      flow.profile = await exchangeDiscordCode(code, { configuration, fetcher });
     } catch (error) {
       flow.error = ["DISCORD_CANCELLED", "DISCORD_UNAVAILABLE"].includes(error.message) ? error.message : "DISCORD_EXCHANGE_FAILED";
     }

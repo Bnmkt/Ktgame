@@ -4,6 +4,8 @@ import { api, BASE_PATH } from "../../api.js";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { PasswordField } from "../common/PasswordField.jsx";
 import { Dialog } from "../common/Dialog.jsx";
+import { isDiscordActivityLocation } from "../../features/discord/context.js";
+import { openActivityBrowser } from "../../features/discord/runtime.js";
 import "./account-connections.css";
 
 export function AccountConnections({ user, onUser, onError, onMessage }) {
@@ -56,7 +58,7 @@ export function AccountConnections({ user, onUser, onError, onMessage }) {
     <header><Link2 size={19}/><h3>Discord</h3></header>
     {!connection ? <p role="status">{t("Chargement…")}</p> : <>
       <p>{connection.linked ? t("Compte associé : {value0}", { value0: connection.username }) : t("Associe ton compte Discord pour te connecter sans saisir ton mot de passe. La double authentification reste active.")}</p>
-      {(connection.available || connection.linked) && <form onSubmit={changeLink} className="account-workspace-password"><PasswordField label={t("Mot de passe actuel")} required autoComplete="current-password" maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)}/><button type="submit" className="secondary" disabled={busy || !password}>{connection.linked ? <Unlink size={17}/> : <LogIn size={17}/>} {t(connection.linked ? "Dissocier Discord" : "Associer Discord")}</button></form>}
+      {isDiscordActivityLocation() && !connection.linked ? <button type="button" className="secondary" onClick={() => openActivityBrowser({ pathname: "/profil" }).catch(error => onError(error.message))}><Link2 size={17}/>{t("Associer Discord dans le navigateur")}</button> : (connection.available || connection.linked) && <form onSubmit={changeLink} className="account-workspace-password"><PasswordField label={t("Mot de passe actuel")} required autoComplete="current-password" maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)}/><button type="submit" className="secondary" disabled={busy || !password}>{connection.linked ? <Unlink size={17}/> : <LogIn size={17}/>} {t(connection.linked ? "Dissocier Discord" : "Associer Discord")}</button></form>}
       {!connection.available && !connection.linked && <small>{t(!connection.ageAllowed ? "Disponible à partir de 13 ans, avec une date de naissance renseignée." : "La connexion Discord n’est pas encore activée.")}</small>}
     </>}
     <div className="account-link-presence"><h4><Monitor size={17}/> {t("Présence de jeu sur Discord")}</h4><p>{t("Le compagnon optionnel affiche le jeu, ses images, le mode, les joueurs et la manche sur Discord. Tes cartes, tes messages et ton classement privé ne sont jamais partagés.")}</p>

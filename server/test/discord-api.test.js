@@ -44,8 +44,9 @@ test("Discord login/link preserves real session restrictions and administrator M
       ...Object.fromEntries(["PARENTAL_DB_PATH", "TRIBUNAL_DB_PATH", "CHAT_DB_PATH", "STATUS_DB_PATH", "REQUEST_LOG_PATH", "HELP_DB_PATH", "DATA_REQUEST_DB_PATH", "BUG_REPORT_DB_PATH", "PATCHNOTES_DB_PATH", "CONTACT_NOTICE_DB_PATH", "EXECUTION_DB_PATH"].map((key) => [key, path.join(directory, `${key}.sqlite`)])) }
   });
   server.stdout.on("data", (chunk) => output += chunk); server.stderr.on("data", (chunk) => output += chunk);
-  const request = async (route, method = "GET", body, token, cookie = "") => {
-    const result = await fetch(url + route, { method, redirect: "manual", headers: { Origin: "https://www.ktga.me", "User-Agent": "DiscordTest", "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(cookie ? { Cookie: cookie } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const activityOrigin = "https://123456789012345678.discordsays.com";
+  const request = async (route, method = "GET", body, token, cookie = "", origin = "https://www.ktga.me") => {
+    const result = await fetch(url + route, { method, redirect: "manual", headers: { Origin: origin, "User-Agent": "DiscordTest", "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(cookie ? { Cookie: cookie } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     return { status: result.status, data: result.headers.get("content-type")?.includes("json") ? await result.json() : await result.text(), headers: result.headers };
   };
   const flow = async (discordId, { token, route = "/api/auth/discord/start", body = {}, roomCode = "" } = {}) => {
@@ -75,6 +76,23 @@ test("Discord login/link preserves real session restrictions and administrator M
     const login = await flow(identities.player, { roomCode: "ABC123" });
     assert.equal(login.status, 200); assert.equal(login.data.user.id, "player"); assert.ok(login.data.token);
     assert.equal(login.callback.headers.get("location"), "https://www.ktga.me/table/ABC123?discord=complete");
+    const activityConfig = await request("/api/discord/activity/config", "GET", null, null, "", activityOrigin);
+    assert.equal(activityConfig.status, 200); assert.equal(activityConfig.data.available, true); assert.equal(activityConfig.data.clientId, "123456789012345678"); assert.equal(activityConfig.data.clientSecret, undefined);
+    assert.equal(activityConfig.headers.get("access-control-allow-origin"), activityOrigin);
+    const activityLogin = id => request("/api/auth/discord/activity", "POST", { code: id, userId: "other", elo: 999999 }, null, "", activityOrigin);
+    assert.equal((await request("/api/auth/discord/activity", "POST", { code: identities.player })).status, 403);
+    assert.equal((await activityLogin("")).status, 400); assert.equal((await activityLogin("invalid")).status, 400);
+    const embedded = await activityLogin(identities.player); assert.equal(embedded.status, 200); assert.equal(embedded.data.user.id, "player"); assert.ok(embedded.data.token); assert.equal(embedded.data.access_token, undefined);
+    assert.equal((await request("/api/me", "GET", null, embedded.data.token, "", activityOrigin)).status, 200);
+    const embeddedMfa = await activityLogin(identities.admin); assert.equal(embeddedMfa.status, 202); assert.equal(embeddedMfa.data.token, undefined); assert.deepEqual(embeddedMfa.data.methods, ["totp"]);
+    const embeddedVerified = await request("/api/auth/mfa/verify", "POST", { challengeId: embeddedMfa.data.challengeId, method: "totp", code: totpCode(totp) }, null, "", activityOrigin);
+    assert.equal(embeddedVerified.status, 200); assert.equal(embeddedVerified.data.user.id, "admin");
+    for (const id of ["banned", "minor", "revoked"]) assert.equal((await activityLogin(identities[id])).status, 403);
+    assert.equal((await activityLogin(identities.locked)).status, 429);
+    assert.equal((await request("/api/auth/login", "POST", { login: "minor@example.test", password }, null, "", activityOrigin)).status, 403);
+    const polling = await fetch(url + "/socket.io/?EIO=4&transport=polling", { headers: { Origin: activityOrigin } }); assert.equal(polling.status, 200);
+    const refusedPolling = await fetch(url + "/socket.io/?EIO=4&transport=polling", { headers: { Origin: "https://999999999999999999.discordsays.com" } }); assert.ok(refusedPolling.status >= 400);
+    assert.ok((await request("/api/discord/activity/config", "GET", null, null, "", "https://999999999999999999.discordsays.com")).status >= 400);
     const admin = await flow(identities.admin);
     assert.equal(admin.status, 202); assert.equal(admin.data.token, undefined); assert.deepEqual(admin.data.methods, ["totp"]);
     const verified = await request("/api/auth/mfa/verify", "POST", { challengeId: admin.data.challengeId, method: "totp", code: totpCode(totp), userId: "player" });
@@ -124,6 +142,7 @@ test("Discord login/link preserves real session restrictions and administrator M
     assert.equal((await request("/api/discord/presence/activity", "GET", null, connection.data.token)).status, 401);
     assert.equal((await request("/api/me/discord", "DELETE", { password }, player.data.token)).status, 200);
     assert.equal((await flow(identities.player)).status, 404);
+    assert.equal((await activityLogin(identities.player)).status, 404);
   } finally {
     if (server.exitCode === null) { const ended = new Promise((resolve) => server.once("exit", resolve)); server.kill(); await ended; }
     assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir())); assert.ok(path.basename(directory).startsWith("ktga-discord-api-"));

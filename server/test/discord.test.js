@@ -4,12 +4,21 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { createDiscordOAuth, discordConfiguration } from "../src/services/discord-oauth.js";
+import { createDiscordOAuth, discordConfiguration, exchangeDiscordCode } from "../src/services/discord-oauth.js";
 import { createDiscordPresence, discordActivityFor } from "../src/services/discord-presence.js";
 import { DiscordIPC, rpcFrame, ipcPaths } from "../../desktop/companion/discord-presence.mjs";
 import { createMfaChallenge, mfaChallengeAccount, consumeMfaChallenge, encryptTotpSecret, totpCode } from "../src/services/account-security.js";
 
 const config = { clientId: "123456789012345678", clientSecret: "test-only-secret", redirectUri: "https://api.ktga.me/api/auth/discord/callback", available: true };
+
+test("embedded authorization exchanges the SDK code without a web redirect or exposing the provider token", async () => {
+  const profile = await exchangeDiscordCode("activity-code", { embedded: true, configuration: () => config, fetcher: async (url, options) => {
+    if (url.endsWith("/token")) { assert.equal(options.body.has("redirect_uri"), false); assert.equal(options.body.get("grant_type"), "authorization_code"); assert.equal(options.body.get("client_secret"), config.clientSecret); return Response.json({ access_token: "do-not-expose", token_type: "Bearer" }); }
+    assert.equal(options.headers.Authorization, "Bearer do-not-expose");
+    return Response.json({ id: "999999999999999999", username: "Activity player", email: "private@example.test" });
+  } });
+  assert.deepEqual(profile, { id: "999999999999999999", username: "Activity player" });
+});
 
 test("Discord MFA challenge selects its own account, expires on security change, and is one-time", () => {
   const secret = "test-encryption-key", totp = "JBSWY3DPEHPK3PXP";

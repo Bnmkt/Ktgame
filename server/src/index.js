@@ -11,8 +11,9 @@ import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
 import { createRoomRuntime } from "./services/room-runtime.js";
 import "dotenv/config";
-import { discordConfiguration } from "./services/discord-oauth.js";
+import { discordAgeAllowed, discordConfiguration } from "./services/discord-oauth.js";
 import { registerDiscordRoutes } from "./services/discord-routes.js";
+import { discordActivityOrigin, registerDiscordActivity } from "./services/discord-activity.js";
 import { createDiscordPresence, registerDiscordPresence } from "./services/discord-presence.js";
 import { normalizeLobbyNotice, updateLobbyNotice } from "./services/lobby-notice.js";
 import { registerPublicPages } from "./services/public-pages.js";
@@ -782,7 +783,7 @@ if (!JWT_SECRET) {
 }
 
 function isAllowedOrigin(origin) {
-  return !origin || allowedOrigins.includes(origin);
+  return !origin || allowedOrigins.includes(origin) || Boolean(origin === discordActivityOrigin() && platformSettings().discordLoginEnabled);
 }
 
 function normalizeBasePath(value) {
@@ -927,6 +928,7 @@ function createAppServer() {
 const server = createAppServer();
 const io = new Server(server, {
   path: `${APP_BASE_PATH}/socket.io`,
+  allowRequest: (req, callback) => callback(null, isAllowedOrigin(req.headers.origin)),
   cors: {
     origin(origin, callback) {
       callback(isAllowedOrigin(origin) ? null : new Error("Origin not allowed by CORS"), isAllowedOrigin(origin));
@@ -2599,6 +2601,7 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 async function beginAccountLogin(req, res, db, user, method, failureKey) {
+  if (req.headers.origin === discordActivityOrigin() && !discordAgeAllowed(user)) return res.status(403).json({ error: "La connexion Discord est réservée aux comptes de 13 ans et plus avec une date de naissance renseignée." });
   if (user.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
   const moderation = activeModeration(user);
   if (moderation?.type === "hard") return res.status(403).json({ code: "HARD_BAN", error: "Ce compte est temporairement inaccessible.", reason: moderation.reason ?? "", endsAt: moderation.endsAt ?? "" });
@@ -2679,6 +2682,7 @@ app.post("/api/auth/login", async (req, res) => {
 registerDiscordRoutes({ app, auth, platformSettings, readDb, sanitizeUser, bcrypt, isUnder13, requestCookie,
   publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, recordAuthFailure, sendAuthLocked, writeDb,
   secureCookies: NODE_ENV === "production" || Boolean(HTTPS_KEY_PATH || HTTPS_PFX_PATH) });
+registerDiscordActivity({ app, clientDist: CLIENT_DIST, platformSettings, readDb, publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, sendAuthLocked });
 registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence, io, roomPresence, configuredGames, publicWebsiteUrl,
   presence: createDiscordPresence({ filename: path.join(path.dirname(databaseFilename), "discord-presence.sqlite") }),
   configuration: discordConfiguration, accountBlocked: (user) => Boolean(activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) });

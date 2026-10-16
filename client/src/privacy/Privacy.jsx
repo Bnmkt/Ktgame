@@ -6,6 +6,7 @@ import { appPath } from "../navigation/routes.js";
 import { Dialog } from "../components/common/Dialog.jsx";
 import { CONSENT_DURATION, CONSENT_KEY, PRIVACY_VERSION, extractMarkers, readConsent } from "./consent.js";
 import { AUDIENCE_VERSION, audienceAllowed, createAudienceClient } from "./audience.js";
+import { isDiscordActivityLocation } from "../features/discord/context.js";
 import "./privacy.css";
 
 const PrivacyContext = createContext(null);
@@ -14,6 +15,7 @@ export const legalLinks = { terms: "Conditions d'utilisation", legal: "Mentions 
 
 export function PrivacyProvider({ children }) {
   const { t: localeText } = useLocale();
+  const embedded = isDiscordActivityLocation();
   const [choice, setChoice] = useState(() => { try { return readConsent(window.localStorage); } catch { return null; } });
   const [open, setOpen] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(choice?.ageConfirmed === true);
@@ -27,6 +29,7 @@ export function PrivacyProvider({ children }) {
     return () => { clearInterval(timer); window.removeEventListener("storage", sync); };
   }, []);
   function choose(enabled, audience = false) {
+    audience = audience && !embedded;
     const next = { version: PRIVACY_VERSION, chosenAt: Date.now(), enabled, audience, audienceVersion: AUDIENCE_VERSION, ageConfirmed: (enabled || audience) && ageConfirmed };
     try { localStorage.setItem(CONSENT_KEY, JSON.stringify(next)); } catch { /* A blocked storage keeps the choice for this visit only. */ }
     setChoice(next); setOpen(false); setError("");
@@ -36,7 +39,7 @@ export function PrivacyProvider({ children }) {
   const content = <>
     <p>{localeText("Les données nécessaires font fonctionner la connexion, les parties et vos préférences. Elles ne servent pas à la publicité.")}</p>
     <label className="privacy-purpose privacy-purpose-choice"><input type="checkbox" checked={navigationEnabled} onChange={(event) => setNavigationEnabled(event.target.checked)} /><div><strong>{localeText("Succès de navigation · facultatif")}</strong><p>{localeText("Autoriser la famille du navigateur, les types de pages visitées, certains indices secrets dans les liens et le temps actif. Pas d'historique détaillé ni d'URL complète enregistrée. Aucun effet sur les parties ou les jetons.")}</p></div></label>
-    <label className="privacy-purpose privacy-purpose-choice"><input type="checkbox" checked={audienceEnabled} onChange={(event) => setAudienceEnabled(event.target.checked)} /><div><strong>{localeText("Mesure d’audience Google Analytics · facultatif")}</strong><p>{localeText("Permettre à Google de mesurer les visites avec des cookies et des informations générales sur le navigateur et l’appareil. Sans pseudo, email, identifiant de compte ni paramètres des liens. Analytics ne démarre pas avant votre accord. Le gestionnaire Google Tag Manager est toutefois chargé à l’ouverture du site, même sans cet accord. Aucun ciblage publicitaire dans notre intégration Analytics.")}</p></div></label>
+    {!embedded && <label className="privacy-purpose privacy-purpose-choice"><input type="checkbox" checked={audienceEnabled} onChange={(event) => setAudienceEnabled(event.target.checked)} /><div><strong>{localeText("Mesure d’audience Google Analytics · facultatif")}</strong><p>{localeText("Permettre à Google de mesurer les visites avec des cookies et des informations générales sur le navigateur et l’appareil. Sans pseudo, email, identifiant de compte ni paramètres des liens. Analytics ne démarre pas avant votre accord. Le gestionnaire Google Tag Manager est toutefois chargé à l’ouverture du site, même sans cet accord. Aucun ciblage publicitaire dans notre intégration Analytics.")}</p></div></label>}
     <label className="privacy-age"><input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} />{localeText("J'ai au moins 13 ans et peux consentir à ce suivi facultatif.")}</label>
     <p className="privacy-caption">{localeText("Avant 13 ans, choisissez sans suivi. Votre choix est conservé 180 jours et peut être modifié à tout moment.")}</p>
     <div className="privacy-actions"><button type="button" className="secondary" onClick={() => choose(false)}>{localeText("Tout refuser")}</button><button type="button" className="secondary" disabled={(navigationEnabled || audienceEnabled) && !ageConfirmed} onClick={() => choose(navigationEnabled, audienceEnabled)}>{localeText("Enregistrer mes choix")}</button><button type="button" className="secondary" disabled={!ageConfirmed} onClick={() => choose(true, true)}>{localeText("Tout accepter")}</button></div>

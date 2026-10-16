@@ -1,5 +1,6 @@
 import { CONSENT_DURATION, PRIVACY_VERSION } from "./consent.js";
 import { gameRules } from "../config/site.js";
+import { isDiscordActivityLocation } from "../features/discord/context.js";
 
 export const AUDIENCE_VERSION = "2026-10-07";
 export const AUDIENCE_ID = "G-YK0459SVPW";
@@ -48,7 +49,7 @@ export function createAudienceClient(window, document, { enabled = AUDIENCE_ENAB
   }
   function update({ choice, route, user, accountReady }) {
     if (user?.minor?.restricted) minorObserved = true;
-    const allowed = enabled && accountReady && !minorObserved && audienceAllowed(choice, now());
+    const allowed = enabled && !isDiscordActivityLocation(window.location) && accountReady && !minorObserved && audienceAllowed(choice, now());
     const page = audiencePage(route, window.location.search);
     if (!allowed || !page) { stop({ erase: !allowed }); return; }
     window[disabledKey] = false;

@@ -6,6 +6,6 @@ export default defineConfig(({ mode, isSsrBuild }) => {
   return {
     base: env.VITE_BASE_PATH || "/",
     plugins: [react()],
-    build: isSsrBuild ? { cssCodeSplit: false, ssrEmitAssets: true } : {}
+    build: isSsrBuild ? { cssCodeSplit: false, ssrEmitAssets: true } : { rollupOptions: { input: { main: "index.html", activity: "discord-activity/index.html" } } }
   };
 });

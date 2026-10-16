@@ -1,4 +1,5 @@
 import { bugDiagnostics } from "./features/bugs/diagnostics.js";
+import { isDiscordActivityLocation } from "./features/discord/context.js";
 
 function normalizeBasePath(path) {
   const normalized = `/${String(path || "").replace(/^\/+|\/+$/g, "")}`;
@@ -7,7 +8,7 @@ function normalizeBasePath(path) {
 
 const BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 const configuredApiUrl = String(import.meta.env.VITE_API_URL ?? "").trim();
-const API_URL = configuredApiUrl || (import.meta.env.DEV ? "http://localhost:4000" : BASE_PATH);
+const API_URL = isDiscordActivityLocation() ? "" : configuredApiUrl || (import.meta.env.DEV ? "http://localhost:4000" : BASE_PATH);
 
 function splitOriginAndPath(url) {
   if (!/^https?:\/\//i.test(url)) return { origin: undefined, basePath: normalizeBasePath(url || BASE_PATH) };
@@ -16,8 +17,8 @@ function splitOriginAndPath(url) {
 }
 
 const socketBase = splitOriginAndPath(API_URL);
-const SOCKET_URL = String(import.meta.env.VITE_SOCKET_URL ?? "").trim() || socketBase.origin;
-const SOCKET_PATH = String(import.meta.env.VITE_SOCKET_PATH ?? "").trim() || `${socketBase.basePath}/socket.io`;
+const SOCKET_URL = isDiscordActivityLocation() ? undefined : String(import.meta.env.VITE_SOCKET_URL ?? "").trim() || socketBase.origin;
+const SOCKET_PATH = isDiscordActivityLocation() ? "/socket.io" : String(import.meta.env.VITE_SOCKET_PATH ?? "").trim() || `${socketBase.basePath}/socket.io`;
 const pendingRequests = new Map();
 const responseCache = new Map();
 const cacheableGetPattern = /^\/api\/(config|games|shop)$/;

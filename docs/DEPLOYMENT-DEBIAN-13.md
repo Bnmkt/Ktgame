@@ -678,6 +678,38 @@ recreer arbitrairement le fichier de demande. Une restauration doit se faire
 service arrete, a partir des deux sauvegardes coherentes, apres copie privee de
 l'etat en echec. Aucun bouton de restauration n'est expose sur le site.
 
+## Activite Discord et ouverture dans le navigateur
+
+L'activite possede une entree dediee : `https://www.ktga.me/discord-activity/`.
+Elle propose de jouer dans Discord ou d'ouvrir le casino dans le navigateur.
+Une fois dans le casino integre, le bouton d'ouverture externe conserve la page
+ou la table, mais ne transfere aucun token, parametre Discord ou fragment prive.
+La session du navigateur reste independante : une connexion peut etre necessaire.
+
+Dans le portail developpeur Discord, choisir l'application existante puis
+Activities > URL Mappings. Configurer le prefixe `/` avec la cible
+`www.ktga.me/discord-activity` (sans `https://`, sans fichier HTML). Cette cible est
+un repertoire. Supprimer les anciennes correspondances `/api` ou `/socket.io`
+qui contourneraient cette cible, sauf si elles ont ete explicitement adaptees.
+Activer les plateformes souhaitees dans Activities > Settings. Les identifiants
+OAuth actuels suffisent ; aucun bot, scope supplementaire ou secret cote client
+n'est necessaire. Le seul scope demande est `identify`.
+
+Nginx transmet les ressources et pages de cette entree vers Node, et retire le
+prefixe pour les routes API et Socket.IO. Le serveur n'autorise que l'origine
+`https://DISCORD_CLIENT_ID.discordsays.com`, jamais tous les domaines Discord.
+Seules les pages de l'entree dediee autorisent les cadres des clients Discord ;
+le site classique reste protege contre les iframes. Pour activer cette evolution,
+installer la version mise a jour de `nginx-https.conf`, verifier `nginx -t`, puis
+recharger Nginx. Ne pas supprimer globalement `X-Frame-Options` ou la CSP.
+
+La connexion integree utilise le SDK officiel et un echange de code cote serveur.
+Les comptes doivent deja etre associes a Discord pour utiliser ce bouton.
+La connexion email reste disponible. MFA, age, restrictions et sanctions sont
+verifies par les memes services que sur le site ; les tokens restent en memoire.
+L'association initiale d'un compte a Discord se fait depuis le navigateur.
+GTM, Analytics et l'installation PWA ne sont pas charges dans l'activite.
+
 ## Sources techniques
 
 Les fichiers fournis implementent les reglages propres a KTGA.ME ; les

@@ -73,7 +73,13 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
   }, [discordResult]);
   async function connectDiscord() {
     setBusy("discord"); setError("");
-    try { await startDiscordLogin(pendingRoomCode); }
+    try {
+      const result = await startDiscordLogin(pendingRoomCode);
+      if (!result) return;
+      if (result.mfaRequired) { setMfa({ ...result, method: result.methods.includes("totp") ? "totp" : result.methods[0] }); setMfaCode(""); setMode("mfa"); }
+      else { setToken(result.token); onAuth(result.user); }
+      setBusy("");
+    }
     catch (err) { setError(err.message); setBusy(""); }
   }
   const registrationPasswordReady = passwordRequirements.every((requirement) => requirement.test(register.password));
