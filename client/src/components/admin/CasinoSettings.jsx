@@ -9,6 +9,7 @@ import { ProgressionSettings } from "./ProgressionSettings.jsx";
 import { LobbyNotice } from "../navigation/LobbyNotice.jsx";
 import { GameImageEditor } from "./GameImageEditor.jsx";
 import { SoftBanRestrictions } from "./SoftBanRestrictions.jsx";
+import { GameplayReset } from "./GameplayReset.jsx";
 import "./editor-copy-settings.css";
 import "../navigation/lobby-notice.css";
 
@@ -62,7 +63,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
   const addRule = () => update("dailyBonusRules", [...config.rules, { id: `bonus-rule-${Date.now()}`, label: "Nouveau palier", day: 7, operation: "add", value: 0.5, repeat: false }]);
 
   return <form className="admin-settings casino-settings" onSubmit={onSubmit}>
-    <header className="casino-settings-heading"><div><span className="eyebrow">{localeText("Configuration générale")}</span><h2>{localeText("Paramètres du casino")}</h2><p>{localeText("Identité, économie et rythme des parties appliqués par le serveur.")}</p></div><button type="submit" disabled={saving}><Save size={18} />{saving ? localeText("Enregistrement…") : localeText("Enregistrer")}</button></header>
+    <header className="casino-settings-heading"><div><span className="eyebrow">{localeText("Configuration générale")}</span><h2>{localeText("Paramètres du casino")}</h2><p>{localeText("Identité, économie et rythme des parties appliqués par le serveur.")}</p></div>{section !== "maintenance" && <button type="submit" disabled={saving}><Save size={18} />{saving ? localeText("Enregistrement…") : localeText("Enregistrer")}</button>}</header>
     <nav className="segmented-tabs casino-settings-tabs" aria-label={localeText("Catégories des paramètres")}>
       <button type="button" className={section === "identity" ? "active" : ""} onClick={() => setSection("identity")}><Landmark size={17} />{localeText("Identité et accès")}</button>
       <button type="button" className={section === "economy" ? "active" : ""} onClick={() => setSection("economy")}><Coins size={17} />{localeText("Économie et bonus")}</button>
@@ -71,7 +72,10 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
       <button type="button" className={section === "notice" ? "active" : ""} onClick={() => setSection("notice")}><Megaphone size={17}/>{localeText("Annonce")}</button>
       <button type="button" className={section === "editing" ? "active" : ""} onClick={() => setSection("editing")}><ShieldCheck size={17}/>{localeText("Édition")}</button>
       <button type="button" className={section === "moderation" ? "active" : ""} onClick={() => setSection("moderation")}><ShieldCheck size={17}/>{localeText("Softbans")}</button>
+      <button type="button" className={section === "maintenance" ? "active" : ""} onClick={() => setSection("maintenance")}><AlertTriangle size={17}/>{localeText("Maintenance")}</button>
     </nav>
+
+    {section === "maintenance" && <GameplayReset/>}
 
     {section === "moderation" && <section className="casino-settings-panel settings-group"><div className="settings-group-heading"><ShieldCheck/><div><h3>{localeText("Restrictions des softbans")}</h3><p>{localeText("Coche les actions interdites par défaut pendant un softban. Chaque fiche joueur peut utiliser une sélection personnalisée.")}</p></div></div><SoftBanRestrictions value={draft.softBanRestrictions} onChange={value => update("softBanRestrictions", value)} games={games} disabled={saving}/><p className="account-admin-notice">{localeText("La sécurité du compte, les demandes de données, les signalements et la possibilité de quitter une partie restent accessibles.")}</p></section>}
 
@@ -158,6 +162,6 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
       </section>
     </div>}
 
-    <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>{localeText("Les paramètres économiques s’appliquent aux nouvelles opérations. Les temporisations sont figées au lancement de chaque partie.")}</span></div></footer>
+    {section !== "maintenance" && <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>{localeText("Les paramètres économiques s’appliquent aux nouvelles opérations. Les temporisations sont figées au lancement de chaque partie.")}</span></div></footer>}
   </form>;
 }

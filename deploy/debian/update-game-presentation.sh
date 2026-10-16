@@ -17,6 +17,8 @@ files=(
   server/src/services/discord-routes.js server/src/services/discord-presence.js
   server/src/services/editor-duplication.js server/src/services/tribunal.js
   server/src/services/softban.js server/src/services/parental-controls.js
+  server/src/services/gameplay-reset.js server/src/services/gameplay-reset-routes.js
+  server/src/services/reset-bootstrap.js
   server/src/services/personal-archive-worker.js
   server/src/services/lobby-notice.js
   client/scripts/build.mjs client/scripts/build-companion.mjs
@@ -49,6 +51,7 @@ import { DatabaseSync } from "node:sqlite";
 const require = createRequire("/opt/ktga/server/package.json");
 const env = require("dotenv").parse(fs.readFileSync("/etc/ktga/server.env"));
 if (!env.SQLITE_PATH?.startsWith("/var/lib/ktga/")) throw new Error("Unexpected production database.");
+if (fs.existsSync(`${env.SQLITE_PATH}.reset-pending.json`)) throw new Error("A gameplay reset is pending: deployment refused.");
 const db = new DatabaseSync(env.SQLITE_PATH, { readOnly: true });
 const count = db.prepare("SELECT count(*) AS count FROM rooms WHERE coalesce(json_extract(data, '$.finished'),0)=0").get().count;
 db.close();

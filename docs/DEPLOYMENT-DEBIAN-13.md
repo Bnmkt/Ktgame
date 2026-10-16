@@ -648,6 +648,36 @@ Le serveur Node garde une file TCP d'acceptation de 4096 (dans la limite du noya
 un keepalive de 65s et une limite de reception des en-tetes de 70s. Ces valeurs ne
 modifient pas les limiteurs de requetes, les droits ou les verifications de session.
 
+## Reinitialisation des donnees de jeu
+
+L'option Admin > Parametres > Maintenance conserve les comptes, identifiants,
+emails, mots de passe, MFA, roles, profils, amis, conversations privees, controles
+parentaux et sanctions. Elle efface les donnees de jeu de tous les comptes,
+administrateurs compris : historiques, transactions, progressions, inventaires,
+succes, classements et participations. Les evenements restent en brouillon ; les
+jetons reviennent au solde d'inscription configure et les cosmetiques par defaut
+sont rendus. Toutes les sessions sont invalidees.
+
+L'action exige une confirmation saisie et une verification du mot de passe ou
+d'un code TOTP administrateur. Elle interrompt les tables puis arrete les processus.
+Le service systemd fourni (`Restart=on-failure`) redemarre automatiquement Node.
+Un lancement manuel avec `node` exige en revanche un nouveau demarrage manuel.
+
+Avant que les services ouvrent leurs bases, le bootstrap consomme le fichier
+`SQLITE_PATH.reset-pending.json`. Il sauvegarde et verifie les bases principale
+et de chat dans `reset-backups/IDENTIFIANT/`, a cote de `SQLITE_PATH`, puis applique
+le reset transactionnel. Le manifeste et les sauvegardes sont prives (0600,
+repertoire 0700). Ne jamais lancer un autre serveur sur les memes bases pendant
+cette operation. Les sauvegardes contiennent des donnees personnelles : les
+conserver selon la politique de retention et ne jamais les exposer sur le web.
+
+En cas d'erreur, le demarrage est refuse et la demande reste en attente. Consulter
+`journalctl -u ktga.service` avant toute intervention. Un nouveau demarrage reprend
+le nettoyage sans appliquer deux fois le reset deja valide. Ne pas supprimer ou
+recreer arbitrairement le fichier de demande. Une restauration doit se faire
+service arrete, a partir des deux sauvegardes coherentes, apres copie privee de
+l'etat en echec. Aucun bouton de restauration n'est expose sur le site.
+
 ## Sources techniques
 
 Les fichiers fournis implementent les reglages propres a KTGA.ME ; les

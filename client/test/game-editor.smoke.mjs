@@ -43,6 +43,11 @@ try{
     const context=await browser.newContext({viewport}),page=await context.newPage();page.on("pageerror",error=>errors.push(error.message));await blocker.enableBlockingInPage(page);
     await page.route("**/__game-editor",route=>route.fulfill({contentType:"text/html",body:html}));await page.route("**/api/locales/**",route=>route.fulfill({contentType:"application/json",body:'{"messages":{}}'}));
     await page.route("**/api/me/data-requests",route=>route.fulfill({contentType:"application/json",body:'{"requests":[],"emailReady":true}'}));
+    const resetRequests=[];
+    await page.route("**/api/admin/gameplay-reset",route=>{
+      if(route.request().method()==="POST"){resetRequests.push(route.request().postDataJSON());return route.fulfill({status:202,contentType:"application/json",body:'{"status":"restart-pending"}'});}
+      return route.fulfill({contentType:"application/json",body:JSON.stringify({summary:{accounts:100,rooms:3,history:500,participants:40,transactions:1500,signupTokens:10000,lastReset:null},confirmation:"REINITIALISER LE CASINO",token:"isolated-browser-token",methods:["password","totp"],pending:false})});
+    });
     await page.goto(`${origin}/__game-editor`);await page.waitForFunction(()=>window.ready);
     const selected=viewport.width===1440?fixtures:fixtures.filter(game=>["texas-holdem","midnight-dice","blackjack"].includes(game.id));
     for(const game of selected){
@@ -94,6 +99,19 @@ try{
     await page.getByRole('button',{name:'Softbans',exact:true}).click();assert.equal(await page.locator('.account-limit-options fieldset').count(),5);
     await page.getByRole('checkbox',{name:'Acheter des objets et des packs',exact:true}).check();await page.getByRole('checkbox',{name:'Yahtzee',exact:true}).check();await page.getByRole('button',{name:'Enregistrer',exact:true}).click();
     assert.ok((await page.evaluate(()=>window.settingsSaved.softBanRestrictions)).includes('game:yahtzee'));assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(directory,`${viewport.width}-softban-settings.png`)});
+    await page.getByRole('button',{name:'Maintenance',exact:true}).click();await page.getByRole('button',{name:'Préparer la réinitialisation',exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Enregistrer',exact:true}).count(),0);assert.equal(await page.locator('.reset-workspace').isVisible(),true);assert.equal(resetRequests.length,0);
+    await page.screenshot({path:path.join(directory,`${viewport.width}-reset-overview.png`)});
+    await page.getByRole('button',{name:'Préparer la réinitialisation',exact:true}).click();const resetDialog=page.getByRole('dialog');await resetDialog.waitFor();
+    const resetButton=page.getByRole('button',{name:'Réinitialiser et redémarrer',exact:true});assert.equal(await resetButton.isDisabled(),true);
+    await page.getByLabel('Recopie la phrase de confirmation',{exact:false}).fill('REINITIALISER LE CASINO');await page.getByLabel('Mot de passe actuel',{exact:true}).fill('Isolated!Password1');assert.equal(await resetButton.isDisabled(),true);
+    await page.getByRole('checkbox',{name:'Je comprends que ces données seront effacées et que tous les joueurs seront déconnectés.',exact:true}).check();assert.equal(await resetButton.isEnabled(),true);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(directory,`${viewport.width}-reset-confirmation.png`)});
+    await page.getByRole('button',{name:'Annuler',exact:true}).click();assert.equal(resetRequests.length,0);
+    await page.getByRole('button',{name:'Préparer la réinitialisation',exact:true}).click();assert.equal(await resetButton.isDisabled(),true);
+    await page.getByLabel('Recopie la phrase de confirmation',{exact:false}).fill('REINITIALISER LE CASINO');await page.getByLabel('Vérification administrateur',{exact:true}).selectOption('totp');await page.getByLabel('Code TOTP',{exact:true}).fill('123456');await page.getByRole('checkbox',{name:'Je comprends que ces données seront effacées et que tous les joueurs seront déconnectés.',exact:true}).check();
+    await page.evaluate(()=>{window.settingsSaved=null});await resetButton.click();await page.getByRole('status').filter({hasText:'Réinitialisation programmée.'}).waitFor();assert.equal(await page.evaluate(()=>window.settingsSaved),null);
+    assert.deepEqual(resetRequests,[{token:'isolated-browser-token',confirmation:'REINITIALISER LE CASINO',acknowledge:true,method:'totp',credential:'123456'}]);
     await page.evaluate(()=>window.mountModeration());const inherit=page.getByRole('checkbox',{name:'Utiliser les restrictions générales',exact:false});await inherit.waitFor();assert.equal(await page.getByRole('checkbox',{name:'Acheter des objets et des packs',exact:true}).isDisabled(),true);
     await inherit.uncheck();await page.getByRole('checkbox',{name:'Acheter des objets et des packs',exact:true}).check();assert.ok((await page.evaluate(()=>window.moderationDraft.moderation.softBan.restrictions)).includes('shop'));
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(directory,`${viewport.width}-player-softban.png`)});await inherit.check();assert.equal(await page.evaluate(()=>window.moderationDraft.moderation.softBan.restrictions),null);

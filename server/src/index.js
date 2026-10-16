@@ -1,3 +1,5 @@
+import "./services/reset-bootstrap.js";
+import { registerGameplayResetRoutes } from "./services/gameplay-reset-routes.js";
 import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
@@ -877,6 +879,11 @@ app.use((req, res, next) => {
 app.use("/api/admin/help", express.json({ limit: "2mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use(express.json());
+let gameplayResetPending = false;
+app.use("/api", (req, res, next) => {
+  if (gameplayResetPending && req.path !== "/health") return res.status(503).json({ code: "GAMEPLAY_RESET_PENDING", error: "Réinitialisation du casino en cours. Reconnecte-toi dans quelques instants." });
+  next();
+});
 const editorDuplicationLimit = createEditorDuplicationLimit({ filename: databaseFilename, limitedUserIds: () => readDb().settings?.editorDuplicationUserIds ?? [] });
 app.use("/api/admin", (req, res, next) => {
   if (!isEditorDuplication(req)) return next();
@@ -5104,6 +5111,16 @@ app.post("/api/admin/users/:id/reset-achievements", auth, requireAdmin, (req, re
   res.json({ ok: true });
 });
 
+registerGameplayResetRoutes({ app, auth, requireAdmin, filename: databaseFilename,
+  readUser: id => readDb().users.find(user => user.id === id),
+  verifyCredential: async (user, method, credential) => {
+    if (typeof credential !== "string" || credential.length > 128) return false;
+    if (method === "password") return Boolean(user.passwordHash && await bcrypt.compare(credential, user.passwordHash));
+    return method === "totp" && Boolean(user.mfa?.totpSecret) && verifyUserMfa(user, "totp", credential, JWT_SECRET);
+  },
+  onQueued: () => { gameplayResetPending = true; io.emit("site-reset-pending", { message: "Réinitialisation du casino en cours." }); void shutdown(true); }
+});
+
 app.post("/api/admin/users/:id/reset-account", auth, requireAdmin, (req, res) => {
   const found = updateDb((db) => {
     const user = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
@@ -6036,7 +6053,7 @@ updateDb((db) => {
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 70000;
 let shuttingDown = false;
-async function shutdown() {
+async function shutdown(restart = false) {
   if (shuttingDown) return;
   shuttingDown = true;
   setTimeout(() => process.exit(1), 10000).unref();
@@ -6044,7 +6061,7 @@ async function shutdown() {
   await gameGateway?.close();
   await Promise.all([readingWork.close(), bcrypt.close(), accountsWork?.close(), capacityTests.close()]);
   executionHistory.close();
-  io.close(() => process.exit(0));
+  io.close(() => process.exit(restart === true ? 1 : 0));
 }
 process.once("SIGTERM", shutdown);
 process.once("SIGINT", shutdown);
