@@ -82,6 +82,27 @@ stopped=true
 systemctl stop ktga.service
 checkTables
 tar -czf "$backup/data.tar.gz" -C / var/lib/ktga
+if [[ -n ${KTGA_EDITOR_DUPLICATION_INITIAL_USER_IDS:-} ]]; then
+  node --input-type=module - "$stage" <<'JS'
+import fs from "node:fs";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+import { DatabaseSync } from "node:sqlite";
+const { validateEditorDuplicationUsers } = await import(pathToFileURL(`${process.argv[2]}/server/src/services/editor-duplication.js`));
+const require = createRequire("/opt/ktga/server/package.json");
+const env = require("dotenv").parse(fs.readFileSync("/etc/ktga/server.env"));
+if (!env.SQLITE_PATH?.startsWith("/var/lib/ktga/")) throw new Error("Unexpected production database.");
+const db = new DatabaseSync(env.SQLITE_PATH);
+try {
+  const settings = JSON.parse(db.prepare("SELECT value FROM meta WHERE key='admin-settings'").get()?.value ?? "{}");
+  if (!Object.hasOwn(settings, "editorDuplicationUserIds")) {
+    settings.editorDuplicationUserIds = validateEditorDuplicationUsers(JSON.parse(process.env.KTGA_EDITOR_DUPLICATION_INITIAL_USER_IDS), db.prepare("SELECT id,guest FROM users").all());
+    db.prepare("INSERT OR REPLACE INTO meta(key,value) VALUES('admin-settings',?)").run(JSON.stringify(settings));
+    console.log("Initial editor duplication policy migrated.");
+  }
+} finally { db.close(); }
+JS
+fi
 if [[ -n ${KTGA_FEATURED_GAME:-} ]]; then
   node --input-type=module <<'JS'
 import fs from "node:fs";

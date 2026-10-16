@@ -8,6 +8,7 @@ import { bonusProgression, bonusRuleEffect, normalizeBonusSettings } from "../..
 import { ProgressionSettings } from "./ProgressionSettings.jsx";
 import { LobbyNotice } from "../navigation/LobbyNotice.jsx";
 import { GameImageEditor } from "./GameImageEditor.jsx";
+import "./editor-copy-settings.css";
 import "../navigation/lobby-notice.css";
 
 const operationLabels = { add: "Ajouter", multiply: "Multiplier", set: "Définir" };
@@ -43,11 +44,14 @@ function BonusChart({ settings }) {
   </section>;
 }
 
-export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }) {
+export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], users = [] }) {
   const { t: localeText } = useLocale();
   const [section, setSection] = useState("identity");
   const [noticePreview, setNoticePreview] = useState(false);
   const [noticeImageOpen, setNoticeImageOpen] = useState(false);
+  const [copyUserId, setCopyUserId] = useState("");
+  const copyUserIds = draft.editorDuplicationUserIds ?? [];
+  const copyCandidates = users.filter(user => !copyUserIds.includes(user.id)).sort((a, b) => a.displayName.localeCompare(b.displayName));
   const notice = draft.lobbyNotice ?? { enabled: false, title: "", content: "", updatedAt: "" };
   const updateNotice = (key, value) => setDraft((current) => ({ ...current, lobbyNotice: { ...(current.lobbyNotice ?? notice), [key]: value } }));
   const config = normalizeBonusSettings(draft);
@@ -64,7 +68,15 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }
       <button type="button" className={section === "pacing" ? "active" : ""} onClick={() => setSection("pacing")}><Clock3 size={17} />{localeText("Rythme des parties")}</button>
       <button type="button" className={section === "progression" ? "active" : ""} onClick={() => setSection("progression")}><TrendingUp size={17} />{localeText("XP et titres")}</button>
       <button type="button" className={section === "notice" ? "active" : ""} onClick={() => setSection("notice")}><Megaphone size={17}/>{localeText("Annonce")}</button>
+      <button type="button" className={section === "editing" ? "active" : ""} onClick={() => setSection("editing")}><ShieldCheck size={17}/>{localeText("Édition")}</button>
     </nav>
+
+    {section === "editing" && <section className="casino-settings-panel settings-group editor-copy-settings">
+      <div className="settings-group-heading"><ShieldCheck/><div><h3>{localeText("Limitation des duplications")}</h3><p>{localeText("Une duplication toutes les cinq minutes par utilisateur sélectionné, tous outils d’édition confondus.")}</p></div></div>
+      <div className="editor-copy-picker settings-field-grid"><label>{localeText("Ajouter un utilisateur")}<select aria-label={localeText("Ajouter un utilisateur")} value={copyUserId} disabled={saving} onChange={event => setCopyUserId(event.target.value)}><option value="">{localeText("Choisir un joueur")}</option>{copyCandidates.map(user => <option key={user.id} value={user.id}>{user.displayName}</option>)}</select></label><button type="button" className="secondary" disabled={saving || !copyCandidates.some(user => user.id === copyUserId)} onClick={() => { setDraft(current => ({ ...current, editorDuplicationUserIds: [...new Set([...(current.editorDuplicationUserIds ?? []), copyUserId])] })); setCopyUserId(""); }}><Plus size={17}/>{localeText("Ajouter")}</button></div>
+      <ul className="editor-copy-list">{copyUserIds.map(id => <li key={id}><span><Users size={18}/><strong>{users.find(user => user.id === id)?.displayName ?? id}</strong></span><button type="button" className="secondary icon-toggle" disabled={saving} title={localeText("Retirer de la limitation")} aria-label={localeText("Retirer {name} de la limitation", { name: users.find(user => user.id === id)?.displayName ?? id })} onClick={() => setDraft(current => ({ ...current, editorDuplicationUserIds: (current.editorDuplicationUserIds ?? []).filter(userId => userId !== id) }))}><Trash2 size={17}/></button></li>)}</ul>
+      {!copyUserIds.length && <p className="empty-state">{localeText("Aucun utilisateur limité.")}</p>}
+    </section>}
 
     {section === "identity" && <div className="casino-settings-panel identity-access-panel">
       <section className="settings-group settings-identity-group">

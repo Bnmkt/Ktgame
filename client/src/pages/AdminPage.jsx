@@ -139,8 +139,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
     setSaving("settings");
     setError("");
     try {
-      const { siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds } = settingsDraft;
-      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds }) });
+      const { siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds } = settingsDraft;
+      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds }) });
       setSettingsDraft(settings);
       setData((current) => ({ ...current, settings }));
       onSettingsChange?.(settings);
@@ -311,7 +311,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
         {isAdministrator && tab === "parental" && <ParentalApprovals onSettingsChange={(settings) => { setSettingsDraft(settings); setData((current) => ({ ...current, settings })); onSettingsChange?.(settings); }} />}
         {isAdministrator && tab === "tribunal" && <TribunalAdmin reportError={setError} notifySuccess={notifySuccess} />}
         {isAdministrator && tab === "ranked" && <RankedAdmin/>}
-        {isAdministrator && tab === "settings" && <CasinoSettings draft={settingsDraft} setDraft={setSettingsDraft} onSubmit={saveSettings} saving={saving === "settings"} games={data.games} />}
+        {isAdministrator && tab === "settings" && <CasinoSettings draft={settingsDraft} setDraft={setSettingsDraft} onSubmit={saveSettings} saving={saving === "settings"} games={data.games} users={data.users} />}
         {tab === "locales" && <LocaleAdmin />}
       </>}
         </section>

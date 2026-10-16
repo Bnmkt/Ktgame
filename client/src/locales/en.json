@@ -1,4 +1,11 @@
 {
+  "Limitation des duplications": "Duplication limits",
+  "Une duplication toutes les cinq minutes par utilisateur sélectionné, tous outils d’édition confondus.": "One duplication every five minutes per selected user, shared across all editing tools.",
+  "Ajouter un utilisateur": "Add a user",
+  "Choisir un joueur": "Choose a player",
+  "Retirer de la limitation": "Remove from the limit",
+  "Retirer {name} de la limitation": "Remove {name} from the limit",
+  "Aucun utilisateur limité.": "No users are limited.",
   "Télécharger le compagnon": "Download the companion",
   "Installation et démarrage": "Installation and startup",
   "Windows et Linux · Node.js 22+ et Discord sur le PC nécessaires.": "Windows and Linux · Node.js 22+ and Discord on your PC required.",

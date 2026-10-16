@@ -1,7 +1,7 @@
 import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
-import { createEditorDuplicationLimit, isEditorDuplication } from "./services/editor-duplication.js";
+import { createEditorDuplicationLimit, isEditorDuplication, validateEditorDuplicationUsers } from "./services/editor-duplication.js";
 import { createLocaleStore, registerLocaleRoutes, validLocale } from "./services/locales.js";
 import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
@@ -874,7 +874,7 @@ app.use((req, res, next) => {
 app.use("/api/admin/help", express.json({ limit: "2mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use(express.json());
-const editorDuplicationLimit = createEditorDuplicationLimit({ filename: databaseFilename });
+const editorDuplicationLimit = createEditorDuplicationLimit({ filename: databaseFilename, limitedUserIds: () => readDb().settings?.editorDuplicationUserIds ?? [] });
 app.use("/api/admin", (req, res, next) => {
   if (!isEditorDuplication(req)) return next();
   auth(req, res, () => requireBackOffice(req, res, () => editorDuplicationLimit(req, res, next)));
@@ -4432,7 +4432,7 @@ app.get("/api/admin", auth, requireBackOffice, (req, res) => {
     achievementRuleSchemas: isAdministrator ? achievementRuleSchemas(configuredGames(db), configuredShop(db), achievementCatalog(db, { includeDisabled: true })) : null,
     pricing: shopPricingMatrix(db),
     permissions,
-    settings: { ...settings, emailVerificationAvailable: emailDeliveryConfigured(), discordConfigured: discordConfiguration().available },
+    settings: { ...settings, ...(isAdministrator ? { editorDuplicationUserIds: db.settings?.editorDuplicationUserIds ?? [] } : {}), emailVerificationAvailable: emailDeliveryConfigured(), discordConfigured: discordConfiguration().available },
     overview: isAdministrator ? adminOverview(db) : { catalog: { shopItems: configuredShop(db).length, customShopItems: db.settings?.customShopItems?.length ?? 0 } }
   });
 });
@@ -4843,7 +4843,9 @@ app.delete("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
+  let editorDuplicationUserIds;
   try {
+    if (req.body.editorDuplicationUserIds !== undefined) editorDuplicationUserIds = validateEditorDuplicationUsers(req.body.editorDuplicationUserIds, readDb().users);
     if (req.body.lobbyNotice !== undefined) updateLobbyNotice(platformSettings().lobbyNotice, req.body.lobbyNotice);
     if (req.body.gameProgression !== undefined) normalizeProgressionConfig(req.body.gameProgression, games.map((game) => game.id));
     if (req.body.contactEmail !== undefined) {
@@ -4857,13 +4859,14 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   const previousNoticeRevision = platformSettings().lobbyNotice.updatedAt;
   const settings = updateDb((db) => {
     db.settings ??= {};
+    if (editorDuplicationUserIds !== undefined) db.settings.editorDuplicationUserIds = editorDuplicationUserIds;
     const previous = platformSettings(db);
     db.settings.platform = normalizePlatformSettings({ ...previous, ...req.body,
       lobbyNotice: req.body.lobbyNotice === undefined ? previous.lobbyNotice : updateLobbyNotice(previous.lobbyNotice, req.body.lobbyNotice) });
     return db.settings.platform;
   });
   if (settings.lobbyNotice.updatedAt !== previousNoticeRevision) io.to("casino-lobby").emit("lobby-notice-updated", settings.lobbyNotice);
-  res.json({ ...settings, supportEmail: settings.contactEmail, emailVerificationAvailable: emailDeliveryConfigured(), discordConfigured: discordConfiguration().available });
+  res.json({ ...settings, editorDuplicationUserIds: readDb().settings?.editorDuplicationUserIds ?? [], supportEmail: settings.contactEmail, emailVerificationAvailable: emailDeliveryConfigured(), discordConfigured: discordConfiguration().available });
 });
 
 app.post("/api/me/lobby-notice/dismiss", auth, (req, res) => {

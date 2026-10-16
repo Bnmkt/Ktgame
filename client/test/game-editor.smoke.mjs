@@ -21,12 +21,15 @@ import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook
 import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import '/src/styles.css';
 const {LocaleProvider}=await import('/src/locales/LocaleProvider.jsx'),{GameEditor}=await import('/src/components/admin/GameEditor.jsx');
 const {ShopCatalog}=await import('/src/components/shop/ShopCatalog.jsx'),{DisplayName}=await import('/src/components/cosmetics/Cosmetics.jsx'),{AccountWorkspace}=await import('/src/components/profile/AccountWorkspace.jsx');
+const {CasinoSettings}=await import('/src/components/admin/CasinoSettings.jsx');
 const h=React.createElement,root=ReactDOM.createRoot(document.getElementById('root'));let sequence=0;
 const player={id:'preview-player',pseudo:'PreviewPlayer',tokens:10000,profile:{birthDate:'1990-01-01'},cosmetics:{equipped:{}},gameProgression:[]};
 window.profileOpens=0;window.addEventListener('ktga-public-profile',()=>window.profileOpens++);
 window.mountCatalog=()=>root.render(h(LocaleProvider,{key:++sequence},h('main',{className:'app-shell'},h(ShopCatalog,{user:player,items:[{id:'effect',value:'gold',name:'Gold name',price:100,type:'nameEffects',category:'classic',description:'Test',packs:['test']},{id:'frame',value:'default',name:'Frame',price:200,type:'memberCards',category:'classic',description:'Test',packs:['test']}],stats:[],onPurchaseItem:()=>{},onPurchasePack:()=>{}}),h('div',{id:'outside-preview'},h(DisplayName,{user:player})))));
 function AccountDemo(){const[form,setForm]=React.useState({displayName:'PreviewPlayer',bio:'',birthDate:'1990-01-01',gender:'',rankedBadgeGameId:''}),[stats,setStats]=React.useState({visibleProfileStats:[],memberCardStats:['hidden','hidden'],customAchievementIds:[]});return h(AccountWorkspace,{user:player,form,setForm,favorites:[],games:[],toggleFavorite:()=>{},statForm:stats,setStatForm:setStats,milestones:[],onPreview:()=>{},onSave:()=>{},onSaveEmail:()=>{},onSavePassword:()=>{},onUser:()=>{},onError:()=>{},onMessage:()=>{}})}
 window.mountAccount=()=>root.render(h(LocaleProvider,{key:++sequence},h('main',{className:'app-shell'},h(AccountDemo))));
+function SettingsDemo(){const[draft,setDraft]=React.useState({editorDuplicationUserIds:[],siteName:'KTGA.ME',siteSubtitle:'Test'});return h(CasinoSettings,{draft,setDraft,users:[{id:'editor',displayName:'PreviewPlayer'}],onSubmit:event=>{event.preventDefault();window.settingsSaved=draft}})}
+window.mountSettings=()=>root.render(h(LocaleProvider,{key:++sequence},h('main',{className:'app-shell'},h(SettingsDemo))));
 function Demo({game,games}){const[draft,setDraft]=React.useState(game);window.draft=draft;return h(GameEditor,{game:draft,games,saving:false,onChange:(key,value)=>setDraft(current=>({...current,[key]:value})),onSave:()=>window.saved=structuredClone(draft),onClose:()=>{window.wasClosed=true;root.render(null)},onEditImage:()=>{}})}
 window.mountGame=(game,games,locale='fr')=>{localStorage.setItem('ktga-locale',locale);window.saved=null;window.wasClosed=false;root.render(h(LocaleProvider,{key:++sequence},h(Demo,{game,games})))};window.ready=true;
 </script></body></html>`;
@@ -80,6 +83,11 @@ try{
     assert.equal(await page.locator('.account-workspace-form > :first-child').getAttribute('class'),'account-workspace-actions');
     await page.screenshot({path:path.join(directory,`${viewport.width}-profile-actions.png`)});
     await page.getByRole('button',{name:'Carte et confidentialité',exact:true}).click();assert.equal(await page.locator('form.account-workspace-form > :first-child').getAttribute('class'),'account-workspace-actions');
+    await page.evaluate(()=>window.mountSettings());await page.getByRole('button',{name:'Édition',exact:true}).click();
+    await page.getByLabel('Ajouter un utilisateur',{exact:true}).selectOption('editor');await page.getByRole('button',{name:'Ajouter',exact:true}).click();
+    assert.equal(await page.locator('.editor-copy-list li').count(),1);await page.getByRole('button',{name:'Enregistrer',exact:true}).click();assert.deepEqual(await page.evaluate(()=>window.settingsSaved.editorDuplicationUserIds),['editor']);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(directory,`${viewport.width}-copy-settings.png`)});
+    await page.getByRole('button',{name:'Retirer PreviewPlayer de la limitation',exact:true}).click();await page.getByRole('button',{name:'Enregistrer',exact:true}).click();assert.deepEqual(await page.evaluate(()=>window.settingsSaved.editorDuplicationUserIds),[]);
     await context.close();
   }
   assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,checks:checks.length,directory}));

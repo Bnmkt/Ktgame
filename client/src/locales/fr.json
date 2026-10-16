@@ -1,4 +1,11 @@
 {
+  "Limitation des duplications": "Limitation des duplications",
+  "Une duplication toutes les cinq minutes par utilisateur sélectionné, tous outils d’édition confondus.": "Une duplication toutes les cinq minutes par utilisateur sélectionné, tous outils d’édition confondus.",
+  "Ajouter un utilisateur": "Ajouter un utilisateur",
+  "Choisir un joueur": "Choisir un joueur",
+  "Retirer de la limitation": "Retirer de la limitation",
+  "Retirer {name} de la limitation": "Retirer {name} de la limitation",
+  "Aucun utilisateur limité.": "Aucun utilisateur limité.",
   "Télécharger le compagnon": "Télécharger le compagnon",
   "Installation et démarrage": "Installation et démarrage",
   "Windows et Linux · Node.js 22+ et Discord sur le PC nécessaires.": "Windows et Linux · Node.js 22+ et Discord sur le PC nécessaires.",
