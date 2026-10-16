@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Coins, Shield, ShieldAlert, Users, X } from "lucide-react";
 import { api, installButtonActionFeedback, setToken } from "./api.js";
 import { defaultPublicSettings } from "./config/site.js";
+import { softBanLimited } from "./features/accounts/softban.js";
 import { completeDiscordReturn } from "./features/accounts/discord-login.js";
 import { DisplayName, cosmeticCssRules, setCosmeticCatalogItems } from "./components/cosmetics/Cosmetics.jsx";
 import { CasinoHeader } from "./components/navigation/CasinoHeader.jsx";
@@ -123,13 +124,13 @@ export default function App() {
     applyPageMetadata(pageMetadata({ pathname: window.location.pathname, search: window.location.search, basePath: (import.meta.env.BASE_URL || "/").replace(/\/$/, ""), siteName: publicSettings.siteName, games: publicGames }));
   }, [route, publicSettings.siteName, publicGames]);
   useEffect(() => {
-    if (!user || user.guest || user.minor?.restricted || user.moderation?.type === "soft") return setTribunalAvailable(false);
+    if (!user || user.guest || user.minor?.restricted || softBanLimited(user, "tribunal:vote")) return setTribunalAvailable(false);
     let cancelled = false;
     const load = () => api("/api/tribunal/availability", { background: true }).then((result) => { if (!cancelled) setTribunalAvailable(Boolean(result.available)); }).catch(() => {});
     load();
     const timer = window.setInterval(load, 60000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [user?.id, user?.guest, user?.minor?.restricted, user?.moderation?.type]);
+  }, [user?.id, user?.guest, user?.minor?.restricted, user?.moderation?.type, user?.moderation?.restrictions?.join(",")]);
   useEffect(() => {
     document.documentElement.classList.toggle("room-route-active", view === "room");
     return () => document.documentElement.classList.remove("room-route-active");
@@ -352,7 +353,7 @@ export default function App() {
     discordResult={discordResult}
   />{view === "lobby" && !accountRecovery && <PublicGamesOverview games={publicGames} siteName={publicSettings.siteName} featuredGameId={publicSettings.featuredGameId} compact />}</>;
   const accountRestrictions = user.minor?.restrictions ?? [];
-  const blockedView = view === "shop" && accountRestrictions.includes("shop") || view === "event" && (accountRestrictions.includes("community-events") || user.moderation?.type === "soft");
+  const blockedView = view === "shop" && accountRestrictions.includes("shop") || view === "event" && (accountRestrictions.includes("community-events") || softBanLimited(user, "community-events"));
   return (
     <>
       {cosmeticStyles && <style>{cosmeticStyles}</style>}

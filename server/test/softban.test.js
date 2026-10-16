@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { featureAccess } from "../src/services/parental-controls.js";
 import { softBanRequestFeatures } from "../src/services/softban.js";
-import { defaultSoftBanRestrictions, softBanOptions, validSoftBanRestrictions } from "../../client/src/features/accounts/softban.js";
+import { defaultSoftBanRestrictions, softBanOptions, validSoftBanRestrictions, softBanLimited } from "../../client/src/features/accounts/softban.js";
 
 const now = Date.now();
 const banned = { pseudo: "Player", moderation: { softBan: { active: true, reason: "Fixture", endsAt: new Date(now + 3600000).toISOString() } } };
@@ -19,6 +19,10 @@ test("every configurable action can be blocked, independently, globally or for o
   assert.equal(access("chat:private", ["chat:global"]).allowed, true);
   assert.equal(access("rooms:create", defaultSoftBanRestrictions).allowed, true);
   assert.equal(access("chat:table", defaultSoftBanRestrictions).code, "SOFT_BAN");
+  assert.equal(softBanLimited({ moderation: { type: "soft", restrictions: [] } }, "chat:global", now), false);
+  assert.equal(softBanLimited({ moderation: { type: "soft", restrictions: ["chat:global"] } }, "chat:global", now), true);
+  assert.equal(softBanLimited({ moderation: { type: "soft", restrictions: ["chat:global"] } }, "chat:private", now), false);
+  assert.equal(softBanLimited({ moderation: { type: "soft", endsAt: new Date(now).toISOString(), restrictions: ["chat:global"] } }, "chat:global", now), false);
   assert.equal(access("shop", ["shop"], { moderation: { softBan: { ...banned.moderation.softBan, endsAt: new Date(now).toISOString() } } }).allowed, true);
   assert.equal(access("shop", [], { moderation: { hardBan: { active: true } } }).code, "HARD_BAN");
   assert.equal(featureAccess({ registrationAuthorization: { ageBand: "under13" }, profile: { birthDate: "2020-01-01" } }, "chat:table", ["chat"], now, []).code, "MINOR_RESTRICTION");

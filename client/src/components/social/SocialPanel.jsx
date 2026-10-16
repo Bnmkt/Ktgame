@@ -6,6 +6,7 @@ import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { useConversationInbox } from "./useConversationInbox.js";
 import { PresenceDot } from "../profile/FriendPresence.jsx";
 import { ChatMessageContent } from "./ChatMessageContent.jsx";
+import { softBanLimited } from "../../features/accounts/softban.js";
 
 const tabs = [
   { id: "journal", label: "Journal", icon: ReceiptText, needsRoom: true },
@@ -40,7 +41,8 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
   const loadedChannel = useRef(null);
   const loadRevision = useRef(0);
   const currentView = useRef(null);
-  const canWrite = user.moderation?.type !== "soft" && !(user.minor?.restrictions ?? []).includes("chat");
+  const chatFeature = activeTab === "direct" ? "chat:private" : activeTab === "room" ? "chat:table" : "chat:global";
+  const canWrite = !softBanLimited(user, chatFeature) && !(user.minor?.restrictions ?? []).includes("chat");
   const activeFriend = friends.find((friend) => friend.id === friendId);
 
   const channelQuery = useMemo(() => {

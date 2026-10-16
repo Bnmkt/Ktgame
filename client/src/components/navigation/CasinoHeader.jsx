@@ -4,17 +4,18 @@ import { Dialog } from "../common/Dialog.jsx";
 import { appPath } from "../../navigation/routes.js";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { LanguagePicker , useLocale } from "../../locales/LocaleProvider.jsx";
+import { softBanLimited } from "../../features/accounts/softban.js";
 
 export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
   const { t: localeText } = useLocale();
   const [menuOpen, setMenuOpen] = useState(false);
   const restrictions = user.minor?.restrictions ?? [];
-  const limited = (feature) => restrictions.includes(feature) || (user.moderation?.type === "soft" && ["friends", "community-events"].includes(feature));
+  const limited = (feature) => restrictions.includes(feature) || feature !== "shop" && softBanLimited(user, feature);
   const destinations = [
     ["lobby", "Casino", Landmark],
     ...(!limited("shop") ? [["shop", "Boutique", ShoppingBag]] : []),
     ["leaderboard", "Classements", Trophy],
-    ...(!user.guest && !user.minor?.restricted && user.moderation?.type !== "soft" && (tribunalAvailable || view === "tribunal") ? [["tribunal", "Tribunal", Scale]] : []),
+    ...(!user.guest && !user.minor?.restricted && !softBanLimited(user, "tribunal:vote") && (tribunalAvailable || view === "tribunal") ? [["tribunal", "Tribunal", Scale]] : []),
     ["profile", "Profil", User],
     ...(roomCode ? [["room", "Ma table", Dice5]] : []),
     ...(eventSlug && !limited("community-events") ? [["event", "Événement", Sparkles]] : []),

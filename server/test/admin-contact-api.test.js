@@ -97,11 +97,13 @@ test("softban settings and per-player overrides enforce actual HTTP mutations wi
       assert.equal(response.status, 403, `${route}: ${JSON.stringify(response.data)}`); assert.equal(response.data.code, "SOFT_BAN", route);
     }
     assert.equal((await request("player", "/api/me")).status, 200);
+    assert.deepEqual((await request("player", "/api/me")).data.moderation.restrictions, policy);
     assert.equal((await request("player", "/api/me/data-requests")).status, 200);
     assert.equal((await request("player", "/api/tribunal/reports", "POST", { accusedId: "editor", category: "other", description: "Un signalement de sécurité qui reste accessible malgré la sanction." })).status, 201);
     assert.equal((await request("player", `/api/rooms/${room.data.code}/leave`, "POST", {})).status, 200);
     assert.equal((await request("admin", "/api/admin/users/player", "PATCH", { moderation: { softBan: { active: true, reason: "Override test", restrictions: [] } } })).status, 200);
     assert.equal((await request("player", "/api/me/daily-claim", "POST", {})).status, 200);
+    assert.deepEqual((await request("player", "/api/me")).data.moderation.restrictions, []);
     assert.deepEqual((await request("admin", "/api/admin/users/player")).data.user.moderation.softBan.restrictions, []);
     assert.equal((await request("admin", "/api/admin/users/editor", "PATCH", { moderation: { softBan: { active: true, reason: "Spectator-only restriction", restrictions: ["rooms:spectate"] } } })).status, 200);
     assert.equal((await request("editor", `/api/rooms/${room.data.code}/join`, "POST", {})).status, 200);

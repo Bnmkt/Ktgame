@@ -2062,7 +2062,7 @@ function tribunalEligibility(user, db = readDb()) {
   if (!settings.enabled) return { eligible: false, reason: "Le tribunal est temporairement fermé." };
   if (!user || user.guest) return { eligible: false, reason: "Un compte joueur est requis pour participer." };
   if (isUnder13(user)) return { eligible: false, reason: "Le tribunal est réservé aux joueurs de 13 ans et plus." };
-  if (activeModeration(user)) return { eligible: false, reason: "Un compte sous sanction ne peut pas siéger au tribunal." };
+  if (!userFeatureAccess(user, "tribunal:vote", db).allowed) return { eligible: false, reason: "Ce compte ne peut pas siéger au tribunal pendant cette sanction." };
   const gamesPlayed = playerStatistics(db, user.id).gamesPlayed;
   if (gamesPlayed < settings.minimumGames) return { eligible: false, reason: `${settings.minimumGames} parties terminées sont requises.`, gamesPlayed };
   const behavior = tribunal.behavior(user.id);

@@ -24,7 +24,7 @@ export const softBanOptions = [
   ["editor:upload", "Outils d’édition", "Importer des images"],
 ];
 
-export const defaultSoftBanRestrictions = ["community-events", "rooms:join", "rooms:spectate", "ranked", "friends", "invitations", "chat:global", "chat:table", "chat:private"];
+export const defaultSoftBanRestrictions = ["community-events", "rooms:join", "rooms:spectate", "ranked", "friends", "invitations", "chat:global", "chat:table", "chat:private", "tribunal:vote"];
 const known = new Set(softBanOptions.map(([id]) => id));
 export function normalizeSoftBanRestrictions(value) {
   return [...new Set((Array.isArray(value) ? value : defaultSoftBanRestrictions).filter(id => known.has(id) || /^game:[a-z0-9-]{2,60}$/.test(id)))];
@@ -37,4 +37,9 @@ export function validSoftBanRestrictions(value, games) {
 export function softBanRestricts(feature, restrictions) {
   const ids = normalizeSoftBanRestrictions(restrictions);
   return ids.includes(feature) || feature.startsWith("game:") && ids.includes("games");
+}
+
+export function softBanLimited(user, feature, now = Date.now()) {
+  const moderation = user?.moderation;
+  return moderation?.type === "soft" && (!moderation.endsAt || Date.parse(moderation.endsAt) > now) && softBanRestricts(feature, moderation.restrictions);
 }

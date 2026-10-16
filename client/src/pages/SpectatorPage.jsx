@@ -1,4 +1,5 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
+import { softBanLimited } from "../features/accounts/softban.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { DoorOpen, Eye, HelpCircle, LockKeyhole, RefreshCw, Trophy } from "lucide-react";
@@ -36,7 +37,7 @@ export function SpectatorPage({ code, user, onBack, onJoin }) {
     } catch (err) { if (mounted.current) setError(err.message); }
     finally { if (mounted.current) setBusy(false); }
   }, [code, password, onJoin]);
-  const canJoin = room && !room.ranked && (!room.state || room.finished && room.state.finished);
+  const canJoin = room && !room.ranked && !softBanLimited(user, "rooms:join") && (!room.state || room.finished && room.state.finished);
   useEffect(() => {
     if (!autoJoin || !canJoin || busy || closed || room.players.length >= room.maxPlayers) return;
     const key = `${code}:${room.activityMatchId ?? "waiting"}:${Boolean(room.state)}:${room.players.map(player => player.id).join(",")}`;
@@ -72,7 +73,7 @@ export function SpectatorPage({ code, user, onBack, onJoin }) {
     try { accept(await api(`/api/rooms/${encodeURIComponent(code)}/spectate`, { method: "POST", body: JSON.stringify({ password }) })); }
     catch (err) { setError(err.message); } finally { setBusy(false); }
   }
-  return <main className="app-shell spectator-page"><header className="page-heading"><div><span className="eyebrow"><Eye size={16} />{" " + localeText("Spectateur ·") + " "}{connected ? localeText("En direct") : room ? localeText("Connexion interrompue") : code}</span><h1>{room?.name ?? localeText("Observer la table {value0}", { value0: code })}</h1></div></header><div className="room-table-tools"><button className="secondary" onClick={onBack}><DoorOpen size={18} />{localeText("Quitter la vue")}</button>{room && <button className="secondary" onClick={() => setRules(true)}><HelpCircle size={18} />{localeText("Règles")}</button>}{room && !closed && <label className="spectator-auto-entry" title={room.ranked ? localeText("Les parties classées se rejoignent depuis la file d'attente.") : undefined}><input type="checkbox" checked={autoJoin} disabled={Boolean(room.ranked)} onChange={event => changeAutoJoin(event.target.checked)}/><span>{localeText("Rejoindre automatiquement à la fin")}</span></label>}{canJoin && !closed && <button disabled={busy} onClick={joinTable}><DoorOpen size={18} />{localeText(busy ? "Connexion…" : "Rejoindre la table")}</button>}</div>
+  return <main className="app-shell spectator-page"><header className="page-heading"><div><span className="eyebrow"><Eye size={16} />{" " + localeText("Spectateur ·") + " "}{connected ? localeText("En direct") : room ? localeText("Connexion interrompue") : code}</span><h1>{room?.name ?? localeText("Observer la table {value0}", { value0: code })}</h1></div></header><div className="room-table-tools"><button className="secondary" onClick={onBack}><DoorOpen size={18} />{localeText("Quitter la vue")}</button>{room && <button className="secondary" onClick={() => setRules(true)}><HelpCircle size={18} />{localeText("Règles")}</button>}{room && !closed && <label className="spectator-auto-entry" title={room.ranked ? localeText("Les parties classées se rejoignent depuis la file d'attente.") : undefined}><input type="checkbox" checked={autoJoin && !softBanLimited(user, "rooms:join")} disabled={Boolean(room.ranked) || softBanLimited(user, "rooms:join")} onChange={event => changeAutoJoin(event.target.checked)}/><span>{localeText("Rejoindre automatiquement à la fin")}</span></label>}{canJoin && !closed && <button disabled={busy} onClick={joinTable}><DoorOpen size={18} />{localeText(busy ? "Connexion…" : "Rejoindre la table")}</button>}</div>
     {error && <p className="error" role="alert">{localeText(error)}</p>}
     {room?.ranked && room.state && !room.state.finished && !closed && <div className="ranked-match-heading"><strong>{localeText("Partie classée")}</strong><RankedTurnTimer turn={room.ranked.turn} paused={Boolean(room.pacing || room.state.nextHandAt)}/></div>}
     {!room && (busy ? <p role="status"><RefreshCw size={18} />{localeText("Connexion…")}</p> : <form className="spectator-access" onSubmit={unlock}><label><LockKeyhole size={16} />{localeText("Mot de passe de la table")}<input type="password" autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button disabled={busy}><DoorOpen size={18} />{localeText("Rejoindre")}</button></form>)}

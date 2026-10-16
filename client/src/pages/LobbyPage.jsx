@@ -1,4 +1,5 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
+import { softBanLimited } from "../features/accounts/softban.js";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
@@ -65,8 +66,12 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const [eventIndex, setEventIndex] = useState(0);
   const accountRestrictions = user.minor?.restrictions ?? [];
   const roomsRestricted = accountRestrictions.includes("rooms");
-  const joiningRestricted = roomsRestricted || user.moderation?.type === "soft";
-  const eventsRestricted = accountRestrictions.includes("community-events") || user.moderation?.type === "soft";
+  const joiningRestricted = roomsRestricted || softBanLimited(user, "rooms:join");
+  const observingRestricted = roomsRestricted || softBanLimited(user, "rooms:spectate");
+  const creatingRestricted = roomsRestricted || softBanLimited(user, "rooms:create");
+  const entryRestricted = joiningRestricted && observingRestricted;
+  const rankedRestricted = softBanLimited(user, "ranked");
+  const eventsRestricted = accountRestrictions.includes("community-events") || softBanLimited(user, "community-events");
 
   useEffect(()=>{
     if (playMode!=="ranked") return;
@@ -131,7 +136,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   const favoriteOrder = (game) => favorites.includes(game.id) ? favorites.indexOf(game.id) : favorites.length;
   const visibleGames = [...games].sort((left, right) => favoriteOrder(left) - favoriteOrder(right)).filter((game) => {
     if (playMode==="ranked" && !rankedGames.includes(game.id)) return false;
-    if (roomsRestricted || accountRestrictions.includes(`game:${game.id}`)) return false;
+    if (roomsRestricted || accountRestrictions.includes(`game:${game.id}`) || softBanLimited(user, `game:${game.id}`)) return false;
     const searchMatch = !normalizedGameSearch || `${game.name} ${game.description ?? ""}`.toLocaleLowerCase("fr").includes(normalizedGameSearch);
     const typeMatch = gameTypeFilter === "all" || game.type === gameTypeFilter;
     const categoryMatch = gameCategoryFilter === "all" || game.category === gameCategoryFilter;
@@ -174,8 +179,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
         <button className="secondary icon-toggle event-carousel-arrow" disabled={eventIndex >= carouselEvents.length - 1} onClick={() => setEventIndex((index) => Math.min(carouselEvents.length - 1, index + 1))} aria-label={localeText("Événement suivant")}><ChevronRight /></button>
         <div className="event-carousel-position" aria-live="polite"><strong>{eventIndex + 1}</strong><span>/ {carouselEvents.length}</span></div>
       </section>}
-      {!joiningRestricted && <div className="lobby-join-action"><button type="button" className="secondary" onClick={() => setJoinOpen(true)}><DoorOpen size={18} />{" " + localeText("Rejoindre avec un code")}</button></div>}
-      {!joiningRestricted && liveFriendTables.length > 0 && <section className="live-room-section"><h2>{localeText("Parties en cours")}</h2><div className="live-room-list">{liveFriendTables.map((room) => <button className="secondary" key={room.code} onClick={() => onEnterRoom(room.code)}><Eye size={18} /><span>{room.name}</span></button>)}</div></section>}
+      {!entryRestricted && <div className="lobby-join-action"><button type="button" className="secondary" onClick={() => setJoinOpen(true)}><DoorOpen size={18} />{" " + localeText("Rejoindre avec un code")}</button></div>}
+      {!observingRestricted && liveFriendTables.length > 0 && <section className="live-room-section"><h2>{localeText("Parties en cours")}</h2><div className="live-room-list">{liveFriendTables.map((room) => <button className="secondary" key={room.code} onClick={() => onEnterRoom(room.code)}><Eye size={18} /><span>{room.name}</span></button>)}</div></section>}
       <div className="single-layout">
         <section>
           <div className="section-title"><h2>{localeText("Jeux disponibles")}</h2><span className="muted">{visibleGames.length}{" " + localeText("jeu")}{visibleGames.length !== 1 ? localeText("x") : ""}</span></div>
@@ -203,7 +208,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
                 <h3>{localeText(game.name)}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label={localeText("Favori")} fill="currentColor" />}</h3>
                 <p>{localeText(game.description || gameRules[game.id]?.goal)}</p>
                 <div className="card-meta"><span>{localeText(gameCategoryLabel(game.category))}</span><span>{localeText(gameComplexityLabel(game.complexity))}</span>{playMode==="ranked"?<RankBadge rank={rankedStatus?.games.find((row)=>row.id===game.id)?.rank}/>:<span>{rooms.filter((room) => room.gameId === game.id && !room.ranked).length}{" " + localeText("tables publiques")}</span>}</div>
-                <div className="game-table-actions">{playMode==="ranked"?<button type="button" disabled={joiningRestricted || rankedStatus?.games.find((row)=>row.id===game.id)?.enabled===false} onClick={()=>chooseTables(game,"browse")}><Swords size={18}/>{localeText("Rejoindre le classé")}</button>:<><button type="button" onClick={() => chooseTables(game, "create")}><Plus size={18} />{localeText("Créer une table")}</button>{!joiningRestricted && <button type="button" className="secondary" onClick={() => chooseTables(game, "browse")}><DoorOpen size={17} />{localeText("Rejoindre (")}{rooms.filter((room) => room.gameId === game.id && !room.ranked).length})</button>}</>}<button type="button" className="secondary game-table-rules" title={localeText("Règles de {value0}", { value0: game.name })} aria-label={localeText("Règles de {value0}", { value0: game.name })} onClick={() => setRulesGame(game.id)}><HelpCircle size={18} /></button></div>
+                <div className="game-table-actions">{playMode==="ranked"?<button type="button" disabled={joiningRestricted || rankedRestricted || rankedStatus?.games.find((row)=>row.id===game.id)?.enabled===false} onClick={()=>chooseTables(game,"browse")}><Swords size={18}/>{localeText("Rejoindre le classé")}</button>:<><button type="button" disabled={creatingRestricted} onClick={() => chooseTables(game, "create")}><Plus size={18} />{localeText("Créer une table")}</button>{!entryRestricted && <button type="button" className="secondary" onClick={() => chooseTables(game, "browse")}><DoorOpen size={17} />{localeText("Rejoindre (")}{rooms.filter((room) => room.gameId === game.id && !room.ranked).length})</button>}</>}<button type="button" className="secondary game-table-rules" title={localeText("Règles de {value0}", { value0: game.name })} aria-label={localeText("Règles de {value0}", { value0: game.name })} onClick={() => setRulesGame(game.id)}><HelpCircle size={18} /></button></div>
               </article>
             ))}
           </div>
