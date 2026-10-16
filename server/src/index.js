@@ -2,6 +2,8 @@ import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
 import { createEditorDuplicationLimit, isEditorDuplication, validateEditorDuplicationUsers } from "./services/editor-duplication.js";
+import { softBanRequestFeatures } from "./services/softban.js";
+import { normalizeSoftBanRestrictions, validSoftBanRestrictions } from "../../client/src/features/accounts/softban.js";
 import { createLocaleStore, registerLocaleRoutes, validLocale } from "./services/locales.js";
 import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
@@ -513,6 +515,7 @@ function normalizePlatformSettings(value = {}) {
     emailVerificationRequired: value.emailVerificationRequired === true,
     discordLoginEnabled: value.discordLoginEnabled === true,
     minorRestrictions: normalizeMinorRestrictions(value.minorRestrictions),
+    softBanRestrictions: normalizeSoftBanRestrictions(value.softBanRestrictions),
     signupTokens: integer("signupTokens", defaultPlatformSettings.signupTokens, 0, 10000000),
     dailyTokens: integer("dailyTokens", defaultPlatformSettings.dailyTokens, 0, 1000000),
     dailyBonusDefaultMultiplier: dailyBonus.defaultMultiplier,
@@ -1539,6 +1542,17 @@ function emitRoomUpdate(room, db = readDb()) {
     const players = new Map();
     for (const socketId of roomPresence.get(room.id) ?? []) {
       const socket = io.sockets.sockets.get(socketId);
+      if (socket?.data.spectator) {
+        const viewer = getUser(socket.data.userId);
+        const access = userFeatureAccess(viewer, "rooms:spectate", db);
+        const gameAccess = userFeatureAccess(viewer, `game:${room.gameId}`, db);
+        if (!access.allowed || !gameAccess.allowed) {
+          socket.emit("room-error", { error: (!access.allowed ? access : gameAccess).reason || "Accès spectateur restreint." });
+          socket.leave(room.id); socket.leave(`chat:room:${room.id}`); roomPresence.get(room.id)?.delete(socketId);
+          delete socket.data.roomId;
+          continue;
+        }
+      }
       if (socket) socket.emit("room", serializeRoom(room, socket.data.userId, db, socket.data.spectator === true, players));
     }
   });
@@ -1922,6 +1936,10 @@ function auth(req, res, next) {
     const accountSetupRoute = req.path === "/api/me" || req.path === "/api/me/email" || req.path === "/api/me/locale";
     if (persistentUser && !validEmail(persistentUser.email) && !accountSetupRoute) return res.status(403).json({ code: "EMAIL_UPGRADE_REQUIRED", error: "Ajoute une adresse email valide pour continuer." });
     if (persistentUser && platformSettings().emailVerificationRequired && validEmail(persistentUser.email) && !persistentUser.emailVerifiedAt && !accountSetupRoute) return res.status(403).json({ code: "EMAIL_VERIFICATION_REQUIRED", error: "Valide ton adresse email pour continuer." });
+    if (moderation?.type === "soft") for (const feature of softBanRequestFeatures(req, persistentUser)) {
+      const access = userFeatureAccess(persistentUser, feature);
+      if (!access.allowed) return rejectFeature(res, access);
+    }
     if (persistentUser && isUnder13(persistentUser) && req.method !== "GET" && !req.path.endsWith("/guardian-activity")) {
       res.once("finish", () => {
         if (res.statusCode >= 400) return;
@@ -1938,11 +1956,18 @@ function auth(req, res, next) {
 }
 
 function userFeatureAccess(user, feature, db = readDb()) {
-  return featureAccess(user, feature, platformSettings(db).minorRestrictions);
+  const settings = platformSettings(db);
+  return featureAccess(user, feature, settings.minorRestrictions, Date.now(), settings.softBanRestrictions);
 }
 
 function tableFeatureAccess(user, room, db = readDb()) {
-  const roomAccess = userFeatureAccess(user, room?.ownerId === user?.id ? "rooms:create" : "rooms:join", db);
+  const seated = room?.players?.some(player => player.id === user?.id);
+  const observing = !seated && room?.state && !(room.finished && room.state.finished && !room.ranked);
+  const roomAccess = userFeatureAccess(user, observing ? "rooms:spectate" : room?.ownerId === user?.id ? "rooms:create" : "rooms:join", db);
+  if (roomAccess.allowed && seated && room?.ranked) {
+    const rankedAccess = userFeatureAccess(user, "ranked", db);
+    if (!rankedAccess.allowed) return rankedAccess;
+  }
   return roomAccess.allowed ? userFeatureAccess(user, `game:${room?.gameId}`, db) : roomAccess;
 }
 
@@ -3143,10 +3168,11 @@ app.post("/api/chat/messages", auth, (req, res) => {
   const db = readDb();
   const user = db.users.find((entry) => entry.id === req.auth.id);
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
-  const access = userFeatureAccess(user, "chat", db);
-  if (!access.allowed) return rejectFeature(res, access);
   const channel = resolveChatChannel(db, user, req.body);
   if (!channel) return res.status(404).json({ error: "Canal introuvable ou inaccessible." });
+  const chatFeature = channel.channelType === "direct" ? "chat:private" : channel.channelType === "room" ? "chat:table" : "chat:global";
+  const access = userFeatureAccess(user, chatFeature, db);
+  if (!access.allowed) return rejectFeature(res, access);
   if (!chatRateAllowed(user.id)) return res.status(429).json({ error: "Tu envoies des messages trop rapidement." });
   try {
     const message = decorateChatMessage(chat.add({ channelType: channel.channelType, channelId: channel.channelId, senderId: user.id, content: req.body.content, participantIds: channel.friend ? [channel.friend.id] : [] }), db, user);
@@ -3901,7 +3927,7 @@ function adminUserDetail(db, user) {
       profileStats: normalizeProfileStats(user.profileStats),
       minor: isUnder13(user),
       moderation: {
-        softBan: { active: moderationEntryActive(user.moderation?.softBan), reason: user.moderation?.softBan?.reason ?? "", endsAt: user.moderation?.softBan?.endsAt ?? "" },
+        softBan: { active: moderationEntryActive(user.moderation?.softBan), reason: user.moderation?.softBan?.reason ?? "", endsAt: user.moderation?.softBan?.endsAt ?? "", restrictions: user.moderation?.softBan?.restrictions ?? null },
         hardBan: { active: moderationEntryActive(user.moderation?.hardBan), reason: user.moderation?.hardBan?.reason ?? "", endsAt: user.moderation?.hardBan?.endsAt ?? "" }
       }
     },
@@ -4846,6 +4872,7 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   let editorDuplicationUserIds;
   try {
     if (req.body.editorDuplicationUserIds !== undefined) editorDuplicationUserIds = validateEditorDuplicationUsers(req.body.editorDuplicationUserIds, readDb().users);
+    if (req.body.softBanRestrictions !== undefined && !validSoftBanRestrictions(req.body.softBanRestrictions, games)) throw new Error("Restrictions de softban invalides.");
     if (req.body.lobbyNotice !== undefined) updateLobbyNotice(platformSettings().lobbyNotice, req.body.lobbyNotice);
     if (req.body.gameProgression !== undefined) normalizeProgressionConfig(req.body.gameProgression, games.map((game) => game.id));
     if (req.body.contactEmail !== undefined) {
@@ -4889,6 +4916,8 @@ app.post("/api/admin/progression/preview", auth, requireAdmin, (req, res) => {
 });
 
 app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
+  const softRestrictions = req.body.moderation?.softBan?.restrictions;
+  if (softRestrictions !== undefined && softRestrictions !== null && !validSoftBanRestrictions(softRestrictions, games)) return res.status(400).json({ error: "Restrictions de softban invalides." });
   for (const [field, allowed, minimum, maximum] of [["gameXp", games.map((game) => game.id), 0, MAX_XP], ["gameElo", RANKED_GAMES, -10000000, 10000000]]) {
     const values = req.body[field];
     if (values === undefined) continue;
@@ -4974,7 +5003,7 @@ app.patch("/api/admin/users/:id", auth, requireAdmin, async (req, res) => {
         const updatedAt = new Date().toISOString();
         const caseId = active ? (!wasActive || !previous.caseId ? `admin-sanction-${randomUUID()}` : previous.caseId) : previous.caseId ?? "";
         const startedAt = active ? (!wasActive ? updatedAt : previous.startedAt || previous.updatedAt || updatedAt) : previous.startedAt ?? "";
-        user.moderation[type] = { active, reason: normalizePlainText(input.reason, 240), endsAt, updatedAt, updatedBy: req.auth.id, caseId, startedAt };
+        user.moderation[type] = { active, reason: normalizePlainText(input.reason, 240), endsAt, updatedAt, updatedBy: req.auth.id, caseId, startedAt, ...(type === "softBan" ? { restrictions: input.restrictions === undefined ? previous.restrictions ?? null : input.restrictions === null ? null : normalizeSoftBanRestrictions(input.restrictions) } : {}) };
         if (active && caseId) moderationDecisions.push({ id: caseId, userId: user.id, adminId: req.auth.id, kind: type, reason: user.moderation[type].reason, startsAt: startedAt, endsAt, durationDays: endsAt ? Math.max(1, Math.ceil((Date.parse(endsAt) - Date.parse(startedAt)) / 86400000)) : 0 });
         if (active && !wasActive) pushNotification(user, { type: "moderation-decision", title: "Sanction administrative", message: `${user.moderation[type].reason || "Une sanction temporaire a été appliquée à ton compte."} Cette décision est inscrite au registre du tribunal selon la procédure 49,3. Un recours écrit peut être envoyé à ${contactEmail()}.` });
         if (type === "hardBan" && !wasActive && active) user.sessionVersion = (Number(user.sessionVersion) || 0) + 1;
@@ -5567,8 +5596,11 @@ app.get("/api/rooms/:code", auth, (req, res) => {
   const db = readDb();
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: "Table introuvable." });
-  const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+  const viewer = getUser(req.auth.id);
+  const access = req.query.spectate === "1" ? userFeatureAccess(viewer, "rooms:spectate", db) : tableFeatureAccess(viewer, room, db);
   if (!access.allowed) return rejectFeature(res, access);
+  const gameAccess = userFeatureAccess(viewer, `game:${room.gameId}`, db);
+  if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
   if (!maySpectate(room, req.auth.id)) return res.json({ ...sanitizeLobbyRoom(room), state: room.state ? { gameId: room.gameId } : null, accessRequired: true });
   res.json(sanitizeRoom(room, req.auth.id, db, req.query.spectate === "1"));
 });
@@ -5578,7 +5610,7 @@ app.post("/api/rooms/:code/spectate", auth, (req, res, next) => dispatchRoomComm
 app.post("/api/rooms/:code/belote-team", auth, (req, res, next) => dispatchRoomCommand("POST /api/rooms/:code/belote-team", req, res, next));
 
 app.post("/api/rooms/:code/invite", auth, (req, res) => {
-  const access = userFeatureAccess(getUser(req.auth.id), "friends");
+  const access = userFeatureAccess(getUser(req.auth.id), "invitations");
   if (!access.allowed) return rejectFeature(res, access);
   if (req.auth.guest) return res.status(400).json({ error: "Les invitations sont réservées aux comptes enregistrés." });
   const friendId = String(req.body.friendId ?? "");
@@ -5612,7 +5644,7 @@ app.post("/api/rooms/:code/invite", auth, (req, res) => {
 });
 
 app.post("/api/room-invites/:id/accept", auth, async (req, res, next) => {
-  const access = userFeatureAccess(getUser(req.auth.id), "friends");
+  const access = userFeatureAccess(getUser(req.auth.id), "invitations");
   if (!access.allowed) return rejectFeature(res, access);
   if (req.auth.guest) return res.status(400).json({ error: "Les invitations sont réservées aux comptes enregistrés." });
   const inviteId = req.params.id;
@@ -5624,6 +5656,8 @@ app.post("/api/room-invites/:id/accept", auth, async (req, res, next) => {
   const room = invite && db.rooms.find((row) => row.code === invite.code && !row.finished);
   const game = room && games.find((g) => g.id === room.gameId);
   if (!invite || !room || !game) return res.status(404).json({ error: "Invitation expirée." });
+  const joinAccess = userFeatureAccess(user, room.state ? "rooms:spectate" : "rooms:join", db);
+  if (!joinAccess.allowed) return rejectFeature(res, joinAccess);
   if (room.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===user.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});
   const tableAccess = tableFeatureAccess(user, room, db);
   if (!tableAccess.allowed) return rejectFeature(res, tableAccess);
@@ -5925,7 +5959,7 @@ io.on("connection", (socket) => {
     const seated = room?.players.some((player) => player.id === viewer.id);
     const viewerUser = getUser(viewer.id);
     const staleSession = viewerUser && (Number(viewer.sessionVersion) || 0) !== (Number(viewerUser.sessionVersion) || 0);
-    const roomAccess = viewerUser ? userFeatureAccess(viewerUser, room?.ownerId === viewer.id ? "rooms:create" : "rooms:join") : { allowed: false };
+    const roomAccess = viewerUser && room ? payload.spectator ? userFeatureAccess(viewerUser, "rooms:spectate") : tableFeatureAccess(viewerUser, room) : { allowed: false };
     const gameAccess = viewerUser && room ? userFeatureAccess(viewerUser, `game:${room.gameId}`) : { allowed: false };
     if (!room || !viewerUser || viewerUser.active === false || staleSession || !roomAccess.allowed || !gameAccess.allowed || (!seated && (!payload.spectator || !maySpectate(room, viewer.id)))) {
       socket.emit("room-error", { error: "Table introuvable." });

@@ -42,7 +42,7 @@ export function createRankedRuntime({ app, auth, requireAdmin, readDb, updateDb,
     const settings=config(db), rules=settings.games[gameId];
     if (!user || user.guest || user.isBot || user.active === false) return "Un compte enregistré est nécessaire.";
     if (!settings.enabled || !rules?.enabled) return "Le classé est indisponible pour ce jeu.";
-    for (const feature of ["rooms:join",`game:${gameId}`]) { const access=userFeatureAccess(user,feature,db); if (!access.allowed) return access.message || access.reason || "Accès classé restreint."; }
+    for (const feature of ["ranked","rooms:join",`game:${gameId}`]) { const access=userFeatureAccess(user,feature,db); if (!access.allowed) return access.message || access.reason || "Accès classé restreint."; }
     if (user.tokens < rules.preset.stake) return "Jetons insuffisants pour la mise classée.";
     if (db.rooms.some((r)=>r.state && !r.finished && r.players.some((p)=>p.id===user.id))) return "Termine ta partie avant de rejoindre une file.";
     return "";

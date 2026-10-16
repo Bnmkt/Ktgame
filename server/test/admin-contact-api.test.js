@@ -8,6 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import test, { before, after } from "node:test";
 import jwt from "jsonwebtoken";
 import { createRequire } from "node:module";
+import { softBanOptions, defaultSoftBanRestrictions } from "../../client/src/features/accounts/softban.js";
 const { io } = createRequire(new URL("../../client/package.json", import.meta.url))("socket.io-client");
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ktga-contact-api-"));
@@ -51,6 +52,66 @@ before(async () => {
 after(async () => {
   await stop(); assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir()));
   assert.ok(path.basename(directory).startsWith("ktga-contact-api-")); fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+});
+
+test("softban settings and per-player overrides enforce actual HTTP mutations without blocking safety actions", async () => {
+  const policy = [...softBanOptions.map(([id]) => id), "game:yahtzee"];
+  for (const id of ["player", "editor"]) assert.equal((await request(id, "/api/admin/settings", "PATCH", { softBanRestrictions: [] })).status, 403);
+  assert.equal((await request("admin", "/api/admin/settings", "PATCH", { softBanRestrictions: ["unknown"] })).status, 400);
+  const room = await request("admin", "/api/rooms", "POST", { gameId: "yahtzee", name: "Softban fixture" });
+  assert.equal(room.status, 200);
+  assert.equal((await request("player", `/api/rooms/${room.data.code}/join`, "POST", {})).status, 200);
+  const token = jwt.sign({ id: "player", sessionVersion: 0 }, secret, { expiresIn: "1h" });
+  const observer = io(url, { autoConnect: false, transports: ["websocket"], auth: { token, stream: "table" } });
+  const connected = new Promise(resolve => observer.once("connect", resolve)); observer.connect(); await connected;
+  const firstView = new Promise(resolve => observer.once("room", resolve)); observer.emit("watch-room", { roomId: room.data.id, token, spectator: true }); await firstView;
+  const restrictedView = new Promise(resolve => observer.once("room-error", resolve));
+  try {
+    assert.equal((await request("admin", "/api/admin/settings", "PATCH", { softBanRestrictions: policy })).status, 200);
+    for (const id of ["player", "editor"]) assert.equal((await request("admin", `/api/admin/users/${id}`, "PATCH", { moderation: { softBan: { active: true, reason: "Softban test", endsAt: new Date(Date.now()+3600000).toISOString(), restrictions: null } } })).status, 200);
+    assert.equal((await request("admin", `/api/rooms/${room.data.code}/bot`, "POST", {})).status, 200);
+    let timeout;
+    try { assert.ok((await Promise.race([restrictedView, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("Restricted spectator still receives room updates")), 5000); })])).error); }
+    finally { clearTimeout(timeout); }
+    const blocked = [
+      ["player", "/api/me/daily-claim", "POST", {}],
+      ["player", "/api/me", "PATCH", { bio: "Blocked biography" }],
+      ["player", "/api/me/cosmetics", "PATCH", {}],
+      ["player", "/api/chat/messages", "POST", { channel: "global", content: "Blocked chat" }],
+      ["player", "/api/chat/messages", "POST", { channel: "room", roomCode: room.data.code, content: "Blocked table chat" }],
+      ["player", "/api/rooms", "POST", { gameId: "yahtzee" }],
+      ["player", `/api/rooms/${room.data.code}/spectate`, "POST", {}],
+      ["player", "/api/shop/purchase", "POST", {}],
+      ["player", "/api/friends/request", "POST", { userId: "editor" }],
+      ["player", "/api/community-events/unknown/join", "POST", {}],
+      ["player", "/api/tribunal/cases/unknown/vote", "POST", { vote: 3 }],
+      ["player", "/api/patchnotes/unknown/reaction", "POST", { value: 1 }],
+      ["editor", "/api/admin/shop", "POST", {}],
+      ["editor", "/api/admin/shop", "POST", { id: "source" }],
+      ["editor", "/api/admin/shop/source", "PATCH", {}],
+      ["editor", "/api/admin/shop/source", "DELETE"],
+      ["editor", "/api/admin/help/images", "POST", {}],
+    ];
+    for (const [id, route, method, body] of blocked) {
+      const response = await request(id, route, method, body);
+      assert.equal(response.status, 403, `${route}: ${JSON.stringify(response.data)}`); assert.equal(response.data.code, "SOFT_BAN", route);
+    }
+    assert.equal((await request("player", "/api/me")).status, 200);
+    assert.equal((await request("player", "/api/me/data-requests")).status, 200);
+    assert.equal((await request("player", "/api/tribunal/reports", "POST", { accusedId: "editor", category: "other", description: "Un signalement de sécurité qui reste accessible malgré la sanction." })).status, 201);
+    assert.equal((await request("player", `/api/rooms/${room.data.code}/leave`, "POST", {})).status, 200);
+    assert.equal((await request("admin", "/api/admin/users/player", "PATCH", { moderation: { softBan: { active: true, reason: "Override test", restrictions: [] } } })).status, 200);
+    assert.equal((await request("player", "/api/me/daily-claim", "POST", {})).status, 200);
+    assert.deepEqual((await request("admin", "/api/admin/users/player")).data.user.moderation.softBan.restrictions, []);
+    assert.equal((await request("admin", "/api/admin/users/editor", "PATCH", { moderation: { softBan: { active: true, reason: "Spectator-only restriction", restrictions: ["rooms:spectate"] } } })).status, 200);
+    assert.equal((await request("editor", `/api/rooms/${room.data.code}/join`, "POST", {})).status, 200);
+    assert.equal((await request("editor", `/api/rooms/${room.data.code}?spectate=1`)).status, 403);
+  } finally {
+    observer.disconnect();
+    for (const id of ["player", "editor"]) await request("admin", `/api/admin/users/${id}`, "PATCH", { moderation: { softBan: { active: false, restrictions: null } } });
+    await request("admin", "/api/admin/settings", "PATCH", { softBanRestrictions: defaultSoftBanRestrictions });
+    await request("admin", `/api/rooms/${room.data.code}`, "DELETE");
+  }
 });
 test("only administrators can change the contact, with strict validation and live public/data-request updates", async () => {
   assert.equal((await request(null, "/api/config")).data.contactEmail, "environment@example.com");

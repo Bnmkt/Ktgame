@@ -139,8 +139,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
     setSaving("settings");
     setError("");
     try {
-      const { siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds } = settingsDraft;
-      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds }) });
+      const { siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds, softBanRestrictions } = settingsDraft;
+      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds, softBanRestrictions }) });
       setSettingsDraft(settings);
       setData((current) => ({ ...current, settings }));
       onSettingsChange?.(settings);

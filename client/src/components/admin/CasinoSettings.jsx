@@ -8,6 +8,7 @@ import { bonusProgression, bonusRuleEffect, normalizeBonusSettings } from "../..
 import { ProgressionSettings } from "./ProgressionSettings.jsx";
 import { LobbyNotice } from "../navigation/LobbyNotice.jsx";
 import { GameImageEditor } from "./GameImageEditor.jsx";
+import { SoftBanRestrictions } from "./SoftBanRestrictions.jsx";
 import "./editor-copy-settings.css";
 import "../navigation/lobby-notice.css";
 
@@ -69,7 +70,10 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
       <button type="button" className={section === "progression" ? "active" : ""} onClick={() => setSection("progression")}><TrendingUp size={17} />{localeText("XP et titres")}</button>
       <button type="button" className={section === "notice" ? "active" : ""} onClick={() => setSection("notice")}><Megaphone size={17}/>{localeText("Annonce")}</button>
       <button type="button" className={section === "editing" ? "active" : ""} onClick={() => setSection("editing")}><ShieldCheck size={17}/>{localeText("Édition")}</button>
+      <button type="button" className={section === "moderation" ? "active" : ""} onClick={() => setSection("moderation")}><ShieldCheck size={17}/>{localeText("Softbans")}</button>
     </nav>
+
+    {section === "moderation" && <section className="casino-settings-panel settings-group"><div className="settings-group-heading"><ShieldCheck/><div><h3>{localeText("Restrictions des softbans")}</h3><p>{localeText("Coche les actions interdites par défaut pendant un softban. Chaque fiche joueur peut utiliser une sélection personnalisée.")}</p></div></div><SoftBanRestrictions value={draft.softBanRestrictions} onChange={value => update("softBanRestrictions", value)} games={games} disabled={saving}/><p className="account-admin-notice">{localeText("La sécurité du compte, les demandes de données, les signalements et la possibilité de quitter une partie restent accessibles.")}</p></section>}
 
     {section === "editing" && <section className="casino-settings-panel settings-group editor-copy-settings">
       <div className="settings-group-heading"><ShieldCheck/><div><h3>{localeText("Limitation des duplications")}</h3><p>{localeText("Une duplication toutes les cinq minutes par utilisateur sélectionné, tous outils d’édition confondus.")}</p></div></div>

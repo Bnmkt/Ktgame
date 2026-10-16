@@ -16,6 +16,7 @@ files=(
   server/src/services/account-security.js server/src/services/discord-oauth.js
   server/src/services/discord-routes.js server/src/services/discord-presence.js
   server/src/services/editor-duplication.js server/src/services/tribunal.js
+  server/src/services/softban.js server/src/services/parental-controls.js
   server/src/services/personal-archive-worker.js
   server/src/services/lobby-notice.js
   client/scripts/build.mjs client/scripts/build-companion.mjs

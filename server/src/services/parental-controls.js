@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { defaultSoftBanRestrictions, softBanRestricts } from "../../../client/src/features/accounts/softban.js";
 
 export const minorRestrictionOptions = Object.freeze([
   { id: "shop", label: "Boutique", description: "Consulter et acheter des objets cosmétiques." },
@@ -62,14 +63,15 @@ export function activeParentalRevocation(user, now = Date.now()) {
   return Number.isFinite(until) && until > now ? { ...entry, revokedUntil: new Date(until).toISOString() } : null;
 }
 
-export function featureAccess(user, feature, restrictions, now = Date.now()) {
+export function featureAccess(user, feature, restrictions, now = Date.now(), softBanRestrictions = defaultSoftBanRestrictions) {
   const moderation = activeModeration(user, now);
   if (moderation?.type === "hard") return { allowed: false, code: "HARD_BAN", reason: moderation.reason, until: moderation.endsAt ?? "" };
   const revoked = activeParentalRevocation(user, now);
   if (revoked) return { allowed: false, code: "PARENTAL_ACCESS_REVOKED", reason: revoked.reason, until: revoked.revokedUntil };
-  if (moderation?.type === "soft" && ["community-events", "rooms:join", "friends", "chat"].includes(feature)) return { allowed: false, code: "SOFT_BAN", reason: moderation.reason, until: moderation.endsAt ?? "" };
+  const softFeatures = Array.isArray(moderation?.restrictions) ? moderation.restrictions : softBanRestrictions;
+  if (moderation?.type === "soft" && softBanRestricts(feature, softFeatures)) return { allowed: false, code: "SOFT_BAN", reason: moderation.reason, until: moderation.endsAt ?? "" };
   const configured = normalizeMinorRestrictions(restrictions);
-  const normalizedFeature = feature === "rooms:create" || feature === "rooms:join" ? "rooms" : feature;
+  const normalizedFeature = feature.startsWith("rooms:") ? "rooms" : feature.startsWith("chat:") ? "chat" : feature === "invitations" ? "friends" : feature;
   if (isUnder13(user, now) && configured.includes(normalizedFeature)) return { allowed: false, code: "MINOR_RESTRICTION", reason: "Cette fonctionnalité est limitée par le contrôle parental.", until: turnsThirteenAt(user.profile?.birthDate) };
   return { allowed: true };
 }

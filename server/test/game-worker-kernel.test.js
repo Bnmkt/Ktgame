@@ -60,6 +60,21 @@ test("all existing games can start in the same isolated runtime", async () => {
   }
 });
 
+test("workers enforce live softban policies for room controls and games while keeping the exit available", async () => {
+  const f = fixture(); await f.command("POST /api/rooms");
+  const moderation = { softBan: { active: true, reason: "Fixture", restrictions: null } };
+  f.context.users = [{ ...user, moderation }];
+  f.kernel.configure({ id: "1", platform: { ...platform, softBanRestrictions: ["rooms:create"] }, games });
+  assert.equal((await f.command("POST /api/rooms/:code/bot")).result.status, 403);
+  assert.equal((await f.command("POST /api/rooms/:code/start")).result.status, 403);
+  f.context.users = [{ ...user, moderation: { softBan: { ...moderation.softBan, restrictions: [] } } }];
+  assert.equal((await f.command("POST /api/rooms/:code/start")).result.status, 200);
+  f.context.users = [{ ...user, moderation }];
+  f.kernel.configure({ id: "1", platform: { ...platform, softBanRestrictions: ["game:yahtzee"] }, games });
+  assert.equal((await f.command("POST /api/rooms/:code/action", { type: "roll" })).result.status, 403);
+  assert.equal((await f.command("POST /api/rooms/:code/leave")).result.status, 200);
+});
+
 test("the worker accepts authorized virtual bots in every ranked engine but rejects ordinary bot injection",async()=> {
   for (const gameId of RANKED_GAMES) {
     const config=normalizeRankedConfig().games[gameId],f=fixture(gameId);

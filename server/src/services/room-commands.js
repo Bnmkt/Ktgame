@@ -9,7 +9,7 @@ import { validateRankedAction } from "./ranked.js";
 
 export function createRoomCommands(dependencies) {
   const { actionAchievementSnapshot, addTokens, advanceRoomPacing, appendRoomAchievementUnlocks, applyAction, bcrypt, blackjackHandTotal, broadcastRooms, cashOutPokerPlayer, configuredGames, consumeRoomAchievementUnlocks, didRoundFinish, displayNameFor, emitRoomUpdate, finishRoomIfNeeded, gameActionAchievementEvent, getTokenBalance, getUser, grantSpectatorAccess, io, maySpectate, platformSettings, pokerBlindsFromBigBlind, processAchievementEvent, progressionConfig, pushNotification, rankedRuntime, readDb, rejectFeature, removePlayerFromRoomState, roomCode, roomPacingActive, roomPlayerFor, roomPresence, roomTiming, roundProgressSnapshot, runBotTurns, sanitizeRoom, saveRoom, startRoomPacing, startRoomRound, startRoundResultsIfNeeded, syncRoomPlayerTokens, tableFeatureAccess, triggerRandomAchievement, unlockEligibleAchievements, userFeatureAccess, writeRoomDb } = dependencies;
-  return new Map([
+  const commands = new Map([
     ["POST /api/rooms", async (req, res) => {
   if (req.body.ranked || req.body.mode === "ranked") return res.status(403).json({ error: "Le classé passe exclusivement par la file d'attente." });
   const user = getUser(req.auth.id);
@@ -64,7 +64,8 @@ export function createRoomCommands(dependencies) {
   const game = room && configuredGames(db).find((g) => g.id === room.gameId);
   if (room?.ranked && !room.ranked.config.spectators && !room.ranked.roster.some((p)=>p.id===req.auth.id)) return res.status(403).json({error:"Spectateurs désactivés pour cette partie classée."});
   if (!user || !room || !game) return res.status(404).json({ error: "Table introuvable." });
-  const roomAccess = userFeatureAccess(user, "rooms:join", db);
+  const spectator = Boolean(room.state && !(room.finished && room.state.finished && !room.ranked) && !room.players.some(player => player.id === user.id));
+  const roomAccess = userFeatureAccess(user, spectator ? "rooms:spectate" : "rooms:join", db);
   if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
   const gameAccess = userFeatureAccess(user, `game:${room.gameId}`, db);
   if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
@@ -90,7 +91,7 @@ export function createRoomCommands(dependencies) {
   const room = readDb().rooms.find((entry) => entry.code === req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: "Table introuvable." });
   const user = getUser(req.auth.id);
-  const roomAccess = userFeatureAccess(user, "rooms:join");
+  const roomAccess = userFeatureAccess(user, "rooms:spectate");
   if (!roomAccess.allowed) return rejectFeature(res, roomAccess);
   const gameAccess = userFeatureAccess(user, `game:${room.gameId}`);
   if (!gameAccess.allowed) return rejectFeature(res, gameAccess);
@@ -438,4 +439,16 @@ export function createRoomCommands(dependencies) {
   res.json(safeRoom);
 }]
   ]);
+  for (const [command, handler] of commands) {
+    if (!command.startsWith("POST /api/rooms/:code/") || ["join", "spectate", "leave"].includes(command.split("/").at(-1))) continue;
+    commands.set(command, async (req, res) => {
+      const db = readDb(), room = db.rooms.find(entry => entry.code === req.params.code.toUpperCase());
+      if (room) {
+        const access = tableFeatureAccess(getUser(req.auth.id), room, db);
+        if (!access.allowed) return rejectFeature(res, access);
+      }
+      return handler(req, res);
+    });
+  }
+  return commands;
 }

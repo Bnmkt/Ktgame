@@ -75,10 +75,16 @@ export function createGameRoomKernel() {
       effects.push({ kind: "tokens", userId, amount, meta });
       return balance;
     };
-    const feature = (user, name) => featureAccess(user, name, settings().minorRestrictions);
+    const feature = (user, name) => featureAccess(user, name, settings().minorRestrictions, Date.now(), settings().softBanRestrictions);
     const rejectFeature = (res, access) => res.status(403).json({ code: access.code, error: access.reason || "Cette action n’est pas disponible pour ce compte.", reason: access.reason ?? "", endsAt: access.until ?? "" });
     const tableAccess = (user, target) => {
-      const access = feature(user, target?.ownerId === user?.id ? "rooms:create" : "rooms:join");
+      const seated = target?.players?.some(player => player.id === user?.id);
+      const observing = !seated && target?.state && !(target.finished && target.state.finished && !target.ranked);
+      const access = feature(user, observing ? "rooms:spectate" : target?.ownerId === user?.id ? "rooms:create" : "rooms:join");
+      if (access.allowed && seated && target?.ranked) {
+        const rankedAccess = feature(user, "ranked");
+        if (!rankedAccess.allowed) return rankedAccess;
+      }
       return access.allowed ? feature(user, `game:${target?.gameId}`) : access;
     };
     const unlock = (user) => { if (user) effects.push({ kind: "unlock", userId: user.id }); return []; };
