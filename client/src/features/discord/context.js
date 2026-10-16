@@ -2,6 +2,9 @@ const launchKeys = ["frame_id", "instance_id", "platform", "custom_id", "referre
 export function isDiscordActivityLocation(location = globalThis.location) {
   return location?.protocol === "https:" && /^\d{16,22}\.discordsays\.com$/.test(location.hostname ?? "");
 }
+export function usesActivityTransport(location = globalThis.location) {
+  return isDiscordActivityLocation(location) || location?.pathname === "/discord-activity" || location?.pathname?.startsWith("/discord-activity/") === true;
+}
 const launch = typeof window !== "undefined" && isDiscordActivityLocation() ? new URLSearchParams(window.location.search) : new URLSearchParams();
 export function activityNavigationUrl(value) {
   if (!isDiscordActivityLocation()) return value;

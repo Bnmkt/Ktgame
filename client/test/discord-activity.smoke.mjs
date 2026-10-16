@@ -77,5 +77,18 @@ try {
     await page.screenshot({ path: path.join(directory, `${viewport.width}-navigation.png`) });
     results.push({ width: viewport.width, login: true, externalTable: true }); await context.close();
   }
-  assert.deepEqual(errors, []); console.log(JSON.stringify({ passed: true, results, directory }));
+  const directContext = await browser.newContext({ viewport: { width: 1280, height: 800 } }), direct = await directContext.newPage();
+  direct.on("pageerror", error => errors.push(error.message)); await blocker.enableBlockingInPage(direct);
+  await direct.route("https://www.ktga.me/**", route => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/api/discord/activity/config") return route.fulfill({ contentType: "application/json", body: JSON.stringify({ available: true, clientId: "123456789012345678", websiteUrl: "https://www.ktga.me" }) });
+    if (url.pathname.startsWith("/api/locales/")) return route.fulfill({ contentType: "application/json", body: '{"messages":{}}' });
+    if (url.pathname === "/") return route.fulfill({ contentType: "text/html", body: "<!doctype html><h1>Classic casino</h1>" });
+    const filename = url.pathname === "/discord-activity/" ? path.join(dist, "discord-activity/index.html") : path.resolve(dist, `.${url.pathname}`);
+    if (!filename.startsWith(dist + path.sep) || !fs.existsSync(filename)) return route.abort();
+    return route.fulfill({ contentType: { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2" }[path.extname(filename)] ?? "application/octet-stream", headers: path.extname(filename) === ".html" ? { "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" } : {}, body: fs.readFileSync(filename) });
+  });
+  await direct.goto("https://www.ktga.me/discord-activity/"); await direct.getByRole("button", { name: "Ouvrir dans le navigateur", exact: true }).click();
+  await direct.getByRole("heading", { name: "Classic casino", exact: true }).waitFor(); await directContext.close();
+  assert.deepEqual(errors, []); console.log(JSON.stringify({ passed: true, results, directEntry: true, directory }));
 } finally { await browser.close(); }

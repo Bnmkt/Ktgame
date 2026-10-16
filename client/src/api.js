@@ -1,5 +1,5 @@
 import { bugDiagnostics } from "./features/bugs/diagnostics.js";
-import { isDiscordActivityLocation } from "./features/discord/context.js";
+import { isDiscordActivityLocation, usesActivityTransport } from "./features/discord/context.js";
 
 function normalizeBasePath(path) {
   const normalized = `/${String(path || "").replace(/^\/+|\/+$/g, "")}`;
@@ -8,7 +8,7 @@ function normalizeBasePath(path) {
 
 const BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 const configuredApiUrl = String(import.meta.env.VITE_API_URL ?? "").trim();
-const API_URL = isDiscordActivityLocation() ? "" : configuredApiUrl || (import.meta.env.DEV ? "http://localhost:4000" : BASE_PATH);
+const API_URL = usesActivityTransport() ? "" : configuredApiUrl || (import.meta.env.DEV ? "http://localhost:4000" : BASE_PATH);
 
 function splitOriginAndPath(url) {
   if (!/^https?:\/\//i.test(url)) return { origin: undefined, basePath: normalizeBasePath(url || BASE_PATH) };
