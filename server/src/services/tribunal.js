@@ -157,6 +157,7 @@ export function createTribunalStore({ filename, random = Math.random }) {
     );
     CREATE INDEX IF NOT EXISTS idx_tribunal_reports_review ON tribunal_reports(status, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_tribunal_reports_accused ON tribunal_reports(accused_id, status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_tribunal_reports_author_target ON tribunal_reports(reporter_id, accused_id, created_at DESC);
     CREATE TABLE IF NOT EXISTS tribunal_cases (
       id TEXT PRIMARY KEY, public_code TEXT NOT NULL UNIQUE, accused_id TEXT NOT NULL, title TEXT NOT NULL,
       summary TEXT NOT NULL, evidence_json TEXT NOT NULL, status TEXT NOT NULL, source TEXT NOT NULL,
@@ -247,17 +248,21 @@ export function createTribunalStore({ filename, random = Math.random }) {
       if (!tribunalCategories.some((entry) => entry.id === input.category)) throw new Error("INVALID_REPORT_CATEGORY");
       const description = clean(input.description, 1200);
       if (description.length < 20) throw new Error("REPORT_DESCRIPTION_TOO_SHORT");
-      const since = iso(now - 24 * 60 * 60 * 1000);
-      const duplicate = db.prepare("SELECT id FROM tribunal_reports WHERE reporter_id = ? AND accused_id = ? AND category = ? AND created_at >= ? AND status != 'dismissed'").get(input.reporterId, input.accusedId, input.category, since);
-      if (duplicate) throw new Error("DUPLICATE_REPORT");
-      const report = {
-        id: randomUUID(), reporterId: input.reporterId, accusedId: input.accusedId, category: input.category,
-        description, evidence: Array.isArray(input.evidence) ? input.evidence.slice(0, 50) : [],
-        context: input.context && typeof input.context === "object" ? input.context : {}, status: "pending", createdAt: iso(now)
-      };
-      db.prepare("INSERT INTO tribunal_reports(id, reporter_id, accused_id, category, description, evidence_json, context_json, status, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(report.id, report.reporterId, report.accusedId, report.category, report.description, JSON.stringify(report.evidence), JSON.stringify(report.context), report.status, report.createdAt);
-      return report;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const since = iso(now - 7 * 24 * 60 * 60 * 1000);
+        const duplicate = db.prepare("SELECT id FROM tribunal_reports WHERE reporter_id = ? AND accused_id = ? AND created_at > ?").get(input.reporterId, input.accusedId, since);
+        if (duplicate) throw new Error("DUPLICATE_REPORT");
+        const report = {
+          id: randomUUID(), reporterId: input.reporterId, accusedId: input.accusedId, category: input.category,
+          description, evidence: Array.isArray(input.evidence) ? input.evidence.slice(0, 50) : [],
+          context: input.context && typeof input.context === "object" ? input.context : {}, status: "pending", createdAt: iso(now)
+        };
+        db.prepare("INSERT INTO tribunal_reports(id, reporter_id, accused_id, category, description, evidence_json, context_json, status, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .run(report.id, report.reporterId, report.accusedId, report.category, report.description, JSON.stringify(report.evidence), JSON.stringify(report.context), report.status, report.createdAt);
+        db.exec("COMMIT");
+        return report;
+      } catch (error) { db.exec("ROLLBACK"); throw error; }
     },
     dismissReport(reportId, adminId, note = "", now = Date.now()) {
       const result = db.prepare("UPDATE tribunal_reports SET status = 'dismissed', review_note = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ? AND status = 'pending'")

@@ -1,6 +1,7 @@
 import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
+import { createEditorDuplicationLimit, isEditorDuplication } from "./services/editor-duplication.js";
 import { createLocaleStore, registerLocaleRoutes, validLocale } from "./services/locales.js";
 import { gameImageUrl } from "../../client/src/features/games/presentation.js";
 import { createGameGateway } from "./services/game-gateway.js";
@@ -873,6 +874,11 @@ app.use((req, res, next) => {
 app.use("/api/admin/help", express.json({ limit: "2mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use(express.json());
+const editorDuplicationLimit = createEditorDuplicationLimit({ filename: databaseFilename });
+app.use("/api/admin", (req, res, next) => {
+  if (!isEditorDuplication(req)) return next();
+  auth(req, res, () => requireBackOffice(req, res, () => editorDuplicationLimit(req, res, next)));
+});
 app.use("/api", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
 app.use("/api/auth", rateLimit({ windowMs: RATE_LIMIT_WINDOW_MS, limit: AUTH_RATE_LIMIT_MAX, standardHeaders: "draft-7", legacyHeaders: false }));
 app.use((req, _res, next) => {
@@ -2981,7 +2987,7 @@ app.post("/api/tribunal/reports", auth, (req, res) => {
       INVALID_REPORT_TARGET: "Tu ne peux pas te signaler toi-même.",
       INVALID_REPORT_CATEGORY: "Choisis un motif de signalement valide.",
       REPORT_DESCRIPTION_TOO_SHORT: "Décris les faits en au moins 20 caractères.",
-      DUPLICATE_REPORT: "Un signalement similaire a déjà été envoyé au cours des dernières 24 heures."
+      DUPLICATE_REPORT: "Tu as déjà signalé ce joueur au cours des sept derniers jours, quel que soit le motif."
     };
     res.status(error.message === "DUPLICATE_REPORT" ? 409 : 400).json({ error: messages[error.message] ?? "Le signalement n’a pas pu être enregistré." });
   }

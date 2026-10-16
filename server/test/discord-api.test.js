@@ -7,6 +7,8 @@ import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { LIMITED_EDITOR_IDS } from "../src/services/editor-duplication.js";
 import { encryptTotpSecret, totpCode } from "../src/services/account-security.js";
 
 test("Discord login/link preserves real session restrictions and administrator MFA", async () => {
@@ -15,8 +17,9 @@ test("Discord login/link preserves real session restrictions and administrator M
   const db = new DatabaseSync(path.join(directory, "main.sqlite"));
   db.exec("CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO meta VALUES('legacy-json-migrated','true'); CREATE TABLE users(id TEXT PRIMARY KEY,data TEXT NOT NULL,pseudo TEXT NOT NULL,email TEXT,guest INTEGER)");
   const identities = { player: "111111111111111111", admin: "222222222222222222", banned: "333333333333333333", minor: "444444444444444444", locked: "555555555555555555", revoked: "666666666666666666" };
-  for (const id of ["player", "other", "admin", "banned", "minor", "locked", "revoked"]) {
-    const user = { id, pseudo: id, email: `${id}@example.test`, active: true, admin: id === "admin", editor: false, tokens: 1000,
+  const limitedId = [...LIMITED_EDITOR_IDS][0];
+  for (const id of ["player", "other", "admin", "banned", "minor", "locked", "revoked", limitedId]) {
+    const user = { id, pseudo: id === limitedId ? "Renamed editor" : id, email: `${id}@example.test`, active: true, admin: id === "admin", editor: id === limitedId, tokens: 1000,
       passwordHash: bcrypt.hashSync(password, 4), passwordPolicyVersion: 1, emailVerifiedAt: new Date().toISOString(), createdAt: new Date().toISOString(),
       profile: { birthDate: ["minor", "revoked"].includes(id) ? "2020-01-01" : "1990-01-01" },
       ...(["minor", "revoked"].includes(id) ? { registrationAuthorization: { ageBand: "under13" } } : {}),
@@ -77,6 +80,19 @@ test("Discord login/link preserves real session restrictions and administrator M
     assert.equal(admin.status, 202); assert.equal(admin.data.token, undefined); assert.deepEqual(admin.data.methods, ["totp"]);
     const verified = await request("/api/auth/mfa/verify", "POST", { challengeId: admin.data.challengeId, method: "totp", code: totpCode(totp), userId: "player" });
     assert.equal(verified.status, 200); assert.equal(verified.data.user.id, "admin", "challenge, not client user id, selects account");
+    const editorToken = jwt.sign({ id: limitedId, sessionVersion: 0 }, secret, { expiresIn: "1h" });
+    const backOffice = (await request("/api/admin", "GET", null, editorToken)).data;
+    const source = backOffice.shop.find(item => item.type === "icons" && item.category === "classic");
+    const copy = { ...source, name: "Fixture copy", price: backOffice.pricing["icons:classic"].recommended, packName: "" };
+    assert.equal((await request("/api/admin/shop", "POST", { ...copy, packName: "!!!" }, editorToken)).status, 400);
+    assert.equal((await request("/api/admin/shop", "POST", copy, editorToken)).status, 200);
+    for (const route of ["/api/admin/community-events/missing/duplicate", "/api/admin/patchnotes/missing/duplicate", "/api/admin/COMMUNITY-EVENTS/missing/DUPLICATE/"]) {
+      const limited = await request(route, "POST", {}, editorToken); assert.equal(limited.status, 429); assert.ok(Number(limited.headers.get("retry-after")) > 0);
+    }
+    assert.equal((await request("/api/admin/shop", "POST", copy, verified.data.token)).status, 200);
+    const report = { accusedId: "other", category: "spam", description: "Des messages répétés ont été envoyés pendant la partie." };
+    assert.equal((await request("/api/tribunal/reports", "POST", report, editorToken)).status, 201);
+    assert.equal((await request("/api/tribunal/reports", "POST", { ...report, category: "other" }, editorToken)).status, 409);
     const game = (await request("/api/games")).data.find(entry => entry.id === "yahtzee");
     assert.equal((await request("/api/admin/games/yahtzee", "PATCH", { ...game, discordIconImage: "/api/game-images/custom.png" }, player.data.token)).status, 403);
     assert.equal((await request("/api/admin/games/yahtzee", "PATCH", { ...game, discordIconImage: "javascript:alert(1)" }, verified.data.token)).status, 400);

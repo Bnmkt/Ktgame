@@ -10,6 +10,19 @@ test("la récompense suit les exemples du tribunal", () => {
   assert.equal(tribunalReward(1, 4.8, 1000), 60);
 });
 
+test("un auteur ne peut signaler le même joueur qu'une fois en sept jours, tous motifs et statuts confondus", () => {
+  const directory=mkdtempSync(path.join(tmpdir(),"ktga-tribunal-week-")), filename=path.join(directory,"tribunal.sqlite");
+  let store=createTribunalStore({filename});const time=Date.parse("2026-10-16T10:00:00Z"),week=7*86400000;
+  const input={reporterId:"author",accusedId:"target",category:"spam",description:"Des messages répétés ont été envoyés durant toute la partie."};
+  try {
+    const report=store.createReport(input,time);store.dismissReport(report.id,"admin","Classé sans suite",time+1000);
+    for(const category of ["spam","harassment","other"])assert.throws(()=>store.createReport({...input,category},time+week-1),/DUPLICATE_REPORT/);
+    store.createReport({...input,reporterId:"another-author"},time+1000);store.createReport({...input,accusedId:"another-target"},time+1000);
+    store.close();store=createTribunalStore({filename});assert.throws(()=>store.createReport({...input,category:"other"},time+week-1),/DUPLICATE_REPORT/);
+    assert.ok(store.createReport({...input,category:"other"},time+week));
+  } finally {store.close();rmSync(directory,{recursive:true,force:true});}
+});
+
 test("le score comportemental ne peut qu'alourdir une décision future", () => {
   assert.equal(tribunalVerdict(2.6, 100).outcome, "not-guilty");
   assert.equal(tribunalVerdict(2.6, 20).outcome, "social-ban");
