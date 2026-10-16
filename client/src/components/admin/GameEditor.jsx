@@ -51,6 +51,8 @@ export function GameEditor({ game, games, saving, error, onChange, onSave, onClo
   }
   return <Dialog title={`${t("Paramètres du jeu")} · ${game.name}`} className="game-settings-dialog" onClose={onClose} dismissible={!saving}>
     <form ref={form} className="game-settings-form" onSubmit={submit} noValidate>
+      <footer className="game-settings-actions"><span>{game.id}</span><div><button type="button" className="secondary" onClick={onClose} disabled={saving}><X size={17} />{t("Annuler")}</button><button type="submit" disabled={saving}><Save size={17} />{t(saving ? "Enregistrement…" : "Enregistrer")}</button></div></footer>
+
       <nav className="game-settings-tabs" role="tablist" aria-label={t("Réglages du jeu")}>{sections.map(([key, label, Icon], index) => <button type="button" role="tab" aria-label={t(label)} id={`${id}-${key}`} tabIndex={section === key ? 0 : -1} aria-controls={`${id}-${key}-panel`} aria-selected={section === key} key={key} disabled={saving} className={section === key ? "active" : ""} onClick={() => switchSection(key)} onKeyDown={event => { const next = event.key === "ArrowRight" ? (index + 1) % sections.length : event.key === "ArrowLeft" ? (index + sections.length - 1) % sections.length : event.key === "Home" ? 0 : event.key === "End" ? sections.length - 1 : null; if (next === null) return; event.preventDefault(); switchSection(sections[next][0]); document.getElementById(`${id}-${sections[next][0]}`)?.focus(); }}><Icon size={18} /><span className="game-settings-tab-name">{t(label)}</span><span className="game-settings-tab-short">{t(shortLabels[key])}</span></button>)}</nav>
       <button type="button" className="secondary game-settings-mobile-view" onClick={() => setMobilePreview(value => !value)} aria-expanded={mobilePreview}><Eye size={17} />{t(mobilePreview ? "Revenir aux réglages" : "Voir l’aperçu")}</button>
       {(validation || error) && <p className="error game-settings-error" role="alert">{validation || t(error)}</p>}
@@ -71,7 +73,6 @@ export function GameEditor({ game, games, saving, error, onChange, onSave, onClo
           <div className="game-settings-preview-scroll"><GamePreview game={game} view={view} /><div className="game-settings-preview-summary"><span><Layers size={16} />{t("Position sur l’accueil")}<b>{game.position ?? 1}</b></span><span><Coins size={16} />{t("Pot d’entrée")}<b><CompactNumber value={game.entryPot ?? 0} /></b></span></div></div>
         </aside>
       </div>
-      <footer className="game-settings-actions"><span>{game.id}</span><div><button type="button" className="secondary" onClick={onClose} disabled={saving}><X size={17} />{t("Annuler")}</button><button type="submit" disabled={saving}><Save size={17} />{t(saving ? "Enregistrement…" : "Enregistrer")}</button></div></footer>
     </form>
   </Dialog>;
 }

@@ -3248,7 +3248,7 @@ button.roll-cooldown {
 
 .admin-user-editor {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   height: min(90vh, 900px);
   max-width: 1180px;
   overflow: hidden;
@@ -9892,7 +9892,7 @@ body:has(.midnight-contract-dialog-layer) .game-log-center { visibility: hidden;
 .event-card-warning { align-items: center; background: rgba(201, 69, 78, .12); border-radius: 8px; color: #f0a1aa; display: flex; font-size: 12px; gap: 7px; padding: 8px; }
 .event-card-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .event-card-actions button { min-height: 38px; padding: 8px 10px; }
-.community-event-editor { display: grid; grid-template-rows: auto auto minmax(0,1fr) auto; height: min(94vh, 980px); max-width: 1500px; overflow: hidden; padding: 0; width: min(96vw, 1500px); }
+.community-event-editor { display: grid; grid-template-rows: auto auto auto minmax(0,1fr); height: min(94vh, 980px); max-width: 1500px; overflow: hidden; padding: 0; width: min(96vw, 1500px); }
 .event-editor-header { align-items: center; border-bottom: 1px solid #3a3c31; display: flex; justify-content: space-between; padding: 18px 22px; }
 .event-editor-header h2 { margin: 3px 0 7px; }
 .event-editor-header > div > div { align-items: center; display: flex; gap: 9px; }
@@ -9914,7 +9914,7 @@ body:has(.midnight-contract-dialog-layer) .game-log-center { visibility: hidden;
 .achievement-admin-summary > strong { color: #f3ead7; font-size: 17px; }
 .achievement-admin-summary p { color: #b9ac91; line-height: 1.4; margin: 0; }
 .achievement-admin-summary small { color: #8f856e; overflow-wrap: anywhere; }
-.achievement-rule-editor { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 90vh; max-width: min(980px, calc(100vw - 32px)); overflow: hidden; padding: 0; }
+.achievement-rule-editor { display: grid; grid-template-rows: auto auto minmax(0, 1fr); max-height: 90vh; max-width: min(980px, calc(100vw - 32px)); overflow: hidden; padding: 0; }
 .achievement-rule-editor > .modal-title-row,
 .achievement-rule-editor > footer { padding: 18px 20px; }
 .achievement-editor-scroll { display: grid; gap: 14px; min-height: 0; overflow: auto; padding: 0 20px 20px; }

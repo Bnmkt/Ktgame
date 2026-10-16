@@ -25,7 +25,7 @@
 .account-workspace-visibility { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
 .account-workspace-visibility label { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #2d4234; font-size: 13px; gap: 12px; }
 .account-workspace-visibility input { width: 18px; min-height: 18px; height: 18px; accent-color: #d9b452; flex-shrink: 0; }
-.account-workspace-actions { display: flex; justify-content: flex-end; padding-top: 24px; }
+.account-workspace-actions { display: flex; justify-content: flex-end; padding-bottom: 20px; }
 .account-workspace-email-action { margin-top: 13px; }
 .account-workspace-password { display: grid; gap: 16px; max-width: 520px; }
 .account-workspace-password > small { color: #a9bba9; font-size: 11px; line-height: 1.6; }

@@ -24,7 +24,7 @@
 .patchnote-studio-layer { padding: 2vh 2vw; }
 .patchnote-studio-dialog { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 96vh; max-height: 96vh; max-width: 1680px; overflow: hidden; width: 96vw; }
 .patchnote-studio-dialog > .modal-title-row { flex: 0 0 auto; }
-.patchnote-studio { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; overflow: hidden; }
+.patchnote-studio { display: grid; grid-template-rows: auto auto minmax(0, 1fr); height: 100%; min-height: 0; overflow: hidden; }
 .patchnote-studio-meta { border-bottom: 1px solid #3c423d; display: grid; gap: 12px; padding: 0 2px 16px; }
 .patchnote-block-fields { display: grid; gap: 12px; }
 .patchnote-block-fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }

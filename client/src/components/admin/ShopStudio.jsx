@@ -95,13 +95,13 @@ export function ShopStudio({
         </>}
       </div>
       <aside className="shop-studio-preview-column">
-        <CosmeticPreview user={user} item={item} />
         <div className="shop-studio-controls" aria-label={localeText("Actions de l’objet")}>
           <button type="submit" disabled={saving}><Save size={18} /> {saving ? localeText("Enregistrement…") : localeText("Enregistrer")}</button>
           {kind === "shop" && <button type="button" className="secondary" onClick={onDuplicate}><Copy size={18} />{" " + localeText("Dupliquer")}</button>}
           {kind === "shop" && <button type="button" className="danger-button" onClick={onDelete}><Trash2 size={18} />{" " + localeText("Supprimer")}</button>}
           <button type="button" className="secondary" onClick={onCancel}><X size={18} />{" " + localeText("Annuler")}</button>
         </div>
+        <CosmeticPreview user={user} item={item} />
       </aside>
     </div>
   </>;

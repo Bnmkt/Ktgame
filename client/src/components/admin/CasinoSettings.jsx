@@ -142,6 +142,6 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [] }
       </section>
     </div>}
 
-    <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>{localeText("Les paramètres économiques s’appliquent aux nouvelles opérations. Les temporisations sont figées au lancement de chaque partie.")}</span></div><button type="submit" disabled={saving}><Save size={17} />{saving ? localeText("Enregistrement…") : localeText("Enregistrer les paramètres")}</button></footer>
+    <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>{localeText("Les paramètres économiques s’appliquent aux nouvelles opérations. Les temporisations sont figées au lancement de chaque partie.")}</span></div></footer>
   </form>;
 }

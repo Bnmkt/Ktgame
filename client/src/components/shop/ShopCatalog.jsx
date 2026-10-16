@@ -21,8 +21,8 @@ function ItemVisual({ item, user }) {
     {item.type === "icons" ? <CosmeticIcon value={item.value} source={item.icon} /> :
       item.type === "diceSkins" ? <>{[2, 4, 6].map((value) => <Die key={value} value={value} skin={item.value} animate={false} />)}</> :
       item.type === "cardSkins" ? <><PlayingCard hidden skin={item.value} animate={false} /><PlayingCard card={{ rank: "A", suit: "H" }} skin={item.value} animate={false} /></> :
-      item.type === "nameEffects" ? <DisplayName user={preview} /> :
-      <ProfileCosmeticShell user={preview} className="catalog-swatch-shell"><div className={`catalog-swatch member-swatch member-${preview.cosmetics?.equipped?.memberCard ?? "default"}`}><DisplayName user={preview} /><span>{localeText("Carte membre")}</span></div></ProfileCosmeticShell>}
+      item.type === "nameEffects" ? <DisplayName user={preview} interactive={false} /> :
+      <ProfileCosmeticShell user={preview} className="catalog-swatch-shell"><div className={`catalog-swatch member-swatch member-${preview.cosmetics?.equipped?.memberCard ?? "default"}`}><DisplayName user={preview} interactive={false} /><span>{localeText("Carte membre")}</span></div></ProfileCosmeticShell>}
   </div>;
 }
 

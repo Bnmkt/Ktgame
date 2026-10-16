@@ -11,7 +11,7 @@ import { normalizeGameModifiers, normalizeBattleModifiers } from "../../server/s
 const root=fileURLToPath(new URL("../../",import.meta.url)),dependencies=path.join(os.tmpdir(),"ktga-chat-browser-tools/node_modules");
 const {chromium}=await import(pathToFileURL(path.join(dependencies,"playwright/index.mjs")));
 const {PlaywrightBlocker}=await import(pathToFileURL(path.join(dependencies,"@ghostery/adblocker-playwright/dist/esm/index.js")));
-const directory=path.join(root,"docs/previews/game-editor-20261015",String(Date.now()));fs.mkdirSync(directory,{recursive:true});
+const directory=path.join(root,"docs/previews/editor-safety-20261016",String(Date.now()));fs.mkdirSync(directory,{recursive:true});
 const listener=net.createServer();await new Promise(resolve=>listener.listen(0,"127.0.0.1",resolve));const port=listener.address().port;await new Promise(resolve=>listener.close(resolve));
 const origin=`http://127.0.0.1:${port}`,child=spawn(process.execPath,["node_modules/vite/bin/vite.js","--host","127.0.0.1","--port",String(port),"--strictPort"],{cwd:path.join(root,"client"),windowsHide:true,env:{...process.env,VITE_API_URL:origin,VITE_BASE_PATH:"/"},stdio:["ignore","pipe","pipe"]});
 let browser,output="";const errors=[],checks=[];child.stdout.on("data",data=>output+=data);child.stderr.on("data",data=>output+=data);
@@ -20,7 +20,13 @@ const html=`<!doctype html><html><head><meta name="viewport" content="width=devi
 import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;
 import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import '/src/styles.css';
 const {LocaleProvider}=await import('/src/locales/LocaleProvider.jsx'),{GameEditor}=await import('/src/components/admin/GameEditor.jsx');
+const {ShopCatalog}=await import('/src/components/shop/ShopCatalog.jsx'),{DisplayName}=await import('/src/components/cosmetics/Cosmetics.jsx'),{AccountWorkspace}=await import('/src/components/profile/AccountWorkspace.jsx');
 const h=React.createElement,root=ReactDOM.createRoot(document.getElementById('root'));let sequence=0;
+const player={id:'preview-player',pseudo:'PreviewPlayer',tokens:10000,profile:{birthDate:'1990-01-01'},cosmetics:{equipped:{}},gameProgression:[]};
+window.profileOpens=0;window.addEventListener('ktga-public-profile',()=>window.profileOpens++);
+window.mountCatalog=()=>root.render(h(LocaleProvider,{key:++sequence},h('main',{className:'app-shell'},h(ShopCatalog,{user:player,items:[{id:'effect',value:'gold',name:'Gold name',price:100,type:'nameEffects',category:'classic',description:'Test',packs:['test']},{id:'frame',value:'default',name:'Frame',price:200,type:'memberCards',category:'classic',description:'Test',packs:['test']}],stats:[],onPurchaseItem:()=>{},onPurchasePack:()=>{}}),h('div',{id:'outside-preview'},h(DisplayName,{user:player})))));
+function AccountDemo(){const[form,setForm]=React.useState({displayName:'PreviewPlayer',bio:'',birthDate:'1990-01-01',gender:'',rankedBadgeGameId:''}),[stats,setStats]=React.useState({visibleProfileStats:[],memberCardStats:['hidden','hidden'],customAchievementIds:[]});return h(AccountWorkspace,{user:player,form,setForm,favorites:[],games:[],toggleFavorite:()=>{},statForm:stats,setStatForm:setStats,milestones:[],onPreview:()=>{},onSave:()=>{},onSaveEmail:()=>{},onSavePassword:()=>{},onUser:()=>{},onError:()=>{},onMessage:()=>{}})}
+window.mountAccount=()=>root.render(h(LocaleProvider,{key:++sequence},h('main',{className:'app-shell'},h(AccountDemo))));
 function Demo({game,games}){const[draft,setDraft]=React.useState(game);window.draft=draft;return h(GameEditor,{game:draft,games,saving:false,onChange:(key,value)=>setDraft(current=>({...current,[key]:value})),onSave:()=>window.saved=structuredClone(draft),onClose:()=>{window.wasClosed=true;root.render(null)},onEditImage:()=>{}})}
 window.mountGame=(game,games,locale='fr')=>{localStorage.setItem('ktga-locale',locale);window.saved=null;window.wasClosed=false;root.render(h(LocaleProvider,{key:++sequence},h(Demo,{game,games})))};window.ready=true;
 </script></body></html>`;
@@ -30,6 +36,7 @@ try{
   for(const viewport of [{width:1440,height:900},{width:900,height:650},{width:390,height:844},{width:320,height:740}]){
     const context=await browser.newContext({viewport}),page=await context.newPage();page.on("pageerror",error=>errors.push(error.message));await blocker.enableBlockingInPage(page);
     await page.route("**/__game-editor",route=>route.fulfill({contentType:"text/html",body:html}));await page.route("**/api/locales/**",route=>route.fulfill({contentType:"application/json",body:'{"messages":{}}'}));
+    await page.route("**/api/me/data-requests",route=>route.fulfill({contentType:"application/json",body:'{"requests":[],"emailReady":true}'}));
     await page.goto(`${origin}/__game-editor`);await page.waitForFunction(()=>window.ready);
     const selected=viewport.width===1440?fixtures:fixtures.filter(game=>["texas-holdem","midnight-dice","blackjack"].includes(game.id));
     for(const game of selected){
@@ -65,6 +72,14 @@ try{
     await page.evaluate(([game,games])=>window.mountGame({...game,coverImage:'',descriptiveImage:'',discordIconImage:''},games),[midnight,fixtures]);await page.getByRole("tab",{name:"Visuels",exact:true}).click();assert.equal(await page.locator('.game-settings-media-empty').count(),3);
     if(viewport.width<=700)await page.getByRole("button",{name:"Voir l’aperçu",exact:true}).click();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    await page.evaluate(()=>window.mountCatalog());await page.locator('.catalog-workspace').waitFor();
+    await page.locator('.catalog-visual .display-name-text').first().click();assert.equal(await page.evaluate(()=>window.profileOpens),0);assert.equal(await page.locator('.catalog-visual .display-name[role="button"]').count(),0);
+    await page.locator('#outside-preview .display-name').click();assert.equal(await page.evaluate(()=>window.profileOpens),1);
+    await page.getByRole('button',{name:'Packs',exact:true}).click();assert.equal(await page.locator('.catalog-visual .display-name[role="button"]').count(),0);
+    await page.evaluate(()=>window.mountAccount());await page.getByRole('heading',{name:'Mon compte',exact:true}).waitFor();
+    assert.equal(await page.locator('.account-workspace-form > :first-child').getAttribute('class'),'account-workspace-actions');
+    await page.screenshot({path:path.join(directory,`${viewport.width}-profile-actions.png`)});
+    await page.getByRole('button',{name:'Carte et confidentialité',exact:true}).click();assert.equal(await page.locator('form.account-workspace-form > :first-child').getAttribute('class'),'account-workspace-actions');
     await context.close();
   }
   assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,checks:checks.length,directory}));
