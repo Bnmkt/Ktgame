@@ -33,6 +33,8 @@ files=(
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx
   client/index.html client/discord-activity/index.html client/vite.config.js client/package.json client/package-lock.json
+  client/public/favicon.svg client/public/sw.js
+  client/public/pwa/icon-180.png client/public/pwa/icon-192.png client/public/pwa/icon-512.png client/public/pwa/icon-maskable-512.png
   client/public/audio/CREDITS.txt client/public/audio/lounge-loop.mp3
   client/public/audio/dice-throw-1.wav client/public/audio/dice-throw-2.wav client/public/audio/dice-throw-3.wav
   client/public/audio/card-slide-1.wav client/public/audio/card-slide-2.wav client/public/audio/card-slide-3.wav client/public/audio/card-slide-4.wav

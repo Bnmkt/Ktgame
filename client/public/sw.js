@@ -1,4 +1,4 @@
-const CACHE = "ktga-offline-v1";
+const CACHE = "ktga-offline-v2";
 const offline = new URL("offline.html", self.registration.scope).href;
 const resources = [offline, "pwa/icon-180.png", "pwa/icon-192.png", "pwa/icon-512.png", "pwa/icon-maskable-512.png"]
   .map((path) => new URL(path, self.registration.scope).href);
