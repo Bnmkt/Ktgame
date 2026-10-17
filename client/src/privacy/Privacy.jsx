@@ -4,7 +4,7 @@ import { Cookie } from "lucide-react";
 import { api } from "../api.js";
 import { appPath } from "../navigation/routes.js";
 import { Dialog } from "../components/common/Dialog.jsx";
-import { CONSENT_DURATION, CONSENT_KEY, PRIVACY_VERSION, extractMarkers, readConsent } from "./consent.js";
+import { CONSENT_DURATION, CONSENT_KEY, PRIVACY_VERSION, extractMarkers, readConsent, latestConsent } from "./consent.js";
 import { AUDIENCE_VERSION, audienceAllowed, createAudienceClient } from "./audience.js";
 import { isDiscordActivityLocation } from "../features/discord/context.js";
 import "./privacy.css";
@@ -22,6 +22,11 @@ export function PrivacyProvider({ children }) {
   const [navigationEnabled, setNavigationEnabled] = useState(choice?.enabled === true);
   const [audienceEnabled, setAudienceEnabled] = useState(audienceAllowed(choice));
   const [error, setError] = useState("");
+  const [accountPending, setAccountPending] = useState(true);
+  function restore(next) {
+    if (next) { try { localStorage.setItem(CONSENT_KEY, JSON.stringify(next)); } catch { /* This visit still uses the account preference. */ } }
+    setChoice(next); setError("");
+  }
   useEffect(() => {
     const sync = () => { try { const next = readConsent(window.localStorage); setChoice((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next); } catch { setChoice(null); } };
     window.addEventListener("storage", sync);
@@ -45,8 +50,8 @@ export function PrivacyProvider({ children }) {
     <div className="privacy-actions"><button type="button" className="secondary" onClick={() => choose(false)}>{localeText("Tout refuser")}</button><button type="button" className="secondary" disabled={(navigationEnabled || audienceEnabled) && !ageConfirmed} onClick={() => choose(navigationEnabled, audienceEnabled)}>{localeText("Enregistrer mes choix")}</button><button type="button" className="secondary" disabled={!ageConfirmed} onClick={() => choose(true, true)}>{localeText("Tout accepter")}</button></div>
     <a href={appPath("cookies")}>{localeText("Détails des cookies et stockages")}</a>
   </>;
-  return <PrivacyContext.Provider value={{ choice, setError, open: openPreferences }}>
-    {!choice && <section className="privacy-choice-panel" aria-label={localeText("Choix de confidentialité")}><div className="privacy-choice-inner"><h2><Cookie size={23} />{localeText("Votre confidentialité")}</h2>{content}</div></section>}
+  return <PrivacyContext.Provider value={{ choice, accountPending, setError, restore, setAccountPending, open: openPreferences }}>
+    {!choice && !accountPending && <section className="privacy-choice-panel" aria-label={localeText("Choix de confidentialité")}><div className="privacy-choice-inner"><h2><Cookie size={23} />{localeText("Votre confidentialité")}</h2>{content}</div></section>}
     {error && <div className="privacy-sync-error" role="alert">{localeText(error)}<button type="button" className="secondary" onClick={openPreferences}>{localeText("Revoir mon choix")}</button></div>}
     {children}
     <footer className="legal-footer"><nav aria-label={localeText("Informations legales")}><a href={appPath("games")}>{localeText("Jeux et règles")}</a><a href={appPath("faq")}>{localeText("FAQ")}</a><a href={appPath("guide")}>{localeText("Guide du joueur")}</a><a href={appPath("bugs")}>{localeText("Suivi des bugs")}</a><a href={appPath("patchnotes")}>{localeText("Patchnotes")}</a><a href={appPath("status")}>{localeText("État des services")}</a>{Object.entries(legalLinks).map(([view, label]) => <a key={view} href={appPath(view)}>{localeText(label)}</a>)}<button type="button" className="secondary" onClick={openPreferences}><Cookie size={15} />{localeText("Mes préférences")}</button></nav><small>{localeText("Jeux gratuits · Jetons virtuels sans valeur monétaire")}</small></footer>
@@ -55,23 +60,44 @@ export function PrivacyProvider({ children }) {
 }
 
 export function useAudienceMeasurement(user, route, accountReady) {
-  const { choice } = useContext(PrivacyContext);
+  const { choice, accountPending } = useContext(PrivacyContext);
   const client = useRef(null);
   useEffect(() => {
     client.current = createAudienceClient(window, document);
     return () => client.current.stop();
   }, []);
-  useEffect(() => { client.current?.update({ choice, route, user, accountReady }); }, [choice, route, user?.minor?.restricted, accountReady]);
+  useEffect(() => { client.current?.update({ choice: accountPending ? null : choice, route, user, accountReady }); }, [choice, accountPending, route, user?.minor?.restricted, accountReady]);
 }
 
-export function useSiteActivity(user, route) {
-  const { choice, setError } = useContext(PrivacyContext);
+export function useSiteActivity(user, route, accountReady = true) {
+  const { choice, setError, restore, setAccountPending } = useContext(PrivacyContext);
+  const [syncedChoice, setSyncedChoice] = useState(null);
+  const localChoice = useRef(choice);
+  localChoice.current = choice;
+  const restoreRef = useRef(restore); restoreRef.current = restore;
+  useEffect(() => {
+    if (!accountReady) return;
+    if (!user?.id || user.guest) { setAccountPending(false); setSyncedChoice(null); return; }
+    let cancelled = false;
+    setAccountPending(true); setSyncedChoice(null);
+    const sync = async () => {
+      try {
+        const account = await api("/api/me/privacy", { background: true });
+        let next = latestConsent(localChoice.current, account);
+        if (next && next !== account) next = await api("/api/me/privacy", { method: "POST", background: true, body: JSON.stringify(next) });
+        if (!cancelled) { restoreRef.current(next); setSyncedChoice(next); }
+      } catch { if (!cancelled) setSyncedChoice(null); }
+      finally { if (!cancelled) setAccountPending(false); }
+    };
+    sync(); const timer = setInterval(sync, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [accountReady, user?.id, user?.guest, choice?.chosenAt, setAccountPending]);
   const current = useRef(route);
   const send = useRef(() => {});
   current.current = route;
   useEffect(() => { send.current(); const timer = setTimeout(() => send.current(), 5100); return () => clearTimeout(timer); }, [route.view, route.id]);
   useEffect(() => {
-    if (!user?.id || user.guest || !choice) return;
+    if (!user?.id || user.guest || !choice || syncedChoice?.chosenAt !== choice.chosenAt) return;
     let stopped = false, timer, busy = false;
     let lastInteraction = Date.now();
     const interact = () => { lastInteraction = Date.now(); };
@@ -80,7 +106,7 @@ export function useSiteActivity(user, route) {
     const events = ["pointerdown", "keydown", "scroll", "touchstart"];
     async function start() {
       try {
-        await api("/api/me/privacy", { method: "POST", background: true, body: JSON.stringify(choice) });
+        setError("");
         if (stopped || !choice.enabled) return;
         const config = await api("/api/me/activity-config");
         if (stopped) return;
@@ -101,5 +127,5 @@ export function useSiteActivity(user, route) {
     }
     start();
     return () => { stopped = true; send.current = () => {}; clearInterval(timer); events.forEach((event) => window.removeEventListener(event, interact)); window.removeEventListener("blur", pause); document.removeEventListener("visibilitychange", visibility); };
-  }, [user?.id, user?.guest, choice, setError]);
+  }, [user?.id, user?.guest, choice, syncedChoice?.chosenAt, setError]);
 }

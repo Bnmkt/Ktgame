@@ -1,0 +1,9 @@
+[Unit]
+Description=KTGA reviewed interface rebuild and deployment
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -w 600 /run/ktga-deployment.lock /usr/bin/node /usr/local/libexec/ktga-source-apply.mjs
+TimeoutStartSec=15min
+UMask=0027

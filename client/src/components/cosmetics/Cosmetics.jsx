@@ -9,6 +9,8 @@ import { copyText } from "../../utils/presentation.jsx";
 import "../profile/game-progression.css";
 import { RankInsignia } from "../../features/games/RankInsignia.jsx";
 import { gameTitle } from "../../features/games/config.js";
+import { gameImageUrl } from "../../features/games/presentation.js";
+import { API_URL } from "../../api.js";
 
 export let cosmeticCatalogItems = [];
 
@@ -65,7 +67,8 @@ export function sanitizedSvgIcon(source) {
 }
 
 export function CosmeticIcon({ value, source, style }) {
-  if (value === "site") return <span className="cosmetic-icon cosmetic-icon-site" style={style}><img src={`${import.meta.env.BASE_URL}favicon.svg?v=20261017`} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></span>;
+  const siteImage = value === "site" && gameImageUrl(source);
+  if (siteImage) return <span className="cosmetic-icon cosmetic-icon-site" style={style}><img src={siteImage.startsWith("/api/") ? `${API_URL}${siteImage}` : siteImage} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></span>;
   const catalogSource = cosmeticCatalogItems.find((item) => item.type === "icons" && item.value === value)?.icon;
   const configuredSource = String(source ?? catalogSource ?? "").trim();
   const iconKey = configuredSource && !configuredSource.startsWith("<svg") ? defaultIconKey(configuredSource.toLowerCase()) : defaultIconKey(value);

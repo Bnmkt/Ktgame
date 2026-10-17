@@ -6,12 +6,14 @@ import { Dialog } from "../common/Dialog.jsx";
 import { artworkCropBounds, encodeArtworkCrop, gameArtworkFormats } from "../../features/games/artwork-crop.js";
 import { gameImageUrl } from "../../features/games/presentation.js";
 import "./game-image-editor.css";
+import { MediaPicker } from "./MediaLibrary.jsx";
 
 const centered = { zoom: 1, x: 0.5, y: 0.5 };
 
-export function GameImageEditor({ gameId, gameName, field, value, onApply, onClose, uploadPath, imageLabel }) {
+export function GameImageEditor({ gameId, gameName, field, value, onApply, onClose, uploadPath, imageLabel, selectableFormat = false, fixedFormat, allowAnimation = true }) {
   const { t: localeText } = useLocale();
-  const format = imageLabel ? { ...gameArtworkFormats[field], label: imageLabel } : gameArtworkFormats[field];
+  const [size, setSize] = useState({ width: 1024, height: 1024 }), [mime, setMime] = useState("image/png"), [libraryOpen, setLibraryOpen] = useState(false);
+  const format = fixedFormat ? { ...fixedFormat, label: imageLabel || "Image" } : selectableFormat ? { ...size, label: imageLabel || "Image" } : imageLabel ? { ...gameArtworkFormats[field], label: imageLabel } : gameArtworkFormats[field];
   const [source, setSource] = useState(null), [crop, setCrop] = useState(centered);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [error, setError] = useState("");
   const input = useRef(null), sourceUrl = useRef(""), generation = useRef(0), drag = useRef(null);
@@ -19,6 +21,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
 
   async function loadSource(file, request) {
     if (!file) return;
+    if (!allowAnimation && file.type === "image/gif") { setError("Choisis une image fixe pour cette icône."); setLoading(false); return; }
     request ??= ++generation.current;
     setError(""); setLoading(false);
     if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type) || file.size > (file.type === "image/gif" ? 3 : 10) * 1024 * 1024) {
@@ -33,6 +36,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
       if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
       sourceUrl.current = url;
       setSource({ url, image, file, animated: file.type === "image/gif", width: image.naturalWidth, height: image.naturalHeight }); setCrop(centered);
+      if (selectableFormat) { const scale = Math.min(1, 1920 / Math.max(image.naturalWidth, image.naturalHeight)); setSize({ width: Math.max(1, Math.round(image.naturalWidth * scale)), height: Math.max(1, Math.round(image.naturalHeight * scale)) }); }
     } catch (failure) {
       URL.revokeObjectURL(url);
       if (request === generation.current) setError(failure.message || "L’image ne peut pas être ouverte.");
@@ -78,8 +82,8 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
     if (!source || busy || loading) return;
     setBusy(true); setError("");
     try {
-      const blob = source.animated ? source.file : await encodeArtworkCrop(source.image, crop, format);
-      const result = await api(uploadPath ?? `/api/admin/games/${encodeURIComponent(gameId)}/images/${field}`, { method: "POST", body: blob, headers: { "Content-Type": source.animated ? "image/gif" : "image/png" }, deduplicate: false });
+      const blob = source.animated ? source.file : await encodeArtworkCrop(source.image, crop, format, selectableFormat ? mime : "image/png");
+      const result = await api(uploadPath ?? `/api/admin/games/${encodeURIComponent(gameId)}/images/${field}`, { method: "POST", body: blob, headers: { "Content-Type": blob.type }, deduplicate: false });
       onApply(result.image);
     } catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
@@ -88,7 +92,9 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
   return <Dialog title={`${localeText(format.label)} · ${gameName}`} className="game-art-editor" layerClassName="game-art-layer" onClose={onClose} dismissible={!busy}>
     <div className="game-art-editor-body">
       <input ref={input} className="game-art-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label={imageLabel ? localeText("Importer une image") : localeText("Importer une image du jeu")} disabled={busy} onChange={(event) => { loadSource(event.target.files?.[0]); event.target.value = ""; }} />
-      <div className="game-art-tools"><button type="button" className="secondary" disabled={busy} onClick={() => input.current.click()}><Upload size={18} />{source ? localeText("Changer l’image") : localeText("Importer une image")}</button><span>{format.width} × {format.height}{" " + localeText("px")}</span></div>
+      <div className="game-art-tools"><button type="button" className="secondary" disabled={busy} onClick={() => input.current.click()}><Upload size={18} />{source ? localeText("Changer l’image") : localeText("Importer une image")}</button><button type="button" className="secondary" disabled={busy} onClick={() => setLibraryOpen(true)}><ImageIcon size={18}/>{localeText("Médiathèque")}</button><span>{format.width} × {format.height}{" " + localeText("px")}</span></div>
+      {selectableFormat && <div className="media-crop-options"><label>{localeText("Proportions")}<select disabled={busy || source?.animated} value="" onChange={event => { const [width, height] = event.target.value.split(":").map(Number); if (width && height) setSize({ width: 1200, height: Math.round(1200 * height / width) }); }}><option value="">{localeText("Personnalisées")}</option>{["1:1", "4:3", "16:9", "16:7", "3:4", "2:3"].map(ratio => <option key={ratio}>{ratio}</option>)}</select></label>{["width", "height"].map(key => <label key={key}>{localeText(key === "width" ? "Largeur" : "Hauteur")}<input type="number" min={1} max={4096} disabled={busy || source?.animated} value={size[key]} onChange={event => setSize(current => ({ ...current, [key]: Math.max(1, Math.min(4096, Number(event.target.value) || 1)) }))}/></label>)}<label>{localeText("Format du fichier")}<select disabled={busy || source?.animated} value={mime} onChange={event => setMime(event.target.value)}><option value="image/png">PNG</option><option value="image/webp">WebP</option><option value="image/jpeg">JPEG</option></select></label></div>}
+      {source?.animated ? <p className="muted">{localeText("Le GIF est conservé avec son animation, ses dimensions et ses éventuelles métadonnées.")}</p> : <p className="muted">{localeText(mime === "image/jpeg" && selectableFormat ? "JPEG : la transparence est remplacée par un fond blanc." : "PNG et WebP conservent la transparence.")}</p>}
       {loading && <p role="status">{localeText("Chargement de l’image…")}</p>}
       {source ? <div className="game-art-workspace">
         <div>
@@ -106,5 +112,6 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
       {error && <p className="error" role="alert">{localeText(error)}</p>}
     </div>
     <div className="game-art-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>{localeText("Annuler")}</button><button type="button" disabled={!source || busy || loading} onClick={apply}><Check size={17} />{busy ? localeText("Enregistrement…") : source?.animated ? localeText("Importer le GIF animé") : localeText("Appliquer le recadrage")}</button></div>
+    {libraryOpen && <MediaPicker onClose={() => setLibraryOpen(false)} onSelect={async row => { setLibraryOpen(false); const request = ++generation.current; setLoading(true); try { const response = await fetch(`${API_URL}${row.image}`, { credentials: "omit" }); if (!response.ok) throw new Error("Image indisponible."); await loadSource(await response.blob(), request); } catch (failure) { if (request === generation.current) { setError(failure.message); setLoading(false); } } }}/>}
   </Dialog>;
 }

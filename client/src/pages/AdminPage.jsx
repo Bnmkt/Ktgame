@@ -28,6 +28,8 @@ import { shopPackName } from "../utils/shop-packs.js";
 import { HelpAdmin } from "../components/admin/HelpAdmin.jsx";
 import { RankedAdmin } from "../components/admin/RankedAdmin.jsx";
 import { LocaleAdmin } from "../components/admin/LocaleAdmin.jsx";
+import { AssetsAdmin } from "../components/admin/AssetsAdmin.jsx";
+import { SourceEditor } from "../components/admin/SourceEditor.jsx";
 
 export function Admin({ user, onBack, onSettingsChange }) {
   const { t: localeText } = useLocale();
@@ -139,8 +141,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
     setSaving("settings");
     setError("");
     try {
-      const { siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds, softBanRestrictions } = settingsDraft;
-      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds, softBanRestrictions }) });
+      const { siteName, siteIcon, siteIconMode, siteIconImage, faviconImage, pwaIcons, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds, softBanRestrictions } = settingsDraft;
+      const settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ siteName, siteIcon, siteIconMode, siteIconImage, faviconImage, pwaIcons, siteSubtitle, featuredGameId, lobbyNotice, contactEmail, registrationsEnabled, guestAccessEnabled, discordLoginEnabled, emailVerificationRequired, signupTokens, dailyTokens, dailyBonusDefaultMultiplier, dailyBonusMaxMultiplier, dailyBonusRules, gameProgression, minRoomStake, botThinkingSeconds, turnEndDelaySeconds, roundResultsSeconds, editorDuplicationUserIds, softBanRestrictions }) });
       setSettingsDraft(settings);
       setData((current) => ({ ...current, settings }));
       onSettingsChange?.(settings);
@@ -225,6 +227,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
       { value: "bugs", label: "Signalements de bugs", icon: Bug }
     ] },
     { label: "Contenu", items: [
+      { value: "media", label: "Médiathèque", icon: BookOpen },
       { value: "events", label: "Événements", icon: Sparkles },
       { value: "games", label: "Jeux", icon: Gamepad2, count: data.games.length },
       { value: "ranked", label: "Mode classé", icon: Trophy },
@@ -235,12 +238,14 @@ export function Admin({ user, onBack, onSettingsChange }) {
       { value: "locales", label: "Langues et traductions", icon: Languages }
     ] },
     { label: "Administration", items: [
+      { value: "source", label: "Code source", icon: Settings },
       { value: "users", label: "Comptes joueurs", icon: Users, count: data.users.length },
       { value: "tribunal", label: "Tribunal", icon: Scale },
       { value: "parental", label: "Contrôle parental", icon: ShieldCheck },
       { value: "settings", label: "Paramètres", icon: Settings }
     ] }
   ] : [{ label: "Édition", items: [
+    { value: "media", label: "Médiathèque", icon: BookOpen },
     { value: "bugs", label: "Signalements de bugs", icon: Bug },
     { value: "shop", label: "Studio boutique", icon: ShoppingBag, count: data.shop.length },
     { value: "events", label: "Événements", icon: Sparkles },
@@ -283,6 +288,8 @@ export function Admin({ user, onBack, onSettingsChange }) {
 
         {tab === "patchnotes" && <PatchnotesAdmin reportError={setError} notifySuccess={notifySuccess} />}
         {tab === "help" && <HelpAdmin reportError={setError} notifySuccess={notifySuccess} />}
+        {tab === "media" && <AssetsAdmin admin={isAdministrator}/>}
+        {isAdministrator && tab === "source" && <SourceEditor/>}
 
         {(tab === "shop" || (isAdministrator && ["users", "games"].includes(tab))) && <section className="card admin-list" ref={pages.anchor}>
           <div className="admin-section-heading">

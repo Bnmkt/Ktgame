@@ -79,11 +79,12 @@ test("activity requires explicit current consent and age eligibility", () => {
   assert.throws(() => setActivityConsent({ profile: { birthDate: "2020-01-01" } }, consent(), now));
   assert.throws(() => setActivityConsent({ registrationAuthorization: { ageBand: "under13" } }, consent(), now));
 });
-test("withdrawal clears optional counters and rejects stale choices", () => {
+test("withdrawal clears optional counters and returns the newer account choice to stale devices", () => {
   const user = { siteActivity: { activeSeconds: 800 } };
   setActivityConsent(user, { ...consent(false), chosenAt: now + 1 }, now + 1);
   assert.equal(user.siteActivity, undefined);
-  assert.throws(() => setActivityConsent(user, consent(), now + 1));
+  assert.equal(setActivityConsent(user, consent(), now + 1).enabled, false);
+  assert.equal(user.privacyConsent.chosenAt, now + 1);
 });
 test("only declared non-identifying URL marker keys and values are allowed", () => {
   const entry = (value, enabled = true) => ({ enabled, rule: { event: "site.visit", condition: { field: "markers", operator: "contains", value } } });

@@ -30,6 +30,7 @@ import "./components/social/social.css";
 import { InstallNotice } from "./pwa/InstallNotice.jsx";
 import { LanguagePicker, LocaleProvider, useLocale } from "./locales/LocaleProvider.jsx";
 import "./navigation/mobile-casino.css";
+import { siteMarkSource } from "./features/site-branding.js";
 
 const Admin = lazy(() => import("./pages/AdminPage.jsx").then((module) => ({ default: module.Admin })));
 const LegalPage = lazy(() => import("./privacy/LegalPage.jsx").then((module) => ({ default: module.LegalPage })));
@@ -60,11 +61,17 @@ export default function App() {
   const [accountRecovery, setAccountRecovery] = useState(() => new URL(window.location.href).searchParams.has("reset-password"));
   const [publicSettings, setPublicSettings] = useState({ ...defaultPublicSettings, ...publicPageData?.settings });
   const [publicGames, setPublicGames] = useState(publicPageData?.games ?? []);
+  useEffect(() => {
+    const icon = document.querySelector('link[rel="icon"]');
+    if (icon) { icon.href = publicSettings.faviconImage || "/api/branding/favicon"; if (publicSettings.faviconImage) icon.type = "image/png"; else icon.removeAttribute("type"); }
+    const apple = document.querySelector('link[rel="apple-touch-icon"]');
+    if (apple) apple.href = publicSettings.pwaIcons?.["180"] || "/api/branding/pwa/180";
+  }, [publicSettings.faviconImage, publicSettings.pwaIcons?.["180"]]);
   const [roomCode, setRoomCode] = useState(null);
   const [route, goTo] = useCasinoRoute();
   const view = route.view;
   useBugReportLocation(route, user);
-  useSiteActivity(user, route);
+  useSiteActivity(user, route, accountReady);
   useAudienceMeasurement(user, route, (accountReady || Boolean(user)) && !accountRecovery);
   useEffect(() => {
     if (!user?.minor?.restricted) return undefined;
@@ -370,7 +377,7 @@ export default function App() {
       {cosmeticStyles && <style>{cosmeticStyles}</style>}
       {discordResult && !discordResult.mfaRequired && <Dialog onClose={() => setDiscordResult(null)} labelledBy="account-link-result"><h2 id="account-link-result">Discord</h2><p>{discordResult.error ? localeText(discordResult.error.message) : discordResult.linked ? localeText("Compte Discord associé.") : localeText("Connexion Discord réussie.")}</p><button type="button" onClick={() => setDiscordResult(null)}>{localeText("Fermer")}</button></Dialog>}
       <AchievementToasts notifications={notifications} onClose={(id) => setNotifications((list) => list.filter((notification) => notification.id !== id))} />
-      <CasinoHeader user={user} siteName={publicSettings.siteName} siteIcon={publicSettings.siteIcon} view={view} roomCode={roomCode} eventSlug={communityEventSlug} tribunalAvailable={tribunalAvailable} onNavigate={navigate} onLogout={logout}>
+      <CasinoHeader user={user} siteName={publicSettings.siteName} siteIcon={siteMarkSource(publicSettings)} view={view} roomCode={roomCode} eventSlug={communityEventSlug} tribunalAvailable={tribunalAvailable} onNavigate={navigate} onLogout={logout}>
       <div className="casino-wallet"><CompactNumber value={user.tokens} label={localeText("Solde exact")} /><Coins size={18} /></div><DailyBonusButton user={user} setUser={setUser} settings={publicSettings} onAchievements={notifyAchievements} onFeedback={setBonusFeedback} /><div className="identity-pill"><DisplayName user={user} />{user.guest && <small>{localeText("Invité")}</small>}{(user.admin || user.editor) && <a href={appPath("admin")} className={`secondary icon-toggle casino-management-link ${view === "admin" ? "active" : ""}`} title={user.admin ? localeText("Administration") : localeText("Studio")} aria-label={user.admin ? localeText("Administration") : localeText("Studio")} onClick={(event) => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate("admin"); } }}><Shield size={18} /></a>}</div>{!user.guest && <button type="button" className={`secondary icon-toggle conversation-toggle ${socialOpen ? "active" : ""} ${conversationUnread ? "conversation-toggle-unread" : ""}`} title={conversationUnread ? localeText("Social · {value0} messages non lus", { value0: conversationUnread }) : localeText("Social")} aria-label={conversationUnread ? localeText("Ouvrir Social, {value0} messages non lus", { value0: conversationUnread }) : localeText("Ouvrir Social")} aria-expanded={socialOpen} onClick={() => { setSocialOpen((value) => !value); setNotificationsOpen(false); }}><Users size={18} />{conversationUnread > 0 && <span className="conversation-toggle-count" aria-hidden="true">{conversationUnread > 99 ? "99+" : conversationUnread}</span>}</button>}{!user.guest && <NotificationCenter items={inboxNotifications} open={notificationsOpen} onToggle={() => { setNotificationsOpen((value) => !value); setSocialOpen(false); }} onDelete={deleteInboxNotification} onClear={clearInboxNotifications} onAction={actOnInboxNotification} />}
       </CasinoHeader>
       {bonusFeedback && <div className={`casino-bonus-feedback ${bonusFeedback.error ? "error" : "daily-bonus-feedback"}`} role={bonusFeedback.error ? "alert" : "status"}><Coins size={18} /><span>{bonusFeedback.message}</span><button type="button" className="secondary icon-toggle" aria-label={localeText("Fermer le message du bonus")} onClick={() => setBonusFeedback(null)}><X size={16} /></button></div>}
@@ -389,7 +396,7 @@ export default function App() {
         {view === "lobby" && <Lobby user={user} setUser={setUser} onOpenRoom={openCasinoRoom} onEnterRoom={(code) => goTo("room", code)} onOpenEvent={openCommunityEvent} onAchievements={notifyAchievements} settings={publicSettings} />}
       </Suspense>
       {friendsOpen && <Suspense fallback={<div role="status" className="casino-modal-loading">{localeText("Chargement des amis…")}</div>}><FriendsModal user={user} roomCode={roomCode} onClose={() => setFriendsOpen(false)} onOpenRoom={openCasinoRoom} onStartChat={(friendId) => { setConversationRequest((current) => ({ friendId, revision: current.revision + 1 })); setFriendsOpen(false); setNotificationsOpen(false); setSocialOpen(true); }} /></Suspense>}
-      {!user.guest && <Suspense fallback={null}><SocialPanel key={user.id} user={user} siteIcon={publicSettings.siteIcon} onNavigate={(destination, id, options) => goTo(destination, id, options)} roomCode={["room", "spectator"].includes(view) ? route.id : roomCode} open={socialOpen} onUnreadChange={setConversationUnread} requestedFriendId={conversationRequest.friendId} requestedFriendRevision={conversationRequest.revision} onClose={() => setSocialOpen(false)} onFriends={() => { setFriendsOpen(true); setSocialOpen(false); setNotificationsOpen(false); }} /></Suspense>}
+      {!user.guest && <Suspense fallback={null}><SocialPanel key={user.id} user={user} siteIcon={siteMarkSource(publicSettings)} onNavigate={(destination, id, options) => goTo(destination, id, options)} roomCode={["room", "spectator"].includes(view) ? route.id : roomCode} open={socialOpen} onUnreadChange={setConversationUnread} requestedFriendId={conversationRequest.friendId} requestedFriendRevision={conversationRequest.revision} onClose={() => setSocialOpen(false)} onFriends={() => { setFriendsOpen(true); setSocialOpen(false); setNotificationsOpen(false); }} /></Suspense>}
       {exclusion && <Dialog title={localeText("Vous avez été exclu")} className="action-confirm-modal" layerClassName="action-confirm-layer" onClose={() => setExclusion(null)}><p>{exclusion.message}</p><div className="actions"><button type="button" onClick={() => setExclusion(null)}>{localeText("J’ai compris")}</button></div></Dialog>}
       {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} onReport={(profile) => setReportTarget(profile)} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} roomCode={roomCode ?? ""} onClose={() => setReportTarget(null)} />}

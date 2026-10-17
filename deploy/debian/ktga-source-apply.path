@@ -1,0 +1,9 @@
+[Unit]
+Description=KTGA approved source changes
+
+[Path]
+DirectoryNotEmpty=/var/lib/ktga/source-editor/queue
+Unit=ktga-source-apply.service
+
+[Install]
+WantedBy=multi-user.target

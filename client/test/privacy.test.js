@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CONSENT_DURATION, PRIVACY_VERSION, extractMarkers, readConsent } from "../src/privacy/consent.js";
+import { CONSENT_DURATION, PRIVACY_VERSION, extractMarkers, readConsent, latestConsent } from "../src/privacy/consent.js";
 import { appPath, readRoute } from "../src/navigation/routes.js";
 import { buildGuidedAchievement } from "../src/components/admin/achievement-guide.js";
 import { normalizeAchievementRule, consumeAchievementEvent } from "../../server/src/services/achievement-rules.js";
@@ -15,6 +15,13 @@ test("privacy storage expires safely and ignores invalid storage", () => {
 });
 test("only explicitly authorized URL markers are transmitted", () => {
   assert.deepEqual(extractMarkers("?secret=answer-42&password=private&email=a@b.be&challenge=unlisted", ["secret:answer-42", "password:private"]), ["secret:answer-42"]);
+});
+test("switching devices restores the latest account choice without extending expiry", () => {
+  const now = Date.now(), local = { version: PRIVACY_VERSION, chosenAt: now - 1000, enabled: true }, account = { ...local, chosenAt: now, enabled: false, audience: false };
+  assert.equal(latestConsent(local, account, now), account);
+  assert.equal(latestConsent(null, account, now), account);
+  assert.equal(latestConsent(account, local, now), account);
+  assert.equal(latestConsent(local, account, now + CONSENT_DURATION), null);
 });
 test("public legal routes respect deployment under /ktga", () => {
   for (const view of ["terms", "legal", "privacy", "cookies", "parents"]) {

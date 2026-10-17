@@ -3,6 +3,9 @@ import { registerGameplayResetRoutes } from "./services/gameplay-reset-routes.js
 import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
+import { registerMediaRoutes } from "./services/media-library.js";
+import { normalizeBranding, validateBranding, registerBrandingRoutes } from "./services/site-branding.js";
+import { registerSourceEditorRoutes } from "./services/source-editor.js";
 import { createEditorDuplicationLimit, isEditorDuplication, validateEditorDuplicationUsers } from "./services/editor-duplication.js";
 import { softBanRequestFeatures } from "./services/softban.js";
 import { normalizeSoftBanRestrictions, validSoftBanRestrictions } from "../../client/src/features/accounts/softban.js";
@@ -509,6 +512,7 @@ function normalizePlatformSettings(value = {}) {
   });
   return {
     siteName: String(value.siteName ?? defaultPlatformSettings.siteName).trim().slice(0, 36) || defaultPlatformSettings.siteName,
+    ...normalizeBranding(value),
     contactEmail: siteContactEmail(value),
     siteIcon: String(value.siteIcon ?? defaultPlatformSettings.siteIcon).trim().slice(0, 6000) || defaultPlatformSettings.siteIcon,
     siteSubtitle: String(value.siteSubtitle ?? defaultPlatformSettings.siteSubtitle).trim().slice(0, 120) || defaultPlatformSettings.siteSubtitle,
@@ -880,6 +884,7 @@ app.use((req, res, next) => {
 });
 app.use("/api/admin/help", express.json({ limit: "2mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
+app.use("/api/admin/source", express.json({ limit: "1mb" }));
 app.use(express.json());
 let gameplayResetPending = false;
 app.use("/api", (req, res, next) => {
@@ -2684,7 +2689,7 @@ registerDiscordRoutes({ app, auth, platformSettings, readDb, sanitizeUser, bcryp
   publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, recordAuthFailure, sendAuthLocked, writeDb,
   secureCookies: NODE_ENV === "production" || Boolean(HTTPS_KEY_PATH || HTTPS_PFX_PATH) });
 registerDiscordActivity({ app, clientDist: CLIENT_DIST, platformSettings, readDb, publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, sendAuthLocked });
-registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence, io, roomPresence, configuredGames, publicWebsiteUrl,
+registerDiscordPresence({ app, auth, readDb, writeDb, isUnder13, onlinePresence, io, roomPresence, configuredGames, publicWebsiteUrl, platformSettings,
   presence: createDiscordPresence({ filename: path.join(path.dirname(databaseFilename), "discord-presence.sqlite") }),
   configuration: discordConfiguration, accountBlocked: (user) => Boolean(activeModeration(user)?.type === "hard" || activeParentalRevocation(user)) });
 
@@ -3478,6 +3483,10 @@ app.get("/api/me/activity-config", auth, (req, res) => {
   res.json({ markers: allowedUrlMarkers(achievementCatalog(db)) });
 });
 
+app.get("/api/me/privacy", auth, (req, res) => {
+  const user = getUser(req.auth.id);
+  res.set("Cache-Control", "no-store").json(user?.privacyConsent ?? null);
+});
 app.post("/api/me/privacy", auth, (req, res) => {
   if (req.auth.guest) return res.status(403).json({ error: "Compte requis." });
   try {
@@ -4883,6 +4892,7 @@ app.delete("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
 app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   let editorDuplicationUserIds;
   try {
+    if (["siteIconImage", "siteIconMode", "faviconImage", "pwaIcons"].some(key => Object.hasOwn(req.body, key))) validateBranding({ ...platformSettings(), ...req.body }, mediaLibrary);
     if (req.body.editorDuplicationUserIds !== undefined) editorDuplicationUserIds = validateEditorDuplicationUsers(req.body.editorDuplicationUserIds, readDb().users);
     if (req.body.softBanRestrictions !== undefined && !validSoftBanRestrictions(req.body.softBanRestrictions, games)) throw new Error("Restrictions de softban invalides.");
     if (req.body.lobbyNotice !== undefined) updateLobbyNotice(platformSettings().lobbyNotice, req.body.lobbyNotice);
@@ -5181,6 +5191,16 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 });
 
 registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
+const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, directory: path.join(path.dirname(databaseFilename), "media-library") });
+registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });
+await registerSourceEditorRoutes({ app, auth, requireAdmin, root: path.resolve(__dirname, "../.."), directory: path.join(path.dirname(databaseFilename), "source-editor"),
+  readUser: getUser, hasOpenTables: () => readDb().rooms.some(room => !room.finished),
+  verifyCredential: async (user, method, credential) => {
+    if (!user || typeof credential !== "string" || credential.length > 128) return false;
+    if (method === "password") return Boolean(user.passwordHash && await bcrypt.compare(credential, user.passwordHash));
+    return method === "totp" && Boolean(user.mfa?.totpSecret) && verifyUserMfa(user, "totp", credential, JWT_SECRET);
+  }
+});
 const localeStore = await createLocaleStore({ directory: path.join(path.dirname(databaseFilename), "locales") });
 registerLocaleRoutes({ app, auth, requireBackOffice, store: localeStore });
 app.patch("/api/me/locale", auth, (req, res) => {

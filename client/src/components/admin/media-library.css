@@ -1,0 +1,21 @@
+.media-library { min-width: 0; }
+.media-picker-layer.casino-dialog-layer { z-index: 1040; }
+.branding-media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-top: 16px; }
+.branding-media-grid article { display: grid; gap: 10px; border: 1px solid #45524b; border-radius: 6px; padding: 14px; align-content: start; }
+.branding-media-grid .media-checker { width: 72px; height: 72px; }
+.media-search { display: flex; gap: 10px; align-items: center; margin: 18px 0; }
+.media-search input { width: 100%; }
+.media-library-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); gap: 24px; align-items: start; }
+.media-library-layout:not(:has(aside)) { grid-template-columns: minmax(0, 1fr); }
+.media-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.media-library-item { display: grid; grid-template-rows: 120px auto auto; gap: 8px; text-align: left; align-content: start; padding: 10px; min-width: 0; }
+.media-library-item strong { white-space: normal; overflow-wrap: anywhere; }
+.media-library-item small { color: var(--muted); font-size: 11px; }
+.media-checker { display: block; background-color: #27302e; background-image: conic-gradient(#ffffff14 25%, transparent 0 50%, #ffffff14 0 75%, transparent 0); background-size: 16px 16px; border: 1px solid #52635b; border-radius: 4px; overflow: hidden; }
+.media-checker img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.media-library-details { display: grid; gap: 12px; position: sticky; top: 95px; min-width: 0; }
+.media-library-details > .media-checker { height: 170px; }
+.media-library-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.media-library-actions button { flex: 1; }
+.media-picker-dialog.casino-dialog { width: min(1100px, calc(100vw - 32px)); max-width: 1100px; }
+@media(max-width: 700px) { .media-library-layout { grid-template-columns: minmax(0, 1fr); } .media-library-details { position: static; } }

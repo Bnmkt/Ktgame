@@ -10,6 +10,7 @@ import { LobbyNotice } from "../navigation/LobbyNotice.jsx";
 import { GameImageEditor } from "./GameImageEditor.jsx";
 import { SoftBanRestrictions } from "./SoftBanRestrictions.jsx";
 import { GameplayReset } from "./GameplayReset.jsx";
+import { SiteBrandingEditor } from "./SiteBrandingEditor.jsx";
 import "./editor-copy-settings.css";
 import "../navigation/lobby-notice.css";
 
@@ -87,6 +88,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
     </section>}
 
     {section === "identity" && <div className="casino-settings-panel identity-access-panel">
+      <SiteBrandingEditor value={draft} onChange={setDraft}/>
       <section className="settings-group settings-identity-group">
         <div className="settings-group-heading"><Landmark /><div><h3>{localeText("Identité publique")}</h3><p>{localeText("Ces éléments sont visibles à la connexion et dans la navigation du casino.")}</p></div></div>
         <div className="settings-field-grid identity-settings-fields">

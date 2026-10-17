@@ -7,6 +7,8 @@
 .game-art-tools span { color: #b9c6bc; font-size: 13px; }
 .game-art-workspace { display: grid; grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr); gap: 24px; align-items: start; }
 .game-art-crop, .game-art-preview > div { position: relative; overflow: hidden; background: #101b17; border: 1px solid #626d5f; border-radius: 4px; }
+.game-art-crop, .game-art-preview > div { background-color: #27302e; background-image: conic-gradient(#ffffff14 25%, transparent 0 50%, #ffffff14 0 75%, transparent 0); background-size: 16px 16px; }
+.media-crop-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .game-art-crop { cursor: grab; touch-action: none; user-select: none; }
 .game-art-crop:active { cursor: grabbing; }
 .game-art-crop::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent 33.1%, #ffffff44 33.1%, #ffffff44 33.4%, transparent 33.4%, transparent 66.5%, #ffffff44 66.5%, #ffffff44 66.8%, transparent 66.8%), linear-gradient(transparent 33.1%, #ffffff44 33.1%, #ffffff44 33.4%, transparent 33.4%, transparent 66.5%, #ffffff44 66.5%, #ffffff44 66.8%, transparent 66.8%); }

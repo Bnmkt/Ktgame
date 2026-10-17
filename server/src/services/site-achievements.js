@@ -54,14 +54,15 @@ export function validActivityConsent(user, now = Date.now()) {
 export function setActivityConsent(user, input, now = Date.now()) {
   const chosenAt = Number(input.chosenAt);
   if (input.version !== PRIVACY_VERSION || !Number.isFinite(chosenAt) || chosenAt > now + 60000 || chosenAt < now - CONSENT_DAYS * 86400000) throw new Error("Choix expire : veuillez le renouveler.");
-  if (chosenAt < (user.privacyConsent?.chosenAt ?? 0)) throw new Error("Un choix plus recent existe deja pour ce compte.");
-  if (input.enabled === true && input.ageConfirmed !== true) throw new Error("Le suivi facultatif necessite une confirmation d'age (13 ans minimum).");
-  if (input.enabled === true && user.registrationAuthorization?.ageBand === "under13") throw new Error("Le suivi facultatif reste desactive pour ce compte mineur.");
-  if (input.enabled === true && user.profile?.birthDate) {
+  if (chosenAt < (user.privacyConsent?.chosenAt ?? 0)) return user.privacyConsent;
+  const optional = input.enabled === true || input.audience === true;
+  if (optional && input.ageConfirmed !== true) throw new Error("Le suivi facultatif necessite une confirmation d'age (13 ans minimum).");
+  if (optional && user.registrationAuthorization?.ageBand === "under13") throw new Error("Le suivi facultatif reste desactive pour ce compte mineur.");
+  if (optional && user.profile?.birthDate) {
     const minimum = new Date(now); minimum.setUTCFullYear(minimum.getUTCFullYear() - 13);
     if (new Date(user.profile.birthDate) > minimum) throw new Error("Le suivi facultatif n'est pas disponible avant 13 ans.");
   }
-  user.privacyConsent = { version: PRIVACY_VERSION, enabled: input.enabled === true, ageConfirmed: input.ageConfirmed === true, chosenAt, expiresAt: new Date(chosenAt + CONSENT_DAYS * 86400000).toISOString() };
+  user.privacyConsent = { version: PRIVACY_VERSION, enabled: input.enabled === true, audience: input.audience === true && input.ageConfirmed === true, audienceVersion: typeof input.audienceVersion === "string" ? input.audienceVersion.slice(0, 40) : "", ageConfirmed: input.ageConfirmed === true, chosenAt, expiresAt: new Date(chosenAt + CONSENT_DAYS * 86400000).toISOString() };
   if (!user.privacyConsent.enabled) delete user.siteActivity;
   return user.privacyConsent;
 }

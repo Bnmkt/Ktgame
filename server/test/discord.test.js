@@ -117,12 +117,12 @@ test("presence uses public game artwork, the custom icon and only allowlisted pr
     room: { gameId: "midnight-dice", players: [{ id: "player" }, { id: "other" }], ranked: { elo: 1400 }, state: { players: [{ id: "player" }], currentPlayerIndex: 0, round: 2, modifiers: { rounds: 5 }, secretContracts: { player: "triple" } } },
     game: { name: "Dés de Minuit", maxPlayers: 8, coverImage: "/api/game-images/cover.png", discordIconImage: "/api/game-images/icon.png" } };
   const activity = discordActivityFor(context);
-  assert.equal(activity.assets.large_image, "https://api.ktga.me/api/game-images/cover.png");
-  assert.equal(activity.assets.small_image, "https://api.ktga.me/api/game-images/icon.png");
+  assert.equal(activity.assets.large_image, "https://api.ktga.me/api/game-images/icon.png");
+  assert.equal(activity.assets.small_image, "https://www.ktga.me/pwa/icon-512.png");
   assert.deepEqual(activity.party, { size: [2, 8] });
   assert.equal(activity.state, "En partie · Classé · Manche 2/5 · À mon tour");
   assert.ok(!JSON.stringify(activity).includes("triple")); assert.ok(!JSON.stringify(activity).includes("1400"));
-  assert.equal(discordActivityFor({ ...context, game: { ...context.game, coverImage: "javascript:alert(1)", descriptiveImage: "/games/preview.png" } }).assets.large_image, "https://www.ktga.me/games/preview.png");
+  assert.equal(discordActivityFor({ ...context, game: { ...context.game, discordIconImage: "", coverImage: "javascript:alert(1)", descriptiveImage: "/games/preview.png" } }).assets.large_image, "https://www.ktga.me/games/preview.png");
   assert.equal(discordActivityFor({ ...context, game: { ...context.game, coverImage: "", discordIconImage: "https://cdn.example.test/icon.png" } }).assets.large_image, "https://cdn.example.test/icon.png");
   assert.equal(discordActivityFor({ ...context, game: { ...context.game, discordIconImage: "https://user:secret@example.test/icon.png" } }).assets.small_image, "https://www.ktga.me/pwa/icon-512.png");
 });

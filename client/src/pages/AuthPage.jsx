@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Clock3, DoorOpen, KeyRound, Landmark, Link, LogIn, MailCheck, RefreshCw, ShieldAlert, UserPlus, X } from "lucide-react";
 import { api, setToken } from "../api.js";
 import { CosmeticIcon } from "../components/cosmetics/Cosmetics.jsx";
+import { siteMarkSource } from "../features/site-branding.js";
 import { defaultPublicSettings } from "../config/site.js";
 import { EnrollmentFields } from "../privacy/EnrollmentFields.jsx";
 import { PRIVACY_VERSION } from "../privacy/consent.js";
@@ -253,7 +254,7 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
 
   const accountSetup = currentUser?.requiresEmailUpgrade || currentUser?.requiresEmailVerification;
   return <main className="auth-screen" id="connexion"><div className={`auth-panel ${accountSetup ? "auth-account-setup" : ""}`}>
-    <div><h1 className="auth-brand"><CosmeticIcon value="site" source={settings.siteIcon} /><span>{settings.siteName}</span></h1><p>{settings.siteSubtitle}</p></div>
+    <div><h1 className="auth-brand"><CosmeticIcon value="site" source={siteMarkSource(settings)} /><span>{settings.siteName}</span></h1><p>{settings.siteSubtitle}</p></div>
     {serverStatus === "checking" && <div className="invite-banner"><Landmark size={18} />{" " + localeText("Vérification de la disponibilité du casino...")}</div>}
     {serverStatus === "down" && <div className="error">{localeText("Le casino est actuellement indisponible. Le serveur de jeu ne répond pas.")}</div>}
     {serverStatus === "ok" && accountSetup && <>

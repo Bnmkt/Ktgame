@@ -1,0 +1,17 @@
+.source-workspace { min-width: 0; }
+.source-workspace-layout { display: grid; grid-template-columns: 235px minmax(0, 1fr); gap: 20px; margin-top: 20px; align-items: start; }
+.source-workspace-layout > aside { min-width: 0; }
+.source-workspace-layout aside label { display: flex; align-items: center; gap: 6px; }
+.source-workspace-layout aside input { width: 100%; min-width: 0; }
+.source-workspace-layout aside nav { display: grid; align-content: start; gap: 4px; max-height: 65dvh; overflow-y: auto; margin-top: 10px; }
+.source-workspace-layout aside button { display: block; padding: 8px; text-align: left; font-size: 11px; overflow-wrap: anywhere; white-space: normal; }
+.source-editor-main { min-width: 0; display: grid; gap: 12px; }
+.source-editor-main textarea { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.6; height: 60dvh; min-height: 300px; resize: vertical; width: 100%; white-space: pre; overflow: auto; background: #090f0e; color: #def1e5; tab-size: 2; }
+.source-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.source-file-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.source-file-heading strong { overflow-wrap: anywhere; }
+.source-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.source-editor-main li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 0; border-bottom: 1px solid #43534b; }
+.source-job { margin-top: 18px; padding: 15px 0; border-block: 1px solid #43534b; }
+.source-job pre { max-height: 250px; white-space: pre-wrap; overflow: auto; font-size: 11px; }
+@media(max-width: 850px) { .source-workspace-layout { grid-template-columns: minmax(0, 1fr); } .source-workspace-layout aside nav { max-height: 180px; } .source-comparison { grid-template-columns: minmax(0, 1fr); } }

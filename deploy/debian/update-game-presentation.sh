@@ -17,6 +17,8 @@ files=(
   server/src/services/discord-routes.js server/src/services/discord-presence.js
   server/src/services/discord-activity.js
   server/src/services/database-status-probe.js server/src/services/status-monitor.js server/src/services/status-detections.js
+  server/src/services/media-library.js server/src/services/site-branding.js server/src/services/source-editor.js server/src/services/site-achievements.js
+  deploy/debian/apply-source-changes.mjs deploy/debian/setup-source-editor.sh deploy/debian/ktga-source-apply.service deploy/debian/ktga-source-apply.path
   server/src/games/engines.js server/src/games/engine-context.js server/src/games/spectator-state.js
   server/src/games/engines/texas-holdem.js
   server/src/services/editor-duplication.js server/src/services/tribunal.js

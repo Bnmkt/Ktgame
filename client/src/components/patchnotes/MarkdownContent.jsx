@@ -5,6 +5,7 @@ import { API_URL, BASE_PATH } from "../../api.js";
 import "./markdown-content.css";
 import { remarkKtgaTokens } from "./markdown-tokens.js";
 import { MarkdownToken } from "./MarkdownToken.jsx";
+import { markdownImageLayout } from "./markdown-image-layout.js";
 
 function safeMarkdownUrl(value) {
   const href = String(value ?? "").trim();
@@ -35,7 +36,8 @@ export function MarkdownContent({ children, className = "", inlineImages = true,
       img: ({ src = "", alt = "", title }) => {
         if (!inlineImages || compactPreview) return null;
         const apiPath = src.startsWith(`${BASE_PATH}/api/`) ? src.slice(BASE_PATH.length) : src.startsWith("/api/") ? src : null;
-        return <img src={apiPath ? `${API_URL}${apiPath}` : src} alt={alt} title={title} />;
+        const layout = markdownImageLayout(title);
+        return <img className={layout ? `markdown-media-float media-${layout.side}` : undefined} style={layout ? { "--media-width": `${layout.width}%` } : undefined} src={apiPath ? `${API_URL}${apiPath}` : src} alt={alt} title={layout ? undefined : title} loading="lazy" />;
       },
       a: ({ href, children: label }) => {
         const safeHref = safeMarkdownUrl(href);
