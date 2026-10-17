@@ -8,8 +8,8 @@ import { MarkdownContent } from "../patchnotes/MarkdownContent.jsx";
 import { formatDate } from "../../utils/presentation.jsx";
 import "./detected-incidents.css";
 
-const stateLabels = { open: "À examiner", in_progress: "En investigation", closed: "Clôturé", dismissed: "Classé sans suite" };
-const filterLabels = { pending: "À traiter", open: "À examiner", in_progress: "En investigation", closed: "Clôturés", dismissed: "Classés sans suite", all: "Tous les suivis" };
+const stateLabels = { open: "À examiner", in_progress: "En investigation", closed: "Clôturé", dismissed: "Classé sans suite", false_positive: "Fausse alerte" };
+const filterLabels = { pending: "À traiter", open: "À examiner", in_progress: "En investigation", closed: "Clôturés", dismissed: "Classés sans suite", false_positive: "Fausses alertes", all: "Tous les suivis" };
 
 function ReasonFields({ draft, setDraft, presets }) {
   const { t: localeText } = useLocale();
@@ -20,8 +20,8 @@ function ReasonFields({ draft, setDraft, presets }) {
       const entry = presets.find((item) => item.id === event.target.value);
       if (entry) setDraft({ ...draft, dismissal_reason: entry.text });
     }}><option value="">{localeText("Justificatif personnalisé")}</option>{presets.map((entry) => <option key={entry.id} value={entry.id}>{localeText(entry.label)}</option>)}</select></label>
-    <label>{localeText("Justificatif du classement sans suite")}<textarea rows={4} maxLength={4000} required value={draft.dismissal_reason} onChange={(event) => { setPreset(""); setDraft({ ...draft, dismissal_reason: event.target.value }); }} /></label>
-    <small>{localeText("Privé. Un clic sur la barre publique remettra le suivi en investigation, sans révéler ce justificatif.")}</small>
+    <label>{localeText(draft.state === "false_positive" ? "Justificatif de la fausse alerte" : "Justificatif du classement sans suite")}<textarea rows={4} maxLength={4000} required value={draft.dismissal_reason} onChange={(event) => { setPreset(""); setDraft({ ...draft, dismissal_reason: event.target.value }); }} /></label>
+    <small>{localeText(draft.state === "false_positive" ? "Les relevés concernés seront corrigés en vert. Les mesures brutes et ce justificatif privé restent conservés. Toute nouvelle anomalie reste détectée." : "Privé. Un clic sur la barre publique remettra le suivi en investigation, sans révéler ce justificatif.")}</small>
   </div>;
 }
 
@@ -77,9 +77,9 @@ export function DetectedIncidents({ components, onPublish }) {
     api(`/api/admin/status/detections/${editing.id}/history`).then((result) => { if (active) setHistory(result.actions); }).catch(() => { if (active) setHistory([]); });
     return () => { active = false; };
   }, [editing]);
-  function edit(row) {
+  function edit(row, state = row.state) {
     setEditing(row);
-    setDraft({ title: row.title, state: row.state, notes: row.notes, dismissal_reason: row.dismissal_reason ?? "" });
+    setDraft({ title: row.title, state, notes: row.notes, dismissal_reason: state === "false_positive" && row.state !== state ? "" : row.dismissal_reason ?? "" });
     setError("");
   }
   function editBatch(state = "") {
@@ -95,7 +95,7 @@ export function DetectedIncidents({ components, onPublish }) {
         const changes = {};
         if (draft.state) changes.state = draft.state;
         if (draft.notes.trim() || draft.notesMode === "replace") { changes.notes = draft.notes; changes.notesMode = draft.notesMode; }
-        if (draft.state === "dismissed") changes.dismissal_reason = draft.dismissal_reason;
+        if (["dismissed", "false_positive"].includes(draft.state)) changes.dismissal_reason = draft.dismissal_reason;
         const result = await api("/api/admin/status/detections/batch", { method: "POST", body: JSON.stringify({ ids: batchEditing.map((row) => row.id), changes }) });
         setNotice(`${result.updated} incident(s) modifié(s).`);
         setSelection([]);
@@ -118,16 +118,16 @@ export function DetectedIncidents({ components, onPublish }) {
     {loadError && <p className="error" role="alert">{loadError}</p>}
     {notice && <p className="status-detection-notice" role="status">{notice}</p>}
     {!data ? <p role="status">{localeText("Chargement des relevés…")}</p> : <>
-      <div className="status-detection-selection"><label><input ref={selectPageRef} type="checkbox" checked={data.rows.length > 0 && selection.length === data.rows.length} disabled={!data.rows.length || busy} onChange={(event) => setSelection(event.target.checked ? data.rows.map((row) => row.id) : [])} />{localeText("Sélectionner cette page")}</label><span>{selection.length}{" " + localeText("sélectionné(s)")}</span><div className="actions"><button type="button" className="secondary" disabled={!selection.length || busy} onClick={() => editBatch()}><Pencil size={16} />{localeText("Modifier en série")}</button><button type="button" className="secondary" disabled={!selection.length || busy} onClick={() => editBatch("dismissed")}><ArchiveX size={16} />{localeText("Classer sans suite")}</button></div></div>
+      <div className="status-detection-selection"><label><input ref={selectPageRef} type="checkbox" checked={data.rows.length > 0 && selection.length === data.rows.length} disabled={!data.rows.length || busy} onChange={(event) => setSelection(event.target.checked ? data.rows.map((row) => row.id) : [])} />{localeText("Sélectionner cette page")}</label><span>{selection.length}{" " + localeText("sélectionné(s)")}</span><div className="actions"><button type="button" className="secondary" disabled={!selection.length || busy} onClick={() => editBatch()}><Pencil size={16} />{localeText("Modifier en série")}</button><button type="button" className="secondary" disabled={!selection.length || busy} onClick={() => editBatch("dismissed")}><ArchiveX size={16} />{localeText("Classer sans suite")}</button><button type="button" className="secondary" disabled={!selection.length || busy} onClick={() => editBatch("false_positive")}><CheckCircle2 size={16}/>{localeText("Fausse alerte")}</button></div></div>
       <div className="status-detection-list">{data.rows.map((row) => <article key={row.id} className={`status-detection-row${selection.includes(row.id) ? " is-selected" : ""}`}>
-        <header><label className="status-detection-pick"><input type="checkbox" checked={selection.includes(row.id)} disabled={busy} aria-label={localeText("Sélectionner {value0}", { value0: row.title })} onChange={(event) => setSelection((ids) => event.target.checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))} /></label><div className="status-detection-row-title"><span className={`status-detection-severity severity-${row.severity}`}><AlertTriangle size={14} />{row.severity === "outage" ? localeText("Indisponibilité") : localeText("Dégradation")} · {components.find((entry) => entry.id === row.component_id)?.name ?? row.component_id}</span><h4>{row.title}</h4></div><span className={`status-detection-state${row.recovered_at ? " is-recovered" : ""}`}>{row.recovered_at ? localeText("Service rétabli · ") : ""}{stateLabels[row.state]}</span></header>
-        <dl><div><dt>{localeText("Détecté")}</dt><dd>{formatDate(row.first_at)}</dd></div><div><dt>{localeText("Dernier relevé anormal")}</dt><dd>{formatDate(row.last_at)}</dd></div><div><dt>{localeText("Sonde")}</dt><dd>{row.recovered_at ? localeText("Rétablie le {value0}", { value0: formatDate(row.recovered_at) }) : localeText("Anomalie non rétablie")}</dd></div></dl>
+        <header><label className="status-detection-pick"><input type="checkbox" checked={selection.includes(row.id)} disabled={busy} aria-label={localeText("Sélectionner {value0}", { value0: row.title })} onChange={(event) => setSelection((ids) => event.target.checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))} /></label><div className="status-detection-row-title"><span className={`status-detection-severity severity-${row.severity}`}><AlertTriangle size={14} />{row.severity === "outage" ? localeText("Indisponibilité") : localeText("Dégradation")} · {components.find((entry) => entry.id === row.component_id)?.name ?? row.component_id}</span><h4>{row.title}</h4></div><span className={`status-detection-state${row.recovered_at || row.state === "false_positive" ? " is-recovered" : ""}`}>{row.recovered_at && row.state !== "false_positive" ? localeText("Service rétabli · ") : ""}{localeText(stateLabels[row.state])}</span></header>
+        <dl><div><dt>{localeText("Détecté")}</dt><dd>{formatDate(row.first_at)}</dd></div><div><dt>{localeText("Dernier relevé anormal")}</dt><dd>{formatDate(row.last_at)}</dd></div><div><dt>{localeText("Sonde")}</dt><dd>{row.state === "false_positive" ? localeText("Relevé invalidé") : row.recovered_at ? localeText("Rétablie le {value0}", { value0: formatDate(row.recovered_at) }) : localeText("Anomalie non rétablie")}</dd></div></dl>
         <p className="status-detection-description">{row.description}</p>
         {row.diagnostic && <p className="status-detection-diagnostic">{row.diagnostic}</p>}
         {row.notes && <MarkdownContent>{row.notes}</MarkdownContent>}
-        {row.dismissal_reason && <div className="status-detection-reason-summary"><strong>{localeText("Justificatif privé du classement sans suite")}</strong><MarkdownContent>{row.dismissal_reason}</MarkdownContent>{row.dismissed_at && <small>{formatDate(row.dismissed_at)}</small>}</div>}
+        {row.dismissal_reason && <div className="status-detection-reason-summary"><strong>{localeText(row.state === "false_positive" ? "Justificatif privé de la fausse alerte" : "Justificatif privé du classement sans suite")}</strong><MarkdownContent>{row.dismissal_reason}</MarkdownContent>{row.dismissed_at && <small>{formatDate(row.dismissed_at)}</small>}</div>}
         {row.public_reopened_at && <p className="status-detection-notice">{localeText("Suivi rouvert depuis la page publique le") + " "}{formatDate(row.public_reopened_at)}.</p>}
-        <div className="actions"><button type="button" className="secondary" onClick={() => edit(row)}><Pencil size={15} />{["closed", "dismissed"].includes(row.state) ? localeText("Consulter / modifier") : localeText("Compléter / clôturer")}</button><button type="button" className="secondary" onClick={() => onPublish(row)}><ExternalLink size={15} />{localeText("Préparer un incident public")}</button>{row.closed_at && <small>{localeText("Clôturé le") + " "}{formatDate(row.closed_at)}</small>}</div>
+        <div className="actions"><button type="button" className="secondary" onClick={() => edit(row)}><Pencil size={15} />{["closed", "dismissed", "false_positive"].includes(row.state) ? localeText("Consulter / modifier") : localeText("Compléter / clôturer")}</button>{row.state !== "false_positive" && <button type="button" className="secondary" onClick={() => edit(row, "false_positive")}><CheckCircle2 size={15}/>{localeText("Fausse alerte")}</button>}<button type="button" className="secondary" onClick={() => onPublish(row)}><ExternalLink size={15} />{localeText("Préparer un incident public")}</button>{row.closed_at && <small>{localeText("Clôturé le") + " "}{formatDate(row.closed_at)}</small>}</div>
       </article>)}</div>
       {!data.rows.length && <p className="empty-state">{localeText("Aucun incident dans cette liste.")}</p>}
       <Pagination {...data} onPage={setPage} onPageSize={(size) => { setPageSize(size); setPage(1); }} label={localeText("Pages des incidents détectés")} />
@@ -136,7 +136,7 @@ export function DetectedIncidents({ components, onPublish }) {
       {!batchEditing && <><label>{localeText("Titre")}<input value={draft.title} required maxLength={160} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label><div className="status-detection-observation"><strong>{localeText("Description automatique")}</strong><p>{editing.description}</p>{editing.diagnostic && <code>{editing.diagnostic}</code>}</div></>}
       {batchEditing && <ul className="status-detection-batch-list">{batchEditing.map((row) => <li key={row.id}>{row.title}</li>)}</ul>}
       <label>{localeText("État du suivi")}<select value={draft.state} onChange={(event) => setDraft({ ...draft, state: event.target.value })}>{batchEditing && <option value="">{localeText("Conserver l’état de chaque dossier")}</option>}{Object.entries(stateLabels).map(([value, label]) => <option key={value} value={value}>{localeText(label)}</option>)}</select></label>
-      {draft.state === "dismissed" && <ReasonFields draft={draft} setDraft={setDraft} presets={presets} />}
+      {["dismissed", "false_positive"].includes(draft.state) && <ReasonFields draft={draft} setDraft={setDraft} presets={presets} />}
       {batchEditing && <label>{localeText("Gestion des notes")}<select value={draft.notesMode} onChange={(event) => setDraft({ ...draft, notesMode: event.target.value })}><option value="append">{localeText("Ajouter aux notes existantes")}</option><option value="replace">{localeText("Remplacer les notes existantes")}</option></select></label>}
       <label>{localeText("Analyse, actions et conclusion")}<textarea rows={batchEditing ? 4 : 7} maxLength={8000} required={draft.state === "closed" && (!batchEditing || draft.notesMode === "replace")} value={draft.notes} placeholder={localeText("Cause confirmée ou incertaine, vérifications effectuées, mesures prises…")} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} /></label>
       {draft.notes && <MarkdownContent>{draft.notes}</MarkdownContent>}
@@ -145,7 +145,7 @@ export function DetectedIncidents({ components, onPublish }) {
       {draft.state === "closed" && (batchEditing || !editing.recovered_at) && <p className="status-detection-warning"><AlertTriangle size={16} />{localeText("Clôturer le suivi ne modifiera pas l’état mesuré du service.")}</p>}
       {editing && history?.length > 0 && <details className="status-detection-history"><summary>{localeText("Historique des modifications")}</summary><ol>{history.map((entry) => <li key={entry.id}><strong>{stateLabels[entry.previous_state]} → {stateLabels[entry.state]}</strong><small>{formatDate(entry.created_at)}{entry.created_by === "public-status" ? localeText(" · Clic sur la barre publique") : localeText(" · Administration")}</small>{entry.dismissal_reason && <MarkdownContent>{entry.dismissal_reason}</MarkdownContent>}{entry.notes && <MarkdownContent>{entry.notes}</MarkdownContent>}</li>)}</ol></details>}
       {error && <p className="error" role="alert">{localeText(error)}</p>}
-      <div className="actions"><button type="button" className="secondary" disabled={busy} onClick={() => { setEditing(null); setBatchEditing(null); }}>{localeText("Annuler")}</button><button type="submit" disabled={busy}><CheckCircle2 size={16} />{busy ? localeText("Enregistrement…") : draft.state === "dismissed" ? localeText("Confirmer le classement sans suite") : draft.state === "closed" ? localeText("Clôturer le suivi") : localeText("Enregistrer")}</button></div>
+      <div className="actions"><button type="button" className="secondary" disabled={busy} onClick={() => { setEditing(null); setBatchEditing(null); }}>{localeText("Annuler")}</button><button type="submit" disabled={busy}><CheckCircle2 size={16} />{busy ? localeText("Enregistrement…") : draft.state === "false_positive" ? localeText("Confirmer la fausse alerte") : draft.state === "dismissed" ? localeText("Confirmer le classement sans suite") : draft.state === "closed" ? localeText("Clôturer le suivi") : localeText("Enregistrer")}</button></div>
     </form></Dialog>}
   </section>;
 }

@@ -332,7 +332,7 @@ export function createStatusMonitor({ filename, now = () => Date.now() }) {
 
   function payload(days, { includeFutureUpdates = false } = {}) {
     const { settings, rangeDays, timestamp, start, displayIntervalMinutes, intervalMs, timelineStart, timelineEnd } = timelinePeriod(days);
-    const rows = db.prepare("SELECT * FROM status_slots WHERE bucket_at >= ? ORDER BY bucket_at ASC").all(start.toISOString());
+    const rows = detections.correctedSlots(db.prepare("SELECT * FROM status_slots WHERE bucket_at >= ? ORDER BY bucket_at ASC").all(start.toISOString()), STATUS_SLOT_MS);
     const monitoringSince = db.prepare("SELECT MIN(bucket_at) AS at FROM status_slots").get()?.at ?? null;
     const incidents = incidentRows({ includeFutureUpdates });
     const activeIncidents = incidents.filter((incident) => incident.state === "in_progress");

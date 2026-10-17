@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 const clean = (value, max) => String(value ?? "").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim().slice(0, max);
-const states = new Set(["open", "in_progress", "closed", "dismissed"]);
+const states = new Set(["open", "in_progress", "closed", "dismissed", "false_positive"]);
 export const dismissalPresets = [
+  { id: "false-positive", label: "Fausse alerte confirmée", text: "Après vérification, le relevé ne correspond pas à un dysfonctionnement du service. La mesure est invalidée ; les prochaines anomalies restent surveillées." },
   { id: "provider", label: "Connexion refusée par le fournisseur mail", text: "Le fournisseur mail refuse la connexion. Aucune action corrective locale identifiée à ce stade ; le service reste surveillé et le suivi pourra être rouvert." },
   { id: "external", label: "Incident chez un prestataire externe", text: "Le problème dépend d'un prestataire externe. Aucune intervention locale possible en l'état ; la surveillance reste active." },
   { id: "transient", label: "Anomalie ponctuelle, non reproduite", text: "Anomalie ponctuelle non reproduite après vérification. Aucun dysfonctionnement persistant confirmé ; surveillance maintenue." },
@@ -19,8 +20,14 @@ export function createStatusDetections(db, components, now) {
     notes TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'probe',
     closed_at TEXT, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT ''
   );
-  CREATE UNIQUE INDEX IF NOT EXISTS status_detections_current ON status_detections(component_id) WHERE recovered_at IS NULL;
   CREATE INDEX IF NOT EXISTS status_detections_state_at ON status_detections(state,first_at DESC);`);
+  const currentIndex = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='status_detections_current'").get();
+  if (!currentIndex?.sql.includes("false_positive")) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.exec("DROP INDEX IF EXISTS status_detections_current; CREATE UNIQUE INDEX status_detections_current ON status_detections(component_id) WHERE recovered_at IS NULL AND state!='false_positive'; COMMIT");
+    } catch (error) { db.exec("ROLLBACK"); throw error; }
+  }
   const columns = new Set(db.prepare("PRAGMA table_info(status_detections)").all().map((column) => column.name));
   for (const [name, type] of [["dismissal_reason", "TEXT NOT NULL DEFAULT ''"], ["dismissed_at", "TEXT"], ["public_reopened_at", "TEXT"]]) {
     if (!columns.has(name)) db.exec(`ALTER TABLE status_detections ADD COLUMN ${name} ${type}`);
@@ -33,7 +40,7 @@ export function createStatusDetections(db, components, now) {
     );
     CREATE INDEX IF NOT EXISTS status_detection_actions_record ON status_detection_actions(detection_id,created_at DESC);`);
   const names = new Map(components.map((entry) => [entry.id, entry.name]));
-  const current = db.prepare("SELECT * FROM status_detections WHERE component_id=? AND recovered_at IS NULL");
+  const current = db.prepare("SELECT * FROM status_detections WHERE component_id=? AND recovered_at IS NULL AND state!='false_positive'");
 
   function observe(component, timestamp, source = "probe") {
     if (!names.has(component.id)) return;
@@ -89,7 +96,7 @@ export function createStatusDetections(db, components, now) {
     if (!names.has(component) && component !== "all") throw new Error("Service invalide.");
     if (!["all", "outage", "degraded"].includes(severity)) throw new Error("Gravité invalide.");
     if (!["pending", "all", ...states].includes(state)) throw new Error("État invalide.");
-    const clauses = [state === "all" ? "1=1" : state === "pending" ? "state NOT IN ('closed','dismissed')" : "state=?"];
+    const clauses = [state === "all" ? "1=1" : state === "pending" ? "state NOT IN ('closed','dismissed','false_positive')" : "state=?"];
     const params = state === "all" || state === "pending" ? [] : [state];
     if (severity !== "all") { clauses.push("severity=?"); params.push(severity); }
     const counts = db.prepare(`SELECT component_id,COUNT(*) AS count FROM status_detections WHERE ${clauses.join(" AND ")} GROUP BY component_id`).all(...params);
@@ -102,7 +109,7 @@ export function createStatusDetections(db, components, now) {
     return { rows: db.prepare(`SELECT * FROM status_detections WHERE ${filter} ORDER BY first_at DESC,id DESC LIMIT ? OFFSET ?`).all(...params, pageSize, (page - 1) * pageSize), totalItems, totalPages, page, pageSize, counts: Object.fromEntries(counts.map((row) => [row.component_id, row.count])), dismissalPresets };
   }
   function summary() {
-    return db.prepare("SELECT COUNT(*) AS pending,COALESCE(SUM(recovered_at IS NULL),0) AS ongoing FROM status_detections WHERE state NOT IN ('closed','dismissed')").get();
+    return db.prepare("SELECT COUNT(*) AS pending,COALESCE(SUM(recovered_at IS NULL),0) AS ongoing FROM status_detections WHERE state NOT IN ('closed','dismissed','false_positive')").get();
   }
   function validate(row, input) {
     const title = clean(input.title ?? row.title, 160);
@@ -116,6 +123,8 @@ export function createStatusDetections(db, components, now) {
     if (!title || !states.has(state)) throw new Error("Titre ou état invalide.");
     if (state === "closed" && !notes) throw new Error("Ajoute une conclusion avant de clôturer cet incident.");
     if (state === "dismissed" && !reason) throw new Error("Ajoute un justificatif avant de classer cet incident sans suite.");
+    if (state === "false_positive" && !reason) throw new Error("Ajoute un justificatif avant de confirmer une fausse alerte.");
+    if (row.state === "false_positive" && state !== "false_positive" && !row.recovered_at && current.get(row.component_id)) throw new Error("Une nouvelle anomalie existe déjà pour ce service. Traite son dossier avant de rétablir ce relevé.");
     return { title, notes, state, reason };
   }
   function write(row, values, userId, publicReopen = false) {
@@ -123,7 +132,7 @@ export function createStatusDetections(db, components, now) {
     db.prepare("UPDATE status_detections SET title=?,notes=?,state=?,dismissal_reason=?,dismissed_at=?,public_reopened_at=?,closed_at=?,updated_at=?,updated_by=? WHERE id=?")
       .run(values.title, values.notes, values.state, values.reason, values.state === "dismissed" ? row.state === "dismissed" ? row.dismissed_at || at : at : row.dismissed_at,
         publicReopen ? at : values.state === "dismissed" ? null : row.public_reopened_at,
-        values.state === "closed" ? row.closed_at || at : null, at, String(userId), row.id);
+        ["closed", "false_positive"].includes(values.state) ? row.closed_at || at : null, at, String(userId), row.id);
     db.prepare("INSERT INTO status_detection_actions VALUES(?,?,?,?,?,?,?,?)").run(randomUUID(), row.id, row.state, values.state, values.notes, values.reason, at, String(userId));
   }
   function transaction(action) {
@@ -155,6 +164,31 @@ export function createStatusDetections(db, components, now) {
       WHERE (state='dismissed' OR (state='in_progress' AND public_reopened_at IS NOT NULL))
       AND first_at<? AND last_at>=?`).all(end, start);
   }
+  function correctedSlots(rows, intervalMs) {
+    if (!rows.length) return rows;
+    const episodes = db.prepare("SELECT component_id,first_at,last_at,severity,state FROM status_detections WHERE first_at<? AND last_at>=?")
+      .all(new Date(Date.parse(rows.at(-1).bucket_at) + intervalMs).toISOString(), rows[0].bucket_at);
+    if (!episodes.some(episode => episode.state === "false_positive")) return rows;
+    const byComponent = new Map();
+    for (const episode of episodes) {
+      const list = byComponent.get(episode.component_id) ?? [];
+      list.push({ ...episode, first: Date.parse(episode.first_at), last: Date.parse(episode.last_at) }); byComponent.set(episode.component_id, list);
+    }
+    return rows.map(row => {
+      const start = Date.parse(row.bucket_at), end = start + intervalMs, updated = Date.parse(row.updated_at);
+      const overlaps = (byComponent.get(row.component_id) ?? []).filter(episode => episode.first < end && episode.last >= start);
+      const invalid = overlaps.filter(episode => episode.state === "false_positive");
+      if (!invalid.length) return row;
+      const valid = overlaps.filter(episode => episode.state !== "false_positive");
+      const corrected = { ...row };
+      // Mixed buckets retain real incidents. Corrections never erase source observations.
+      if (!valid.length && ["degraded", "outage"].includes(row.worst_status) && invalid.some(episode => episode.severity === "outage" || row.worst_status === "degraded")) corrected.worst_status = "operational";
+      if (["degraded", "outage"].includes(row.latest_status) && invalid.some(episode => updated >= episode.first && updated <= episode.last && (episode.severity === "outage" || row.latest_status === "degraded")) && !valid.some(episode => updated >= episode.first && updated <= episode.last)) {
+        corrected.latest_status = "operational"; corrected.message = "Le service est opérationnel.";
+      }
+      return corrected;
+    });
+  }
   function reopenPublic(component, start, end) {
     return transaction(() => {
       const rows = db.prepare("SELECT * FROM status_detections WHERE component_id=? AND state='dismissed' AND first_at<? AND last_at>=?").all(component, end, start);
@@ -167,9 +201,9 @@ export function createStatusDetections(db, components, now) {
   }
   function prune(timestamp) {
     transaction(() => {
-      db.prepare("DELETE FROM status_detections WHERE state IN ('closed','dismissed') AND recovered_at IS NOT NULL AND updated_at<?").run(new Date(timestamp - 400 * 86400000).toISOString());
+      db.prepare("DELETE FROM status_detections WHERE (state IN ('closed','dismissed') AND recovered_at IS NOT NULL OR state='false_positive') AND updated_at<?").run(new Date(timestamp - 400 * 86400000).toISOString());
       db.exec("DELETE FROM status_detection_actions WHERE detection_id NOT IN (SELECT id FROM status_detections)");
     });
   }
-  return { observe, list, summary, update, batch, publicRanges, reopenPublic, history, prune };
+  return { observe, list, summary, update, batch, publicRanges, reopenPublic, correctedSlots, history, prune };
 }

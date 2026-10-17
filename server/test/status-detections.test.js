@@ -8,6 +8,65 @@ import { spawnSync } from "node:child_process";
 import { createStatusMonitor } from "../src/services/status-monitor.js";
 import { createEmailStatusProbe, smtpDiagnostic } from "../src/services/email-status-probe.js";
 
+test("false alerts correct public status and statistics without deleting observations or exposing private reasons", () => {
+  let timestamp = Date.parse("2026-10-17T10:02:00Z");
+  const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });
+  try {
+    monitor.recordSnapshot([{ id: "database", status: "degraded", latencyMs: .7 }]);
+    const row = monitor.detections.list().rows[0];
+    assert.throws(() => monitor.detections.update(row.id, { state: "false_positive" }, "admin"), /justificatif/);
+    monitor.detections.update(row.id, { state: "false_positive", dismissal_reason: "Private check: free pages, integrity OK." }, "admin");
+    assert.equal(monitor.detections.list().totalItems, 0);
+    assert.equal(monitor.detections.list({ state: "false_positive" }).totalItems, 1);
+    assert.equal(monitor.detections.summary().ongoing, 0);
+    const payload = monitor.payload(7), database = payload.components.find(entry => entry.id === "database");
+    assert.equal(database.status, "operational"); assert.equal(database.days.at(-1).status, "operational");
+    assert.equal(payload.timeline.at(-1).components.database.status, "operational");
+    assert.equal(payload.timeline.at(-1).components.database.investigation, false);
+    assert.equal(JSON.stringify(payload).includes("Private check"), false);
+    assert.equal(monitor.detections.history(row.id)[0].created_by, "admin");
+    monitor.detections.update(row.id, { state: "open" }, "admin");
+    assert.equal(monitor.payload(7).components.find(entry => entry.id === "database").status, "degraded", "source data is unchanged and the decision is reversible");
+  } finally { monitor.close(); }
+});
+
+test("new real failures in a corrected bucket create a separate episode and stay red", () => {
+  let timestamp = Date.parse("2026-10-17T10:02:00Z");
+  const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });
+  try {
+    monitor.recordSnapshot([{ id: "database", status: "degraded" }]);
+    const original = monitor.detections.list().rows[0];
+    monitor.detections.update(original.id, { state: "false_positive", dismissal_reason: "Confirmed false alert." }, "admin");
+    timestamp += 60000; monitor.recordSnapshot([{ id: "database", status: "outage" }]);
+    const next = monitor.detections.list().rows[0];
+    assert.notEqual(original.id, next.id); assert.equal(next.severity, "outage");
+    const payload = monitor.payload(7);
+    assert.equal(payload.components.find(entry => entry.id === "database").status, "outage");
+    assert.equal(payload.timeline.at(-1).components.database.status, "outage");
+    assert.equal(payload.components.find(entry => entry.id === "database").uptime, 0);
+    assert.throws(() => monitor.detections.update(original.id, { state: "open" }, "admin"), /nouvelle anomalie/);
+    timestamp += 60000; monitor.recordSnapshot([{ id: "database", status: "operational" }]);
+    assert.equal(monitor.payload(7).components.find(entry => entry.id === "database").status, "operational");
+    assert.equal(monitor.payload(7).timeline.at(-1).components.database.status, "outage", "a real outage in a mixed bucket is retained");
+  } finally { monitor.close(); }
+});
+
+test("false-alert batches remain atomic and correct only selected services", () => {
+  const timestamp = Date.parse("2026-10-17T10:02:00Z");
+  const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });
+  try {
+    monitor.recordSnapshot([{ id: "database", status: "degraded" }, { id: "email", status: "outage" }]);
+    const rows = monitor.detections.list().rows;
+    assert.throws(() => monitor.detections.batch(rows.map(row => row.id), { state: "false_positive" }, "admin"), /justificatif/);
+    assert.equal(monitor.detections.list().totalItems, 2);
+    const database = rows.find(row => row.component_id === "database");
+    monitor.detections.batch([database.id], { state: "false_positive", dismissal_reason: "Verified." }, "admin");
+    const components = monitor.payload(7).components;
+    assert.equal(components.find(row => row.id === "database").status, "operational");
+    assert.equal(components.find(row => row.id === "email").status, "outage");
+  } finally { monitor.close(); }
+});
+
 test("les anomalies fusionnent par épisode, le rétablissement ne clôture pas le suivi privé", () => {
   let timestamp = Date.parse("2026-10-04T08:30:00Z");
   const monitor = createStatusMonitor({ filename: ":memory:", now: () => timestamp });

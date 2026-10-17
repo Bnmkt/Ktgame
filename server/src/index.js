@@ -143,6 +143,7 @@ import {
   verifyUserMfa
 } from "./services/account-security.js";
 import { createStatusMonitor } from "./services/status-monitor.js";
+import { databaseHealthProbe } from "./services/database-status-probe.js";
 import { createEmailStatusProbe, smtpDiagnostic } from "./services/email-status-probe.js";
 import { describeChatLinks, detectChatLinks } from "./services/chat-links.js";
 import { apiHealthProbe } from "./services/api-status-probe.js";
@@ -1247,9 +1248,7 @@ function databaseStatusProbe() {
   try {
     const health = currentDatabaseHealth(true);
     const latencyMs = performance.now() - startedAt;
-    const oversizedWal = health.walBytes > Math.max(64 * 1024 * 1024, health.fileBytes * 2);
-    const degraded = latencyMs > 500 || health.fragmentationRatio > .35 || oversizedWal;
-    return { id: "database", status: degraded ? "degraded" : "operational", latencyMs, message: degraded ? "Le stockage nécessite une surveillance." : "Le stockage répond normalement." };
+    return databaseHealthProbe(health, latencyMs);
   } catch {
     return { id: "database", status: "outage", latencyMs: performance.now() - startedAt, message: "Le stockage ne répond pas à la sonde." };
   }

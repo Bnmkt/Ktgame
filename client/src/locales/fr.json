@@ -1,4 +1,12 @@
 {
+  "Fausse alerte": "Fausse alerte",
+  "Fausses alertes": "Fausses alertes",
+  "Fausse alerte confirmée": "Fausse alerte confirmée",
+  "Justificatif de la fausse alerte": "Justificatif de la fausse alerte",
+  "Justificatif privé de la fausse alerte": "Justificatif privé de la fausse alerte",
+  "Confirmer la fausse alerte": "Confirmer la fausse alerte",
+  "Relevé invalidé": "Relevé invalidé",
+  "Les relevés concernés seront corrigés en vert. Les mesures brutes et ce justificatif privé restent conservés. Toute nouvelle anomalie reste détectée.": "Les relevés concernés seront corrigés en vert. Les mesures brutes et ce justificatif privé restent conservés. Toute nouvelle anomalie reste détectée.",
   "Réglages audio": "Réglages audio",
   "Audio": "Audio",
   "audio::Maître": "Maître",

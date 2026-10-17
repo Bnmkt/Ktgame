@@ -1,4 +1,12 @@
 {
+  "Fausse alerte": "False alarm",
+  "Fausses alertes": "False alarms",
+  "Fausse alerte confirmée": "Confirmed false alarm",
+  "Justificatif de la fausse alerte": "Reason for marking this as a false alarm",
+  "Justificatif privé de la fausse alerte": "Private false-alarm justification",
+  "Confirmer la fausse alerte": "Confirm false alarm",
+  "Relevé invalidé": "Invalidated observation",
+  "Les relevés concernés seront corrigés en vert. Les mesures brutes et ce justificatif privé restent conservés. Toute nouvelle anomalie reste détectée.": "Affected observations will be corrected to green. Raw measurements and this private justification are retained. New anomalies will still be detected.",
   "Réglages audio": "Audio settings",
   "Audio": "Audio",
   "audio::Maître": "Master",
