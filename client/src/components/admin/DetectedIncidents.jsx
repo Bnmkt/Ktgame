@@ -25,7 +25,7 @@ function ReasonFields({ draft, setDraft, presets }) {
   </div>;
 }
 
-export function DetectedIncidents({ components, onPublish }) {
+export function DetectedIncidents({ components, onPublish, onChange }) {
   const { t: localeText } = useLocale();
   const [filter, setFilter] = useState("pending");
   const [component, setComponent] = useState("all");
@@ -106,6 +106,7 @@ export function DetectedIncidents({ components, onPublish }) {
       setEditing(null);
       setBatchEditing(null);
       await load();
+      await onChange?.();
     } catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
   }
