@@ -31,12 +31,21 @@ try {
     const table = { id: "fixture-room", code: "ABC123", name: "Yahtzee entre amis", gameId: "yahtzee", ownerId: user.id, players: [user, { id: "bot", pseudo: "Bot 1", isBot: true, tokens: 10000, cosmetics: { equipped: {} } }], readyPlayerIds: [user.id], minPlayers: 1, maxPlayers: 6, stake: 10, gameModifiers: {}, state: null, finished: false };
     await context.addInitScript(() => {
       window.ktgaFixtureNotes = [];
+      window.ktgaFixtureSamples = [];
       const proto = window.AudioContext?.prototype;
       if (!proto) return;
       const create = proto.createOscillator;
       proto.createOscillator = function(...args) {
         const node = create.apply(this, args), start = node.start.bind(node);
         node.start = (...values) => { window.ktgaFixtureNotes.push(node.frequency.value); return start(...values); };
+        return node;
+      };
+      const bufferSource = proto.createBufferSource;
+      proto.createBufferSource = function(...args) {
+        const node = bufferSource.apply(this, args), start = node.start.bind(node), stop = node.stop.bind(node);
+        let record;
+        node.start = (...values) => { record = { loop: node.loop, duration: node.buffer?.duration, offset: values[1] ?? 0, stopped: false }; window.ktgaFixtureSamples.push(record); return start(...values); };
+        node.stop = (...values) => { if (record) record.stopped = true; return stop(...values); };
         return node;
       };
     });
@@ -68,7 +77,7 @@ try {
       let filename = path.resolve(dist, `.${decodeURIComponent(url.pathname)}`);
       if (filename !== dist && !filename.startsWith(dist + path.sep)) return route.abort();
       if (!fs.existsSync(filename) || fs.statSync(filename).isDirectory()) filename = path.join(dist, "discord-activity/index.html");
-      const types = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
+      const types = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".wav": "audio/wav", ".mp3": "audio/mpeg" };
       return route.fulfill({ contentType: types[path.extname(filename)] ?? "application/octet-stream", body: fs.readFileSync(filename) });
     });
     await page.goto("https://discord.com/ktga-fixture"); const frame = page.frameLocator('iframe[title="KTGA Activity"]');
@@ -83,7 +92,10 @@ try {
       await frame.getByRole("button", { name: "Se connecter avec Discord", exact: true }).click();
     }
     await frame.locator(".casino-header").waitFor();
-    if (!unlinked) await frame.getByRole("button", { name: "Tout refuser", exact: true }).click();
+    if (!unlinked) {
+      assert.equal(requests.some(request => request.path === "/audio/lounge-loop.mp3"), false, "music waits for the first interaction");
+      await frame.getByRole("button", { name: "Tout refuser", exact: true }).click();
+    }
     assert.equal(await frame.locator(".casino-mobile-navigation").isVisible(), true);
     assert.equal(await frame.locator(".casino-navigation").isVisible(), false);
     await frame.getByRole("button", { name: "Ouvrir dans le navigateur", exact: true }).click();
@@ -91,9 +103,23 @@ try {
     assert.equal((await page.evaluate(() => window.commands.find(command => command.cmd === "OPEN_EXTERNAL_LINK"))).args.url, "https://www.ktga.me/");
     await frame.locator(".casino-header").waitFor(); assert.equal(await frame.locator(".activity-toolbar").isVisible(), true);
     assert.equal(requests.filter(request => request.path === "/api/auth/discord/activity").length, unlinked ? 2 : 1);
-    await frame.getByRole("button", { name: "Couper les effets sonores", exact: true }).click();
-    await frame.getByRole("button", { name: "Activer les effets sonores", exact: true }).waitFor();
-    await frame.getByRole("button", { name: "Activer les effets sonores", exact: true }).click();
+    await frame.getByRole("button", { name: "Réglages audio", exact: true }).click();
+    const mixer = frame.getByRole("dialog", { name: "Audio", exact: true });
+    assert.equal(await mixer.getByRole("slider").count(), 3);
+    await page.screenshot({ path: path.join(directory, `${viewport.width}-audio.png`) });
+    const activityFrame = page.frames().find(frame => frame.url().startsWith(origin));
+    await activityFrame.waitForFunction(() => window.ktgaFixtureSamples.some(sample => sample.loop));
+    await mixer.getByRole("slider", { name: /Musique/ }).press("Home");
+    assert.ok(await activityFrame.evaluate(() => window.ktgaFixtureSamples.filter(sample => sample.loop).every(sample => sample.stopped)));
+    await mixer.getByRole("button", { name: "Rétablir les volumes", exact: true }).click();
+    await activityFrame.waitForFunction(() => window.ktgaFixtureSamples.some(sample => sample.loop && !sample.stopped));
+    await activityFrame.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" }); document.dispatchEvent(new Event("visibilitychange")); });
+    assert.ok(await activityFrame.evaluate(() => window.ktgaFixtureSamples.filter(sample => sample.loop).every(sample => sample.stopped)));
+    await activityFrame.evaluate(() => { Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" }); document.dispatchEvent(new Event("visibilitychange")); });
+    await activityFrame.waitForFunction(() => window.ktgaFixtureSamples.some(sample => sample.loop && !sample.stopped));
+    await mixer.getByRole("button", { name: "Tout couper", exact: true }).click();
+    await mixer.getByRole("button", { name: "Réactiver le son", exact: true }).click();
+    await mixer.getByRole("button", { name: "Fermer", exact: true }).click();
     await page.screenshot({ path: path.join(directory, `${viewport.width}-casino.png`) });
     assert.ok(requests.some(request => request.path === "/api/auth/discord/activity"));
     assert.deepEqual((await page.evaluate(() => window.commands.find(command => command.cmd === "AUTHORIZE"))).args.scope, ["identify"]);
@@ -109,7 +135,9 @@ try {
     await page.waitForTimeout(1400);
     const notes = await activity.evaluate(() => window.ktgaFixtureNotes);
     assert.ok(notes.includes(523.25), "game start chime");
-    assert.ok(notes.includes(170), "dice cue");
+    assert.ok(requests.some(request => request.path.startsWith("/audio/dice-throw-")), "real dice sample requested");
+    assert.ok(await activity.evaluate(() => window.ktgaFixtureSamples.some(sample => !sample.loop && sample.duration > .1)), "real sample decoded and played");
+    assert.equal(requests.filter(request => request.path === "/audio/lounge-loop.mp3").length, 1, "music buffer is reused");
     assert.ok(notes.includes(440), "timer limit cue");
     assert.ok(await activity.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await page.screenshot({ path: path.join(directory, `${viewport.width}-playing.png`) });

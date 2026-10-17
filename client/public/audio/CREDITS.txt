@@ -1,0 +1,15 @@
+KTGA audio sources
+
+Dice and cards: Casino Audio 1.1 by Kenney Vleugels (Kenney.nl).
+Source: https://kenney.nl/assets/casino-audio
+License: Creative Commons Zero (CC0 1.0).
+https://creativecommons.org/publicdomain/zero/1.0/
+Selected dice-throw and card-slide recordings converted to PCM WAV.
+
+Music: Chill lofi inspired by omfgdude, made loopable by qubodup.
+Source: https://opengameart.org/content/chill-lofi-inspired-loop-edit
+Original: https://opengameart.org/content/chill-lofi-inspired
+License: Creative Commons Zero (CC0 1.0).
+Converted to MP3 for browser compatibility, with reduced integrated loudness.
+
+All files are served locally by KTGA. No third-party audio player is used.

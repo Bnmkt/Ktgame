@@ -1,4 +1,12 @@
 {
+  "Réglages audio": "Audio settings",
+  "Audio": "Audio",
+  "audio::Maître": "Master",
+  "Ambiance": "Ambience",
+  "Musique": "Music",
+  "Réactiver le son": "Unmute",
+  "Tout couper": "Mute all",
+  "Rétablir les volumes": "Reset volumes",
   "Associe ton compte Discord pour te connecter sans saisir ton mot de passe.": "Link your Discord account to sign in without entering your password.",
   "Dans l’activité Discord, un compte associé se connecte automatiquement sans deuxième étape KTGA. Sur le site, la double authentification reste active.": "In the Discord Activity, linked accounts sign in automatically without a second KTGA step. Two-factor authentication remains active on the website.",
   "Couper les effets sonores": "Mute sound effects",

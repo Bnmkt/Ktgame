@@ -1,0 +1,11 @@
+.sound-mixer-layer { z-index: 150; }
+.casino-dialog.sound-mixer-modal { width: min(380px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; padding: 20px; }
+.sound-mixer-modal .modal-title-row { margin-bottom: 20px; }
+.sound-mixer-modal h2 { font-size: 22px; }
+.sound-mixer-channels { display: grid; gap: 22px; }
+.sound-mixer-channel { display: grid; gap: 10px; color: #e3e9de; }
+.sound-mixer-channel > span { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.sound-mixer-channel output { margin-left: auto; color: #edd17f; font-size: 13px; font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+.sound-mixer-channel input { width: 100%; min-height: 30px; margin: 0; padding: 0; accent-color: #d4b350; cursor: pointer; }
+.sound-mixer-footer { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #46553f; padding-top: 18px; margin-top: 22px; }
+.sound-mixer-footer button { min-height: 42px; }

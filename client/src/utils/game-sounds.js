@@ -1,32 +1,64 @@
 import { createNotificationSound } from "./notification-sound.js";
+import { audioVolume, updateAudioSettings } from "./audio-settings.js";
+import { audioSamples, loungeMusic, nextAudioVariant } from "./audio-assets.js";
 
-const preferenceKey = "ktga-game-sounds";
 const profiles = {
   click: { tones: [[720, 0, .025, "sine"]], duration: .035 },
-  dice: { tones: [0, .045, .095, .16, .24].map((delay, index) => [170 + index * 47, delay, .045, "triangle", .065]) },
-  card: { tones: [[1900, 0, .025, "triangle", .055], [1300, .045, .025, "sine", .08]] },
   start: { tones: [[523.25, 0, .07, "sine"], [659.25, .12, .06, "sine"], [783.99, .24, .06, "sine"]], duration: .3 },
   warning: { tones: [[740, 0, .05, "sine"], [740, .16, .04, "sine"]], duration: .1 },
   limit: { tones: [[660, 0, .06, "triangle"], [440, .16, .05, "sine"]], duration: .18 }
 };
-let sound, enabled, owners = 0;
-const lastPlayed = new Map();
+let sound, owners = 0, music, musicPending = false, musicPosition = 0, musicGeneration = 0, musicActivated = false;
+const lastPlayed = new Map(), variants = new Map();
 export function gameSoundsEnabled() {
-  try { return localStorage.getItem(preferenceKey) !== "off"; } catch { return enabled ?? true; }
+  return audioVolume("ambience") > 0;
 }
 export function setGameSoundsEnabled(value) {
-  enabled = Boolean(value);
-  try { localStorage.setItem(preferenceKey, enabled ? "on" : "off"); } catch { /* Keep the choice for this visit. */ }
-  window.dispatchEvent(new Event("ktga-sounds-updated"));
+  updateAudioSettings({ muted: !value });
 }
 export function playGameSound(kind) {
-  if (!sound || !profiles[kind] || !gameSoundsEnabled() || document.visibilityState === "hidden") return;
+  if (!sound || !(profiles[kind] || audioSamples[kind]) || !gameSoundsEnabled() || document.visibilityState === "hidden") return;
   const now = Date.now();
   if (now - (lastPlayed.get(kind) ?? 0) < (kind === "click" ? 60 : 450)) return;
   lastPlayed.set(kind, now);
+  if (audioSamples[kind]) {
+    const variant = nextAudioVariant(audioSamples[kind], variants.get(kind)); variants.set(kind, variant);
+    return sound.playSample(variant, () => gameSoundsEnabled() && document.visibilityState !== "hidden");
+  }
   return sound.play(() => gameSoundsEnabled() && document.visibilityState !== "hidden", profiles[kind]);
 }
+function syncMusic() {
+  if (!sound || !audioVolume("music") || document.visibilityState === "hidden") {
+    musicGeneration++;
+    if (music) { musicPosition = music.position(); music.stop(); music = null; }
+    return;
+  }
+  if (music || musicPending || !musicActivated) return;
+  const owner = sound, generation = musicGeneration;
+  musicPending = true;
+  owner.playSample(loungeMusic, () => owner === sound && generation === musicGeneration && document.visibilityState !== "hidden", { channel: "music", loop: true, offset: musicPosition })
+    .catch(() => null)
+    .then(handle => { if (generation === musicGeneration && sound === owner) music = handle; else handle?.stop(); })
+    .finally(() => { musicPending = false; if (generation !== musicGeneration && sound) syncMusic(); });
+}
+function activateMusic() { musicActivated = true; syncMusic(); }
 export function acquireGameSounds() {
-  if (!owners++) sound = createNotificationSound({ throttleMs: 0 });
-  return () => { if (!--owners) { sound.close(); sound = null; lastPlayed.clear(); } };
+  if (!owners++) {
+    sound = createNotificationSound({ throttleMs: 0 });
+    window.addEventListener("pointerdown", activateMusic);
+    window.addEventListener("keydown", activateMusic);
+    window.addEventListener("ktga-sounds-updated", syncMusic);
+    window.addEventListener("storage", syncMusic);
+    document.addEventListener("visibilitychange", syncMusic);
+    syncMusic();
+  }
+  return () => { if (!--owners) {
+    musicGeneration++; music?.stop(); music = null; musicPosition = 0; musicActivated = false;
+    window.removeEventListener("pointerdown", activateMusic);
+    window.removeEventListener("keydown", activateMusic);
+    window.removeEventListener("ktga-sounds-updated", syncMusic);
+    window.removeEventListener("storage", syncMusic);
+    document.removeEventListener("visibilitychange", syncMusic);
+    sound.close(); sound = null; lastPlayed.clear(); variants.clear();
+  } };
 }

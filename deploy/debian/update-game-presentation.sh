@@ -32,6 +32,9 @@ files=(
   client/src/locales/LocaleProvider.jsx client/src/locales/locale.css
   client/src/components/admin/LocaleAdmin.jsx
   client/index.html client/discord-activity/index.html client/vite.config.js client/package.json client/package-lock.json
+  client/public/audio/CREDITS.txt client/public/audio/lounge-loop.mp3
+  client/public/audio/dice-throw-1.wav client/public/audio/dice-throw-2.wav client/public/audio/dice-throw-3.wav
+  client/public/audio/card-slide-1.wav client/public/audio/card-slide-2.wav client/public/audio/card-slide-3.wav client/public/audio/card-slide-4.wav
   client/src/main.jsx client/src/App.jsx client/src/config/site.js client/src/seo/render.jsx
   client/src/styles.css client/src/navigation/casino.css
   client/src/pages/AdminPage.jsx client/src/pages/AuthPage.jsx client/src/pages/LobbyPage.jsx
@@ -70,7 +73,7 @@ backupFiles=(server/src client/src client/dist-ssr deploy/debian)
 for file in client/index.html client/package.json client/package-lock.json client/vite.config.js client/discord-activity; do
   if [[ -e /opt/ktga/$file ]]; then backupFiles+=("$file"); fi
 done
-for directory in client/scripts desktop/companion; do
+for directory in client/scripts desktop/companion client/public/audio; do
   if [[ -d /opt/ktga/$directory ]]; then backupFiles+=("$directory"); fi
 done
 tar -czf "$backup/code.tar.gz" -C /opt/ktga "${backupFiles[@]}"

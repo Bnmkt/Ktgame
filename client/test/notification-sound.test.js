@@ -76,7 +76,7 @@ test("audio retries after activation, cancels stale turns and cleans up", async 
     constructor() { this.state = "suspended"; this.currentTime = 1; }
     resume() { return new Promise((resolve) => { resume = () => { this.state = "running"; resolve(); }; }); }
     createOscillator() { oscillatorCount += 1; return { frequency: {}, connect() {}, start() {}, stop() {} }; }
-    createGain() { return { gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; }
+    createGain() { return { gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, disconnect() {} }; }
     close() { closed = true; this.state = "closed"; return Promise.resolve(); }
   }
   globalThis.window = { AudioContext, addEventListener: (name, handler) => events.set(name, handler), removeEventListener: (name) => events.delete(name) };

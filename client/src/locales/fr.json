@@ -1,4 +1,12 @@
 {
+  "Réglages audio": "Réglages audio",
+  "Audio": "Audio",
+  "audio::Maître": "Maître",
+  "Ambiance": "Ambiance",
+  "Musique": "Musique",
+  "Réactiver le son": "Réactiver le son",
+  "Tout couper": "Tout couper",
+  "Rétablir les volumes": "Rétablir les volumes",
   "Associe ton compte Discord pour te connecter sans saisir ton mot de passe.": "Associe ton compte Discord pour te connecter sans saisir ton mot de passe.",
   "Dans l’activité Discord, un compte associé se connecte automatiquement sans deuxième étape KTGA. Sur le site, la double authentification reste active.": "Dans l’activité Discord, un compte associé se connecte automatiquement sans deuxième étape KTGA. Sur le site, la double authentification reste active.",
   "Couper les effets sonores": "Couper les effets sonores",
