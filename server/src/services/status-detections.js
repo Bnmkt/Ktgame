@@ -132,7 +132,7 @@ export function createStatusDetections(db, components, now) {
     db.prepare("UPDATE status_detections SET title=?,notes=?,state=?,dismissal_reason=?,dismissed_at=?,public_reopened_at=?,closed_at=?,updated_at=?,updated_by=? WHERE id=?")
       .run(values.title, values.notes, values.state, values.reason, values.state === "dismissed" ? row.state === "dismissed" ? row.dismissed_at || at : at : row.dismissed_at,
         publicReopen ? at : values.state === "dismissed" ? null : row.public_reopened_at,
-        ["closed", "false_positive"].includes(values.state) ? row.closed_at || at : null, at, String(userId), row.id);
+        values.state === "false_positive" ? row.state === "false_positive" ? row.closed_at || at : at : values.state === "closed" ? row.closed_at || at : null, at, String(userId), row.id);
     db.prepare("INSERT INTO status_detection_actions VALUES(?,?,?,?,?,?,?,?)").run(randomUUID(), row.id, row.state, values.state, values.notes, values.reason, at, String(userId));
   }
   function transaction(action) {
