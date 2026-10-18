@@ -1,6 +1,8 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useEffect, useRef, useState } from "react";
-import { Check, Image as ImageIcon, RotateCcw, Upload } from "lucide-react";
+import { Check, Image as ImageIcon, Upload } from "lucide-react";
+import { CropTools } from "../common/CropTools.jsx";
+import { cropImageStyle, transformedImageSize } from "../../features/games/image-transform.js";
 import { api, API_URL } from "../../api.js";
 import { Dialog } from "../common/Dialog.jsx";
 import { artworkCropBounds, encodeArtworkCrop, gameArtworkFormats } from "../../features/games/artwork-crop.js";
@@ -15,6 +17,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
   const [size, setSize] = useState({ width: 1024, height: 1024 }), [mime, setMime] = useState("image/png"), [libraryOpen, setLibraryOpen] = useState(false);
   const format = fixedFormat ? { ...fixedFormat, label: imageLabel || "Image" } : selectableFormat ? { ...size, label: imageLabel || "Image" } : imageLabel ? { ...gameArtworkFormats[field], label: imageLabel } : gameArtworkFormats[field];
   const [source, setSource] = useState(null), [crop, setCrop] = useState(centered);
+  const [grid, setGrid] = useState(true);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [error, setError] = useState("");
   const input = useRef(null), sourceUrl = useRef(""), generation = useRef(0), drag = useRef(null);
   useEffect(() => () => { generation.current++; if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current); }, []);
@@ -57,10 +60,8 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
   }, [value]);
 
   const bounds = source ? artworkCropBounds(source.width, source.height, crop, format.width / format.height) : null;
-  const imageStyle = bounds ? {
-    width: `${source.width / bounds.width * 100}%`, height: `${source.height / bounds.height * 100}%`,
-    left: `${50 - bounds.x * source.width / bounds.width * 100}%`, top: `${50 - bounds.y * source.height / bounds.height * 100}%`
-  } : null;
+  const imageStyle = bounds ? cropImageStyle(source.width, source.height, crop, bounds) : null;
+  const transformedSize = source ? transformedImageSize(source.width, source.height, crop) : null;
   const update = (next) => setCrop((previous) => ({ ...previous, ...next }));
   function move(event) {
     if (!drag.current || busy || loading || source?.animated) return;
@@ -69,14 +70,14 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
     drag.current = { x: event.clientX, y: event.clientY };
     setCrop((previous) => {
       const current = artworkCropBounds(source.width, source.height, previous, format.width / format.height);
-      return { ...current, x: current.x - dx / rect.width * current.width / source.width, y: current.y - dy / rect.height * current.height / source.height };
+      return { ...previous, ...current, x: current.x - dx / rect.width * current.width / transformedSize.width, y: current.y - dy / rect.height * current.height / transformedSize.height };
     });
   }
   function nudge(event) {
     const direction = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key];
     if (!direction || busy || loading || source?.animated) return;
     event.preventDefault();
-    update({ x: bounds.x + direction[0] * bounds.width / source.width * 0.02, y: bounds.y + direction[1] * bounds.height / source.height * 0.02 });
+    update({ x: bounds.x + direction[0] * bounds.width / transformedSize.width * 0.02, y: bounds.y + direction[1] * bounds.height / transformedSize.height * 0.02 });
   }
   async function apply() {
     if (!source || busy || loading) return;
@@ -103,9 +104,10 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
             event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY };
           }} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
             <img src={source.url} alt="Image à recadrer" draggable={false} style={imageStyle} />
+            {grid && !source.animated && <span className="crop-grid-overlay"/>}
           </div>
           <label className="game-art-zoom">{localeText("Zoom") + " "}<output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.5} max={5} step={0.01} value={bounds.zoom} aria-label={localeText("Zoom du recadrage")} disabled={busy || loading || source.animated} onChange={(event) => update({ ...bounds, zoom: Number(event.target.value) })} /></label>
-          <button type="button" className="secondary" disabled={busy || loading || source.animated} onClick={() => setCrop(centered)}><RotateCcw size={17} />{localeText("Réinitialiser le cadrage")}</button>
+          {!source.animated && <CropTools crop={crop} onChange={update} onReset={() => setCrop(centered)} disabled={busy || loading} grid={grid} onGridChange={setGrid}/>}
         </div>
         <aside className="game-art-preview"><span className="eyebrow">{localeText("Aperçu")}</span><div style={{ aspectRatio: `${format.width} / ${format.height}` }}><img src={source.url} alt="Aperçu du recadrage" style={imageStyle} /></div><strong>{gameName}</strong></aside>
       </div> : !loading && <div className="game-art-empty"><ImageIcon size={44} /><span>{localeText(format.label)}</span></div>}

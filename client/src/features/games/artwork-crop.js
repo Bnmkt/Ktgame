@@ -1,3 +1,5 @@
+import { drawTransformedCrop, transformedImageSize } from "./image-transform.js";
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const gameArtworkFormats = {
   descriptiveImage: { label: "Image descriptive", width: 960, height: 720 },
@@ -7,6 +9,7 @@ export const gameArtworkFormats = {
 
 export function artworkCropBounds(width, height, crop = {}, ratio = 16 / 7) {
   if (![width, height, ratio].every((value) => Number.isFinite(value) && value > 0)) throw new Error("Invalid image dimensions.");
+  ({ width, height } = transformedImageSize(width, height, crop));
   const zoom = clamp(Number.isFinite(crop.zoom) ? crop.zoom : 1, 0.5, 5);
   const cropWidth = Math.min(width, height * ratio) / zoom;
   const cropHeight = cropWidth / ratio;
@@ -25,7 +28,7 @@ export async function encodeArtworkCrop(image, crop, format, mime = "image/png")
   context.imageSmoothingQuality = "high";
   if (mime === "image/jpeg") { context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height); }
   else context.clearRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(image, bounds.left, bounds.top, bounds.width, bounds.height, 0, 0, format.width, format.height);
+  drawTransformedCrop(context, image, crop, bounds, format.width, format.height);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, 0.92));
   if (!blob || blob.size > 3 * 1024 * 1024) throw new Error("L’image recadrée dépasse 3 Mo. Choisis une autre image.");
   return blob;

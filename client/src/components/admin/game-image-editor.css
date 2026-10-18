@@ -11,10 +11,9 @@
 .media-crop-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .game-art-crop { cursor: grab; touch-action: none; user-select: none; }
 .game-art-crop:active { cursor: grabbing; }
-.game-art-crop::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent 33.1%, #ffffff44 33.1%, #ffffff44 33.4%, transparent 33.4%, transparent 66.5%, #ffffff44 66.5%, #ffffff44 66.8%, transparent 66.8%), linear-gradient(transparent 33.1%, #ffffff44 33.1%, #ffffff44 33.4%, transparent 33.4%, transparent 66.5%, #ffffff44 66.5%, #ffffff44 66.8%, transparent 66.8%); }
-.game-art-crop img, .game-art-preview img { position: absolute; display: block; max-width: none; object-fit: fill; pointer-events: none; }
+.game-art-crop img, .game-art-preview img { position: absolute; display: block; max-width: none; max-height: none; object-fit: fill; pointer-events: none; }
 .game-art-zoom { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; margin: 18px 0; }
-.game-art-zoom input { grid-column: 1 / -1; width: 100%; }
+.game-art-zoom input { grid-column: 1 / -1; width: 100%; min-width: 0; margin-inline: 0; }
 .game-art-preview { display: grid; gap: 10px; min-width: 0; }
 .game-art-empty { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 14px; color: #b5c4bc; border: 1px dashed #566b60; border-radius: 4px; }
 .game-art-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 10px; border-top: var(--site-border-width, 1px) solid #42493e; padding-top: 16px; }

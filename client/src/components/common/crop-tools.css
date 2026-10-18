@@ -1,0 +1,8 @@
+.crop-tools { display:grid; gap:12px; margin-top:14px; min-width:0; }
+.crop-tool-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.crop-tool-actions button { width:40px; height:40px; min-height:40px; padding:0; flex:0 0 40px; display:grid; place-items:center; }
+.crop-tool-actions button[aria-pressed="true"] { border-color:var(--site-primary); color:var(--site-primary); background:var(--site-raised); }
+.crop-angle-control { display:grid; grid-template-columns:minmax(0,1fr) 80px auto; align-items:center; gap:8px; font-size:13px; }
+.crop-angle-control input[type="number"] { width:100%; min-width:0; }
+.crop-angle-control input[type="range"] { grid-column:1/-1; width:100%; min-width:0; margin-inline:0; }
+.crop-grid-overlay { position:absolute; inset:0; pointer-events:none; border:1px solid #ffffff66; background:linear-gradient(90deg,transparent 33.1%,#ffffff66 33.1%,#ffffff66 33.4%,transparent 33.4%,transparent 66.5%,#ffffff66 66.5%,#ffffff66 66.8%,transparent 66.8%),linear-gradient(transparent 33.1%,#ffffff66 33.1%,#ffffff66 33.4%,transparent 33.4%,transparent 66.5%,#ffffff66 66.5%,#ffffff66 66.8%,transparent 66.8%); }

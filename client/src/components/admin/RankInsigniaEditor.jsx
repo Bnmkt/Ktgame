@@ -6,6 +6,8 @@ import { Dialog } from "../common/Dialog.jsx";
 import { LucideIconPicker } from "../cosmetics/Cosmetics.jsx";
 import { RankInsignia } from "../../features/games/RankInsignia.jsx";
 import { encodeInsigniaCrop, insigniaCropBounds } from "../../features/games/insignia-crop.js";
+import { cropImageStyle, transformedImageSize } from "../../features/games/image-transform.js";
+import { CropTools } from "../common/CropTools.jsx";
 
 const centered = { zoom: 1, x: 0.5, y: 0.5 };
 
@@ -19,6 +21,7 @@ export function RankInsigniaEditor({ rank, division = "", references = [], onApp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hiddenReferences, setHiddenReferences] = useState([]);
+  const [grid, setGrid] = useState(false);
   const input = useRef(null), drag = useRef(null), generation = useRef(0), sourceUrl = useRef("");
   useEffect(() => () => { generation.current++; if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current); }, []);
 
@@ -58,12 +61,10 @@ export function RankInsigniaEditor({ rank, division = "", references = [], onApp
   }
 
   const bounds = source ? insigniaCropBounds(source.width, source.height, crop) : null;
-  const imageStyle = bounds ? {
-    width: `${source.width / bounds.side * 100}%`, height: `${source.height / bounds.side * 100}%`,
-    left: `${50 - bounds.x * source.width / bounds.side * 100}%`, top: `${50 - bounds.y * source.height / bounds.side * 100}%`
-  } : null;
+  const imageStyle = bounds ? cropImageStyle(source.width, source.height, crop, bounds) : null;
+  const transformedSize = source ? transformedImageSize(source.width, source.height, crop) : null;
   function updateCrop(next) {
-    setCrop((previous) => insigniaCropBounds(source.width, source.height, { ...previous, ...next }));
+    setCrop((previous) => { const value = { ...previous, ...next }; return { ...value, ...insigniaCropBounds(source.width, source.height, value) }; });
   }
   function move(event) {
     if (!drag.current || busy) return;
@@ -72,7 +73,8 @@ export function RankInsigniaEditor({ rank, division = "", references = [], onApp
     drag.current = { x: event.clientX, y: event.clientY };
     setCrop((previous) => {
       const current = insigniaCropBounds(source.width, source.height, previous);
-      return insigniaCropBounds(source.width, source.height, { ...current, x: current.x - dx / width * current.side / source.width, y: current.y - dy / width * current.side / source.height });
+      const value = { ...previous, ...current, x: current.x - dx / width * current.side / transformedSize.width, y: current.y - dy / width * current.side / transformedSize.height };
+      return { ...value, ...insigniaCropBounds(source.width, source.height, value) };
     });
   }
   function nudge(event) {
@@ -81,7 +83,7 @@ export function RankInsigniaEditor({ rank, division = "", references = [], onApp
     const direction = directions[event.key];
     if (!direction) return;
     event.preventDefault();
-    updateCrop({ x: bounds.x + direction[0] * bounds.side / source.width * 0.02, y: bounds.y + direction[1] * bounds.side / source.height * 0.02 });
+    updateCrop({ x: bounds.x + direction[0] * bounds.side / transformedSize.width * 0.02, y: bounds.y + direction[1] * bounds.side / transformedSize.height * 0.02 });
   }
   async function apply() {
     setBusy(true); setError("");
@@ -112,9 +114,10 @@ export function RankInsigniaEditor({ rank, division = "", references = [], onApp
           }} onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}>
             <img src={source.url} alt="Image à recadrer" draggable={false} style={imageStyle}/>
             {references.filter((reference)=>!hiddenReferences.includes(reference.division)).map((reference)=><div key={reference.division} className="ranked-crop-reference"><RankInsignia rank={reference.rank}/></div>)}
+            {grid && <span className="crop-grid-overlay"/>}
           </div>
           <label className="ranked-crop-zoom">{localeText("Zoom") + " "}<output>{bounds.zoom.toFixed(2)} ×</output><input type="range" min={0.25} max={5} step={0.05} value={bounds.zoom} aria-label={localeText("Zoom du recadrage")} disabled={busy} onChange={(event) => updateCrop({ zoom: Number(event.target.value) })}/></label>
-          <button type="button" className="secondary" disabled={busy} onClick={() => updateCrop({ x: 0.5, y: 0.5 })}><RotateCcw size={17}/>{localeText("Recentrer")}</button>
+          <CropTools crop={crop} onChange={updateCrop} onReset={() => setCrop(centered)} disabled={busy || loading} grid={grid} onGridChange={setGrid}/>
         </div> : <div className="ranked-image-empty">{rank.insigniaImage ? <RankInsignia rank={rank}/> : <ImageIcon size={64}/>}</div>}
         <div className="ranked-image-preview"><span className="eyebrow">{localeText("Aperçu")}</span>{source ? <div className="ranked-crop-thumbnail"><img src={source.url} alt="Aperçu de l’insigne recadré" style={imageStyle}/></div> : <RankInsignia rank={rank}/>}<div><strong>{rank.name}</strong><small>{division ? localeText("Division {value0}", { value0: division }) : localeText("Insigne commun")}</small></div></div>
       </div>
