@@ -710,6 +710,24 @@ verifies par les memes services que sur le site ; les tokens restent en memoire.
 L'association initiale d'un compte a Discord se fait depuis le navigateur.
 GTM, Analytics et l'installation PWA ne sont pas charges dans l'activite.
 
+## Reconstruction depuis l'editeur de sources
+
+Apres installation ou modification de `client/package.json` ou de son lockfile :
+
+```bash
+sudo bash /opt/ktga/deploy/debian/setup-source-editor.sh
+sudo flock -w 600 /run/ktga-deployment.lock node /usr/local/libexec/ktga-source-apply.mjs --check-build
+```
+
+La premiere commande installe les dependances verrouillees dans un repertoire
+dedie, sans toucher aux `node_modules` du site en cours. Les scripts npm des
+dependances sont desactives. La compilation reste isolee, sans acces reseau,
+aux secrets ou aux donnees du site.
+
+`--check-build` reconstruit l'interface et le rendu serveur sans appliquer les
+brouillons, publier de fichiers ou redemarrer le site. Les reconstructions
+demandees depuis l'admin refusent toujours une bascule avec des tables ouvertes.
+
 ## Sources techniques
 
 Les fichiers fournis implementent les reglages propres a KTGA.ME ; les

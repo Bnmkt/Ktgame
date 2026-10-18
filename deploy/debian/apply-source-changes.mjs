@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
+import { sourceBuildDependencies, sourceBuildCommand } from "./source-build-environment.mjs";
 
 // Installed root-owned outside the editable source tree; no HTTP arguments or shell commands.
 const root = "/opt/ktga", state = "/var/lib/ktga/source-editor", queue = `${state}/queue`, results = `${state}/results`;
@@ -36,10 +37,38 @@ async function ownTree(directory, uid, gid) {
   for (const entry of await fs.readdir(directory, { withFileTypes: true })) { const target = path.join(directory, entry.name); if (entry.isSymbolicLink()) continue; await fs.chown(target, uid, gid); if (entry.isDirectory()) await ownTree(target, uid, gid); }
   await fs.chown(directory, uid, gid);
 }
+async function rebuild(workspace, files) {
+  const dependencies = await sourceBuildDependencies(`${root}/client`);
+  await fs.mkdir(workspace, { mode: 0o750 });
+  // Configuration and tools are trusted deployment files, not editable through the admin UI.
+  for (const entry of ["src", "public", "index.html", "discord-activity", "vite.config.js", "package.json"]) await fs.cp(`${root}/client/${entry}`, `${workspace}/${entry}`, { recursive: true, dereference: false });
+  await fs.symlink(`${dependencies}/node_modules`, `${workspace}/node_modules`);
+  for (const row of files) await fs.writeFile(path.join(workspace, row.path.slice("client/".length)), row.content);
+  const passwd = (await fs.readFile("/etc/passwd", "utf8")).split("\n").find(line => line.startsWith("ktga-build:"))?.split(":");
+  if (!passwd) throw new Error("Utilisateur de reconstruction absent.");
+  await ownTree(workspace, Number(passwd[2]), Number(passwd[3]));
+  await run("/usr/bin/systemd-run", sourceBuildCommand(workspace, dependencies));
+  await run("/usr/bin/systemd-run", sourceBuildCommand(workspace, dependencies, true));
+  async function validateOutput(directory) { for (const entry of await fs.readdir(directory, { withFileTypes: true })) { if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile())) throw new Error("Sortie de reconstruction invalide."); if (entry.isDirectory()) await validateOutput(path.join(directory, entry.name)); } }
+  await validateOutput(`${workspace}/dist`); await validateOutput(`${workspace}/dist-ssr`);
+  for (const entry of await fs.readdir(`${workspace}/dist-ssr/assets`)) await fs.copyFile(`${workspace}/dist-ssr/assets/${entry}`, `${workspace}/dist/assets/${entry}`);
+}
 await fs.mkdir(results, { recursive: true, mode: 0o750 });
 const owner = await fs.stat(state);
 for (const directory of [state, results]) { const stat = await fs.lstat(directory); if (stat.isSymbolicLink() || stat.uid !== 0 || (stat.mode & 0o022)) throw new Error("Répertoire de publication non sécurisé."); }
-for (const name of await fs.readdir(queue)) {
+if (process.argv.includes("--check-build")) {
+  const workspace = `/var/lib/ktga-build/${randomUUID()}`;
+  try {
+    await rebuild(workspace, []);
+    console.log(log);
+    console.log("Reconstruction interface et rendu serveur réussie. Aucun brouillon appliqué, aucun redémarrage.");
+  } catch (error) {
+    console.error(log);
+    throw error;
+  } finally {
+    if (!(await fs.lstat(workspace).catch(() => null))?.isSymbolicLink()) await fs.rm(workspace, { recursive: true, force: true });
+  }
+} else for (const name of await fs.readdir(queue)) {
   if (!/^[a-f0-9-]{36}\.json$/.test(name)) continue;
   const pending = path.join(queue, name), id = name.slice(0, -5), target = path.join(results, name);
   let job = { id, status: "failed" }, stopped = false, backupReady = false;
@@ -54,20 +83,7 @@ for (const name of await fs.readdir(queue)) {
       if (hash(await fs.readFile(await safeTarget(row.path), "utf8")) !== row.baseHash) throw new Error("Les sources ont changé depuis la préparation.");
     }
     noTables(); await status("building", "Reconstruction isolée en cours.");
-    await fs.mkdir(workspace, { mode: 0o750 });
-    // Configuration and tools are trusted deployment files, not editable through the admin UI.
-    for (const entry of ["src", "public", "index.html", "discord-activity", "vite.config.js", "package.json"]) await fs.cp(`${root}/client/${entry}`, `${workspace}/${entry}`, { recursive: true, dereference: false });
-    await fs.symlink(`${root}/client/node_modules`, `${workspace}/node_modules`);
-    for (const row of job.files) await fs.writeFile(path.join(workspace, row.path.slice("client/".length)), row.content);
-    const passwd = (await fs.readFile("/etc/passwd", "utf8")).split("\n").find(line => line.startsWith("ktga-build:"))?.split(":");
-    if (!passwd) throw new Error("Utilisateur de reconstruction absent.");
-    await ownTree(workspace, Number(passwd[2]), Number(passwd[3]));
-    const sandbox = ["--collect", "--wait", "--pipe", "--quiet", "--uid=ktga-build", "-p", `WorkingDirectory=${workspace}`, "-p", "ProtectSystem=strict", "-p", "ProtectHome=true", "-p", "PrivateNetwork=true", "-p", "NoNewPrivileges=true", "-p", "MemoryMax=1500M", "-p", "CPUQuota=100%", "-p", `ReadWritePaths=${workspace}`, "-p", "InaccessiblePaths=/etc/ktga /var/lib/ktga", "/usr/bin/env", "-i", "PATH=/usr/bin:/bin", `HOME=${workspace}`, "VITE_API_URL=https://api.ktga.me", "VITE_AUDIENCE_READY=true", "/usr/bin/node", `${root}/client/node_modules/vite/bin/vite.js`, "build", "--mode", "production", "--configLoader", "runner"];
-    await run("/usr/bin/systemd-run", sandbox);
-    await run("/usr/bin/systemd-run", [...sandbox, "--ssr", "src/seo/render.jsx", "--outDir", "dist-ssr"]);
-    async function validateOutput(directory) { for (const entry of await fs.readdir(directory, { withFileTypes: true })) { if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile())) throw new Error("Sortie de reconstruction invalide."); if (entry.isDirectory()) await validateOutput(path.join(directory, entry.name)); } }
-    await validateOutput(`${workspace}/dist`); await validateOutput(`${workspace}/dist-ssr`);
-    for (const entry of await fs.readdir(`${workspace}/dist-ssr/assets`)) await fs.copyFile(`${workspace}/dist-ssr/assets/${entry}`, `${workspace}/dist/assets/${entry}`);
+    await rebuild(workspace, job.files);
     noTables();
     for (const row of job.files) if (hash(await fs.readFile(await safeTarget(row.path), "utf8")) !== row.baseHash) throw new Error("Les sources ont changé pendant la reconstruction.");
     await fs.mkdir(backup, { recursive: true, mode: 0o700 });
