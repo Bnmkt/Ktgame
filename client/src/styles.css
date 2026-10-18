@@ -10713,3 +10713,16 @@ body:has(.midnight-contract-dialog-layer) .game-log-center { visibility: hidden;
   .room-app-shell.table-fullscreen .poker-play-area { overflow: visible; }
   .room-app-shell.table-fullscreen .poker-control-dock { position: relative; }
 }
+
+.public-profile-modal.profile-cosmetic-shell {
+  width: min(980px, calc(100vw - 40px));
+  height: auto;
+  max-height: 90dvh;
+  min-height: 0;
+}
+
+.public-profile-modal .public-profile-scroll {
+  min-height: 0;
+  max-height: 90dvh;
+  overflow-y: auto;
+}

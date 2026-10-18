@@ -213,6 +213,8 @@ export function previewUserForItem(user, item) {
   if (item.type === "profileEffects") equipped.profileEffect = item.value;
   if (item.type === "diceSkins") equipped.diceSkin = item.value;
   if (item.type === "cardSkins") equipped.cardSkin = item.value;
+return { ...user, cosmetics: { ...(user.cosmetics ?? {}), equipped } };
+
   return { ...user, cosmetics: { ...(user.cosmetics ?? {}), equipped } };
 }
 
