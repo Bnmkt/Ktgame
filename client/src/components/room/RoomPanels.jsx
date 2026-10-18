@@ -1,4 +1,5 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
+import { Mascot, gameMascot } from "../mascots/Mascot.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import React, { useState } from "react";
 import { BadgeCheck, Bot, Crown, Eye, EyeOff, HelpCircle, Play, ReceiptText, Save, Settings, Swords, UserMinus, X } from "lucide-react";
@@ -171,9 +172,12 @@ export function RoomStatusPanel({ room, state, current, userId, isOwner, onAddBo
   return (
     <section className="card table-status-card">
       <div className="table-status-head">
-        <div>
+        <div className="mascot-waiting-pair">
+          {!state && <Mascot {...gameMascot(room.gameId)}/>}
+          <div>
           <span className="eyebrow">{localeText("Table")}</span>
           <h2>{state ? (state.finished ? localeText("Manche terminée") : localeText("Manche en cours")) : localeText("En attente")}</h2>
+          </div>
         </div>
         {owner && <div className="room-master"><Crown size={16} /><span>{localeText("Maître")}</span><DisplayName user={owner} /></div>}
       </div>

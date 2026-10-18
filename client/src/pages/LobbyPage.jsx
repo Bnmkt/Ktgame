@@ -1,4 +1,5 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
+import { Mascot } from "../components/mascots/Mascot.jsx";
 import { softBanLimited } from "../features/accounts/softban.js";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
@@ -158,7 +159,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
 
   return (
     <main className="app-shell">
-      <div className="page-heading lobby-heading"><div><span className="eyebrow">{localeText("Le casino")}</span><h1>{localeText("À quelle table joues-tu ?")}</h1></div></div>
+      <div className="page-heading lobby-heading mascot-page-heading"><div><span className="eyebrow">{localeText("Le casino")}</span><h1>{localeText("À quelle table joues-tu ?")}</h1></div><Mascot character="lucky" pose={playMode === "ranked" ? "victory" : "welcome"}/></div>
       {error && !selectedGame && <div className="error">{localeText(error)}</div>}
       {(user.minor?.restricted || user.moderation?.type === "soft") && <div className="account-limitation-notice"><ShieldCheck size={18} /><span><strong>{localeText("Accès adapté")}</strong>{localeText("Certaines fonctions et certains jeux ne sont pas disponibles pour ce compte.")}</span></div>}
       <LobbyNotice notice={notice} user={user} setUser={setUser}/>
@@ -212,7 +213,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
               </article>
             ))}
           </div>
-          {!visibleGames.length && <div className="empty-state game-filter-empty"><strong>{localeText("Aucun jeu ne correspond à ces critères.")}</strong><button className="secondary" onClick={resetGameFilters}>{localeText("Effacer la recherche et les filtres")}</button></div>}
+          {!visibleGames.length && <div className="empty-state game-filter-empty mascot-empty-state"><Mascot character="lucky" pose="think"/><strong>{localeText("Aucun jeu ne correspond à ces critères.")}</strong><button className="secondary" onClick={resetGameFilters}>{localeText("Effacer la recherche et les filtres")}</button></div>}
         </section>
       </div>
       {joinOpen && <JoinRoomDialog userId={user.id} onClose={() => setJoinOpen(false)} onJoined={onOpenRoom} />}

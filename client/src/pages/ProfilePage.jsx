@@ -1,4 +1,5 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
+import { Mascot } from "../components/mascots/Mascot.jsx";
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { useEffect, useState } from "react";
 import { PublicProfileModal } from "../components/profile/PublicProfileModal.jsx";
@@ -292,7 +293,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
 
   return (
     <main className={`app-shell ${isShop ? "shop-shell" : "profile-shell"}`}>
-      <div className="page-heading"><div><span className="eyebrow">{isShop ? localeText("Collections") : localeText("Espace personnel")}</span><h1>{isShop ? localeText("Boutique") : localeText("Profil de {value0}", { value0: user.profile?.displayName ?? user.pseudo })}</h1></div></div>
+      <div className={`page-heading ${isShop ? "mascot-page-heading" : ""}`}><div><span className="eyebrow">{isShop ? localeText("Collections") : localeText("Espace personnel")}</span><h1>{isShop ? localeText("Boutique") : localeText("Profil de {value0}", { value0: user.profile?.displayName ?? user.pseudo })}</h1></div>{isShop && <Mascot character="jacky" pose="welcome"/>}</div>
       {error && <div className="error">{localeText(error)}</div>}
       {message && <div className="success">{message}</div>}
       <div className={isShop ? "shop-page-layout" : "profile-layout"}>

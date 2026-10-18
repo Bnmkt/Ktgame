@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+ <!-- Square FACE TEXTURE only: flat 2D, no dice shape and NO PIPS -->
+ <rect width="1024" height="1024" fill="#241a16"/>
+ <rect x="16" y="16" width="992" height="992" rx="128" fill="#2a201b"/>
+ <rect x="38" y="38" width="948" height="948" rx="108" fill="#dba64f"/>
+ <rect x="70" y="70" width="884" height="884" rx="85" fill="#92715b"/>
+ <!-- very minimal black corner fillets, leave every pip position unobstructed -->
+ <path d="M99 214V145Q99 99 145 99H214" fill="none" stroke="#392920" stroke-width="14" stroke-linecap="round"/>
+ <path d="M810 99H879Q925 99 925 145V214" fill="none" stroke="#392920" stroke-width="14" stroke-linecap="round"/>
+ <path d="M99 810V879Q99 925 145 925H214" fill="none" stroke="#392920" stroke-width="14" stroke-linecap="round"/>
+ <path d="M810 925H879Q925 925 925 879V810" fill="none" stroke="#392920" stroke-width="14" stroke-linecap="round"/>
+ <!-- plain center; even 9 mm die pips overlay remains strongly legible -->
+</svg>

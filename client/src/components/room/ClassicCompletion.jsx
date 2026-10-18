@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Coins, DoorOpen, Eye, Medal, Play, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Coins, DoorOpen, Eye, Play, Sparkles, Trophy } from "lucide-react";
 import { Dialog } from "../common/Dialog.jsx";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { CompactNumber } from "../../utils/presentation.jsx";
@@ -7,6 +7,7 @@ import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { gameTitle } from "../../features/games/config.js";
 import { classicResults } from "../../features/games/classic-completion.js";
 import "./classic-completion.css";
+import { Mascot, gameMascot } from "../mascots/Mascot.jsx";
 
 function signed(value, t) {
   return <>{value > 0 ? "+" : value < 0 ? "-" : ""}<CompactNumber value={Math.abs(value)} label={t("Bilan net de jetons")} /></>;
@@ -28,7 +29,7 @@ function CompletionContent({ room, userId, actions, endsAt, dialog = false }) {
   const hasMoney = rows.some((row) => !row.isBot && (row.spent > 0 || row.recovered > 0));
   return <div className={`classic-completion-content ${own?.winner ? "completion-victory" : "completion-finished"}`}>
     <div className="classic-completion-body">
-    <header className="classic-completion-heading"><span className="eyebrow">{t(gameTitle(room.gameId))} · {t("Partie terminée")}</span><div className="classic-completion-headline"><span className="classic-completion-emblem" aria-hidden="true">{own?.winner ? <Trophy size={32}/> : <Medal size={32}/>}</span><div><h2>{t(outcome)}</h2><p>{own ? t("Ta partie en un regard") : t("Résultats finaux")}</p></div></div></header>
+    <header className="classic-completion-heading"><span className="eyebrow">{t(gameTitle(room.gameId))} · {t("Partie terminée")}</span><div className="classic-completion-headline"><span className="classic-completion-emblem" aria-hidden="true"><Mascot character={own?.winner ? gameMascot(room.gameId).character : "milo"} pose={own?.winner ? "victory" : "welcome"}/></span><div><h2>{t(outcome)}</h2><p>{own ? t("Ta partie en un regard") : t("Résultats finaux")}</p></div></div></header>
     {own && <div className="classic-completion-metrics">
       <div><small>{t(room.gameId === "blackjack" ? "Ta main" : room.gameId === "belote" ? "Score de ton équipe" : own.unit === "Place" ? "Ta place" : "Ton score")}</small><strong><CompactNumber value={own.score}/></strong><span>{own.unit === "Place" ? t("sur {count} joueurs", { count: rows.length }) : t(own.unit)}</span></div>
       {rows.length > 1 && !["president", "blackjack", "belote"].includes(room.gameId) && <div><small>{t("Ta place")}</small><strong>#{own.rank}</strong><span>{t("sur {count} joueurs", { count: rows.length })}</span></div>}

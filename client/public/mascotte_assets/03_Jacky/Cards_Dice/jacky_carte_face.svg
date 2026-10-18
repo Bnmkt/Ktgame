@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="1200" viewBox="0 0 840 1200">
+  <!-- Flat, print-safe Jacky card FRONT; the game draws numbers and suits -->
+  <rect width="840" height="1200" rx="70" fill="#1c1413"/>
+  <rect x="12" y="12" width="816" height="1176" rx="62" fill="#b57740"/>
+  <rect x="30" y="30" width="780" height="1140" rx="50" fill="#f7ecda"/>
+  <rect x="45" y="45" width="750" height="1110" rx="39" fill="none" stroke="#24201b" stroke-width="9"/>
+  <rect x="64" y="64" width="712" height="1072" rx="25" fill="none" stroke="#dcb777" stroke-width="7"/>
+  <!-- Only four very simple flat corner motifs, no game symbols or numbers -->
+  <path d="M80 185V83H184" fill="none" stroke="#38281f" stroke-width="11" stroke-linecap="round"/>
+  <path d="M760 185V83H656" fill="none" stroke="#38281f" stroke-width="11" stroke-linecap="round"/>
+  <path d="M80 1015V1117H184" fill="none" stroke="#38281f" stroke-width="11" stroke-linecap="round"/>
+  <path d="M760 1015V1117H656" fill="none" stroke="#38281f" stroke-width="11" stroke-linecap="round"/>
+  <!-- Minimal tiny sunglasses-and-ears detail only at header and footer -->
+  <g transform="translate(362 75)">
+    <path d="M32 30L13 0L44 21M75 30L95 0L64 21" fill="#9a6036" stroke="#38271f" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="24" y="23" width="32" height="19" rx="5" fill="#211b1a"/>
+    <rect x="61" y="23" width="32" height="19" rx="5" fill="#211b1a"/>
+    <path d="M54 29Q59 25 65 29" stroke="#211b1a" stroke-width="5" fill="none"/>
+  </g>
+  <g transform="translate(478 1125) rotate(180)">
+    <path d="M32 30L13 0L44 21M75 30L95 0L64 21" fill="#9a6036" stroke="#38271f" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="24" y="23" width="32" height="19" rx="5" fill="#211b1a"/>
+    <rect x="61" y="23" width="32" height="19" rx="5" fill="#211b1a"/>
+    <path d="M54 29Q59 25 65 29" stroke="#211b1a" stroke-width="5" fill="none"/>
+  </g>
+</svg>
