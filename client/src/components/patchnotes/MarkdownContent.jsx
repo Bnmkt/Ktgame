@@ -37,7 +37,7 @@ export function MarkdownContent({ children, className = "", inlineImages = true,
         if (!inlineImages || compactPreview) return null;
         const apiPath = src.startsWith(`${BASE_PATH}/api/`) ? src.slice(BASE_PATH.length) : src.startsWith("/api/") ? src : null;
         const layout = markdownImageLayout(title);
-        return <img className={layout ? `markdown-media-float media-${layout.side}` : undefined} style={layout ? { "--media-width": `${layout.width}%` } : undefined} src={apiPath ? `${API_URL}${apiPath}` : src} alt={alt} title={layout ? undefined : title} loading="lazy" />;
+        return <img className={layout ? `markdown-media-float media-${layout.side}` : undefined} style={layout ? { "--media-width": layout.width, "--media-height": layout.height } : undefined} src={apiPath ? `${API_URL}${apiPath}` : src} alt={alt} title={layout ? undefined : title} loading="lazy" />;
       },
       a: ({ href, children: label }) => {
         const safeHref = safeMarkdownUrl(href);

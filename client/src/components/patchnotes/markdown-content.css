@@ -1,8 +1,8 @@
 .patchnote-markdown { min-width: 0; overflow-wrap: anywhere; display: flow-root; }
-.patchnote-markdown .markdown-media-float { width: var(--media-width, 40%); max-width: 100%; height: auto; border-radius: 6px; }
+.patchnote-markdown .markdown-media-float { width: var(--media-width, 40%); max-width: 100%; height: var(--media-height, auto); object-fit: contain; border-radius: 6px; }
 .patchnote-markdown .media-left { float: left; margin: 0 20px 14px 0; }
 .patchnote-markdown .media-right { float: right; margin: 0 0 14px 20px; }
-@media (max-width: 600px) { .patchnote-markdown .markdown-media-float { float: none; display: block; width: 100%; margin: 0 0 14px; } }
+@media (max-width: 600px) { .patchnote-markdown .markdown-media-float { float: none; display: block; margin: 0 0 14px; } }
 .patchnote-markdown > :first-child { margin-top: 0; }
 .patchnote-markdown > :last-child { margin-bottom: 0; }
 .patchnote-markdown p { margin: 0 0 12px; }
