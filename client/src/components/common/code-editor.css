@@ -1,0 +1,16 @@
+.code-field, .code-field-loading { min-width: 0; max-width: 100%; border: 1px solid var(--site-border, #514b38); border-radius: 6px; overflow: hidden; font-weight: 400; }
+.code-field-heading { display: flex; justify-content: space-between; gap: 12px; color: #c3cbd1; background: #182126; padding: 7px 10px; font: 11px ui-monospace, monospace; }
+.code-field-host { min-width: 0; width: 100%; }
+.code-field .cm-editor { height: var(--code-height, 280px); min-height: 100px; max-height: 70dvh; color: #e0e6ec; background: #10171c; outline: none; text-align: left; }
+.code-field .cm-scroller { overflow: auto; font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.code-field .cm-content { padding: 10px 0; caret-color: #f3ca73; }
+.code-field .cm-gutters { background: #151e24; color: #9aa8b1; border-right: 1px solid #39464e; }
+.code-field .cm-activeLine, .code-field .cm-activeLineGutter { background: #23323a; }
+.code-field .cm-cursor { border-left-color: #f3ca73; }
+.code-field .cm-selectionBackground, .code-field .cm-focused .cm-selectionBackground { background: #375261 !important; }
+.code-field .cm-tooltip { background: #182126; color: #e0e6ec; border-color: #687a86; z-index: 3; }
+.code-field .cm-tooltip-autocomplete ul { display: block; padding: 0; }
+.code-field .cm-tooltip-autocomplete li { display: block; border: 0; }
+.code-field .cm-search input { background: #fffaf0; color: #171b20; width: auto; min-height: 28px; }
+.code-field-diagnostics { margin: 0; padding: 8px 12px 8px 28px; color: #ff9ca5; background: #1c151b; font-size: 12px; max-height: 100px; overflow: auto; }
+.code-field-loading { padding: 15px; background: #10171c; color: #c3cbd1; }

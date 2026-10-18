@@ -1,4 +1,5 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
+import { CodeEditor } from "../common/CodeEditor.jsx";
 import { useState } from "react";
 import { AlertTriangle, BadgeCheck, Bird, Bot, Cat, CheckCircle2, Club, Coins, Copy, Crown, Diamond, Dice5, Dog, Fish, Flame, Gem, Heart, Landmark, Medal, PawPrint, Rabbit, Rocket, Shield, Snail, Spade, Sparkles, Squirrel, Star, Swords, Trophy, Turtle, User, Zap } from "lucide-react";
 import { DynamicIcon, iconNames } from "lucide-react/dynamic.mjs";
@@ -606,7 +607,7 @@ export function MotionDesigner({ motion, onChange }) {
       </div></div>}
       {activeMotion.preset === "custom" && <div className="designer-section custom-keyframes-section">
         <div className="custom-keyframes-heading"><div><h4>{localeText("Keyframes personnalisées")}</h4><small>{localeText("Colle les étapes seules ou une règle @keyframes complète. Son nom sera isolé automatiquement pour cet objet.")}</small></div><button type="button" className="secondary" onClick={() => set("customKeyframes", exampleFrames)}>{localeText("Charger un exemple")}</button></div>
-        <label>{localeText("Étapes de l’animation")}<textarea className="keyframes-editor" spellCheck="false" value={activeMotion.customKeyframes} onChange={(event) => set("customKeyframes", event.target.value)} placeholder={exampleFrames} /></label>
+        <label>{localeText("Étapes de l’animation")}<CodeEditor language="css-declarations" label={localeText("Étapes de l’animation")} maxLength={12000} height={300} value={activeMotion.customKeyframes} onChange={value => set("customKeyframes", value)}/></label>
         <div className={`keyframes-validation ${customFrames ? "valid" : "invalid"}`}>{customFrames ? <><CheckCircle2 size={16} />{" " + localeText("Keyframes valides et prêtes à être utilisées.")}</> : <><AlertTriangle size={16} />{" " + localeText("Ajoute au moins deux étapes valides, par exemple 0% et 100%.")}</>}</div>
         <small className="field-help">{localeText("Propriétés acceptées : transform, opacity, filter, box-shadow, background-position, background-color, border-color, color et letter-spacing. Variables disponibles : --motion-distance, --motion-negative-distance, --motion-scale et --motion-rotation.")}</small>
       </div>}
