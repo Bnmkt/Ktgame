@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EditorState } from "@codemirror/state";
 import { codeLanguage, codeDiagnostics, sourceLanguage } from "../src/components/common/code-languages.js";
+import { editorDocumentValue } from "../src/components/common/code-files.js";
 const diagnose = (language, doc) => codeDiagnostics({ state: EditorState.create({ doc, extensions: [codeLanguage(language)] }) }, language);
+
+test("external document comparisons use the same line endings as CodeMirror", () => {
+  for (const value of ["a\r\nb\r\n", "a\rb\r", "a\nb\n"]) assert.equal(editorDocumentValue(value), EditorState.create({ doc: value }).doc.toString());
+});
 
 test("code editors select source languages and diagnose syntax without running code", () => {
   assert.equal(sourceLanguage("x.jsx"), "jsx");
