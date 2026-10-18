@@ -1,0 +1,8 @@
+.shop-artwork-editor { align-content:start; }
+.shop-artwork-slots { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:16px; }
+.shop-artwork-slot { display:grid; align-content:start; gap:10px; min-width:0; }
+.shop-artwork-sample { height:150px; display:grid; place-items:center; overflow:hidden; border:1px solid var(--site-border); border-radius:4px; background:repeating-conic-gradient(#ffffff12 0% 25%,transparent 0% 50%) 0 0 / 16px 16px; }
+.shop-artwork-sample img { display:block; width:100%; height:100%; }
+.shop-artwork-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.shop-artwork-actions button { min-height:38px; }
+.shop-artwork-actions button:not(:first-child) { width:38px; padding:0; display:grid; place-items:center; }

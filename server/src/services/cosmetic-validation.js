@@ -1,3 +1,5 @@
+import { cosmeticImageSettings } from "../../../client/src/utils/cosmetic-images.js";
+
 const cosmeticCssProperties = new Set([
   "align-items", "animation", "background", "background-attachment", "background-clip", "background-color", "background-image", "background-origin", "background-position", "background-position-x", "background-position-y", "background-repeat", "background-size",
   "border", "border-bottom-color", "border-bottom-left-radius", "border-bottom-right-radius", "border-bottom-style", "border-bottom-width", "border-color", "border-image-outset", "border-image-repeat", "border-image-slice", "border-image-source", "border-image-width", "border-left-color", "border-left-style", "border-left-width", "border-radius", "border-right-color", "border-right-style", "border-right-width", "border-style", "border-top-color", "border-top-left-radius", "border-top-right-radius", "border-top-style", "border-top-width", "border-width",
@@ -91,6 +93,7 @@ export function normalizeCosmeticDesign(value, type) {
   const common = {
     version: 1,
     type,
+    ...cosmeticImageSettings(value),
     borderColor: color("borderColor", "#d6ad45"),
     borderWidth: number("borderWidth", 2, 0, 8),
     borderStyle: option("borderStyle", "solid", ["solid", "double", "dashed"]),

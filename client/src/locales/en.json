@@ -4721,5 +4721,20 @@
   "Rechercher...": "Search...",
   "Bordures": "Borders",
   "Lecture seule": "Read only",
-  "Chargement de l’éditeur…": "Loading editor..."
+  "Chargement de l’éditeur…": "Loading editor...",
+  "Tourner de 90° à gauche": "Rotate 90° left",
+  "Tourner de 90° à droite": "Rotate 90° right",
+  "Retourner horizontalement": "Flip horizontally",
+  "Retourner verticalement": "Flip vertically",
+  "Grille de cadrage": "Crop grid",
+  "Outils de recadrage": "Crop tools",
+  "Rotation en degrés": "Rotation in degrees",
+  "Ajuster la rotation": "Adjust rotation",
+  "Images et textures": "Images and textures",
+  "Image de l’icône": "Icon image",
+  "Affichage de l’image": "Image sizing",
+  "Remplir": "Fill",
+  "Image entière": "Fit entire image",
+  "Position horizontale": "Horizontal position",
+  "Position verticale": "Vertical position"
 }

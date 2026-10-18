@@ -12,6 +12,7 @@ import { RankInsignia } from "../../features/games/RankInsignia.jsx";
 import { gameTitle } from "../../features/games/config.js";
 import { gameImageUrl } from "../../features/games/presentation.js";
 import { API_URL } from "../../api.js";
+import { cosmeticImage, cosmeticImageBackground, cosmeticImageSettings } from "../../utils/cosmetic-images.js";
 
 export let cosmeticCatalogItems = [];
 
@@ -72,6 +73,8 @@ export function CosmeticIcon({ value, source, style }) {
   if (siteImage) return <span className="cosmetic-icon cosmetic-icon-site" style={style}><img src={siteImage.startsWith("/api/") ? `${API_URL}${siteImage}` : siteImage} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></span>;
   const catalogSource = cosmeticCatalogItems.find((item) => item.type === "icons" && item.value === value)?.icon;
   const configuredSource = String(source ?? catalogSource ?? "").trim();
+  const imageSource = cosmeticImage(configuredSource);
+  if (imageSource) return <span className={`cosmetic-icon cosmetic-icon-${String(value ?? "preview").replace(/[^a-zA-Z0-9_-]/g, "")}`} style={style}><img src={`${API_URL}${imageSource}`} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }}/></span>;
   const iconKey = configuredSource && !configuredSource.startsWith("<svg") ? defaultIconKey(configuredSource.toLowerCase()) : defaultIconKey(value);
   const lucideName = normalizeLucideIconName(configuredSource || iconKey);
   const icons = {
@@ -219,6 +222,7 @@ export function defaultVisualDesign(type) {
   const common = {
     version: 1,
     type,
+    ...cosmeticImageSettings(),
     borderColor: "#d6ad45",
     borderWidth: 2,
     borderStyle: "solid",
@@ -427,9 +431,10 @@ export function cosmeticMotionCssRules(item) {
 
 export function designAnimation(design) {
   const speed = Math.max(0.6, Number(design.animationSpeed) || 3);
-  if (design.animation === "flow") return `animation: aurora-flow ${speed}s ease-in-out infinite; background-size: 280% 280%;`;
+  const texture = [design.surfaceImage, design.faceImage, design.backImage].some(cosmeticImage);
+  if (design.animation === "flow") return `animation: aurora-flow ${speed}s ease-in-out infinite; ${texture ? "" : "background-size: 280% 280%;"}`;
   if (design.animation === "pulse") return `animation: cosmetic-visual-pulse ${speed}s ease-in-out infinite;`;
-  if (design.animation === "shimmer") return `animation: shine-sweep ${speed}s linear infinite; background-size: 260% 100%;`;
+  if (design.animation === "shimmer") return `animation: shine-sweep ${speed}s linear infinite; ${texture ? "" : "background-size: 260% 100%;"}`;
   return "";
 }
 
@@ -464,29 +469,30 @@ export function visualDesignCssRules(item) {
   const border = `var(--custom-border-width,${design.borderWidth}px) ${design.borderStyle} ${design.borderColor}`;
   const shape = rootShapeCss(design.shape, design.radius);
   const animation = designAnimation(design);
+  const imageBackground = (field, fallback) => cosmeticImageBackground(design, field, fallback, image => `${API_URL}${image}`);
   if (item.type === "diceSkins") {
     const selector = `.die-skin-${value}`;
     const pipRadius = design.pipShape === "round" ? "999px" : design.pipShape === "soft" ? "3px" : "0";
     const pipTransform = design.pipShape === "diamond" ? "rotate(45deg)" : "none";
-    return `${selector}{background:${designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle)};border:${border};${shape}box-shadow:${designShadow(design)};${animation}}\n${selector} .pip{background:${design.pipColor};border-radius:${pipRadius};height:var(--custom-pip-size,${design.pipSize}px);width:var(--custom-pip-size,${design.pipSize}px);transform:${pipTransform};box-shadow:0 0 var(--custom-pip-glow,${design.pipGlow}px) ${rgbaFromHex(design.pipColor, 0.65)};}`;
+    return `${selector}{background:${imageBackground("surfaceImage", designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle))};border:${border};${shape}box-shadow:${designShadow(design)};${animation}}\n${selector} .pip{background:${design.pipColor};border-radius:${pipRadius};height:var(--custom-pip-size,${design.pipSize}px);width:var(--custom-pip-size,${design.pipSize}px);transform:${pipTransform};box-shadow:0 0 var(--custom-pip-glow,${design.pipGlow}px) ${rgbaFromHex(design.pipColor, 0.65)};}`;
   }
   if (item.type === "cardSkins") {
     const selector = `.card-skin-${value}`;
     const common = `border:${border};${shape}box-shadow:${designShadow(design)};${animation}`;
-    return `${selector}:not(.card-back){background:${designBackground(design.faceMode, design.facePrimary, design.faceSecondary, design.angle)};${common}color:${design.blackSuitColor};}\n${selector}:not(.card-back).red-suit{color:${design.redSuitColor};}\n.card-back${selector}{background:${cardBackBackground(design)};${common}color:${design.facePrimary};}`;
+    return `${selector}:not(.card-back){background:${imageBackground("faceImage", designBackground(design.faceMode, design.facePrimary, design.faceSecondary, design.angle))};${common}color:${design.blackSuitColor};}\n${selector}:not(.card-back).red-suit{color:${design.redSuitColor};}\n.card-back${selector}{background:${imageBackground("backImage", cardBackBackground(design))};${common}color:${design.facePrimary};}`;
   }
   if (item.type === "profileBanners") {
     const selector = `.profile-cosmetic-shell.profile-banner-${value}`;
-    return `${selector}{background:${designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle, design.tertiaryColor)};border:${border};${shape}box-shadow:${designShadow(design, design.accentColor)};${animation}}`;
+    return `${selector}{background:${imageBackground("surfaceImage", designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle, design.tertiaryColor))};border:${border};${shape}box-shadow:${designShadow(design, design.accentColor)};${animation}}`;
   }
   if (item.type === "profileFrames") {
     const selector = `.profile-cosmetic-frame-layer.profile-frame-${value}`;
-    return `${selector}{background:${designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle, design.tertiaryColor)};border:${border};${shape}box-shadow:${designShadow(design, design.accentColor)};${animation}}`;
+    return `${selector}{background:${imageBackground("surfaceImage", designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle, design.tertiaryColor))};border:${border};${shape}box-shadow:${designShadow(design, design.accentColor)};${animation}}`;
   }
   const selector = `.member-${value}`;
   const roots = `.vip-card${selector},.member-swatch${selector}`;
   const fontFamilies = { casino: "inherit", serif: "Georgia, serif", modern: "Inter, Arial, sans-serif", mono: '"Cascadia Code", Consolas, monospace' };
-  return `${roots}{background:${designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle, design.tertiaryColor)};border:${border};${shape}box-shadow:${designShadow(design, design.accentColor)};font-family:${fontFamilies[design.fontStyle] ?? "inherit"};${animation}}\n.vip-card${selector}::before{background:linear-gradient(90deg,transparent,${design.accentColor},transparent);}\n.vip-card${selector} .vip-label{color:${design.titleColor};}\n.vip-card${selector} .display-name-text{color:${design.textColor};}\n.vip-card${selector}>small{color:${design.secondaryTextColor};}`;
+  return `${roots}{background:${imageBackground("surfaceImage", designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle, design.tertiaryColor))};border:${border};${shape}box-shadow:${designShadow(design, design.accentColor)};font-family:${fontFamilies[design.fontStyle] ?? "inherit"};${animation}}\n.vip-card${selector}::before{background:linear-gradient(90deg,transparent,${design.accentColor},transparent);}\n.vip-card${selector} .vip-label{color:${design.titleColor};}\n.vip-card${selector} .display-name-text{color:${design.textColor};}\n.vip-card${selector}>small{color:${design.secondaryTextColor};}`;
 }
 
 export function cosmeticCssRules(items = []) {
