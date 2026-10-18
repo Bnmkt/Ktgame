@@ -1,6 +1,6 @@
 .spectator-page { max-width: 1100px; }
 .spectator-page .eyebrow { align-items: center; display: inline-flex; gap: 8px; }
-.spectator-auto-entry { display: inline-flex; align-items: center; gap: 10px; min-height: 42px; margin-left: auto; padding: 8px 12px; border: 1px solid #58654a; border-radius: 6px; color: #e9dfbd; background: #19241f; font-size: 13px; cursor: pointer; }
+.spectator-auto-entry { display: inline-flex; align-items: center; gap: 10px; min-height: 42px; margin-left: auto; padding: 8px 12px; border: var(--site-border-width, 1px) solid #58654a; border-radius: 6px; color: #e9dfbd; background: #19241f; font-size: 13px; cursor: pointer; }
 .spectator-auto-entry input { flex: 0 0 18px; width: 18px; height: 18px; margin: 0; accent-color: #dbb95f; }
 .spectator-auto-entry:has(input:disabled) { opacity: .6; cursor: not-allowed; }
 @media (max-width: 600px) { .spectator-auto-entry { flex: 1 1 100%; margin-left: 0; } }
@@ -18,14 +18,14 @@
 .spectator-columns .playing-card { height: 76px; min-width: 48px; width: 100%; }
 .spectator-lanes { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .spectator-boxes section > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.spectator-boxes span { border: 1px solid #efd389; min-width: 32px; padding: 8px; text-align: center; }
+.spectator-boxes span { border: var(--site-border-width, 1px) solid #efd389; min-width: 32px; padding: 8px; text-align: center; }
 .spectator-page .dice-row { flex-wrap: wrap; }
 .live-room-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 24px; }
 .live-room-list button { align-items: center; display: inline-flex; gap: 8px; }
 @media (max-width: 600px) { .spectator-columns { grid-template-columns: repeat(7, 58px); } .spectator-lanes { grid-template-columns: minmax(0, 1fr); } }
 .public-dice-board { display: grid; gap: 16px; min-width: 0; }
 .public-dice-choices dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; }
-.public-dice-choices dl > div { border-bottom: 1px solid #ffffff40; padding: 8px 0; display: flex; gap: 8px; justify-content: space-between; }
+.public-dice-choices dl > div { border-bottom: var(--site-border-width, 1px) solid #ffffff40; padding: 8px 0; display: flex; gap: 8px; justify-content: space-between; }
 .public-dice-choices dt { overflow-wrap: anywhere; }
 .public-dice-choices dd { margin: 0; color: #ffe397; font-weight: 700; }
 .public-dice-scores { min-width: 0; overflow-x: auto; }

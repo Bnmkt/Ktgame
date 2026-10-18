@@ -1,5 +1,5 @@
 .account-limit-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin-top: 20px; }
-.account-limit-options fieldset { min-width: 0; margin: 0; padding: 10px 0 0; border: 0; border-top: 1px solid #3f493c; }
+.account-limit-options fieldset { min-width: 0; margin: 0; padding: 10px 0 0; border: 0; border-top: var(--site-border-width, 1px) solid #3f493c; }
 .account-limit-options legend { padding: 0 12px 0 0; color: #e4bd60; font-size: 14px; font-weight: 700; }
 .account-limit-options label { display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 10px 0; color: #e0dfd4; font-size: 13px; line-height: 1.5; min-width: 0; }
 .account-limit-options input[type=checkbox] { flex: 0 0 auto; width: 18px; height: 18px; min-height: 18px; margin: 0; accent-color: #d0a543; }

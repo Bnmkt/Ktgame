@@ -7,17 +7,17 @@
 .account-admin-preview .vip-ratio strong { font-size: 13px; overflow-wrap: anywhere; }
 .account-admin-state { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 18px; }
 .account-admin-sidebar nav { display: grid; gap: 4px; }
-.account-admin-sidebar nav button { justify-content: flex-start; min-height: 42px; text-align: left; padding: 10px 12px; font-size: 13px; color: #bfd0c7; background: transparent; border: 1px solid transparent; border-radius: 6px; }
+.account-admin-sidebar nav button { justify-content: flex-start; min-height: 42px; text-align: left; padding: 10px 12px; font-size: 13px; color: #bfd0c7; background: transparent; border: var(--site-border-width, 1px) solid transparent; border-radius: 6px; }
 .account-admin-sidebar nav button:hover { background: #202c26; }
 .account-admin-sidebar nav button.active { color: #f1d27a; border-color: #887744; background: #2c3024; }
 .account-admin-sidebar nav svg { flex-shrink: 0; }
-.account-admin-reference { padding-top: 18px; border-top: 1px solid #394740; margin-top: 18px; display: grid; gap: 14px; }
+.account-admin-reference { padding-top: 18px; border-top: var(--site-border-width, 1px) solid #394740; margin-top: 18px; display: grid; gap: 14px; }
 .account-admin-reference dt, .account-admin-facts dt { color: #9daf9f; font-size: 11px; }
 .account-admin-reference dd, .account-admin-facts dd { margin: 5px 0 0; color: #e2e7d9; font-size: 13px; overflow-wrap: anywhere; }
 .account-admin-content { min-width: 0; }
 .account-admin-rank { display:flex; align-items:center; gap:10px; }
 .account-admin-mobile-section { display:none !important; }
-.account-admin-section { padding: 0 0 26px; margin-bottom: 26px; border-bottom: 1px solid #394740; }
+.account-admin-section { padding: 0 0 26px; margin-bottom: 26px; border-bottom: var(--site-border-width, 1px) solid #394740; }
 .account-admin-section:last-child { margin-bottom: 0; }
 .account-admin-section > header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
 .account-admin-section > header > svg { color: #c5af69; flex-shrink: 0; }
@@ -27,7 +27,7 @@
 .account-admin-field > div { min-width: 0; }
 .account-admin-field > div:first-child { padding-top: 10px; display: grid; gap: 7px; color: #dbcba4; font-size: 13px; font-weight: 700; }
 .account-admin-field small { color: #96a69b; font-weight: 400; line-height: 1.5; }
-.admin-user-editor .account-admin-workspace input:not([type=checkbox]):not([type=radio]), .admin-user-editor .account-admin-workspace select, .admin-user-editor .account-admin-workspace textarea { width: 100%; min-width: 0; min-height: 42px; border-radius: 6px; background: #101d17; border: 1px solid #526456; color: #ecede1; padding: 10px 12px; font: inherit; font-size: 14px; }
+.admin-user-editor .account-admin-workspace input:not([type=checkbox]):not([type=radio]), .admin-user-editor .account-admin-workspace select, .admin-user-editor .account-admin-workspace textarea { width: 100%; min-width: 0; min-height: 42px; border-radius: 6px; background: #101d17; border: var(--site-border-width, 1px) solid #526456; color: #ecede1; padding: 10px 12px; font: inherit; font-size: 14px; }
 .account-admin-workspace input:disabled, .account-admin-workspace select:disabled { opacity: .55; }
 .account-admin-workspace input[type=date], .account-admin-workspace input[type=datetime-local], .account-admin-workspace select { color-scheme:dark; }
 .account-admin-workspace .account-admin-field textarea { min-height: 105px; }
@@ -37,11 +37,11 @@
 .admin-user-editor .account-admin-date input { flex: 1; width: auto; }
 .account-admin-date span { color: #d0bd76; font-size: 12px; white-space: nowrap; }
 .account-admin-favorites { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.account-admin-favorites button { background: #17221d; border: 1px solid #45564a; color: #bac9bf; justify-content: flex-start; text-align: left; font-size: 12px; min-height: 42px; padding: 10px; border-radius: 6px; }
+.account-admin-favorites button { background: #17221d; border: var(--site-border-width, 1px) solid #45564a; color: #bac9bf; justify-content: flex-start; text-align: left; font-size: 12px; min-height: 42px; padding: 10px; border-radius: 6px; }
 .account-admin-favorites button svg { flex-shrink: 0; }
 .account-admin-favorites button.active { background: #323627; color: #f4d483; border-color: #a7914c; }
 .account-admin-favorites button.active svg { fill: #c1a34e; }
-.account-admin-toggle { display: flex !important; flex-direction: row; justify-content: space-between; align-items: center; gap: 18px; padding: 14px 0; border-bottom: 1px solid #2e3c32; }
+.account-admin-toggle { display: flex !important; flex-direction: row; justify-content: space-between; align-items: center; gap: 18px; padding: 14px 0; border-bottom: var(--site-border-width, 1px) solid #2e3c32; }
 .account-admin-toggle > span { display: grid; gap: 5px; min-width: 0; }
 .account-admin-toggle strong { font-size: 13px; color: #dfdfc7; }
 .account-admin-toggle small { font-size: 12px; line-height: 1.5; color: #9cafa3; font-weight: 400; }
@@ -55,7 +55,7 @@
 .account-admin-notice { color: #c9b46a; border-left: 3px solid #8d793f; padding-left: 14px; font-size: 12px; line-height: 1.7; margin: 20px 0; }
 .account-admin-restrictions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .account-admin-restrictions span { color: #dfa89d; background: #2c211e; padding: 7px 10px; font-size: 11px; border-radius: 4px; }
-.account-admin-sanction { padding: 0 0 22px; margin-bottom: 22px; border-bottom: 1px solid #465547; }
+.account-admin-sanction { padding: 0 0 22px; margin-bottom: 22px; border-bottom: var(--site-border-width, 1px) solid #465547; }
 .account-admin-sanction .account-admin-toggle { margin-bottom: 20px; }
 .account-admin-content .admin-danger-zone { margin: 0; background: transparent; border: 0; padding: 0; }
 .account-admin-sensitive { min-width: 0; border: 0; margin: 0; padding: 0; }

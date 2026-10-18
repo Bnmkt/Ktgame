@@ -1,18 +1,18 @@
-.player-help-surface { background: #101718; border: 1px solid #5b533b; border-radius: 8px; padding: 24px; }
-.player-help-navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 20px; border-bottom: 1px solid #3b4942; }
-.player-help-navigation a { display: inline-flex; align-items: center; gap: 8px; color: #c7d4cd; padding: 10px 16px; text-decoration: none; border: 1px solid #46554b; border-radius: 6px; }
+.player-help-surface { background: var(--site-surface, #101718); border: var(--site-border-width, 1px) solid var(--site-border, #5b533b); border-radius: var(--site-radius, 8px); padding: 24px; }
+.player-help-navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 20px; border-bottom: var(--site-border-width, 1px) solid #3b4942; }
+.player-help-navigation a { display: inline-flex; align-items: center; gap: 8px; color: #c7d4cd; padding: 10px 16px; text-decoration: none; border: var(--site-border-width, 1px) solid #46554b; border-radius: 6px; }
 .player-help-navigation a.active { background: #263e31; color: #def3df; border-color: #82ad8d; }
 .player-help-navigation > button { margin-left: auto; }
 .player-help-filters { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 16px; margin: 24px 0; }
-.player-help-filters label > span:not(.sr-only) { display: flex; align-items: center; gap: 9px; background: #fffaf0; border-radius: 6px; color: #4e5c52; padding-left: 12px; }
+.player-help-filters label > span:not(.sr-only) { display: flex; align-items: center; gap: 9px; background: var(--site-input, #fffaf0); border-radius: 6px; color: #4e5c52; padding-left: 12px; }
 .player-help-filters input { background: transparent; border: 0; min-width: 0; }
-.player-help-filters select, .player-help-editor select { width: 100%; min-height: 40px; font: inherit; border: 1px solid #60725f; border-radius: 6px; background: #17241d; color: #e2eedf; padding: 8px; }
+.player-help-filters select, .player-help-editor select { width: 100%; min-height: 40px; font: inherit; border: var(--site-border-width, 1px) solid #60725f; border-radius: 6px; background: #17241d; color: #e2eedf; padding: 8px; }
 .player-help-intro { color: #bacbc1; max-width: 760px; line-height: 1.7; margin-bottom: 28px; }
-.player-help-question { border-bottom: 1px solid #364c40; padding: 18px 0; }
+.player-help-question { border-bottom: var(--site-border-width, 1px) solid #364c40; padding: 18px 0; }
 .player-help-question summary { display: flex; gap: 20px; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; }
 .player-help-question summary::-webkit-details-marker { display: none; }
 .player-help-topic { margin: 34px 0 0; }
-.player-help-topic > header { display: flex; align-items: center; gap: 14px; justify-content: space-between; border-bottom: 1px solid #625232; padding-bottom: 12px; }
+.player-help-topic > header { display: flex; align-items: center; gap: 14px; justify-content: space-between; border-bottom: var(--site-border-width, 1px) solid #625232; padding-bottom: 12px; }
 .player-help-topic h2 { color: #e7c463; font-size: 20px; line-height: 1.4; margin: 0; overflow-wrap: anywhere; }
 .player-help-topic header > span { color: #adbaae; font-size: 11px; white-space: nowrap; }
 .player-help-question summary strong { font-size: 16px; line-height: 1.5; }
@@ -21,19 +21,19 @@
 .player-help-question[open] summary > svg { transform: rotate(180deg); }
 .player-help-question summary:hover strong { color: #f4d888; }
 .player-help-lead { color: #e4d6a6; font-size: 16px; line-height: 1.7; border-left: 3px solid #c5a652; padding-left: 16px; margin: 0 0 20px; }
-.player-help-guide-intro { margin: 26px 0 34px; border-bottom: 1px solid #405047; padding-bottom: 22px; }
+.player-help-guide-intro { margin: 26px 0 34px; border-bottom: var(--site-border-width, 1px) solid #405047; padding-bottom: 22px; }
 .player-help-guide-intro .player-help-intro { margin-top: 0; margin-bottom: 18px; }
 .player-help-reading-progress { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; color: #aec3b2; font-size: 12px; }
 .player-help-reading-progress strong { color: #e8c566; }
 .player-help-reading-progress progress { accent-color: #c5a652; width: min(320px, 100%); height: 5px; }
 .player-help-read-check { display: flex; flex-direction: row; gap: 10px; align-items: center; margin-top: 22px; color: #b8d8be; font-size: 12px; }
 .player-help-read-check input { accent-color: #cbb354; height: 17px; min-height: 17px; width: 17px; flex-shrink: 0; margin: 0; }
-.player-help-scenario { min-width: 0; margin: 28px 0 0; border: 0; border-top: 1px solid #53614e; padding: 20px 0 0; }
+.player-help-scenario { min-width: 0; margin: 28px 0 0; border: 0; border-top: var(--site-border-width, 1px) solid #53614e; padding: 20px 0 0; }
 .player-help-scenario legend { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding-right: 12px; font-size: 14px; font-weight: 700; color: #e2ca83; }
 .player-help-scenario legend small { font-weight: 400; color: #9db8a3; font-size: 10px; }
 .player-help-scenario > p { font-size: 15px; line-height: 1.6; margin-top: 0; }
 .player-help-scenario-options { display: grid; gap: 8px; }
-.player-help-scenario-options label { display: flex; flex-direction: row; gap: 12px; align-items: center; background: #18231d; border: 1px solid #52614f; border-radius: 6px; padding: 12px 14px; color: #d7e0d1; font-size: 13px; cursor: pointer; line-height: 1.6; }
+.player-help-scenario-options label { display: flex; flex-direction: row; gap: 12px; align-items: center; background: #18231d; border: var(--site-border-width, 1px) solid #52614f; border-radius: 6px; padding: 12px 14px; color: #d7e0d1; font-size: 13px; cursor: pointer; line-height: 1.6; }
 .player-help-scenario-options label:hover { border-color: #b7a668; }
 .player-help-scenario-options input { width: 17px; height: 17px; min-height: 17px; flex-shrink: 0; margin: 0; accent-color: #d8b656; }
 .player-help-scenario-options span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -52,11 +52,11 @@
 .player-help-contents a > span { color: #809688; font-size: 11px; padding-top: 2px; width: 22px; flex-shrink: 0; }
 .player-help-contents a.active { border-color: #e8c05c; color: #ffe3a0; background: #26342b; font-weight: 800; }
 .player-help-contents a, .player-help-chapter h2, .player-help-question summary strong, .player-help-editor-list strong { overflow-wrap: anywhere; }
-.player-help-chapter { padding: 0 0 35px; margin-bottom: 30px; border-bottom: 1px solid #405047; scroll-margin-top: 24px; }
+.player-help-chapter { padding: 0 0 35px; margin-bottom: 30px; border-bottom: var(--site-border-width, 1px) solid #405047; scroll-margin-top: 24px; }
 .player-help-chapter header > span { font-size: 11px; color: #8bc4a5; font-weight: 700; }
 .player-help-chapter h2 { font-size: 23px; margin-top: 8px; }
 .player-help-figure { margin: 22px 0 0; }
-.player-help-figure img { display: block; width: 100%; max-height: 620px; object-fit: contain; background: #0b1210; border: 1px solid #445447; border-radius: 6px; }
+.player-help-figure img { display: block; width: 100%; max-height: 620px; object-fit: contain; background: #0b1210; border: var(--site-border-width, 1px) solid #445447; border-radius: 6px; }
 .player-help-figure figcaption { color: #a6bbae; font-size: 12px; padding-top: 8px; }
 .modal.player-help-welcome { display: flex; flex-direction: column; width: 850px; max-width: calc(100vw - 24px); max-height: 90dvh; overflow: hidden; }
 .player-help-welcome .modal-title-row, .player-help-step-controls, .player-help-step-head, .player-help-step-dots { flex-shrink: 0; }
@@ -70,9 +70,9 @@
 .player-help-step-dots button { width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 50%; background: #192821; color: #d0dfd3; border-color: #4e6657; font-size: 12px; }
 .player-help-step-dots button.active { background: #c9a047; color: #1a190f; }
 .player-help-step-dots button.is-visited { background: #263e2f; color: #add5b0; border-color: #6e936f; }
-.player-help-step-controls { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid #455348; padding-top: 16px; }
+.player-help-step-controls { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: var(--site-border-width, 1px) solid #455348; padding-top: 16px; }
 .player-help-step-controls > div { display: flex; gap: 8px; }
-.card.player-help-editor { min-width: 0; border-radius: 8px; align-content: start; gap: 20px; }
+.card.player-help-editor { min-width: 0; border-radius: var(--site-radius, 8px); align-content: start; gap: 20px; }
 .player-help-control-scope { display: contents; }
 .player-help-editor-toolbar { display: flex; gap: 12px; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
 .player-help-editor-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 22px; align-items: start; }
@@ -82,10 +82,10 @@
 .player-help-editor-list small { color: #a7b7a9; }
 .player-help-editor-fields { display: grid; gap: 18px; min-width: 0; }
 .player-help-editor-fields textarea { width: 100%; min-height: 280px; resize: vertical; padding: 12px; font: inherit; line-height: 1.6; }
-.player-help-editor-fields input, .player-help-editor-fields textarea { background: #0d1714; color: #edf2e6; border: 1px solid #536454; border-radius: 6px; }
+.player-help-editor-fields input, .player-help-editor-fields textarea { background: #0d1714; color: #edf2e6; border: var(--site-border-width, 1px) solid #536454; border-radius: 6px; }
 .player-help-editor-fields .player-help-intro-input { min-height: 85px; }
 .player-help-editor-fields .player-help-short-input { min-height: 90px; }
-.player-help-interaction-editor { padding: 20px 0; border-block: 1px solid #4e5c48; display: grid; gap: 16px; min-width: 0; }
+.player-help-interaction-editor { padding: 20px 0; border-block: var(--site-border-width, 1px) solid #4e5c48; display: grid; gap: 16px; min-width: 0; }
 .player-help-interaction-editor header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; }
 .player-help-interaction-editor h3 { font-size: 15px; margin: 0; }
 .player-help-interaction-editor header label { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 12px; }
@@ -98,11 +98,11 @@
 .player-help-editor-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .player-help-editor-row label { flex: 1; min-width: 140px; }
 .player-help-editor-controls { display: flex; flex-wrap: wrap; gap: 9px; }
-.player-help-editor-settings { margin: 24px 0; padding-bottom: 24px; border-bottom: 1px solid #455348; }
+.player-help-editor-settings { margin: 24px 0; padding-bottom: 24px; border-bottom: var(--site-border-width, 1px) solid #455348; }
 .player-help-editor .player-help-publish { display: flex; align-items: center; gap: 8px; }
 .player-help-publish input { width: 18px; min-height: 18px; height: 18px; accent-color: #d9b452; }
 .player-help-editor-fields label > span { display: inline-flex; align-items: center; gap: 7px; }
-.player-help-editor-preview { padding: 20px; background: #11241b; border: 1px solid #3f6851; border-radius: 6px; }
+.player-help-editor-preview { padding: 20px; background: #11241b; border: var(--site-border-width, 1px) solid #3f6851; border-radius: 6px; }
 @media (max-width: 760px) {
   .player-help-surface { padding: 16px; }
   .player-help-guide-layout, .player-help-editor-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }

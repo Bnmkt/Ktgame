@@ -1,9 +1,9 @@
 .game-settings-dialog.casino-dialog { width: min(1440px, calc(100vw - 32px)); max-width: 1440px; height: min(920px, 94dvh); max-height: 94dvh; padding: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 0; overflow: hidden; background: #101916; }
-.game-settings-dialog > .modal-title-row { padding: 22px 26px 18px; margin: 0; border-bottom: 1px solid #354438; }
+.game-settings-dialog > .modal-title-row { padding: 22px 26px 18px; margin: 0; border-bottom: var(--site-border-width, 1px) solid #354438; }
 .game-settings-dialog > .modal-title-row h2 { font-size: 22px; overflow-wrap: anywhere; }
 .game-settings-form { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
-.game-settings-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-shrink: 0; border-bottom: 1px solid #354438; padding: 10px 22px; gap: 6px; }
-.game-settings-tabs button { justify-content: center; gap: 8px; min-height: 46px; padding: 10px; background: transparent; color: #c6cbbd; border: 1px solid transparent; border-radius: 5px; font-size: 14px; }
+.game-settings-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-shrink: 0; border-bottom: var(--site-border-width, 1px) solid #354438; padding: 10px 22px; gap: 6px; }
+.game-settings-tabs button { justify-content: center; gap: 8px; min-height: 46px; padding: 10px; background: transparent; color: #c6cbbd; border: var(--site-border-width, 1px) solid transparent; border-radius: 5px; font-size: 14px; }
 .game-settings-tabs button.active, .game-settings-preview-views button.active { background: #c79b3026; color: #f2d681; border-color: #b18b3d; }
 .game-settings-tab-short { display: none; }
 .game-settings-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 370px); flex: 1; }
@@ -12,16 +12,16 @@
 .game-settings-panel[hidden] { display: none; }
 .game-settings-panel > header h3 { margin: 5px 0 0; font-size: 20px; }
 .game-settings-panel label { display: grid; align-content: start; gap: 9px; font-size: 14px; color: #e1ddce; font-weight: 650; min-width: 0; }
-.game-settings-panel input:not([type=checkbox]), .game-settings-panel select, .game-settings-panel textarea { width: 100%; min-width: 0; min-height: 44px; padding: 11px 12px; border-radius: 5px; font: inherit; color: #eeeade; background: #0b1310; border: 1px solid #4d5f50; color-scheme: dark; }
+.game-settings-panel input:not([type=checkbox]), .game-settings-panel select, .game-settings-panel textarea { width: 100%; min-width: 0; min-height: 44px; padding: 11px 12px; border-radius: 5px; font: inherit; color: #eeeade; background: #0b1310; border: var(--site-border-width, 1px) solid #4d5f50; color-scheme: dark; }
 .game-settings-panel textarea { min-height: 160px; resize: vertical; line-height: 1.6; }
 .game-settings-panel small { color: #adb7a9; font-size: 12px; line-height: 1.55; font-weight: 400; }
 .game-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-.game-settings-facts { margin: 0; border-top: 1px solid #354438; padding-top: 18px; display: flex; gap: 32px; flex-wrap: wrap; }
+.game-settings-facts { margin: 0; border-top: var(--site-border-width, 1px) solid #354438; padding-top: 18px; display: flex; gap: 32px; flex-wrap: wrap; }
 .game-settings-facts dt { font-size: 12px; color: #aeb6a8; margin-bottom: 7px; }
 .game-settings-facts dd { margin: 0; font-size: 14px; color: #e8dfca; }
 .game-settings-panel .admin-form-section { background: transparent; border: 0; padding: 0; margin: 0; border-radius: 0; }
 .game-settings-panel .game-media-fields { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-.game-settings-panel .game-media-field { display: grid; grid-template-columns: 128px minmax(0, 1fr); align-items: start; gap: 10px 20px; padding-bottom: 22px; border-bottom: 1px solid #354438; }
+.game-settings-panel .game-media-field { display: grid; grid-template-columns: 128px minmax(0, 1fr); align-items: start; gap: 10px 20px; padding-bottom: 22px; border-bottom: var(--site-border-width, 1px) solid #354438; }
 .game-settings-panel .game-media-field > strong { font-size: 14px; }
 .game-settings-panel .game-media-field > .game-artwork-media, .game-settings-panel .game-media-field > .game-settings-media-empty { grid-column: 1; grid-row: 1 / 4; margin: 0; width: 128px; aspect-ratio: 4/3; }
 .game-settings-media-empty { display: flex; justify-content: center; align-items: center; border: 1px dashed #4d5f50; border-radius: 5px; color: #9da998; }
@@ -29,16 +29,16 @@
 .game-settings-panel .game-media-field > :not(.game-artwork-media):not(.game-settings-media-empty) { grid-column: 2; }
 .game-settings-panel .game-media-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .game-settings-panel .game-media-actions button { flex: initial; min-height: 38px; font-size: 13px; }
-.game-settings-panel .game-settings-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; background: #1b251f; border: 1px solid #435746; border-radius: 5px; }
+.game-settings-panel .game-settings-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; background: #1b251f; border: var(--site-border-width, 1px) solid #435746; border-radius: 5px; }
 .game-settings-switch input { width: 20px; height: 20px; accent-color: #d6b659; flex-shrink: 0; }
-.game-settings-preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 22px; gap: 18px; background: #0b120f; border-left: 1px solid #354438; }
+.game-settings-preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 22px; gap: 18px; background: #0b120f; border-left: var(--site-border-width, 1px) solid #354438; }
 .game-settings-preview > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .game-settings-state { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: #abb1a7; }
 .game-settings-state.is-enabled { color: #7ac8a6; }
 .game-settings-preview-views { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .game-settings-preview-views button { background: transparent; color: #c6cbbd; border-color: #3b493e; border-radius: 4px; padding: 8px 4px; font-size: 11px; gap: 4px; min-height: 36px; justify-content: center; }
 .game-settings-preview-scroll { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
-.game-settings-sample { border: 1px solid #929da1; border-radius: 6px; overflow: hidden; background: #15221b; }
+.game-settings-sample { border: var(--site-border-width, 1px) solid #929da1; border-radius: 6px; overflow: hidden; background: #15221b; }
 .game-settings-sample.is-cards { border-color: #b8495d; }
 .game-settings-sample-meta, .game-settings-sample-tags { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12px; color: #d3ccaf; }
 .game-settings-sample-meta { padding: 12px; }
@@ -48,10 +48,10 @@
 .game-settings-sample h3 { margin: 0 0 12px; font-size: 21px; overflow-wrap: anywhere; }
 .game-settings-sample p { font-size: 14px; color: #dadbc7; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
 .game-settings-sample.is-featured h3 { color: #eed17b; text-align: center; }
-.game-settings-sample-action { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; padding: 11px; border: 1px solid #ba923e; border-radius: 4px; background: #af8129; color: #16130b; font-size: 13px; font-weight: 750; }
+.game-settings-sample-action { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; padding: 11px; border: var(--site-border-width, 1px) solid #ba923e; border-radius: 4px; background: #af8129; color: #16130b; font-size: 13px; font-weight: 750; }
 .game-settings-pieces { display: flex; min-height: 100px; align-items: center; justify-content: center; gap: 10px; padding: 20px 10px; background: #202e26; }
 .game-settings-pieces .die { flex-shrink: 0; }
-.game-settings-presence { padding: 18px; border: 1px solid #495057; border-radius: 6px; background: #23262a; display: flex; gap: 14px; align-items: start; }
+.game-settings-presence { padding: 18px; border: var(--site-border-width, 1px) solid #495057; border-radius: 6px; background: #23262a; display: flex; gap: 14px; align-items: start; }
 .game-settings-presence-art { position: relative; width: 92px; flex-shrink: 0; }
 .game-settings-presence-art > .game-artwork-media { aspect-ratio: 1; border-radius: 6px; }
 .game-settings-presence-art > .game-artwork-media + .game-artwork-media, .game-settings-presence-art > svg { position: absolute; bottom: -7px; right: -7px; width: 30px; height: 30px; border-radius: 50%; border: 3px solid #23262a; background: #3c453c; }
@@ -61,10 +61,10 @@
 .game-settings-presence b { font-size: 15px; color: #f2f3f4; }
 .game-settings-presence span, .game-settings-presence small { font-size: 12px; color: #c6c8cc; }
 .game-settings-presence .game-settings-presence-action { background: #3a3e43; padding: 8px; border-radius: 4px; text-align: center; }
-.game-settings-preview-summary { display: grid; gap: 14px; border-top: 1px solid #354438; padding-top: 18px; margin-top: 24px; }
+.game-settings-preview-summary { display: grid; gap: 14px; border-top: var(--site-border-width, 1px) solid #354438; padding-top: 18px; margin-top: 24px; }
 .game-settings-preview-summary > span { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #aeb6a8; }
 .game-settings-preview-summary b { margin-left: auto; color: #e8dfca; }
-.game-settings-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #354438; padding: 14px 22px; flex-shrink: 0; }
+.game-settings-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: var(--site-border-width, 1px) solid #354438; padding: 14px 22px; flex-shrink: 0; }
 .game-settings-actions > span { font-size: 12px; color: #aeb6a8; }
 .game-settings-actions > div { display: flex; gap: 10px; }
 .game-settings-actions button { min-height: 42px; gap: 7px; border-radius: 5px; }

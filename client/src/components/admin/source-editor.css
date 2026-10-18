@@ -11,7 +11,7 @@
 .source-file-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .source-file-heading strong { overflow-wrap: anywhere; }
 .source-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.source-editor-main li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 0; border-bottom: 1px solid #43534b; }
-.source-job { margin-top: 18px; padding: 15px 0; border-block: 1px solid #43534b; }
+.source-editor-main li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 0; border-bottom: var(--site-border-width, 1px) solid var(--site-border, #43534b); }
+.source-job { margin-top: 18px; padding: 15px 0; border-block: var(--site-border-width, 1px) solid var(--site-border, #43534b); }
 .source-job pre { max-height: 250px; white-space: pre-wrap; overflow: auto; font-size: 11px; }
 @media(max-width: 850px) { .source-workspace-layout { grid-template-columns: minmax(0, 1fr); } .source-workspace-layout aside nav { max-height: 180px; } .source-comparison { grid-template-columns: minmax(0, 1fr); } }

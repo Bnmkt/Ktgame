@@ -31,6 +31,8 @@ import { InstallNotice } from "./pwa/InstallNotice.jsx";
 import { LanguagePicker, LocaleProvider, useLocale } from "./locales/LocaleProvider.jsx";
 import "./navigation/mobile-casino.css";
 import { siteMarkSource } from "./features/site-branding.js";
+import { useSiteTheme } from "./features/theme/useSiteTheme.js";
+import "./features/theme/theme.css";
 
 const Admin = lazy(() => import("./pages/AdminPage.jsx").then((module) => ({ default: module.Admin })));
 const LegalPage = lazy(() => import("./privacy/LegalPage.jsx").then((module) => ({ default: module.LegalPage })));
@@ -60,6 +62,7 @@ export default function App() {
   const [discordResult, setDiscordResult] = useState(null);
   const [accountRecovery, setAccountRecovery] = useState(() => new URL(window.location.href).searchParams.has("reset-password"));
   const [publicSettings, setPublicSettings] = useState({ ...defaultPublicSettings, ...publicPageData?.settings });
+  useSiteTheme(publicSettings.appearance);
   const [publicGames, setPublicGames] = useState(publicPageData?.games ?? []);
   useEffect(() => {
     const icon = document.querySelector('link[rel="icon"]');

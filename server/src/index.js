@@ -19,6 +19,8 @@ import { registerDiscordRoutes } from "./services/discord-routes.js";
 import { discordActivityOrigin, registerDiscordActivity } from "./services/discord-activity.js";
 import { createDiscordPresence, registerDiscordPresence } from "./services/discord-presence.js";
 import { normalizeLobbyNotice, updateLobbyNotice } from "./services/lobby-notice.js";
+import { normalizeTheme } from "../../client/src/features/theme/config.js";
+import { registerThemeRoutes } from "./services/site-themes.js";
 import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
 import { activeModeration, activeParentalRevocation, createParentalControlStore, defaultMinorRestrictions, exactAge, featureAccess, isUnder13, minorRestrictionOptions, normalizeMinorRestrictions, registrationMarker, turnsThirteenAt } from "./services/parental-controls.js";
@@ -513,6 +515,7 @@ function normalizePlatformSettings(value = {}) {
   return {
     siteName: String(value.siteName ?? defaultPlatformSettings.siteName).trim().slice(0, 36) || defaultPlatformSettings.siteName,
     ...normalizeBranding(value),
+    appearance: normalizeTheme(value.appearance),
     contactEmail: siteContactEmail(value),
     siteIcon: String(value.siteIcon ?? defaultPlatformSettings.siteIcon).trim().slice(0, 6000) || defaultPlatformSettings.siteIcon,
     siteSubtitle: String(value.siteSubtitle ?? defaultPlatformSettings.siteSubtitle).trim().slice(0, 120) || defaultPlatformSettings.siteSubtitle,
@@ -4892,6 +4895,7 @@ app.delete("/api/admin/achievements/:id", auth, requireAdmin, (req, res) => {
 app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   let editorDuplicationUserIds;
   try {
+    if (Object.hasOwn(req.body, "appearance")) throw new Error("Utilise l'editeur de themes pour modifier l'apparence.");
     if (["siteIconImage", "siteIconMode", "faviconImage", "pwaIcons"].some(key => Object.hasOwn(req.body, key))) validateBranding({ ...platformSettings(), ...req.body }, mediaLibrary);
     if (req.body.editorDuplicationUserIds !== undefined) editorDuplicationUserIds = validateEditorDuplicationUsers(req.body.editorDuplicationUserIds, readDb().users);
     if (req.body.softBanRestrictions !== undefined && !validSoftBanRestrictions(req.body.softBanRestrictions, games)) throw new Error("Restrictions de softban invalides.");
@@ -5193,6 +5197,7 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
 const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, directory: path.join(path.dirname(databaseFilename), "media-library") });
 registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });
+registerThemeRoutes({ app, auth, requireAdmin, readDb, updateDb, settings: platformSettings, mediaLibrary });
 await registerSourceEditorRoutes({ app, auth, requireAdmin, root: path.resolve(__dirname, "../.."), directory: path.join(path.dirname(databaseFilename), "source-editor"),
   readUser: getUser, hasOpenTables: () => readDb().rooms.some(room => !room.finished),
   verifyCredential: async (user, method, credential) => {

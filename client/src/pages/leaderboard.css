@@ -1,18 +1,18 @@
 .leaderboard-page { max-width: 1180px; }
-.leaderboard-page-panel { border: 1px solid #5b533b; border-radius: 8px; padding: 22px; background: #101718; scroll-margin-top: 20px; }
+.leaderboard-page-panel { border: var(--site-border-width, 1px) solid var(--site-border, #5b533b); border-radius: var(--site-radius, 8px); padding: 22px; background: var(--site-surface, #101718); scroll-margin-top: 20px; }
 .leaderboard-page .page-heading { align-items: center; display: flex; justify-content: space-between; gap: 16px; }
 .leaderboard-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; padding: 16px 0 22px; }
 .leaderboard-filters label { display: grid; gap: 8px; min-width: 170px; }
-.leaderboard-filters select, .leaderboard-filters input { background: #1b2425; border: 1px solid #77663c; border-radius: 6px; color: #f5ecd4; font: inherit; min-height: 42px; padding: 8px 12px; max-width: 100%; color-scheme: dark; }
+.leaderboard-filters select, .leaderboard-filters input { background: var(--site-raised, #1b2425); border: var(--site-border-width, 1px) solid #77663c; border-radius: 6px; color: #f5ecd4; font: inherit; min-height: 42px; padding: 8px 12px; max-width: 100%; color-scheme: dark; }
 .leaderboard-periods { display: flex; gap: 4px; }
 .leaderboard-periods button { min-height: 42px; }
-.leaderboard-metrics { border-bottom: 1px solid #6a6247; display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 18px; }
+.leaderboard-metrics { border-bottom: var(--site-border-width, 1px) solid #6a6247; display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 18px; }
 .leaderboard-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 0; }
 .leaderboard-summary h2 { font-size: 20px; margin: 0; }
 .leaderboard-summary small { color: #cfcab6; margin-left: auto; }
 .leaderboard-table-scroll { overflow-x: auto; }
 .leaderboard-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-variant-numeric: tabular-nums; }
-.leaderboard-table th, .leaderboard-table td { border-bottom: 1px solid #ffffff20; padding: 13px 12px; text-align: left; vertical-align: middle; }
+.leaderboard-table th, .leaderboard-table td { border-bottom: var(--site-border-width, 1px) solid #ffffff20; padding: 13px 12px; text-align: left; vertical-align: middle; }
 .leaderboard-table thead { background: #172322; color: #dac996; }
 .leaderboard-table thead th:first-child { width: 82px; }
 .leaderboard-table thead th:nth-child(3) { width: 110px; }

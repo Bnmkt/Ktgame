@@ -1,0 +1,24 @@
+:where(:root) {
+  --site-primary: #e8c777; --site-secondary: #69d5aa; --site-link: #7dc9ed;
+  --site-success: #69d8a7; --site-danger: #ff8b95;
+  --site-page: #07080a; --site-surface: #101718; --site-raised: #1b2425;
+  --site-header: #101514; --site-card: #11191a; --site-text: #f8ecd2; --site-muted: #b8ae99;
+  --site-border: #514b38; --site-button-top: #c99a38; --site-button-bottom: #8b5d17;
+  --site-button-text: #170f04; --site-input: #fffaf0; --site-input-text: #171b20;
+  --site-radius: 8px; --site-button-radius: 8px; --site-border-width: 1px;
+  --site-image: none; --site-image-opacity: .2;
+}
+/* Interface surfaces only: cards, dice, ranks and equipped cosmetics retain their own palettes. */
+body { color: var(--site-text); background-color: var(--site-page); }
+.auth-screen { background: linear-gradient(135deg, var(--site-page), var(--site-surface)); }
+:where(.card, .panel, .admin-list, .shop-page-panel, .leaderboard-page-panel, .settings-group, .casino-dialog) { border-radius: var(--site-radius); }
+button { border-radius: var(--site-button-radius); }
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), textarea, select) { color: var(--site-input-text); }
+:where(.casino-header, .casino-mobile-navigation) { background-color: var(--site-header); }
+:where(.card, .panel, .shop-page-panel, .leaderboard-page-panel) { border-width: var(--site-border-width); }
+[data-site-wallpaper="true"] .app-shell::before,
+[data-site-wallpaper="true"] .auth-screen {
+  background-image: linear-gradient(rgb(from var(--site-page) r g b / calc(1 - var(--site-image-opacity))), rgb(from var(--site-page) r g b / calc(1 - var(--site-image-opacity)))), var(--site-image);
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+}
+@media (prefers-reduced-motion: reduce) { .theme-sample * { transition: none !important; } }

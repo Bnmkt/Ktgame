@@ -1,8 +1,8 @@
-.status-detection-section { border-top: 1px solid #3c433b; display: grid; gap: 16px; padding-top: 24px; }
+.status-detection-section { border-top: var(--site-border-width, 1px) solid #3c433b; display: grid; gap: 16px; padding-top: 24px; }
 .status-detection-section .admin-form-heading { align-items: start; display: flex; gap: 12px; justify-content: space-between; }
 .status-detection-section .admin-form-heading p { max-width: 760px; }
 .status-detection-list { display: grid; gap: 12px; }
-.status-detection-row { background: #101817; border: 1px solid #3b4338; border-radius: 6px; min-width: 0; padding: 18px; }
+.status-detection-row { background: #101817; border: var(--site-border-width, 1px) solid #3b4338; border-radius: 6px; min-width: 0; padding: 18px; }
 .status-detection-row header { align-items: start; display: flex; gap: 12px; justify-content: space-between; }
 .status-detection-row h4 { color: #f6e7c3; font-size: 17px; margin: 8px 0 14px; overflow-wrap: anywhere; }
 .status-detection-severity { align-items: center; display: inline-flex; font-size: 12px; gap: 6px; }
@@ -33,9 +33,9 @@
 .status-detection-kind > span { font-size: 13px; font-weight: 800; }
 .status-detection-kind .segmented-tabs { overflow-x: auto; padding: 3px; }
 .status-detection-kind .segmented-tabs button { font-size: 13px; min-height: 34px; white-space: nowrap; }
-.status-detection-filters select, .status-detection-dialog select { background: #192220; border: 1px solid #465347; border-radius: 6px; color: #f4e8cb; font: inherit; min-height: 42px; min-width: 0; padding: 8px 12px; }
+.status-detection-filters select, .status-detection-dialog select { background: #192220; border: var(--site-border-width, 1px) solid #465347; border-radius: 6px; color: #f4e8cb; font: inherit; min-height: 42px; min-width: 0; padding: 8px 12px; }
 .status-detection-filters select:focus-visible, .status-detection-dialog select:focus-visible { outline: 2px solid #cda54a; outline-offset: 2px; }
-.status-detection-selection { align-items: center; border-block: 1px solid #3b4338; display: flex; flex-wrap: wrap; gap: 12px 20px; padding: 12px 0; }
+.status-detection-selection { align-items: center; border-block: var(--site-border-width, 1px) solid #3b4338; display: flex; flex-wrap: wrap; gap: 12px 20px; padding: 12px 0; }
 .status-detection-selection > label { align-items: center; display: flex; gap: 8px; }
 .status-detection-selection > span { color: #b9c8bd; font-size: 13px; }
 .status-detection-selection .actions { margin-left: auto; flex-wrap: wrap; }
@@ -50,7 +50,7 @@
 .status-detection-batch-list { color: #c8d1c4; font-size: 13px; margin: 0; max-height: 140px; overflow-y: auto; padding-left: 20px; }
 .status-detection-history summary { cursor: pointer; color: #ecd18c; }
 .status-detection-history ol { padding-left: 20px; }
-.status-detection-history li { border-bottom: 1px solid #3b4338; font-size: 13px; margin-bottom: 12px; padding-bottom: 12px; }
+.status-detection-history li { border-bottom: var(--site-border-width, 1px) solid #3b4338; font-size: 13px; margin-bottom: 12px; padding-bottom: 12px; }
 .status-detection-history small { display: block; color: #a6b9ae; margin-top: 6px; }
 @media (max-width: 600px) {
   .status-detection-row { padding: 14px; }

@@ -85,17 +85,17 @@ test("manifest assets have actual PNG dimensions and safe standalone root naviga
   const template = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"); assert.match(template, /rel="manifest"/); assert.match(template, /apple-touch-icon/);
 });
 test("service worker only caches the static offline page and icons, never navigation responses or API data", async () => {
-  const handlers = {}, added = [], deleted = []; let offline = false;
+  const handlers = {}, added = [], deleted = []; let offline = false, currentCache;
   const fallback = { staticOffline: true };
   const context = {
     URL, Response, self: { registration: { scope: "https://www.ktga.me/" }, location: { origin: "https://www.ktga.me" }, addEventListener: (name, handler) => { handlers[name] = handler; }, skipWaiting: async () => {}, clients: { claim: async () => {} } },
-    caches: { open: async () => ({ addAll: async (urls) => added.push(...urls) }), keys: async () => ["ktga-offline-v0", "ktga-offline-v1", "other-cache"], delete: async (key) => deleted.push(key), match: async () => fallback },
+    caches: { open: async name => { currentCache = name; return { addAll: async urls => added.push(...urls) }; }, keys: async () => ["ktga-offline-obsolete", currentCache, "other-cache"], delete: async (key) => deleted.push(key), match: async () => fallback },
     fetch: async () => { if (offline) throw Error("offline"); return { online: true }; }
   };
   vm.runInNewContext(fs.readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), context);
   let task; handlers.install({ waitUntil(promise) { task = promise; } }); await task;
   assert.equal(added.length, 5); assert.ok(added.every((url) => /\/offline\.html$|\/pwa\/icon-[\w-]+\.png$/.test(url)));
-  handlers.activate({ waitUntil(promise) { task = promise; } }); await task; assert.deepEqual(deleted, ["ktga-offline-v0"]);
+  handlers.activate({ waitUntil(promise) { task = promise; } }); await task; assert.deepEqual(deleted, ["ktga-offline-obsolete"]);
   for (const request of [{ url: "https://www.ktga.me/api/me", mode: "cors", method: "GET" }, { url: "https://api.ktga.me/api/me", mode: "navigate", method: "GET" }, { url: "https://www.ktga.me/api/login", mode: "navigate", method: "POST" }, { url: "https://www.ktga.me/assets/app.js", mode: "cors", method: "GET" }]) {
     let intercepted = false; handlers.fetch({ request, respondWith() { intercepted = true; } }); assert.equal(intercepted, false);
   }
@@ -103,6 +103,9 @@ test("service worker only caches the static offline page and icons, never naviga
   handlers.fetch({ request, respondWith(promise) { task = promise; } }); assert.equal((await task).online, true);
   offline = true; handlers.fetch({ request, respondWith(promise) { task = promise; } }); assert.equal(await task, fallback);
   assert.equal(added.length, 5);
+  let themeCached = false;
+  handlers.fetch({ request: { url: "https://www.ktga.me/api/site-theme.css", mode: "cors", method: "GET" }, respondWith() { themeCached = true; } });
+  assert.equal(themeCached, false);
 });
 test("production Nginx serves PWA entry files with explicit MIME types and without sticky caching", () => {
   const config = fs.readFileSync(new URL("../../deploy/debian/nginx-https.conf", import.meta.url), "utf8");
