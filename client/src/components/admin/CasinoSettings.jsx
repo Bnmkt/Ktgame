@@ -2,7 +2,7 @@ import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Bot, Clock3, Coins, Gift, ImagePlus, Landmark, Mail, Megaphone, Plus, Save, ShieldCheck, Trash2, TrendingUp, Trophy, Users } from "lucide-react";
 import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
-import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
+import { ConfirmActionButton, ConfirmDialog } from "../common/ConfirmAction.jsx";
 import { CompactNumber, formatCompactNumber } from "../../utils/presentation.jsx";
 import { bonusProgression, bonusRuleEffect, normalizeBonusSettings } from "../../features/bonus/config.js";
 import { ProgressionSettings } from "./ProgressionSettings.jsx";
@@ -11,6 +11,11 @@ import { GameImageEditor } from "./GameImageEditor.jsx";
 import { SoftBanRestrictions } from "./SoftBanRestrictions.jsx";
 import { GameplayReset } from "./GameplayReset.jsx";
 import { SiteBrandingEditor } from "./SiteBrandingEditor.jsx";
+import { CodeEditor } from "../common/CodeEditor.jsx";
+import { ThemeEditor } from "./ThemeEditor.jsx";
+import { SETTINGS_SECTIONS } from "./settings-navigation.js";
+import { SettingsDirectory } from "./SettingsDirectory.jsx";
+import "./casino-settings.css";
 import "./editor-copy-settings.css";
 import "../navigation/lobby-notice.css";
 
@@ -47,9 +52,12 @@ function BonusChart({ settings }) {
   </section>;
 }
 
-export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], users = [] }) {
+export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], users = [], onThemeApplied, onCancel }) {
   const { t: localeText } = useLocale();
   const [section, setSection] = useState("identity");
+  const [themeDirty, setThemeDirty] = useState(false), [pendingSection, setPendingSection] = useState(null);
+  const navigateSection = next => { if (section === "theme" && themeDirty && next !== section) setPendingSection(next); else setSection(next); };
+  const selectedSection = SETTINGS_SECTIONS.find(row => row.id === section);
   const [noticePreview, setNoticePreview] = useState(false);
   const [noticeImageOpen, setNoticeImageOpen] = useState(false);
   const [copyUserId, setCopyUserId] = useState("");
@@ -63,18 +71,11 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
   const removeRule = (id) => update("dailyBonusRules", config.rules.filter((rule) => rule.id !== id));
   const addRule = () => update("dailyBonusRules", [...config.rules, { id: `bonus-rule-${Date.now()}`, label: "Nouveau palier", day: 7, operation: "add", value: 0.5, repeat: false }]);
 
-  return <form className="admin-settings casino-settings" onSubmit={onSubmit}>
-    <header className="casino-settings-heading"><div><span className="eyebrow">{localeText("Configuration générale")}</span><h2>{localeText("Paramètres du casino")}</h2><p>{localeText("Identité, économie et rythme des parties appliqués par le serveur.")}</p></div>{section !== "maintenance" && <button type="submit" disabled={saving}><Save size={18} />{saving ? localeText("Enregistrement…") : localeText("Enregistrer")}</button>}</header>
-    <nav className="segmented-tabs casino-settings-tabs" aria-label={localeText("Catégories des paramètres")}>
-      <button type="button" className={section === "identity" ? "active" : ""} onClick={() => setSection("identity")}><Landmark size={17} />{localeText("Identité et accès")}</button>
-      <button type="button" className={section === "economy" ? "active" : ""} onClick={() => setSection("economy")}><Coins size={17} />{localeText("Économie et bonus")}</button>
-      <button type="button" className={section === "pacing" ? "active" : ""} onClick={() => setSection("pacing")}><Clock3 size={17} />{localeText("Rythme des parties")}</button>
-      <button type="button" className={section === "progression" ? "active" : ""} onClick={() => setSection("progression")}><TrendingUp size={17} />{localeText("XP et titres")}</button>
-      <button type="button" className={section === "notice" ? "active" : ""} onClick={() => setSection("notice")}><Megaphone size={17}/>{localeText("Annonce")}</button>
-      <button type="button" className={section === "editing" ? "active" : ""} onClick={() => setSection("editing")}><ShieldCheck size={17}/>{localeText("Édition")}</button>
-      <button type="button" className={section === "moderation" ? "active" : ""} onClick={() => setSection("moderation")}><ShieldCheck size={17}/>{localeText("Softbans")}</button>
-      <button type="button" className={section === "maintenance" ? "active" : ""} onClick={() => setSection("maintenance")}><AlertTriangle size={17}/>{localeText("Maintenance")}</button>
-    </nav>
+  return <form className="admin-settings casino-settings" onSubmit={event => { if (["theme", "maintenance"].includes(section)) event.preventDefault(); else onSubmit(event); }}>
+    <header className="casino-settings-heading"><div><span className="eyebrow">{localeText("Configuration générale")}</span><h2>{localeText("Paramètres du casino")}</h2></div>{!["maintenance", "theme"].includes(section) && <div className="settings-save-actions">{onCancel && <ConfirmActionButton className="secondary" disabled={saving} dialogTitle={localeText("Annuler les modifications ?")} message={localeText("Les paramètres enregistrés seront restaurés dans ce formulaire.")} confirmLabel={localeText("Annuler les modifications")} onConfirm={onCancel}>{localeText("Annuler")}</ConfirmActionButton>}<button type="submit" disabled={saving}><Save size={18} />{saving ? localeText("Enregistrement…") : localeText("Enregistrer")}</button></div>}</header>
+    <div className="settings-workspace"><SettingsDirectory section={section} onNavigate={navigateSection}/><div className="settings-workspace-content"><header className="settings-current-heading"><span className="eyebrow">{localeText(selectedSection.group)}</span><h3>{localeText(selectedSection.title)}</h3><p>{localeText(selectedSection.detail)}</p></header>
+
+    {section === "theme" && <ThemeEditor onApplied={onThemeApplied} onDirtyChange={setThemeDirty}/>}
 
     {section === "maintenance" && <GameplayReset/>}
 
@@ -87,19 +88,18 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
       {!copyUserIds.length && <p className="empty-state">{localeText("Aucun utilisateur limité.")}</p>}
     </section>}
 
-    {section === "identity" && <div className="casino-settings-panel identity-access-panel">
-      <SiteBrandingEditor value={draft} onChange={setDraft}/>
-      <section className="settings-group settings-identity-group">
+    {section === "branding" && <><SiteBrandingEditor value={draft} onChange={setDraft}/><div className="settings-group"><label>{localeText("Nom Lucide ou SVG personnalisé")}<span className="admin-site-icon-preview"><CosmeticIcon value="site" source={draft.siteIcon}/></span><CodeEditor language="svg" label={localeText("Icône du site")} maxLength={6000} height={180} value={draft.siteIcon ?? ""} onChange={value => update("siteIcon", value)}/></label></div></>}
+    {["identity", "access"].includes(section) && <div className="casino-settings-panel identity-access-panel">
+      {section === "identity" && <section className="settings-group settings-identity-group">
         <div className="settings-group-heading"><Landmark /><div><h3>{localeText("Identité publique")}</h3><p>{localeText("Ces éléments sont visibles à la connexion et dans la navigation du casino.")}</p></div></div>
         <div className="settings-field-grid identity-settings-fields">
-          <label className="admin-site-icon-field">{localeText("Icône du site")}<span><span className="admin-site-icon-preview"><CosmeticIcon value="site" source={draft.siteIcon} /></span><input maxLength="6000" value={draft.siteIcon ?? ""} onChange={(event) => update("siteIcon", event.target.value)} placeholder={localeText("landmark, crown ou SVG")} /></span><small>{localeText("Nom d’une icône Lucide ou SVG personnalisé.")}</small></label>
           <label>{localeText("Nom du casino")}<input required maxLength="36" value={draft.siteName} onChange={(event) => update("siteName", event.target.value)} /></label>
           <label className="settings-field-wide">{localeText("Jeux à l’affiche")}<select value={draft.featuredGameId ?? ""} onChange={(event) => update("featuredGameId", event.target.value)}><option value="">{localeText("Premier jeu disponible")}</option>{games.filter((game) => game.enabled !== false).map((game) => <option value={game.id} key={game.id}>{localeText(game.name)}</option>)}</select></label>
           <label className="settings-field-wide">{localeText("Sous-titre")}<input required maxLength="120" value={draft.siteSubtitle} onChange={(event) => update("siteSubtitle", event.target.value)} /><small>{draft.siteSubtitle?.length ?? 0}{localeText("/120 caractères")}</small></label>
           <label className="settings-field-wide"><span><Mail size={16} />{" " + localeText("Email de contact")}</span><input required type="email" maxLength="254" autoComplete="off" value={draft.contactEmail ?? draft.supportEmail ?? ""} onChange={(event) => update("contactEmail", event.target.value)} /><small>{localeText("Contact public, recours, alertes de bugs, demandes de données et inscriptions parentales. L’expéditeur et la connexion SMTP restent configurés sur le serveur.")}</small></label>
         </div>
-      </section>
-      <section className="settings-group settings-access-group">
+      </section>}
+      {section === "access" && <section className="settings-group settings-access-group">
         <div className="settings-group-heading"><Users /><div><h3>{localeText("Accès au casino")}</h3><p>{localeText("Contrôle les modes de connexion proposés aux visiteurs.")}</p></div></div>
         <div className="settings-access-options">
           <label><span><Users /><b>{localeText("Connexion Discord")}</b><small>{draft.discordConfigured ? localeText("Permettre la connexion avec un compte Discord associé.") : localeText("Configure l’application Discord sur le serveur pour activer cette option.")}</small></span><input type="checkbox" disabled={!draft.discordConfigured} checked={draft.discordLoginEnabled === true} onChange={(event) => update("discordLoginEnabled", event.target.checked)} /></label>
@@ -107,7 +107,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
           <label title={!draft.emailVerificationAvailable ? localeText("Configure le serveur SMTP pour activer cette option.") : ""}><span><ShieldCheck /><b>{localeText("Validation par email")}</b><small>{draft.emailVerificationAvailable ? localeText("Exiger la validation de l’adresse avant l’accès au casino.") : localeText("Indisponible tant que le serveur SMTP n’est pas configuré.")}</small></span><input type="checkbox" disabled={!draft.emailVerificationAvailable} checked={draft.emailVerificationRequired === true} onChange={(event) => update("emailVerificationRequired", event.target.checked)} /></label>
           <label><span><Users /><b>{localeText("Comptes invités")}</b><small>{localeText("Autoriser une session temporaire sans inscription.")}</small></span><input type="checkbox" checked={draft.guestAccessEnabled} onChange={(event) => update("guestAccessEnabled", event.target.checked)} /></label>
         </div>
-      </section>
+      </section>}
     </div>}
 
     {section === "notice" && <section className="settings-group lobby-notice-editor">
@@ -118,15 +118,15 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
       <div className="lobby-notice-image-actions"><button type="button" className="secondary" onClick={() => setNoticeImageOpen(true)}><ImagePlus size={16}/>{localeText("Importer / recadrer")}</button><button type="button" className="secondary" disabled={!notice.backgroundImage} onClick={() => updateNotice("backgroundImage", "")}><Trash2 size={16}/>{localeText("Retirer l’image")}</button></div>
       {noticeImageOpen && <GameImageEditor gameName={localeText("Annonce")} field="coverImage" imageLabel={localeText("Image de fond")} uploadPath="/api/admin/lobby-notice/image" value={notice.backgroundImage} onApply={(image) => { updateNotice("backgroundImage", image); setNoticeImageOpen(false); }} onClose={() => setNoticeImageOpen(false)}/>}
       <div className="segmented-tabs lobby-notice-preview"><button type="button" className={!noticePreview ? "active" : ""} onClick={() => setNoticePreview(false)}>{localeText("Rédaction")}</button><button type="button" className={noticePreview ? "active" : ""} onClick={() => setNoticePreview(true)}>{localeText("Aperçu")}</button></div>
-      {!noticePreview ? <label>{localeText("Contenu de l’annonce (Markdown)")}<textarea required={notice.enabled} maxLength={20000} value={notice.content} onChange={(event) => updateNotice("content", event.target.value)}/></label> : <div className="lobby-notice-preview"><LobbyNotice notice={notice} preview/></div>}
+      {!noticePreview ? <label>{localeText("Contenu de l’annonce (Markdown)")}<CodeEditor language="markdown" label={localeText("Contenu de l'annonce")} maxLength={20000} height={360} value={notice.content} onChange={value => updateNotice("content", value)}/></label> : <div className="lobby-notice-preview"><LobbyNotice notice={notice} preview/></div>}
     </section>}
 
-    {section === "economy" && <div className="casino-settings-panel economy-bonus-panel">
-      <section className="settings-group economy-settings-group">
+    {["economy", "bonus"].includes(section) && <div className="casino-settings-panel economy-bonus-panel">
+      {section === "economy" && <section className="settings-group economy-settings-group">
         <div className="settings-group-heading"><Coins /><div><h3>{localeText("Économie générale")}</h3><p>{localeText("Soldes initiaux et limite minimale des nouvelles tables.")}</p></div></div>
         <div className="settings-field-grid economy-settings-fields"><label>{localeText("Jetons à l’inscription")}<input type="number" min="0" max="10000000" value={draft.signupTokens} onChange={(event) => update("signupTokens", Number(event.target.value))} /></label><label>{localeText("Mise minimale")}<input type="number" min="1" max="1000000" value={draft.minRoomStake} onChange={(event) => update("minRoomStake", Number(event.target.value))} /></label></div>
-      </section>
-      <section className="settings-group bonus-settings-group">
+      </section>}
+      {section === "bonus" && <><section className="settings-group bonus-settings-group">
         <div className="settings-group-heading"><Gift /><div><h3>{localeText("Bonus quotidien")}</h3><p>{localeText("Le plafond est appliqué après chaque règle et ne peut jamais être dépassé.")}</p></div></div>
         <div className="settings-field-grid bonus-core-fields">
           <label>{localeText("Jetons bonus de base")}<input type="number" min="0" max="1000000" value={draft.dailyTokens} onChange={(event) => update("dailyTokens", Number(event.target.value))} /><small>{localeText("Montant multiplié lors du versement.")}</small></label>
@@ -148,7 +148,7 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
           {!config.rules.length && <div className="empty-state">{localeText("Aucun palier : le multiplicateur par défaut restera constant.")}</div>}
         </div>
       </section>
-      <BonusChart settings={draft} />
+      <BonusChart settings={draft} /></>}
     </div>}
 
     {section === "progression" && <ProgressionSettings value={draft.gameProgression} onChange={(value) => update("gameProgression", value)} games={games} />}
@@ -164,6 +164,8 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
       </section>
     </div>}
 
-    {section !== "maintenance" && <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>{localeText("Les paramètres économiques s’appliquent aux nouvelles opérations. Les temporisations sont figées au lancement de chaque partie.")}</span></div></footer>}
+    {!["maintenance", "theme"].includes(section) && <footer className="admin-settings-footer"><div><AlertTriangle size={18} /><span>{localeText("Les paramètres économiques s’appliquent aux nouvelles opérations. Les temporisations sont figées au lancement de chaque partie.")}</span></div></footer>}
+    </div></div>
+    {pendingSection && <ConfirmDialog title={localeText("Quitter sans enregistrer ?")} message={localeText("Les modifications non enregistrées des thèmes seront perdues.")} confirmLabel={localeText("Quitter")} onClose={() => setPendingSection(null)} onConfirm={() => { setSection(pendingSection); setThemeDirty(false); setPendingSection(null); }} />}
   </form>;
 }

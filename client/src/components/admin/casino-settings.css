@@ -1,0 +1,37 @@
+.settings-workspace { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 26px; align-items: start; }
+.settings-save-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-directory { position: sticky; top: 100px; min-width: 0; }
+.settings-mobile-category { display: none; }
+.settings-directory-search { display: flex; align-items: center; gap: 7px; margin-bottom: 20px; }
+.settings-directory-search input { min-width: 0; width: 100%; font-size: 12px; }
+.settings-directory nav { display: grid; gap: 18px; }
+.settings-directory nav section { min-width: 0; }
+.settings-directory h3 { color: var(--site-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; margin: 0 0 7px; padding-left: 9px; }
+.settings-directory nav button { display: flex; gap: 10px; justify-content: flex-start; text-align: left; background: transparent; box-shadow: none; border: var(--site-border-width, 1px) solid transparent; color: var(--site-text); font-size: 12px; min-height: 38px; padding: 9px; width: 100%; margin: 2px 0; }
+.settings-directory nav button svg { flex: 0 0 17px; }
+.settings-directory nav button.active { background: color-mix(in srgb, var(--site-primary) 12%, var(--site-surface)); border-color: var(--site-border); color: var(--site-primary); }
+.settings-workspace-content { min-width: 0; border-left: var(--site-border-width, 1px) solid var(--site-border); padding-left: 26px; }
+.settings-current-heading { padding-bottom: 18px; margin-bottom: 22px; border-bottom: var(--site-border-width, 1px) solid var(--site-border); }
+.settings-current-heading h3 { font-size: 23px; margin: 4px 0 7px; }
+.settings-current-heading p { color: var(--site-muted); font-size: 13px; margin: 0; }
+.settings-workspace-content .identity-access-panel, .settings-workspace-content .economy-bonus-panel { grid-template-columns: minmax(0, 1fr); }
+.settings-workspace-content .settings-group + .settings-group { border-left: 0; }
+.settings-workspace-content .settings-group { padding: 20px; }
+.settings-workspace-content > .settings-group { padding: 0; }
+.settings-workspace-content .branding-media-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.settings-workspace-content .admin-settings-footer { margin-top: 22px; }
+@media (max-width: 850px) {
+  .settings-workspace { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .settings-directory { position: static; }
+  .settings-directory-search { margin-bottom: 12px; }
+  .settings-directory nav { display: none; }
+  .settings-mobile-category { display: grid; }
+  .settings-mobile-category select { min-height: 40px; min-width: 0; max-width: 100%; width: 100%; font: inherit; padding: 8px; }
+  .settings-workspace-content { border-left: 0; border-top: var(--site-border-width, 1px) solid var(--site-border); padding: 20px 0 0; }
+}
+@media (max-width: 550px) {
+  .casino-settings-heading { padding: 15px; gap: 12px; flex-wrap: wrap; }
+  .casino-settings-heading h2 { font-size: 21px; }
+  .settings-workspace-content .settings-field-grid, .settings-workspace-content .branding-media-grid { grid-template-columns: minmax(0, 1fr); }
+  .settings-workspace-content .bonus-rule-list > article { display: flex; flex-direction: column; align-items: stretch; }
+}

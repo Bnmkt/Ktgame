@@ -318,7 +318,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
         {isAdministrator && tab === "parental" && <ParentalApprovals onSettingsChange={(settings) => { setSettingsDraft(settings); setData((current) => ({ ...current, settings })); onSettingsChange?.(settings); }} />}
         {isAdministrator && tab === "tribunal" && <TribunalAdmin reportError={setError} notifySuccess={notifySuccess} />}
         {isAdministrator && tab === "ranked" && <RankedAdmin/>}
-        {isAdministrator && tab === "settings" && <CasinoSettings draft={settingsDraft} setDraft={setSettingsDraft} onSubmit={saveSettings} saving={saving === "settings"} games={data.games} users={data.users} />}
+        {isAdministrator && tab === "settings" && <CasinoSettings draft={settingsDraft} setDraft={setSettingsDraft} onCancel={() => setSettingsDraft(data.settings)} onSubmit={saveSettings} saving={saving === "settings"} games={data.games} users={data.users} onThemeApplied={appearance => { setSettingsDraft(current => ({ ...current, appearance })); setData(current => ({ ...current, settings: { ...current.settings, appearance } })); onSettingsChange?.({ ...data.settings, appearance }); }} />}
         {tab === "locales" && <LocaleAdmin />}
       </>}
         </section>
