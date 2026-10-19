@@ -3,6 +3,7 @@ import { css } from "@codemirror/lang-css";
 import { json, jsonParseLinter } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
 import { markdown } from "@codemirror/lang-markdown";
+import { html } from "@codemirror/lang-html";
 import { syntaxTree } from "@codemirror/language";
 
 export { sourceLanguage } from "./code-files.js";
@@ -12,6 +13,7 @@ export function codeLanguage(name) {
   if (name === "json") return json();
   if (name === "xml" || name === "svg") return xml();
   if (name === "markdown") return markdown();
+  if (name === "html") return html();
   return javascript({ jsx: name === "jsx" });
 }
 

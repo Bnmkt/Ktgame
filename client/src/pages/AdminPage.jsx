@@ -30,6 +30,7 @@ import { RankedAdmin } from "../components/admin/RankedAdmin.jsx";
 import { LocaleAdmin } from "../components/admin/LocaleAdmin.jsx";
 import { AssetsAdmin } from "../components/admin/AssetsAdmin.jsx";
 import { SourceEditor } from "../components/admin/SourceEditor.jsx";
+import { CustomPagesAdmin } from "../components/admin/CustomPagesAdmin.jsx";
 
 export function Admin({ user, onBack, onSettingsChange }) {
   const { t: localeText } = useLocale();
@@ -235,6 +236,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
       { value: "shop", label: "Boutique", icon: ShoppingBag, count: data.shop.length },
       { value: "patchnotes", label: "Patchnotes", icon: Newspaper },
       { value: "help", label: "FAQ et tutos", icon: BookOpen },
+      { value: "pages", label: "Pages personnalisées", icon: BookOpen },
       { value: "locales", label: "Langues et traductions", icon: Languages }
     ] },
     { label: "Administration", items: [
@@ -251,6 +253,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
     { value: "events", label: "Événements", icon: Sparkles },
     { value: "patchnotes", label: "Patchnotes", icon: Newspaper },
     { value: "help", label: "FAQ et tutos", icon: BookOpen },
+    { value: "pages", label: "Pages personnalisées", icon: BookOpen },
     { value: "locales", label: "Langues et traductions", icon: Languages }
   ] }];
   const adminNavigation = adminNavigationGroups.flatMap((group) => group.items);
@@ -288,6 +291,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
 
         {tab === "patchnotes" && <PatchnotesAdmin reportError={setError} notifySuccess={notifySuccess} />}
         {tab === "help" && <HelpAdmin reportError={setError} notifySuccess={notifySuccess} />}
+        {tab === "pages" && <CustomPagesAdmin />}
         {tab === "media" && <AssetsAdmin admin={isAdministrator}/>}
         {isAdministrator && tab === "source" && <SourceEditor/>}
 

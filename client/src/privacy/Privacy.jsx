@@ -8,6 +8,7 @@ import { CONSENT_DURATION, CONSENT_KEY, PRIVACY_VERSION, extractMarkers, readCon
 import { AUDIENCE_VERSION, audienceAllowed, createAudienceClient } from "./audience.js";
 import { isDiscordActivityLocation } from "../features/discord/context.js";
 import "./privacy.css";
+import { CustomPageLinks } from "../components/navigation/CustomPageLinks.jsx";
 
 const PrivacyContext = createContext(null);
 export function usePrivacyChoice() { return useContext(PrivacyContext)?.choice; }
@@ -54,7 +55,7 @@ export function PrivacyProvider({ children }) {
     {!choice && !accountPending && <section className="privacy-choice-panel" aria-label={localeText("Choix de confidentialité")}><div className="privacy-choice-inner"><h2><Cookie size={23} />{localeText("Votre confidentialité")}</h2>{content}</div></section>}
     {error && <div className="privacy-sync-error" role="alert">{localeText(error)}<button type="button" className="secondary" onClick={openPreferences}>{localeText("Revoir mon choix")}</button></div>}
     {children}
-    <footer className="legal-footer"><nav aria-label={localeText("Informations legales")}><a href={appPath("games")}>{localeText("Jeux et règles")}</a><a href={appPath("faq")}>{localeText("FAQ")}</a><a href={appPath("guide")}>{localeText("Guide du joueur")}</a><a href={appPath("bugs")}>{localeText("Suivi des bugs")}</a><a href={appPath("patchnotes")}>{localeText("Patchnotes")}</a><a href={appPath("status")}>{localeText("État des services")}</a>{Object.entries(legalLinks).map(([view, label]) => <a key={view} href={appPath(view)}>{localeText(label)}</a>)}<button type="button" className="secondary" onClick={openPreferences}><Cookie size={15} />{localeText("Mes préférences")}</button></nav><small>{localeText("Jeux gratuits · Jetons virtuels sans valeur monétaire")}</small></footer>
+    <footer className="legal-footer"><nav aria-label={localeText("Informations legales")}><a href={appPath("games")}>{localeText("Jeux et règles")}</a><a href={appPath("faq")}>{localeText("FAQ")}</a><a href={appPath("guide")}>{localeText("Guide du joueur")}</a><a href={appPath("bugs")}>{localeText("Suivi des bugs")}</a><a href={appPath("patchnotes")}>{localeText("Patchnotes")}</a><a href={appPath("status")}>{localeText("État des services")}</a><CustomPageLinks/>{Object.entries(legalLinks).map(([view, label]) => <a key={view} href={appPath(view)}>{localeText(label)}</a>)}<button type="button" className="secondary" onClick={openPreferences}><Cookie size={15} />{localeText("Mes préférences")}</button></nav><small>{localeText("Jeux gratuits · Jetons virtuels sans valeur monétaire")}</small></footer>
     {open && <Dialog title={localeText("Mes préférences de confidentialité")} className="privacy-dialog" onClose={() => setOpen(false)}>{content}</Dialog>}
   </PrivacyContext.Provider>;
 }

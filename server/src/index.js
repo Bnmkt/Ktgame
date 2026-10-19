@@ -154,6 +154,7 @@ import { describeChatLinks, detectChatLinks } from "./services/chat-links.js";
 import { apiHealthProbe } from "./services/api-status-probe.js";
 import { createPatchnoteStore } from "./services/patchnotes.js";
 import { createHelpStore } from "./services/help-content.js";
+import { createCustomPageStore, registerCustomPageRoutes } from "./services/custom-pages.js";
 import { createTribunalStore, tribunalCategories } from "./services/tribunal.js";
 import { createChatStore, directChannelId } from "./services/chat.js";
 
@@ -773,6 +774,9 @@ process.on("exit", () => { clearInterval(bugRetentionTimer); bugReports.close();
 const helpFilename = process.env.HELP_DB_PATH ? path.resolve(process.cwd(), process.env.HELP_DB_PATH) : `${process.env.SQLITE_PATH ? path.resolve(process.cwd(), process.env.SQLITE_PATH) : path.join(__dirname, "..", "data", "ktga.sqlite")}.help.sqlite`;
 const playerHelp = createHelpStore({ filename: helpFilename, uploadDirectory: path.join(path.dirname(helpFilename), "help-images") });
 process.on("exit", () => playerHelp.close());
+const customPagesFilename = process.env.CUSTOM_PAGES_DB_PATH ? path.resolve(process.cwd(), process.env.CUSTOM_PAGES_DB_PATH) : `${databaseFilename}.pages.sqlite`;
+const customPages = createCustomPageStore({ filename: customPagesFilename });
+process.on("exit", () => customPages.close());
 const serverStartedAt = Date.now();
 const requestTelemetry = {
   active: 0,
@@ -886,6 +890,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use("/api/admin/help", express.json({ limit: "2mb" }));
+app.use("/api/admin/pages", express.json({ limit: "1mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use("/api/admin/source", express.json({ limit: "1mb" }));
 app.use(express.json());
@@ -4707,6 +4712,7 @@ app.get("/api/help", (_req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.json(playerHelp.read(true));
 });
+registerCustomPageRoutes({ app, store: customPages, auth, requireBackOffice });
 app.get("/api/help/images/:id", (req, res) => {
   const image = playerHelp.image(req.params.id);
   if (!image) return res.status(404).json({ error: "Image introuvable." });
@@ -6053,7 +6059,7 @@ if (CLIENT_DIST) {
   if (!fs.existsSync(CLIENT_DIST)) {
     console.warn(`CLIENT_DIST is configured but does not exist: ${CLIENT_DIST}`);
   } else {
-    await registerPublicPages({ app, clientDist: CLIENT_DIST, settings: platformSettings, games: configuredGames, help: () => playerHelp.read(true), catalog: () => ({ currentVersion: patchnotes.currentVersion, notes: patchnotes.list() }), note: (version) => version ? patchnotes.get(version) : null, basePath: APP_BASE_PATH });
+    await registerPublicPages({ app, clientDist: CLIENT_DIST, settings: platformSettings, games: configuredGames, help: () => playerHelp.read(true), catalog: () => ({ currentVersion: patchnotes.currentVersion, notes: patchnotes.list() }), note: (version) => version ? patchnotes.get(version) : null, customPages: () => customPages.list(true), customPage: slug => customPages.published(slug), customRevision: customPages.revision, basePath: APP_BASE_PATH });
     app.use(express.static(CLIENT_DIST, { index: false, dotfiles: "deny" }));
     app.use((_req, res) => res.status(404).set("X-Robots-Tag", "noindex").type("text/plain").send("Not found"));
   }

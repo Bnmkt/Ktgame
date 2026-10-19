@@ -49,6 +49,7 @@ const ParentalPortalPage = lazy(() => import("./privacy/ParentalPortalPage.jsx")
 const TribunalPage = lazy(() => import("./pages/TribunalPage.jsx").then((module) => ({ default: module.TribunalPage })));
 const SocialPanel = lazy(() => import("./components/social/SocialPanel.jsx").then((module) => ({ default: module.SocialPanel })));
 const HelpPage = lazy(() => import("./components/help/HelpContent.jsx").then((module) => ({ default: module.HelpPage })));
+const CustomPage = lazy(() => import("./pages/CustomPage.jsx").then(module => ({ default: module.CustomPage })));
 const HelpOnboarding = lazy(() => import("./components/help/HelpOnboarding.jsx").then((module) => ({ default: module.HelpOnboarding })));
 const publicPageData = readPublicPageData();
 
@@ -140,7 +141,7 @@ export default function App() {
   useEffect(() => { api("/api/config").then((settings) => setPublicSettings({ ...defaultPublicSettings, ...settings })).catch(() => {}); }, []);
   useEffect(() => { api("/api/games").then(setPublicGames).catch(() => {}); }, []);
   useEffect(() => {
-    if (view === "patchnotes") return;
+    if (["patchnotes", "page"].includes(view)) return;
     applyPageMetadata(pageMetadata({ pathname: window.location.pathname, search: window.location.search, basePath: (import.meta.env.BASE_URL || "/").replace(/\/$/, ""), siteName: publicSettings.siteName, games: publicGames }));
   }, [route, publicSettings.siteName, publicGames]);
   useEffect(() => {
@@ -356,6 +357,7 @@ export default function App() {
   const parentAccess = view === "parents" && (new URL(window.location.href).searchParams.has("parental-verify") || new URL(window.location.href).searchParams.has("parental-access"));
   if (publicPageData?.meta.status === 404 && view === "patchnotes" && !user?.admin && !user?.editor && (route.id || new URLSearchParams(window.location.search).get("version")) === publicPageData.meta.id) return <main className="app-shell"><section className="panel"><h1>{localeText("Version introuvable")}</h1><p>{localeText("Cette version n’est pas disponible publiquement.")}</p><a href={appPath("patchnotes")}>{localeText("Patchnotes publiées")}</a></section></main>;
   if (view === "games") return <PublicGamesPage games={publicGames} id={route.id} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} />;
+  if (view === "page") return <Suspense fallback={<main className="app-shell" role="status">{localeText("Chargement…")}</main>}><CustomPage key={route.id} slug={route.id} user={user} accountReady={accountReady} siteName={publicSettings.siteName} initialPage={publicPageData?.page}/></Suspense>;
   if (view === "not-found") return <main className="app-shell"><section className="panel"><h1>{localeText("Page introuvable")}</h1><p>{localeText("Cette page n’existe pas ou n’est pas disponible publiquement.")}</p><a href={appPath("lobby")}>{localeText("Retour au casino")}</a></section></main>;
   if (view === "bugs") return <Suspense fallback={<main className="app-shell" role="status">{localeText("Chargement des signalements…")}</main>}><BugReportsPage id={route.id} user={user} onBack={() => goTo("lobby")} onNavigate={(id) => goTo("bugs", id)} /></Suspense>;
   if (["faq", "guide"].includes(view)) return <Suspense fallback={<main className="app-shell" role="status">{localeText("Chargement de l’aide…")}</main>}><HelpPage key={view} mode={view} siteName={publicSettings.siteName} onBack={() => goTo("lobby")} initialDocument={publicPageData?.help} /></Suspense>;

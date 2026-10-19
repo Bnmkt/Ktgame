@@ -68,9 +68,26 @@ test("public caches expire and do not multiply for tracking or verification quer
   assert.equal(count, 1);
   time = 30001; service.document("/faq"); assert.equal(count, 2);
 });
+
+test("custom pages use published content, clear public caches after publication and respect indexing", () => {
+  let revision = 0, title = "Le club";
+  const service = fixture({ customPages: () => [{ slug:"le-club", title, description:"Notre club", indexable:true, showFooter:true }, { slug:"discret", title:"Page discrète", indexable:false }], customPage: slug => ({ slug, title, format:"html", html:"<p>Publié</p>" }), customRevision: () => revision });
+  assert.equal(service.metadata("/pages/le-club").view,"page");
+  assert.equal(service.metadata("/pages/le-club").indexable,true);
+  assert.equal(service.metadata("/pages/discret").indexable,false);
+  assert.equal(service.metadata("/pages/brouillon").status,404);
+  assert.equal(service.metadata("/pages/le-club?preview=private").indexable,false);
+  assert.match(service.sitemap(),/\/pages\/le-club/);
+  assert.ok(!service.sitemap().includes("/pages/discret"));
+  assert.match(service.document("/pages/le-club").html,/Le club/);
+  title = "Le nouveau club"; revision++;
+  assert.match(service.document("/pages/le-club").html,/Le nouveau club/);
+});
 test("built renderer sends real content without JavaScript and preserves HTTP semantics", { skip: !fs.existsSync(new URL("../../client/dist-ssr/render.js", import.meta.url)) }, async () => {
   const app = express();
-  await registerPublicPages({ app, clientDist: new URL("../../client/dist/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"), ...sources });
+  await registerPublicPages({ app, clientDist: new URL("../../client/dist/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"), ...sources,
+    customPages: () => [{ slug:"le-club", title:"Le club", description:"Une page du club", indexable:true, showFooter:true }],
+    customPage: () => ({ slug:"le-club", title:"Le club", format:"html", html:"<h2>Notre club</h2>", indexable:true }) });
   app.use((_req, res) => res.sendStatus(404));
   const server = app.listen(0, "127.0.0.1"); await new Promise((resolve) => server.once("listening", resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -84,6 +101,10 @@ test("built renderer sends real content without JavaScript and preserves HTTP se
       if (route === "/jeux/yahtzee") assert.match(html, /Combinaisons inférieures/);
     }
     assert.equal((await fetch(origin + "/does-not-exist")).status, 404);
+    const customResponse = await fetch(origin + "/pages/le-club");
+    assert.equal(customResponse.status, 200);
+    assert.match(await customResponse.text(), /<h2>Notre club<\/h2>/);
+    assert.equal((await fetch(origin + "/pages/non-publiee")).status, 404);
     assert.match((await fetch(origin + "/admin")).headers.get("x-robots-tag"), /noindex/);
     assert.equal((await fetch(origin + "/faq/", { redirect: "manual" })).status, 308);
     assert.equal((await fetch(origin + "//outside.example/faq/", { redirect: "manual" })).headers.get("location"), "/outside.example/faq");

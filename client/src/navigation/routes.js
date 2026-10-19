@@ -1,9 +1,9 @@
-const paths = { lobby: "", games: "jeux", profile: "profil", shop: "shop", leaderboard: "classements", tribunal: "tribunal", admin: "admin", faq: "faq", guide: "guide", patchnotes: "patchnotes", status: "status", bugs: "bugs", room: "table", spectator: "observer", event: "evenement", terms: "conditions", legal: "mentions-legales", privacy: "confidentialite", cookies: "cookies", parents: "parents" };
+const paths = { lobby: "", games: "jeux", page: "pages", profile: "profil", shop: "shop", leaderboard: "classements", tribunal: "tribunal", admin: "admin", faq: "faq", guide: "guide", patchnotes: "patchnotes", status: "status", bugs: "bugs", room: "table", spectator: "observer", event: "evenement", terms: "conditions", legal: "mentions-legales", privacy: "confidentialite", cookies: "cookies", parents: "parents" };
 
 export function appPath(view, id = "", base = import.meta.env?.BASE_URL ?? "/") {
   const prefix = `/${base.replace(/^\/+|\/+$/g, "")}`.replace(/\/$/, "");
   const segment = paths[view] ?? "";
-  return `${prefix}/${segment}${["games", "room", "spectator", "event", "bugs"].includes(view) && id ? `/${encodeURIComponent(id)}` : ""}`;
+  return `${prefix}/${segment}${["games", "page", "room", "spectator", "event", "bugs"].includes(view) && id ? `/${encodeURIComponent(id)}` : ""}`;
 }
 
 export function readRoute(location, base = import.meta.env?.BASE_URL ?? "/") {
@@ -22,6 +22,7 @@ export function readRoute(location, base = import.meta.env?.BASE_URL ?? "/") {
     if (["games", "profile", "shop", "leaderboard", "tribunal", "admin", "faq", "guide", "patchnotes", "status", "bugs", "terms", "legal", "privacy", "cookies", "parents"].includes(view)) return { view };
   }
   if (parts.length === 2 && parts[0] === "jeux" && /^[a-zA-Z0-9_-]+$/.test(parts[1])) return { view: "games", id: parts[1] };
+  if (parts.length === 2 && parts[0] === "pages" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[1]) && parts[1].length <= 80) return { view: "page", id: parts[1] };
   if (parts.length === 2 && parts[0] === "patchnotes" && /^[a-zA-Z0-9._-]+$/.test(parts[1])) return { view: "patchnotes", id: parts[1] };
   if (parts.length === 2 && parts[0] === "bugs" && /^\d{1,10}$/.test(parts[1])) return { view: "bugs", id: parts[1] };
   if (parts.length === 2 && ["table", "observer", "evenement"].includes(parts[0])) {

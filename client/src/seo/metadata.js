@@ -10,10 +10,10 @@ const pages = {
   cookies: ["Cookies et préférences", "Informations sur les cookies nécessaires au fonctionnement de KTGA.ME et vos préférences."],
   parents: ["Informations pour les parents", "Découvrez les protections et le parcours parental prévus pour les jeunes joueurs de KTGA.ME."]
 };
-const paths = { lobby: "", games: "jeux", faq: "faq", guide: "guide", patchnotes: "patchnotes", terms: "conditions", legal: "mentions-legales", privacy: "confidentialite", cookies: "cookies", parents: "parents" };
+const paths = { lobby: "", games: "jeux", page: "pages", faq: "faq", guide: "guide", patchnotes: "patchnotes", terms: "conditions", legal: "mentions-legales", privacy: "confidentialite", cookies: "cookies", parents: "parents" };
 const privatePaths = { profil: "profile", shop: "shop", classements: "leaderboard", tribunal: "tribunal", admin: "admin", status: "status", bugs: "bugs", table: "room", observer: "spectator", evenement: "event" };
 
-export function pageMetadata({ pathname = "/", search = "", basePath = "", siteName = "KTGA.ME", games = [], notes = [] } = {}) {
+export function pageMetadata({ pathname = "/", search = "", basePath = "", siteName = "KTGA.ME", games = [], notes = [], customPages = [] } = {}) {
   const base = basePath.replace(/\/$/, "");
   const relative = base && pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : pathname;
   const parts = relative.split("/").filter(Boolean);
@@ -24,18 +24,21 @@ export function pageMetadata({ pathname = "/", search = "", basePath = "", siteN
   let id = "";
   if (!view && parts.length === 1 && privatePaths[parts[0]] && !["table", "observer", "evenement"].includes(parts[0])) view = privatePaths[parts[0]];
   if (parts.length === 2 && ["table", "observer", "evenement", "bugs"].includes(parts[0]) && /^[a-zA-Z0-9_-]+$/.test(parts[1])) { view = privatePaths[parts[0]]; id = parts[1]; }
-  if (parts.length > 1 && !(["games", "patchnotes", "room", "spectator", "event", "bugs"].includes(view) && parts.length === 2)) view = undefined;
+  if (parts.length > 1 && !(["games", "page", "patchnotes", "room", "spectator", "event", "bugs"].includes(view) && parts.length === 2)) view = undefined;
   if (view === "lobby" && (query.has("room") || query.has("event"))) view = query.has("room") ? "room" : "event";
   if (view === "games") id = parts[1] || "";
+  if (view === "page") id = parts[1] || "";
   if (view === "patchnotes") id = parts[1] || query.get("version") || "";
   let [title, description] = pages[view] || ["Accès au site", "Connectez-vous à KTGA.ME pour accéder à cet espace."];
   const game = id && view === "games" ? games.find((entry) => entry.id === id && entry.enabled !== false) : null;
   const note = id && view === "patchnotes" ? notes.find((entry) => entry.version === id && entry.status === "published") : null;
+  const custom = id && view === "page" ? customPages.find(entry => entry.slug === id) : null;
   if (game) { title = `${game.name} : règles et jeu gratuit`; description = `${game.description || `Découvrez ${game.name} sur ${siteName}.`} Retrouvez les règles et jouez gratuitement avec des jetons virtuels sans valeur monétaire.`; }
   if (note) { title = `Patchnote ${note.version} - ${note.title}`; description = String(note.summary || `Les nouveautés de la version ${note.version} de ${siteName}.`).replace(/[#*`\[\]]/g, " "); canonical = `/patchnotes?version=${encodeURIComponent(note.version)}`; }
-  if (!view || (view === "games" && id && !game) || (view === "patchnotes" && id && !note)) { status = 404; view = "not-found"; title = "Page introuvable"; description = "Cette page n’existe pas ou n’est pas disponible publiquement."; }
-  const sensitive = [...query.keys()].some((key) => /token|password|verify|parental|receipt|secret|challenge|code/i.test(key));
-  const indexable = Boolean(pages[view]) && status === 200 && !sensitive;
+  if (custom) { title = custom.title; description = custom.description || custom.title; }
+  if (!view || (view === "page" && !custom) || (view === "games" && id && !game) || (view === "patchnotes" && id && !note)) { status = 404; view = "not-found"; title = "Page introuvable"; description = "Cette page n’existe pas ou n’est pas disponible publiquement."; }
+  const sensitive = [...query.keys()].some((key) => /token|password|verify|parental|receipt|secret|challenge|code|preview/i.test(key));
+  const indexable = Boolean(pages[view] || custom) && custom?.indexable !== false && status === 200 && !sensitive;
   return { view, id, status, indexable, title: `${siteName} - ${title}`, description: description.replace(/\s+/g, " ").trim().slice(0, 220), canonicalPath: `${base}${canonical}`, robots: indexable ? "index, follow" : "noindex, follow" };
 }
 

@@ -8,13 +8,13 @@ const publicSettings = (settings) => Object.fromEntries(["siteName", "siteIcon",
 const publicGames = (games) => games.filter((game) => game.enabled !== false).map(({ id, name, type, minPlayers, maxPlayers, description, descriptiveImage, coverImage }) => ({ id, name, type, minPlayers, maxPlayers, description, descriptiveImage, coverImage }));
 const publicNotes = (notes) => notes.filter((note) => note.status === "published").map(({ id, version, versionGroup, title, summary, status, publishedAt, updatedAt }) => ({ id, version, versionGroup, title, summary, status, publishedAt, updatedAt }));
 
-export function createPublicPageService({ template, render, styles = [], settings, games, help, catalog, note, origin = "https://www.ktga.me", basePath = "", now = Date.now }) {
+export function createPublicPageService({ template, render, styles = [], settings, games, help, catalog, note, customPages = () => [], customPage = () => null, customRevision = () => 0, origin = "https://www.ktga.me", basePath = "", now = Date.now }) {
   const canonicalOrigin = new URL(origin).origin;
   let sourceCache;
   const pages = new Map();
   function source() {
-    if (!sourceCache || now() >= sourceCache.until) {
-      sourceCache = { until: now() + 30000, settings: publicSettings(settings()), games: publicGames(games()), catalog: catalog() };
+    if (!sourceCache || now() >= sourceCache.until || sourceCache.customRevision !== customRevision()) {
+      sourceCache = { until: now() + 30000, customRevision: customRevision(), customPages: customPages(), settings: publicSettings(settings()), games: publicGames(games()), catalog: catalog() };
       sourceCache.catalog = { currentVersion: sourceCache.catalog.currentVersion, notes: publicNotes(sourceCache.catalog.notes) };
       pages.clear();
     }
@@ -23,14 +23,15 @@ export function createPublicPageService({ template, render, styles = [], setting
   function metadata(url) {
     const parsed = new URL(url, canonicalOrigin);
     const data = source();
-    return pageMetadata({ pathname: parsed.pathname, search: parsed.search, basePath, siteName: data.settings.siteName, games: data.games, notes: data.catalog.notes });
+    return pageMetadata({ pathname: parsed.pathname, search: parsed.search, basePath, siteName: data.settings.siteName, games: data.games, notes: data.catalog.notes, customPages: data.customPages });
   }
   function document(url) {
     const meta = metadata(url);
     const cacheKey = `${meta.canonicalPath}:${meta.robots}:${meta.status}`;
     if (meta.status !== 404 && pages.has(cacheKey)) return pages.get(cacheKey);
-    const { settings: siteSettings, games: gameList, catalog: releases } = source();
-    const data = { meta, settings: siteSettings, games: gameList, catalog: releases };
+    const { settings: siteSettings, games: gameList, catalog: releases, customPages: pageList } = source();
+    const data = { meta, settings: siteSettings, games: gameList, catalog: releases, customPages: pageList };
+    if (meta.view === "page") data.page = customPage(meta.id);
     if (["faq", "guide"].includes(meta.view)) data.help = help();
     if (meta.view === "patchnotes") {
       const published = note(meta.id || data.catalog.notes[0]?.version);
@@ -50,6 +51,7 @@ export function createPublicPageService({ template, render, styles = [], setting
     const entries = ["/", "/jeux", "/faq", "/guide", "/patchnotes", "/conditions", "/mentions-legales", "/confidentialite", "/cookies", "/parents"].map((route) => ({ route }));
     entries.push(...data.games.map((game) => ({ route: `/jeux/${encodeURIComponent(game.id)}` })));
     entries.push(...data.catalog.notes.map((entry) => ({ route: `/patchnotes?version=${encodeURIComponent(entry.version)}`, lastmod: entry.updatedAt || entry.publishedAt })));
+    entries.push(...data.customPages.filter(entry => entry.indexable).map(entry => ({ route:`/pages/${encodeURIComponent(entry.slug)}`, lastmod:entry.updatedAt })));
     return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries.map((entry) => `<url><loc>${escape(canonicalOrigin + basePath + entry.route)}</loc>${entry.lastmod && Number.isFinite(Date.parse(entry.lastmod)) ? `<lastmod>${new Date(entry.lastmod).toISOString()}</lastmod>` : ""}</url>`).join("")}</urlset>`;
   }
   return { metadata, document, sitemap, robots: () => `User-agent: *\nAllow: /\n\nSitemap: ${canonicalOrigin}${basePath}/sitemap.xml\n` };
