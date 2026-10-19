@@ -1,12 +1,13 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
-import { Mascot } from "../components/mascots/Mascot.jsx";
+import { Mascot, gameMascot } from "../components/mascots/Mascot.jsx";
+import "./game-lounge.css";
 import { softBanLimited } from "../features/accounts/softban.js";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
 import { GameArtwork } from "../components/game/GameArtwork.jsx";
 import { LobbyNotice } from "../components/navigation/LobbyNotice.jsx";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, HelpCircle, Play, Plus, Search, ShieldCheck, Spade, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, Gamepad2, HelpCircle, Play, Plus, Search, ShieldCheck, Spade, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api } from "../api.js";
 import { friendTables } from "../features/games/friend-tables.js";
 import { applyRoomPatch } from "../features/games/room-feed.js";
@@ -158,8 +159,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   }
 
   return (
-    <main className="app-shell">
-      <div className="page-heading lobby-heading mascot-page-heading"><div><span className="eyebrow">{localeText("Le casino")}</span><h1>{localeText("À quelle table joues-tu ?")}</h1></div><Mascot character="lucky" pose={playMode === "ranked" ? "victory" : "welcome"}/></div>
+    <main className="app-shell game-lounge">
+      <div className="page-heading lobby-heading mascot-page-heading lounge-heading"><div><span className="eyebrow"><Gamepad2 size={18}/>{localeText("Le casino")}</span><h1>{localeText("À quelle table joues-tu ?")}</h1><div className="lounge-mode-label"><span>{localeText(playMode === "ranked" ? "Classé" : "Classique")}</span><span><Users size={14}/>{localeText("Multijoueur")}</span></div></div><div className="lounge-hosts"><Mascot character="lucky" pose={playMode === "ranked" ? "victory" : "dice"}/><Mascot character="jacky" pose="cards"/></div></div>
       {error && !selectedGame && <div className="error">{localeText(error)}</div>}
       {(user.minor?.restricted || user.moderation?.type === "soft") && <div className="account-limitation-notice"><ShieldCheck size={18} /><span><strong>{localeText("Accès adapté")}</strong>{localeText("Certaines fonctions et certains jeux ne sont pas disponibles pour ce compte.")}</span></div>}
       <LobbyNotice notice={notice} user={user} setUser={setUser}/>
@@ -185,6 +186,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       <div className="single-layout">
         <section>
           <div className="section-title"><h2>{localeText("Jeux disponibles")}</h2><span className="muted">{visibleGames.length}{" " + localeText("jeu")}{visibleGames.length !== 1 ? localeText("x") : ""}</span></div>
+          <div className="lounge-categories" role="group" aria-label={localeText("Type de jeu")}>{[{ value: "all", label: "Tous les jeux", icon: Gamepad2 }, { value: "dice", label: "Jeux de dés", icon: Dice5 }, { value: "cards", label: "Jeux de cartes", icon: Spade }].map(({ value, label, icon: Icon }) => <button key={value} type="button" className={gameTypeFilter === value ? "active" : "secondary"} aria-pressed={gameTypeFilter === value} onClick={() => setGameTypeFilter(value)}><Icon size={18}/><span>{localeText(label)}</span></button>)}</div>
           <div className="game-filter-panel">
             <div className="game-filter-toolbar">
               <label className="game-search-field"><Search size={18} /><span className="sr-only">{localeText("Rechercher un jeu")}</span><input type="search" value={gameSearch} onChange={(event) => setGameSearch(event.target.value)} placeholder={localeText("Rechercher un jeu…")} /></label>
@@ -205,7 +207,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
               <article key={game.id} className={`game-card premium-card ${game.type} ${playMode==="ranked"?"ranked-game-card":""}`}>
                 <GameArtwork source={game.descriptiveImage} backdrop />
                 <header className="game-entry-meta"><span className="game-entry-kind">{game.type === "dice" ? <Dice5 size={20} /> : <Spade size={20} />}<span>{game.type === "dice" ? localeText("Dés") : localeText("Cartes")}</span></span><span className="game-entry-count"><Users size={16} />{playMode === "ranked" ? localeText("{value0} joueurs", { value0: rankedStatus?.games.find((row) => row.id === game.id)?.players ?? "…" }) : localeText("{value0} joueurs", { value0: game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}` })}</span></header>
-                <GameArtwork source={game.coverImage} halo />
+                <GameArtwork source={game.coverImage} halo fallback={<div className={`lounge-game-scene lounge-scene-${game.type}`}><Mascot {...gameMascot(game.id, game.type)} size="large"/></div>} />
                 <h3>{localeText(game.name)}{favorites.includes(game.id) && <Star className="game-favorite" size={16} aria-label={localeText("Favori")} fill="currentColor" />}</h3>
                 <p>{localeText(game.description || gameRules[game.id]?.goal)}</p>
                 <div className="card-meta"><span>{localeText(gameCategoryLabel(game.category))}</span><span>{localeText(gameComplexityLabel(game.complexity))}</span>{playMode==="ranked"?<RankBadge rank={rankedStatus?.games.find((row)=>row.id===game.id)?.rank}/>:<span>{rooms.filter((room) => room.gameId === game.id && !room.ranked).length}{" " + localeText("tables publiques")}</span>}</div>

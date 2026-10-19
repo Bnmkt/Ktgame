@@ -1,7 +1,7 @@
 .auth-screen.ktga-entry { position:relative; isolation:isolate; display:block; min-height:calc(100svh - 140px); background:var(--site-page,#07080a); padding:36px 24px 28px; overflow:hidden; }
 .entry-scene { position:absolute; inset:0; z-index:-2; pointer-events:none; }
 .entry-scene img { width:100%; height:100%; object-fit:cover; object-position:50% 45%; }
-.entry-scene::after { content:""; position:absolute; inset:0; background:rgba(5,17,14,.84); }
+.entry-scene::after { content:""; position:absolute; inset:0; background:rgba(5,17,14,.67); }
 .entry-identity { position:relative; text-align:center; max-width:780px; margin:0 auto 24px; }
 .entry-identity .auth-brand { justify-content:center; color:var(--site-primary,#e8c777); font-size:44px; margin:0 0 8px; line-height:1.1; overflow-wrap:anywhere; }
 .entry-identity p { margin:0; color:#e2e7df; font-size:15px; line-height:1.5; }
@@ -36,6 +36,29 @@
 .entry-stage .discord-login-button { min-height:46px; }
 .entry-stage .password-requirements { gap:8px 12px; }
 @keyframes mascot-arrive { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+.entry-session { display:flex; justify-content:center; align-items:center; gap:24px; margin-bottom:18px; color:var(--site-secondary,#69d5aa); font-size:12px; font-weight:800; text-transform:uppercase; }
+.entry-session > span { display:inline-flex; align-items:center; gap:8px; }
+.entry-availability i { width:7px; height:7px; border-radius:50%; background:var(--site-success,#69d8a7); }
+.entry-identity .auth-brand { font-size:60px; font-weight:900; color:var(--site-primary,#e8c777); text-shadow:0 4px 0 #183128; }
+.entry-identity .auth-brand .cosmetic-icon { width:52px; height:52px; }
+.auth-screen.ktga-entry { border-block:2px solid var(--site-border,#514b38); }
+.entry-stage .auth-panel { border:2px solid var(--site-border,#514b38); border-top:5px solid var(--site-primary,#e8c777); box-shadow:0 7px 0 #06100d,0 0 0 5px #06100d66; }
+.entry-panel-intro { padding-bottom:16px; border-bottom:1px solid var(--site-border,#514b38); }
+.entry-panel-intro > span { display:flex; align-items:center; gap:7px; text-transform:uppercase; font-size:10px; }
+.entry-panel-intro h2 { font-size:28px; font-weight:850; }
+.entry-stage .tabs { background:#07120e; padding:5px; gap:5px; border-bottom:2px solid #34493e; }
+.entry-stage .tabs button { color:var(--site-muted,#b8ae99); border-radius:4px; }
+.entry-stage .tabs button.active { background:var(--site-primary,#e8c777); color:var(--site-button-text,#170f04); border-color:transparent; box-shadow:0 2px 0 #89652c; }
+.entry-stage .form-stack > button[type="submit"] { border-bottom-width:3px; font-weight:850; font-size:16px; }
+.entry-companion { gap:0; }
+.entry-companion .mascot-size-large { width:340px; height:360px; flex-basis:340px; }
+.entry-companion figcaption { position:relative; margin-top:-10px; padding:13px 16px; background:#14372a; border:1px solid #448963; border-bottom-width:3px; border-radius:6px; }
+.entry-companion figcaption strong { position:absolute; bottom:calc(100% - 5px); left:12px; background:var(--site-primary,#e8c777); color:var(--site-button-text,#170f04); padding:3px 10px; border-radius:3px; font-size:12px; transform:rotate(-3deg); }
+.entry-companion[data-character="nixie"] figcaption { background:#442833; border-color:#bf7389; }
+.entry-companion[data-character="milo"] figcaption { background:#332a47; border-color:#8b79b1; }
+.entry-companion-right figcaption { background:#442833; border-color:#aa687a; }
+.entry-stage .auth-panel:focus-within { border-inline-color:var(--site-primary,#e8c777); }
+.entry-footer { padding-top:18px; border-top:1px solid #78908040; }
 @media (max-width:1060px) {
   .entry-stage { grid-template-columns:minmax(0,210px) minmax(0,480px); justify-content:center; gap:18px; }
   .entry-companion-right { display:none; }
@@ -51,6 +74,8 @@
   .entry-companion-left { position:absolute; right:0; bottom:calc(100% + 8px); }
   .entry-companion .mascot-size-large { width:86px; height:100px; flex-basis:86px; }
   .entry-companion figcaption { display:none; }
+  .entry-session { justify-content:flex-start; gap:16px; margin-bottom:10px; font-size:10px; }
+  .entry-identity .auth-brand .cosmetic-icon { width:32px; height:32px; }
   .entry-stage .auth-panel { padding:22px 18px; }
   .entry-stage .tabs button { font-size:12px; padding:8px 5px; gap:4px; }
   .entry-stage .tabs button > svg { flex:0 0 15px; width:15px; height:15px; }

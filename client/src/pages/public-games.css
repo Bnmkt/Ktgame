@@ -25,6 +25,14 @@
 .public-game-intro > .game-artwork-media { aspect-ratio: 12 / 11; border-radius: 6px; }
 .public-game-entry { display: flex; flex-direction: column; overflow: hidden; border: var(--site-border-width, 1px) solid #41463c; border-radius: var(--site-radius, 8px); color: #f7efd9; background: #111b19; text-decoration: none; }
 .public-game-entry:hover, .public-game-entry:focus-visible { border-color: #d7b652; }
+.public-catalog-heading { align-items:center; gap:16px; border-bottom:2px solid var(--site-border,#514b38); padding-bottom:16px; }
+.public-catalog-heading > div { flex:1; min-width:0; }
+.public-catalog-heading h1 { overflow-wrap:anywhere; }
+.public-games-grid:not(.public-games-featured) .public-game-entry { border-width:2px; border-bottom-width:5px; background:var(--site-card,#11191a); box-shadow:0 4px 0 #050c09; transition:transform 150ms ease; }
+.public-games-grid:not(.public-games-featured) .public-game-entry:hover { transform:translateY(-3px); }
+.public-games-grid:not(.public-games-featured) .public-game-entry h3 { color:var(--site-primary,#e8c777); font-size:23px; }
+.public-game-meta { border-bottom:1px solid var(--site-border,#514b38); }
+.public-catalog-heading > a { flex-shrink:0; }
 .public-game-entry > div:last-child { padding: 18px; }
 .public-game-entry h3 { font-size: 20px; margin: 12px 0 8px; }
 .public-game-entry p { color: #bdbba9; line-height: 1.65; margin: 0 0 18px; }
@@ -55,4 +63,13 @@
   .public-game-featured-heading { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .public-games-featured .public-game-featured h3 { grid-column: 1; }
   .public-game-featured .public-game-type { grid-column: 1; justify-self: end; }
+}
+@media (max-width:600px) {
+  .public-games-page .public-catalog-heading { display:grid; grid-template-columns:minmax(0,1fr) 72px; gap:8px; }
+  .public-catalog-heading > a { grid-column:1/-1; justify-self:start; }
+  .public-catalog-heading h1 { font-size:26px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .public-games-grid:not(.public-games-featured) .public-game-entry { transition:none; }
+  .public-games-grid:not(.public-games-featured) .public-game-entry:hover { transform:none; }
 }

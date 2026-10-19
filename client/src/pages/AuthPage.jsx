@@ -1,6 +1,6 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Clock3, DoorOpen, KeyRound, Landmark, Link, LogIn, MailCheck, RefreshCw, ShieldAlert, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Check, Clock3, DoorOpen, Gamepad2, KeyRound, Landmark, Link, LogIn, MailCheck, RefreshCw, ShieldAlert, UserPlus, X } from "lucide-react";
 import { api, setToken } from "../api.js";
 import { CosmeticIcon } from "../components/cosmetics/Cosmetics.jsx";
 import { siteMarkSource } from "../features/site-branding.js";
@@ -260,11 +260,11 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
   const entryTitle = accountSetup ? "Ton compte, en toute sécurité" : mode === "register" ? "Crée ton profil de joueur" : mode === "guest" ? "Une place pour toi" : mode === "mfa" ? "Encore une petite étape" : ["forgot-password", "reset-password"].includes(mode) ? "Retrouvons ton compte" : "À toi de jouer !";
   return <main className="auth-screen ktga-entry" id="connexion" data-entry-mode={mode}>
     <div className="entry-scene" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}mascotte_assets/ui/scene-casino.webp`} width={1600} height={1067} alt="" decoding="async" fetchPriority="high"/></div>
-    <header className="entry-identity"><h1 className="auth-brand"><CosmeticIcon value="site" source={siteMarkSource(settings)} /><span>{settings.siteName}</span></h1><p>{settings.siteSubtitle}</p></header>
+    <header className="entry-identity"><div className="entry-session"><span><Gamepad2 size={16}/>{localeText("Multijoueur")}</span>{serverStatus === "ok" && <span className="entry-availability"><i aria-hidden="true"/>{localeText("En ligne")}</span>}</div><h1 className="auth-brand"><CosmeticIcon value="site" source={siteMarkSource(settings)} /><span>{settings.siteName}</span></h1><p>{settings.siteSubtitle}</p></header>
     <div className="entry-stage">
-    <figure className="entry-companion entry-companion-left"><Mascot key={`${companion}:${companionPose}`} character={companion} pose={companionPose} size="large" priority/><figcaption><strong>{companion === "nixie" ? "Nixie" : companion === "milo" ? "Milo" : "Lucky"}</strong><span>{localeText(mode === "register" ? "Ta première partie commence ici." : "On te garde une place.")}</span></figcaption></figure>
+    <figure className="entry-companion entry-companion-left" data-character={companion}><Mascot key={`${companion}:${companionPose}`} character={companion} pose={companionPose} size="large" priority/><figcaption><strong>{companion === "nixie" ? "Nixie" : companion === "milo" ? "Milo" : "Lucky"}</strong><span>{localeText(mode === "register" ? "Ta première partie commence ici." : "On te garde une place.")}</span></figcaption></figure>
     <div className={`auth-panel ${accountSetup ? "auth-account-setup" : ""}`}>
-    <div className="entry-panel-intro"><span>{localeText("Bienvenue au casino")}</span><h2>{localeText(entryTitle)}</h2></div>
+    <div className="entry-panel-intro"><span><Gamepad2 size={15}/>{localeText("Bienvenue au casino")}</span><h2>{localeText(entryTitle)}</h2></div>
     {serverStatus === "checking" && <div className="invite-banner"><Landmark size={18} />{" " + localeText("Vérification de la disponibilité du casino...")}</div>}
     {serverStatus === "down" && <div className="error">{localeText("Le casino est actuellement indisponible. Le serveur de jeu ne répond pas.")}</div>}
     {serverStatus === "ok" && accountSetup && <>

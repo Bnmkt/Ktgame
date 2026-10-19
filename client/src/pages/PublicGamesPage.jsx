@@ -4,6 +4,7 @@ import { gameRules } from "../config/site.js";
 import { Die, PlayingCard } from "../components/game/GamePieces.jsx";
 import { appPath } from "../navigation/routes.js";
 import { GameArtwork } from "../components/game/GameArtwork.jsx";
+import { Mascot, gameMascot } from "../components/mascots/Mascot.jsx";
 import { featuredGame, gameImageUrl } from "../features/games/presentation.js";
 import "./public-games.css";
 
@@ -35,7 +36,7 @@ export function PublicGamesPage({ games = [], id = "", siteName = "KTGA.ME", onB
   const rules = game && gameRules[game.id];
   if (id && !game) return <main className="app-shell"><section className="public-games-surface"><h1>{localeText("Jeu introuvable")}</h1><p>{localeText("Ce jeu n’est pas disponible publiquement.")}</p><a href={appPath("games")}>{localeText("Tous les jeux")}</a></section></main>;
   return <main className="app-shell public-games-page">
-    <header className="page-heading"><div><span className="eyebrow">{siteName}{" " + localeText("· Cartes et dés")}</span><h1>{game ? localeText(game.name) : localeText("Jeux gratuits en ligne")}</h1></div><a className="secondary" href={appPath("lobby")} onClick={onBack ? (event) => { event.preventDefault(); onBack(); } : undefined}><ArrowLeft size={17} />{localeText("Casino")}</a></header>
+    <header className="page-heading public-catalog-heading"><div><span className="eyebrow">{siteName}{" " + localeText("· Cartes et dés")}</span><h1>{game ? localeText(game.name) : localeText("Jeux gratuits en ligne")}</h1></div><Mascot {...(game ? gameMascot(game.id, game.type) : { character: "lucky", pose: "point" })}/><a className="secondary" href={appPath("lobby")} onClick={onBack ? (event) => { event.preventDefault(); onBack(); } : undefined}><ArrowLeft size={17} />{localeText("Casino")}</a></header>
     <section className="public-games-surface">{game ? <>
       <div className="public-game-intro"><GameVisual game={game} /><div><h2>{localeText(rules?.goal || game.description)}</h2>{game.description !== rules?.goal && <p>{localeText(game.description)}</p>}<dl><div><dt>{localeText("Joueurs")}</dt><dd>{game.minPlayers === game.maxPlayers ? game.minPlayers : localeText("{value0} à {value1}", { value0: game.minPlayers, value1: game.maxPlayers })}</dd></div><div><dt>{localeText("Type")}</dt><dd>{game.type === "dice" ? localeText("Jeu de dés") : localeText("Jeu de cartes")}</dd></div><div><dt>{localeText("Accès")}</dt><dd>{localeText("Gratuit")}</dd></div></dl><a className="public-game-action" href={`${appPath("lobby")}#connexion`}>{localeText("Jouer sur") + " "}{siteName}<ArrowRight size={18} /></a><p className="muted">{localeText("Les jetons n’ont aucune valeur monétaire. Aucun achat ni retrait d’argent réel.")}</p></div></div>
       <nav className="public-game-sections" aria-label={localeText("Règles du jeu")}>{rules?.sections.map((section, index) => <a key={index} href={`#regles-${index}`}>{localeText(section.title)}</a>)}</nav>
