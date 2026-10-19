@@ -8,6 +8,7 @@ import { usePagination } from "../common/usePagination.js";
 import { CompactNumber, shopCategoryLabel } from "../../utils/presentation.jsx";
 import { shopPackDefinitions } from "../../utils/shop-packs.js";
 import { defaultCatalogFilters, filterShopItems, ownsShopItem, pricePack } from "../../features/shop/catalog.js";
+import { Mascot } from "../mascots/Mascot.jsx";
 import "./catalog.css";
 
 const types = ["icons", "nameEffects", "memberCards", "profileBanners", "profileFrames", "profileEffects", "diceSkins", "cardSkins"];
@@ -52,7 +53,7 @@ export function ShopCatalog({ user, items, stats, onPurchaseItem, onPurchasePack
     setSelection((previous) => previous.includes(item.id) ? previous.filter((id) => id !== item.id) : [...previous, item.id]);
   };
   return <div className="catalog-workspace">
-    <nav className="catalog-mode" aria-label={localeText("Catalogue")}><button className={mode === "items" ? "active" : ""} type="button" onClick={() => setMode("items")} aria-pressed={mode === "items"}><ShoppingBag size={18} />{localeText("Objets")}</button><button className={mode === "packs" ? "active" : ""} type="button" onClick={() => setMode("packs")} aria-pressed={mode === "packs"}><Boxes size={18} />{localeText("Packs")}</button></nav>
+    <nav className="catalog-mode" aria-label={localeText("Catalogue")}><button className={mode === "items" ? "active" : ""} type="button" onClick={() => setMode("items")} aria-pressed={mode === "items"}><ShoppingBag size={18} />{localeText("Objets")}</button><button className={mode === "packs" ? "active" : ""} type="button" onClick={() => setMode("packs")} aria-pressed={mode === "packs"}><Boxes size={18} />{localeText("Packs")}</button><Mascot cycle="collection" className="catalog-host" docked/></nav>
     <div className="catalog-filters">
       <label className="catalog-search"><span>{localeText("Recherche")}</span><div><Search size={17} /><input type="search" value={filters.search} onChange={(event) => change("search", event.target.value)} placeholder={localeText("Nom, collection…")} /></div></label>
       <label>{localeText("Type")}<select aria-label={localeText("Type")} value={filters.type} onChange={(event) => change("type", event.target.value)}><option value="all">{localeText("Tous les types")}</option>{types.map((value) => <option value={value} key={value}>{localeText(shopTypeLabel(value))}</option>)}</select></label>

@@ -1,16 +1,17 @@
-.game-lounge .lounge-heading { position:relative; margin-bottom:24px; padding:16px 0 20px; border-bottom:2px solid var(--site-border,#514b38); min-height:164px; }
+.game-lounge .lounge-heading { position:relative; margin-bottom:24px; padding:16px 0 20px; border-bottom:2px solid var(--site-border,#514b38); }
 .lounge-heading .eyebrow { display:flex; align-items:center; gap:8px; color:var(--site-secondary,#69d5aa); }
 .lounge-heading h1 { font-size:34px; line-height:1.2; margin:10px 0 14px; }
 .lounge-mode-label { display:flex; align-items:center; flex-wrap:wrap; gap:12px; font-size:12px; font-weight:750; }
 .lounge-mode-label > span { display:inline-flex; align-items:center; gap:6px; color:var(--site-muted,#b8ae99); }
 .lounge-mode-label > span:first-child { background:var(--site-primary,#e8c777); color:var(--site-button-text,#170f04); padding:4px 10px; border-radius:3px; }
-.lounge-hosts { display:flex; align-items:flex-end; flex-shrink:0; }
-.lounge-hosts .ktga-mascot { width:158px; height:158px; flex-basis:158px; }
-.lounge-hosts .ktga-mascot + .ktga-mascot { margin-left:-28px; transform:rotate(5deg); }
+.lounge-hosts { display:flex; align-items:flex-end; justify-content:center; grid-column:2; grid-row:1; align-self:end; min-width:0; border-left:1px solid var(--site-border,#514b38); padding-left:12px; }
+.lounge-hosts .ktga-mascot { width:104px; height:100px; flex:0 0 104px; }
+.lounge-hosts .ktga-mascot + .ktga-mascot { margin-left:-22px; }
 .lounge-categories { display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
 .lounge-categories button { min-height:44px; padding:10px 18px; border-bottom-width:3px; border-radius:5px; box-shadow:none; }
 .lounge-categories button.active { background:var(--site-primary,#e8c777); color:var(--site-button-text,#170f04); border-color:var(--site-primary,#e8c777); }
-.game-lounge .game-filter-panel { background:var(--site-surface,#101718); box-shadow:none; }
+.game-lounge .game-filter-panel { grid-template-columns:minmax(0,1fr) 200px; align-items:center; background:var(--site-surface,#101718); box-shadow:none; }
+.game-lounge .game-filter-controls, .game-lounge .active-filter-summary { grid-column:1/-1; }
 .game-lounge .game-grid { gap:24px; }
 .game-lounge .game-card { --lounge-edge:#899399; grid-template-rows:auto auto auto 1fr auto auto; align-content:start; gap:14px; padding:18px; border-width:2px; border-bottom-width:5px; border-radius:8px; background:var(--site-card,#11191a); box-shadow:0 5px 0 #050c09; }
 .game-lounge .game-card.cards { --lounge-edge:#b8495d; }
@@ -26,19 +27,24 @@
 .game-lounge .card-meta { align-items:center; gap:8px; padding-top:12px; border-top:1px solid var(--site-border,#514b38); font-size:11px; color:var(--site-secondary,#69d5aa); }
 .game-lounge .game-table-actions > button { min-height:42px; border-radius:4px; }
 .game-lounge .game-table-actions > button:first-child { background:var(--site-primary,#e8c777); color:var(--site-button-text,#170f04); font-weight:850; border-bottom-width:3px; }
-.lounge-game-scene { display:flex; justify-content:center; align-items:center; aspect-ratio:16/8; overflow:hidden; border-radius:4px; background:#183e32; border-bottom:2px solid #47725e; }
+.lounge-game-scene { display:flex; justify-content:center; align-items:end; aspect-ratio:16/8; overflow:hidden; border-radius:4px; background:#183e32; border-bottom:2px solid #47725e; }
 .lounge-scene-cards { background:#472b38; border-color:#8f5267; }
 .lounge-game-scene .mascot-size-large { width:100%; height:100%; flex:0 1 180px; max-height:170px; }
+.lounge-game-scene .mascot-docked { border-bottom:0; }
 .game-lounge .game-card:focus-within { outline:2px solid var(--site-primary,#e8c777); outline-offset:3px; }
 @media (max-width:900px) {
-  .lounge-hosts .ktga-mascot { width:120px; height:120px; flex-basis:120px; }
+  .game-lounge .game-filter-panel { grid-template-columns:minmax(0,1fr) 110px; }
+  .lounge-hosts .ktga-mascot { width:92px; height:96px; flex-basis:92px; }
+  .lounge-hosts .ktga-mascot + .ktga-mascot { display:none; }
   .lounge-heading h1 { font-size:29px; }
+}
+@media (max-width:760px) {
+  .game-lounge .game-filter-panel { grid-template-columns:minmax(0,1fr); }
+  .lounge-hosts { display:none; }
 }
 @media (max-width:600px) {
   .game-lounge .lounge-heading { min-height:120px; gap:8px; padding-top:6px; }
   .lounge-heading h1 { font-size:24px; margin:8px 0 12px; }
-  .lounge-hosts .ktga-mascot { width:78px; height:100px; flex-basis:78px; }
-  .lounge-hosts .ktga-mascot + .ktga-mascot { display:none; }
   .lounge-heading .eyebrow { font-size:10px; }
   .lounge-mode-label { font-size:10px; gap:8px; }
   .lounge-categories { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }

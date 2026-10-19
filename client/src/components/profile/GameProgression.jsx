@@ -12,7 +12,7 @@ export function GameProgression({ rows = [], favorites = [], selection, equipped
   const chosen = selectedTitle ? { gameId: selectedRow.gameId, titleLevel: selectedTitle.level } : selectedRow ? { gameId: selectedRow.gameId, titleLevel: selectedRow.titleLevel } : equippedTitle;
   const value = selection?.titleHidden || !chosen?.titleLevel ? "hidden" : `${chosen.gameId}:${chosen.titleLevel}`;
   if (!onTitleChange && !visible.length && !rows.some((row)=>row.competitive)) return null;
-  return <section className="xp-workspace"><header><div><span className="eyebrow">{localeText("Carrière")}</span><h3><TrendingUp size={20} />{publicView ? localeText("Titres des jeux favoris") : localeText("Progression des jeux favoris")}</h3></div><Mascot character="milo" pose={visible.some(row => row.mastery > 0) ? "victory" : "welcome"} size="tiny"/></header>
+  return <section className="xp-workspace"><header><div><span className="eyebrow">{localeText("Carrière")}</span><h3><TrendingUp size={20} />{publicView ? localeText("Titres des jeux favoris") : localeText("Progression des jeux favoris")}</h3></div><Mascot character="milo" pose={visible.some(row => row.mastery > 0) ? "victory" : "welcome"} cycle={visible.some(row => row.mastery > 0) ? "" : "career"} tilt={3} docked size="tiny"/></header>
     {onTitleChange && <label className="xp-equipped-title">{localeText("Titre affiché")}<select aria-label={localeText("Titre affiché")} value={value} onChange={(event) => {
       if (event.target.value === "hidden") onTitleChange({ titleGameId: "", titleLevel: 0, titleHidden: true });
       else { const [titleGameId, titleLevel] = event.target.value.split(":"); onTitleChange({ titleGameId, titleLevel: Number(titleLevel), titleHidden: false }); }

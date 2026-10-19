@@ -34,6 +34,33 @@ export const mascotScenes = {
   terrace: "05_Milo/Membercard_Profile/terrasse_casino_au_bord_de_l_eau_étoilée.png"
 };
 
+export const mascotCycles = {
+  dice: [
+    { character: "lucky", pose: "dice", tilt: -4 },
+    { character: "midnight", pose: "dice", flip: true, tilt: 3 },
+    { character: "lucky", pose: "point", flip: true, tilt: -2 }
+  ],
+  cards: [
+    { character: "jacky", pose: "cards", flip: true, tilt: 4 },
+    { character: "lucky", pose: "cards", tilt: -3 },
+    { character: "jacky", pose: "welcome", flip: true, tilt: 2 }
+  ],
+  ranked: [
+    { character: "lucky", pose: "victory", tilt: -3 },
+    { character: "midnight", pose: "victory", flip: true, tilt: 3 },
+    { character: "jacky", pose: "victory", tilt: -2 }
+  ],
+  collection: [
+    { character: "jacky", pose: "welcome", flip: true, tilt: 4 },
+    { character: "nixie", pose: "welcome", tilt: -4 },
+    { character: "jacky", pose: "cards", flip: true, tilt: 2 }
+  ],
+  career: [
+    { character: "milo", pose: "welcome", flip: true, tilt: 3 },
+    { character: "milo", pose: "point", flip: true, tilt: -3 }
+  ]
+};
+
 export function mascotAsset(character = "lucky", pose = "welcome", width = 360) {
   const key = Object.hasOwn(mascotSources, character) ? character : "lucky";
   const selectedPose = Object.hasOwn(mascotSources[key], pose) ? pose : "welcome";

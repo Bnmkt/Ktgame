@@ -6,6 +6,9 @@
 .account-ranked-emblem-preview .ranked-insignia { width: 36px; height: 36px; }
 .xp-workspace { border-top: var(--site-border-width, 1px) solid #455045; margin-top: 22px; padding-top: 20px; min-width: 0; }
 .xp-workspace > header, .xp-game-list article > header, .xp-game-list article > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.xp-workspace > header { align-items:end; border-bottom:1px solid #455045; }
+.xp-workspace > header > div { flex:1; min-width:0; }
+.xp-workspace > header > .mascot-docked { margin-left:auto; }
 .xp-workspace h3 { font-size: 18px; display: flex; align-items: center; gap: 8px; margin: 7px 0; }
 .xp-workspace label { font-size: 12px; color: #c8cfbf; }
 .xp-workspace select { font: inherit; margin-top: 6px; color: #f1edda; background: #111b17; border: var(--site-border-width, 1px) solid #596453; border-radius: 5px; padding: 10px; max-width: 100%; }

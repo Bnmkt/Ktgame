@@ -173,7 +173,7 @@ export function RoomStatusPanel({ room, state, current, userId, isOwner, onAddBo
     <section className="card table-status-card">
       <div className="table-status-head">
         <div className="mascot-waiting-pair">
-          {!state && <Mascot {...gameMascot(room.gameId)}/>}
+          {!state && <Mascot {...gameMascot(room.gameId)} flip tilt={-3} docked/>}
           <div>
           <span className="eyebrow">{localeText("Table")}</span>
           <h2>{state ? (state.finished ? localeText("Manche terminée") : localeText("Manche en cours")) : localeText("En attente")}</h2>
