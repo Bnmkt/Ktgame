@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import sanitizeHtml from "sanitize-html";
+import { Script } from "node:vm";
 
 const clean = (value, max) => String(value ?? "").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim().slice(0, max);
 const color = /^(?:#[\da-f]{3,8}|[a-z]+|(?:rgb|hsl)a?\([\d.,%\s]+\)|var\(--site-[a-z-]+\))$/i;
@@ -46,7 +47,24 @@ export function normalizeCustomPage(input) {
   const content = input.content.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
   const html = input.format === "html" ? renderCustomHtml(content) : "";
   if (input.format === "html" && !html.trim()) throw new Error("Ajoute du contenu HTML visible.");
-  return { title, slug, description: clean(input.description, 280), format: input.format, content, html, showFooter: input.showFooter === true, footerLabel: clean(input.footerLabel, 60), indexable: input.indexable !== false, position: Math.max(0, Math.min(999, Math.trunc(Number(input.position) || 0))) };
+  const { style, script } = pageCode(input);
+  return { title, slug, description: clean(input.description, 280), format: input.format, content, html, style, script, showFooter: input.showFooter === true, footerLabel: clean(input.footerLabel, 60), indexable: input.indexable !== false, position: Math.max(0, Math.min(999, Math.trunc(Number(input.position) || 0))) };
+}
+
+function pageCode(input) {
+  const result = {};
+  for (const key of ["style", "script"]) {
+    const value = input[key] ?? "";
+    if (typeof value !== "string" || value.length > 50000) throw new Error("Chaque bloc CSS ou JavaScript est limité à 50 000 caractères.");
+    result[key] = value;
+  }
+  if (/<\/style/i.test(result.style)) throw new Error("Saisis uniquement le CSS, sans balise style.");
+  if (result.script.trim()) new Script(wrapPageScript(result.script));
+  return result;
+}
+
+function wrapPageScript(script) {
+  return `(function(root) { if (!root || !root.isConnected) return; const onCleanup = callback => root.addEventListener('ktga-page-dispose', callback, {once:true}); try {\n${script}\n} catch(error) { console.error('Custom page:', error); } })(document.currentScript.parentElement);`;
 }
 
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -69,7 +87,7 @@ export function createCustomPageStore({ filename, now = Date.now }) {
   const publicDocument = record => {
     if (!record?.published_json) return null;
     const { content, ...document } = JSON.parse(record.published_json);
-    return { ...document, ...(document.format === "markdown" ? { content } : {}), updatedAt: record.published_at };
+    return { ...document, ...(document.format === "markdown" ? { content } : {}), scriptUrl: document.script?.trim() ? `/api/pages/${document.slug}/script.js?v=${encodeURIComponent(record.published_at)}` : "", updatedAt: record.published_at };
   };
   function list(publicOnly = false) {
     if (!publicOnly) return db.prepare(`SELECT id, draft_slug AS slug, json_extract(draft_json,'$.title') AS title,
@@ -125,6 +143,29 @@ export function createCustomPageStore({ filename, now = Date.now }) {
 
 export function registerCustomPageRoutes({ app, store, auth, requireBackOffice }) {
   const action = handler => (req, res) => { try { handler(req, res); } catch (error) { res.status(error.status ?? 400).json({ error: error.message }); } };
+  const previews = new Map();
+  const previewScript = script => {
+    if (!script?.trim()) return "";
+    for (const [key, entry] of previews) if (entry.expires <= Date.now()) previews.delete(key);
+    if (previews.size >= 64) previews.delete(previews.keys().next().value);
+    const key = randomUUID();
+    previews.set(key, { script, expires: Date.now() + 300000 });
+    return `/api/page-code-preview/${key}.js`;
+  };
+  const authorizeCode = req => {
+    const previous = req.params.id ? store.get(req.params.id) : null;
+    if ((req.body.style?.trim() || req.body.script?.trim() || previous?.style?.trim() || previous?.script?.trim()) && !req.backOfficeUser?.admin) throw fail("Les blocs CSS et JavaScript sont réservés aux administrateurs.", 403);
+  };
+  app.get("/api/page-code-preview/:key.js", (req, res) => {
+    const entry = previews.get(req.params.key);
+    if (!entry || entry.expires <= Date.now()) return res.sendStatus(404);
+    res.set("Cache-Control", "no-store").type("application/javascript").send(wrapPageScript(entry.script));
+  });
+  app.get("/api/pages/:slug/script.js", (req, res) => {
+    const document = store.published(req.params.slug);
+    if (!document?.script?.trim()) return res.sendStatus(404);
+    res.set("Cache-Control", "no-cache").type("application/javascript").send(wrapPageScript(document.script));
+  });
   app.get("/api/pages", (_req, res) => res.set("Cache-Control", "no-cache").json(store.list(true)));
   app.get("/api/pages/:slug", (req, res) => {
     const document = store.published(req.params.slug);
@@ -135,12 +176,17 @@ export function registerCustomPageRoutes({ app, store, auth, requireBackOffice }
   app.get("/api/admin/pages/:id", auth, requireBackOffice, (req, res) => {
     const document = store.get(req.params.id);
     if (!document) return res.status(404).json({ error: "Page introuvable." });
-    res.set("Cache-Control", "no-store").json(document);
+    res.set("Cache-Control", "no-store").json({ ...document, scriptUrl: previewScript(document.script) });
   });
-  app.post("/api/admin/pages/preview", auth, requireBackOffice, action((req, res) => res.set("Cache-Control", "no-store").json({ html: renderCustomHtml(req.body.content) })));
-  app.post("/api/admin/pages", auth, requireBackOffice, action((req, res) => res.status(201).json(store.save(req.body, { actorId: req.auth.id, publish: req.body.publish === true }))));
+  app.post("/api/admin/pages/preview", auth, requireBackOffice, action((req, res) => {
+    authorizeCode(req);
+    const code = pageCode(req.body);
+    res.set("Cache-Control", "no-store").json({ html: req.body.format === "markdown" ? "" : renderCustomHtml(req.body.content), scriptUrl: previewScript(code.script) });
+  }));
+  app.post("/api/admin/pages", auth, requireBackOffice, action((req, res) => { authorizeCode(req); res.status(201).json(store.save(req.body, { actorId: req.auth.id, publish: req.body.publish === true })); }));
   app.put("/api/admin/pages/:id", auth, requireBackOffice, action((req, res) => {
     if (!store.get(req.params.id)) throw fail("Page introuvable.", 404);
+    authorizeCode(req);
     res.json(store.save(req.body, { id: req.params.id, actorId: req.auth.id, publish: req.body.publish === true }));
   }));
   app.post("/api/admin/pages/:id/unpublish", auth, requireBackOffice, action((req, res) => res.json(store.unpublish(req.params.id, req.body.revision))));

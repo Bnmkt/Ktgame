@@ -291,7 +291,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
 
         {tab === "patchnotes" && <PatchnotesAdmin reportError={setError} notifySuccess={notifySuccess} />}
         {tab === "help" && <HelpAdmin reportError={setError} notifySuccess={notifySuccess} />}
-        {tab === "pages" && <CustomPagesAdmin />}
+        {tab === "pages" && <CustomPagesAdmin admin={isAdministrator}/>}
         {tab === "media" && <AssetsAdmin admin={isAdministrator}/>}
         {isAdministrator && tab === "source" && <SourceEditor/>}
 

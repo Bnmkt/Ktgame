@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Eye } from "lucide-react";
-import { api } from "../api.js";
+import { api, BASE_PATH } from "../api.js";
 import { appPath } from "../navigation/routes.js";
 import { useLocale } from "../locales/LocaleProvider.jsx";
 import { applyPageMetadata, pageMetadata } from "../seo/metadata.js";
@@ -8,8 +8,16 @@ import { MarkdownContent } from "../components/patchnotes/MarkdownContent.jsx";
 import "./custom-pages.css";
 
 export function CustomPageContent({ page }) {
-  if (page.format === "html") return <div className="custom-page-content custom-page-html" dangerouslySetInnerHTML={{ __html: page.html || "" }}/>;
-  return <MarkdownContent className="custom-page-content">{page.content || ""}</MarkdownContent>;
+  const root = useRef(null);
+  useEffect(() => {
+    const element = root.current;
+    if (!page.scriptUrl) return;
+    const script = document.createElement("script");
+    script.src = `${window.location.pathname.startsWith("/discord-activity/") ? "/discord-activity" : BASE_PATH}${page.scriptUrl}`;
+    element.appendChild(script);
+    return () => { element.dispatchEvent(new Event("ktga-page-dispose")); script.remove(); };
+  }, [page.scriptUrl, page.html, page.content]);
+  return <div ref={root} className="custom-page-runtime">{page.style && <style>{`@scope (.custom-page-runtime) {\n${page.style}\n}`}</style>}{page.format === "html" ? <div className="custom-page-content custom-page-html" dangerouslySetInnerHTML={{ __html: page.html || "" }}/> : <MarkdownContent className="custom-page-content">{page.content || ""}</MarkdownContent>}</div>;
 }
 
 export function CustomPage({ slug, user, accountReady = true, siteName = "KTGA.ME", initialPage }) {
