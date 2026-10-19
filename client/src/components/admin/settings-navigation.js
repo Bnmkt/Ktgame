@@ -1,7 +1,6 @@
 export const SETTINGS_SECTIONS = [
   { id: "identity", group: "Site", title: "Identité et contact", detail: "Nom, accueil, jeu à l'affiche et contact" },
   { id: "branding", group: "Site", title: "Logos et application", detail: "Icône du site, favicon et PWA" },
-  { id: "media", group: "Site", title: "Médiathèque", detail: "Poids maximal des images importées" },
   { id: "theme", group: "Site", title: "Thèmes et apparence", detail: "Couleurs, surfaces et image de fond" },
   { id: "notice", group: "Site", title: "Annonce", detail: "Message affiché dans le casino" },
   { id: "access", group: "Accès et protection", title: "Connexion et inscriptions", detail: "Invités, Discord et validation email" },

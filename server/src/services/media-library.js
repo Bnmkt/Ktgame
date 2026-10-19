@@ -5,26 +5,16 @@ import express from "express";
 import { sanitizeBugImage } from "./bug-images.js";
 
 const filePattern = /^[a-f0-9]{64}\.(png|jpg|webp|gif)$/;
-export const DEFAULT_MEDIA_UPLOAD_MB = 3;
-export const MAX_MEDIA_UPLOAD_MB = 20;
-export function validateMediaUploadLimit(value) {
-  if (!Number.isInteger(value) || value < 1 || value > MAX_MEDIA_UPLOAD_MB) throw new Error("La limite de la médiathèque doit être un entier entre 1 et 20 Mo.");
-  return value;
-}
-export function mediaUploadLimit(value = DEFAULT_MEDIA_UPLOAD_MB) {
-  return Number.isInteger(value) && value >= 1 && value <= MAX_MEDIA_UPLOAD_MB ? value : DEFAULT_MEDIA_UPLOAD_MB;
-}
 export const mediaPath = value => typeof value === "string" && /^\/api\/media\/[a-f0-9]{64}\.(png|jpg|webp|gif)$/.test(value) ? value : "";
 const dimensions = (width, height) => {
   if (!width || !height || width > 4096 || height > 4096 || width * height > 16777216) throw new Error("Dimensions maximales : 4 096 pixels par côté.");
   return { width, height };
 };
 
-export function sanitizeMedia(body, mime, maxMb = DEFAULT_MEDIA_UPLOAD_MB) {
-  const maxBytes = mediaUploadLimit(maxMb) * 1024 * 1024;
-  if (!Buffer.isBuffer(body) || body.length < 20 || body.length > maxBytes) throw new Error(`Une image de ${mediaUploadLimit(maxMb)} Mo maximum est requise.`);
+export function sanitizeMedia(body, mime) {
+  if (!Buffer.isBuffer(body) || body.length < 20 || body.length > 3 * 1024 * 1024) throw new Error("Une image de 3 Mo maximum est requise.");
   if (mime === "image/png") {
-    const data = sanitizeBugImage(body, maxBytes);
+    const data = sanitizeBugImage(body);
     return { data, mime, extension: "png", ...dimensions(data.readUInt32BE(16), data.readUInt32BE(20)) };
   }
   if (mime === "image/gif" && ["GIF87a", "GIF89a"].includes(body.toString("ascii", 0, 6)) && body.at(-1) === 0x3b) {
@@ -62,7 +52,7 @@ export function sanitizeMedia(body, mime, maxMb = DEFAULT_MEDIA_UPLOAD_MB) {
   throw new Error("Image invalide. Formats acceptés : PNG, JPEG, WebP et GIF.");
 }
 
-export async function createMediaLibrary(directory, { uploadLimit = () => DEFAULT_MEDIA_UPLOAD_MB } = {}) {
+export async function createMediaLibrary(directory) {
   await fs.mkdir(directory, { recursive: true, mode: 0o750 });
   const filename = path.join(directory, "catalog.json");
   let rows;
@@ -74,7 +64,7 @@ export async function createMediaLibrary(directory, { uploadLimit = () => DEFAUL
     get: id => rows.find(row => row.id === id),
     target: id => filePattern.test(id ?? "") ? path.join(directory, id) : null,
     save: (body, mime, name, actor) => change(async next => {
-      const image = sanitizeMedia(body, mime, uploadLimit()), id = `${createHash("sha256").update(image.data).digest("hex")}.${image.extension}`;
+      const image = sanitizeMedia(body, mime), id = `${createHash("sha256").update(image.data).digest("hex")}.${image.extension}`;
       let row = next.find(entry => entry.id === id);
       if (!row) {
         if (next.length >= 2000 || next.reduce((sum, entry) => sum + entry.bytes, 0) + image.data.length > 200 * 1024 * 1024) throw new Error("La médiathèque est pleine.");
@@ -87,18 +77,10 @@ export async function createMediaLibrary(directory, { uploadLimit = () => DEFAUL
   };
 }
 
-export async function registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, directory, settings = () => ({}) }) {
-  const uploadLimit = () => mediaUploadLimit(settings().mediaUploadMaxMb);
-  const store = await createMediaLibrary(directory, { uploadLimit });
-  app.get("/api/admin/media/limits", auth, requireBackOffice, (_req, res) => res.set("Cache-Control", "no-store").json({ maxMb: uploadLimit() }));
+export async function registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, directory }) {
+  const store = await createMediaLibrary(directory);
   app.get("/api/admin/media", auth, requireBackOffice, (_req, res) => res.set("Cache-Control", "no-store").json(store.list()));
-  app.post("/api/admin/media", auth, requireBackOffice, (req, res, next) => {
-    const maxMb = uploadLimit();
-    express.raw({ type: ["image/png", "image/jpeg", "image/webp", "image/gif"], limit: maxMb * 1024 * 1024 })(req, res, error => {
-      if (error?.type === "entity.too.large") return res.status(413).json({ error: `Une image de ${maxMb} Mo maximum est requise.` });
-      next(error);
-    });
-  }, async (req, res) => {
+  app.post("/api/admin/media", auth, requireBackOffice, express.raw({ type: ["image/png", "image/jpeg", "image/webp", "image/gif"], limit: "3mb" }), async (req, res) => {
     try { res.status(201).json(await store.save(req.body, req.get("Content-Type")?.split(";")[0], req.query.name, req.auth.id)); } catch (error) { res.status(400).json({ error: error.message }); }
   });
   app.patch("/api/admin/media/:id", auth, requireBackOffice, async (req, res) => {

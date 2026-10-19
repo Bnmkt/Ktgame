@@ -4773,11 +4773,5 @@
   "Elle ne sera plus accessible publiquement. Le brouillon sera conservé.": "The page will no longer be public. Its draft will be kept.",
   "Dépublier": "Unpublish",
   "Supprimer cette page ?": "Delete this page?",
-  "Le brouillon et la version publiée seront supprimés.": "Both the draft and the published version will be deleted.",
-  "Poids maximal des images importées": "Maximum size of imported images",
-  "Poids maximal par image (Mo)": "Maximum image size (MB)",
-  "La limite s’applique aux nouveaux imports, GIF animés compris. Les images existantes sont conservées.": "The limit applies to new uploads, including animated GIFs. Existing images are kept.",
-  "De 1 à 20 Mo. Application immédiate après enregistrement.": "From 1 to 20 MB. Takes effect immediately after saving.",
-  "PNG, JPEG, WebP ou GIF : {value0} Mo maximum.": "PNG, JPEG, WebP or GIF: maximum {value0} MB.",
-  "L’image recadrée dépasse {value0} Mo. Réduis ses dimensions ou change son format.": "The cropped image exceeds {value0} MB. Reduce its dimensions or change its format."
+  "Le brouillon et la version publiée seront supprimés.": "Both the draft and the published version will be deleted."
 }
