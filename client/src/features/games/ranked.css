@@ -125,12 +125,11 @@
 .ranked-profile { padding:20px 0; border-top:1px solid #383f37; }
 .ranked-profile h3 { display:flex; align-items:center; gap:8px; margin-bottom:16px; }
 .ranked-profile>div:not(.ranked-history) { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:10px; }
-.ranked-profile a { display:grid; gap:6px; border-bottom:1px solid #384338; padding:12px 0; color:#f4efd9; text-decoration:none; }
+.ranked-profile .ranked-profile-entry { display:grid; grid-template-columns:56px minmax(0,1fr); align-items:center; gap:14px; padding:14px; border:1px solid #596958; border-left:3px solid var(--rank-color); border-radius:5px; background:rgba(7,17,17,.94); color:#f4efd9; }
 .ranked-profile-entry { --rank-color:#e6bd56; }
-.ranked-profile a.ranked-profile-entry { grid-template-columns:56px minmax(0,1fr); align-items:center; gap:14px; }
 .ranked-profile-entry .ranked-profile-insignia { width:56px; height:56px; color:var(--rank-color); }
 .ranked-profile-statistics { display:grid; gap:6px; min-width:0; overflow-wrap:anywhere; }
-.ranked-profile-entry:hover,.ranked-profile-entry:focus-visible { background:#1c2722; }
+.ranked-profile-entry .ranked-profile-statistics > strong { color:#fff4dc; }
 .ranked-profile b,.ranked-match-heading { color:#e6bd56; }
 .ranked-profile small { color:#b9c2b8; font-size:12px; }
 .ranked-history article { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:8px; padding:12px 0; border-bottom:1px solid #384338; }

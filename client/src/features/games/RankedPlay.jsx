@@ -4,7 +4,6 @@ import { Bot, Check, Clock3, LogOut, Swords, UserRound } from "lucide-react";
 import { RankInsignia } from "./RankInsignia.jsx";
 import { rankedPreparation } from "./ranked-queue-state.js";
 import { api } from "../../api.js";
-import { appPath } from "../../navigation/routes.js";
 import { gameTitle, gameModifierDefinitions } from "./config.js";
 import { Dialog } from "../../components/common/Dialog.jsx";
 import { ConfirmActionButton } from "../../components/common/ConfirmAction.jsx";
@@ -134,11 +133,11 @@ export function RankedCoordinator({user,onOpenRoom}) {
     {data.proposal ? <ReadyMatch key={data.proposal.id} proposal={data.proposal} serverTime={data.serverTime} userId={user.id} busy={busy} error={error} onReady={()=>respond(true)} onDecline={()=>respond(false)} fillControl={<FillRankedBots allowed={user.admin && data.queue.canFillBots} onData={setData} onError={setError}/>}/> : waitingOpen && <Dialog title={localeText("Recherche classée")} hideTitle className="ranked-ready-dialog" onClose={()=>setWaitingOpen(false)}><QueueHeading gameId={data.queue.gameId} rank={data.games.find((row)=>row.id===data.queue.gameId)?.rank}/><QueueDetails queue={data.queue} serverTime={data.serverTime}/>{error && <p className="error" role="alert">{localeText(error)}</p>}<FillRankedBots allowed={user.admin && data.queue.canFillBots} onData={setData} onError={setError}/><div className="ranked-queue-actions"><button type="button" className="danger" disabled={busy} onClick={()=>respond(false)}><LogOut size={18}/>{localeText("Quitter la file")}</button></div></Dialog>}
   </>;
 }
-export function RankedProfile({rows=[]}) {
+export function RankedProfile({rows=[], publicView=false}) {
   const { t: localeText } = useLocale();
   const entries=rows.filter((row)=>row.competitive);
   if(!entries.length)return null;
-  return <section className="ranked-profile"><h3><Swords size={20}/>{localeText("Carrière classée")}</h3><div>{entries.map((row)=><a className="ranked-profile-entry" href={`${appPath("leaderboard")}?elo=${row.gameId}`} key={row.gameId} data-rank-tier={row.competitive.rank.id}><RankInsignia rank={row.competitive.rank} className="ranked-profile-insignia"/><div className="ranked-profile-statistics"><strong>{row.gameName}</strong><RankBadge rank={row.competitive.rank} showInsignia={false}/>{row.competitive.placement && !row.competitive.placement.completed ? <small>{row.competitive.placement.games} / {row.competitive.placement.required}{" " + localeText("placements")}</small> : row.competitive.elo!==undefined && <small>{row.competitive.elo}{" " + localeText("Elo · privé")}</small>}<small>{row.competitive.games}{" " + localeText("parties ·") + " "}{row.competitive.wins}{" " + localeText("premières places")}</small></div></a>)}</div></section>;
+  return <section className="ranked-profile"><h3><Swords size={20}/>{localeText("Carrière classée")}</h3><div>{entries.map((row)=><div className="ranked-profile-entry" key={row.gameId} data-rank-tier={row.competitive.rank.id}><RankInsignia rank={row.competitive.rank} className="ranked-profile-insignia"/><div className="ranked-profile-statistics"><strong>{row.gameName}</strong><RankBadge rank={row.competitive.rank} showInsignia={false}/>{row.competitive.placement && !row.competitive.placement.completed ? <small>{row.competitive.placement.games} / {row.competitive.placement.required}{" " + localeText("placements")}</small> : !publicView && row.competitive.elo!==undefined && <small>{row.competitive.elo}{" " + localeText("Elo · privé")}</small>}<small>{row.competitive.games}{" " + localeText("parties ·") + " "}{row.competitive.wins}{" " + localeText("premières places")}</small></div></div>)}</div></section>;
 }
 export function RankedHistory() {
   const { t: localeText } = useLocale();
