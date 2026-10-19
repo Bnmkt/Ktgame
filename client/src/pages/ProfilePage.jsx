@@ -9,7 +9,7 @@ import { api, setToken } from "../api.js";
 import { Wardrobe } from "../components/profile/Wardrobe.jsx";
 import { AccountWorkspace } from "../components/profile/AccountWorkspace.jsx";
 import { ReportPlayerDialog } from "../components/profile/ReportPlayerDialog.jsx";
-import { DisplayName, FriendCode, ProfileCosmeticShell } from "../components/cosmetics/Cosmetics.jsx";
+import { DisplayName, FriendCode, ProfileCosmeticShell, previewUserForItem } from "../components/cosmetics/Cosmetics.jsx";
 import { memberCardOptions, publicProfileStatOptions } from "../config/site.js";
 import { gameTitle } from "../features/games/config.js";
 import { CompactNumber, achievementTypeLabel, formatDate, formatExactNumber, memberCardStats, transactionLabel } from "../utils/presentation.jsx";
@@ -62,6 +62,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const [games, setGames] = useState([]);
   const [favorites, setFavorites] = useState(user.profile?.favoriteGames ?? []);
   const [publicProfile, setPublicProfile] = useState(null);
+  const [shopPreviewMode, setShopPreviewMode] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [achievementType, setAchievementType] = useState("games");
   const [shop, setShop] = useState([]);
@@ -163,7 +164,19 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   async function openPublicProfile(id) {
     setError("");
     try {
+      setShopPreviewMode(false);
       setPublicProfile(await api(`/api/users/${id}/public`));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function previewShopProfile(item) {
+    setError("");
+    try {
+      const profile = await api(`/api/users/${user.id}/public`);
+      setPublicProfile(previewUserForItem(profile, item));
+      setShopPreviewMode(true);
     } catch (err) {
       setError(err.message);
     }
@@ -332,7 +345,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
           {tab === "customize" && <Wardrobe user={user} setUser={setUser} catalog={shop} onOpenShop={onOpenShop} />}
           {tab === "shop" && <>
             {!user.guest && <button className="secret-rock-trigger" type="button" onClick={openSmallRock} aria-label={localeText("Examiner la pierre")} title={localeText("Une pierre inhabituelle")}><Gem size={25} /></button>}
-            {user.guest ? <p>{localeText("Connecte-toi avec un compte pour acheter des éléments de personnalisation.")}</p> : <ShopCatalog user={user} items={shop} stats={displayedStats} onPurchaseItem={(item) => setPurchaseConfirmation({ kind: "item", item })} onPurchasePack={(pack) => setPurchaseConfirmation({ kind: "pack", pack })} />}
+            {user.guest ? <p>{localeText("Connecte-toi avec un compte pour acheter des éléments de personnalisation.")}</p> : <ShopCatalog user={user} items={shop} stats={displayedStats} onPurchaseItem={(item) => setPurchaseConfirmation({ kind: "item", item })} onPurchasePack={(pack) => setPurchaseConfirmation({ kind: "pack", pack })} onPreviewProfile={previewShopProfile} />}
           </>}
           {tab === "achievements" && <>
             <div className="achievement-head">
@@ -395,7 +408,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
         {smallRockMessage && <div className={smallRockUnlocked ? "success" : "error"}>{smallRockMessage}</div>}
         <button className="secret-rock-action" type="button" onClick={touchSmallRock} disabled={!smallRockStartedAt || smallRockUnlocked}><Gem size={18} /> {smallRockUnlocked ? localeText("Secret découvert") : localeText("Toucher la pierre")}</button>
       </div></ModalBackdrop>}
-      {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromProfileModal} onReport={setReportTarget} />}
+      {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} preview={shopPreviewMode} onClose={() => { setPublicProfile(null); setShopPreviewMode(false); }} onFriendRequest={requestFriendFromProfileModal} onReport={setReportTarget} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} onClose={() => setReportTarget(null)} />}
     </main>
   );

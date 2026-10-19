@@ -22,7 +22,7 @@ export function shortStatLabel(label) {
   return String(label ?? "Stat");
 }
 
-export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequest, onReport }) {
+export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequest, onReport, preview = false }) {
   const { t: localeText } = useLocale();
   const [relationship, setRelationship] = useState(profile.relationship ?? {});
   useEffect(() => setRelationship(profile.relationship ?? {}), [profile.id, profile.relationship]);
@@ -56,16 +56,17 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
   }
   return (
     <ModalBackdrop className="modal-backdrop" onClick={onClose}>
-      <div className={profileCosmeticClassName(profile, "modal public-profile-modal")} role="dialog" aria-modal="true" aria-label={localeText("Profil public")} onClick={(e) => e.stopPropagation()}>
+      <div className={profileCosmeticClassName(profile, "modal public-profile-modal")} role="dialog" aria-modal="true" aria-label={preview ? `${localeText("Aperçu")} · ${localeText("Profil public")}` : localeText("Profil public")} onClick={(e) => e.stopPropagation()}>
         <ProfileCosmeticEffect user={profile} />
         <ProfileCosmeticFrame user={profile} />
         <div className="public-profile-scroll"><div className="modal-title-row">
           <div className="modal-title-actions">
-            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary" disabled={relationship.isFriend || relationship.requested} onClick={() => onFriendRequest?.(profile.id)}>{relationship.isFriend ? localeText("Ami") : relationship.requested ? localeText("Demande envoyée") : localeText("Ajouter en ami")}</button>}
-            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary icon-toggle" disabled={Boolean(connectionBusy)} aria-pressed={Boolean(relationship.muted)} title={relationship.muted ? localeText("Réactiver les messages") : localeText("Mettre en sourdine")} aria-label={relationship.muted ? localeText("Réactiver les messages de ce joueur") : localeText("Mettre ce joueur en sourdine")} onClick={() => controlConnection("muted", relationship.muted ? "DELETE" : "POST")}>{relationship.muted ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>}
-            {currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <ConfirmActionButton className="danger-button icon-toggle" disabled={Boolean(connectionBusy)} title={localeText("Masquer ce joueur")} aria-label={localeText("Masquer ce joueur")} dialogTitle={localeText("Masquer ce joueur ?")} message={localeText("Vous ne pourrez plus vous ajouter, vous inviter ou échanger des messages. Cette action le retire aussi de vos amis.")} confirmLabel={localeText("Masquer")} danger onConfirm={() => controlConnection("hidden", "POST")}><EyeOff size={16} /></ConfirmActionButton>}
-            {currentUser && !currentUser.guest && !relationship.self && relationship.blocked && <button className="secondary" disabled={Boolean(connectionBusy)} onClick={() => controlConnection("hidden", "DELETE")}><Eye size={16} />{localeText("Réafficher")}</button>}
-            {currentUser && !currentUser.guest && !relationship.self && <button className="secondary profile-report-button" onClick={() => onReport?.(profile)}><Flag size={16} />{" " + localeText("Signaler")}</button>}
+            {preview && <span className="public-profile-tryout"><Eye size={16}/>{localeText("Aperçu")}</span>}
+            {!preview && currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary" disabled={relationship.isFriend || relationship.requested} onClick={() => onFriendRequest?.(profile.id)}>{relationship.isFriend ? localeText("Ami") : relationship.requested ? localeText("Demande envoyée") : localeText("Ajouter en ami")}</button>}
+            {!preview && currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <button className="secondary icon-toggle" disabled={Boolean(connectionBusy)} aria-pressed={Boolean(relationship.muted)} title={relationship.muted ? localeText("Réactiver les messages") : localeText("Mettre en sourdine")} aria-label={relationship.muted ? localeText("Réactiver les messages de ce joueur") : localeText("Mettre ce joueur en sourdine")} onClick={() => controlConnection("muted", relationship.muted ? "DELETE" : "POST")}>{relationship.muted ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>}
+            {!preview && currentUser && !currentUser.guest && !relationship.self && !relationship.blocked && <ConfirmActionButton className="danger-button icon-toggle" disabled={Boolean(connectionBusy)} title={localeText("Masquer ce joueur")} aria-label={localeText("Masquer ce joueur")} dialogTitle={localeText("Masquer ce joueur ?")} message={localeText("Vous ne pourrez plus vous ajouter, vous inviter ou échanger des messages. Cette action le retire aussi de vos amis.")} confirmLabel={localeText("Masquer")} danger onConfirm={() => controlConnection("hidden", "POST")}><EyeOff size={16} /></ConfirmActionButton>}
+            {!preview && currentUser && !currentUser.guest && !relationship.self && relationship.blocked && <button className="secondary" disabled={Boolean(connectionBusy)} onClick={() => controlConnection("hidden", "DELETE")}><Eye size={16} />{localeText("Réafficher")}</button>}
+            {!preview && currentUser && !currentUser.guest && !relationship.self && <button className="secondary profile-report-button" onClick={() => onReport?.(profile)}><Flag size={16} />{" " + localeText("Signaler")}</button>}
             <button className="secondary icon-toggle" aria-label={localeText("Fermer le profil")} onClick={onClose}><X size={18} /></button>
           </div>
         </div>
@@ -74,7 +75,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
           <aside>
             <div className={`vip-card member-${profile.cosmetics?.equipped?.memberCard ?? "default"}`}>
               <span className="vip-label">{memberCardOptions[profile.cosmetics?.equipped?.memberCard ?? "default"]}{" " + localeText("· Profil public")}</span>
-              <strong><DisplayName user={profile} /></strong>
+              <strong><DisplayName user={profile} interactive={!preview} /></strong>
               <FriendCode code={profile.friendCode} />
               <div className="vip-stats">{(profile.profileStats?.publicStats ?? []).map((stat, index) => <div className="vip-ratio" key={`${stat.key}-${index}`}><BadgeCheck size={16} /><span title={localeText(stat.label)}>{shortStatLabel(stat.label)}</span><strong title={String(stat.value)}>{stat.value}</strong></div>)}</div>
             </div>

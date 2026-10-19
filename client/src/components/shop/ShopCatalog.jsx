@@ -26,7 +26,7 @@ function ItemVisual({ item, user }) {
   </div>;
 }
 
-export function ShopCatalog({ user, items, stats, onPurchaseItem, onPurchasePack }) {
+export function ShopCatalog({ user, items, stats, onPurchaseItem, onPurchasePack, onPreviewProfile }) {
   const { t: localeText } = useLocale();
   const [mode, setMode] = useState("items");
   const [filters, setFilters] = useState({ ...defaultCatalogFilters });
@@ -80,7 +80,7 @@ export function ShopCatalog({ user, items, stats, onPurchaseItem, onPurchasePack
         {matching.length > 0 && <Pagination {...pages} pageSizes={[12, 24, 48]} label={localeText("Pages du catalogue")} />}
         {mode === "packs" && <section className="catalog-checkout"><div><span>{selected.length}{" " + localeText("objet")}{selected.length > 1 ? localeText("s") : ""}{" " + localeText("sélectionné")}{selected.length > 1 ? localeText("s") : ""}</span>{pricing.discount > 0 && <del><CompactNumber value={pricing.subtotal} /></del>}<strong><CompactNumber value={pricing.total} label={localeText("Total exact")} /><Coins size={18} /></strong></div><button type="button" disabled={!selected.length || pricing.total > Number(user.tokens)} onClick={() => onPurchasePack({ ...pricing, packId: effectiveTheme, name: definitions[effectiveTheme]?.name, itemIds: selected.map((item) => item.id), count: selected.length })}><ShoppingBag size={17} />{localeText("Acheter la sélection")}</button></section>}
       </div>
-      <aside className="catalog-preview">{preview ? <><CosmeticPreview user={user} item={preview} stats={stats} /><h3>{localeText(preview.name)}</h3><span>{localeText(shopTypeLabel(preview.type))} · {localeText(shopCategoryLabel(preview.category))}</span></> : <span>{localeText("Aucun aperçu")}</span>}</aside>
+      <aside className="catalog-preview">{preview ? <><div className="catalog-preview-heading"><Eye size={17}/><span>{localeText("Aperçu")}</span></div><button type="button" className="catalog-profile-surface" onClick={() => onPreviewProfile?.(preview)} disabled={!onPreviewProfile} aria-label={`${localeText("Profil public")} · ${localeText(preview.name)}`}><CosmeticPreview user={user} item={preview} stats={stats} /><span><Eye size={17}/>{localeText("Profil public")}</span></button><h3>{localeText(preview.name)}</h3><span>{localeText(shopTypeLabel(preview.type))} · {localeText(shopCategoryLabel(preview.category))}</span></> : <span>{localeText("Aucun aperçu")}</span>}</aside>
     </div>
   </div>;
 }
