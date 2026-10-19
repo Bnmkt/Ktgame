@@ -16,9 +16,17 @@ button { border-radius: var(--site-button-radius); }
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), textarea, select) { color: var(--site-input-text); }
 :where(.casino-header, .casino-mobile-navigation) { background-color: var(--site-header); }
 :where(.card, .panel, .shop-page-panel, .leaderboard-page-panel) { border-width: var(--site-border-width); }
-[data-site-wallpaper="true"] .app-shell::before,
-[data-site-wallpaper="true"] .auth-screen {
-  background-image: linear-gradient(rgb(from var(--site-page) r g b / calc(1 - var(--site-image-opacity))), rgb(from var(--site-page) r g b / calc(1 - var(--site-image-opacity)))), var(--site-image);
-  background-size: cover; background-position: center; background-repeat: no-repeat;
+html[data-site-wallpaper="true"] {
+  background-color: var(--site-page);
+  background-image: var(--site-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+html[data-site-wallpaper="true"] body,
+html[data-site-wallpaper="true"] .app-shell::before,
+html[data-site-wallpaper="true"] .auth-screen {
+  background: transparent;
 }
 @media (prefers-reduced-motion: reduce) { .theme-sample * { transition: none !important; } }
