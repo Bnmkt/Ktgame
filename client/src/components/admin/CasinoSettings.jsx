@@ -79,6 +79,8 @@ export function CasinoSettings({ draft, setDraft, onSubmit, saving, games = [], 
 
     {section === "maintenance" && <GameplayReset/>}
 
+    {section === "media" && <section className="casino-settings-panel settings-group"><div className="settings-group-heading"><ImagePlus/><div><h3>{localeText("Médiathèque")}</h3><p>{localeText("La limite s’applique aux nouveaux imports, GIF animés compris. Les images existantes sont conservées.")}</p></div></div><div className="settings-field-grid"><label>{localeText("Poids maximal par image (Mo)")}<input type="number" min={1} max={20} step={1} required disabled={saving} value={draft.mediaUploadMaxMb ?? 3} onChange={event => update("mediaUploadMaxMb", Number(event.target.value))}/><small>{localeText("De 1 à 20 Mo. Application immédiate après enregistrement.")}</small></label></div></section>}
+
     {section === "moderation" && <section className="casino-settings-panel settings-group"><div className="settings-group-heading"><ShieldCheck/><div><h3>{localeText("Restrictions des softbans")}</h3><p>{localeText("Coche les actions interdites par défaut pendant un softban. Chaque fiche joueur peut utiliser une sélection personnalisée.")}</p></div></div><SoftBanRestrictions value={draft.softBanRestrictions} onChange={value => update("softBanRestrictions", value)} games={games} disabled={saving}/><p className="account-admin-notice">{localeText("La sécurité du compte, les demandes de données, les signalements et la possibilité de quitter une partie restent accessibles.")}</p></section>}
 
     {section === "editing" && <section className="casino-settings-panel settings-group editor-copy-settings">
