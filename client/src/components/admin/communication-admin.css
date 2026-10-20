@@ -1,0 +1,58 @@
+.comms-studio { min-width: 0; padding: 22px; }
+.comms-studio a { color: var(--site-link, #7dc9ed); }
+.comms-tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--site-border); padding: 0 0 18px; margin-bottom: 22px; }
+.comms-workspace { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 22px; align-items: start; }
+.comms-library { min-width: 0; }
+.comms-search { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.comms-search input { min-width: 0; width: 100%; }
+.comms-records { display: grid; gap: 8px; margin-top: 16px; }
+.comms-records > button { display: flex; flex-direction: column; align-items: start; text-align: left; min-width: 0; overflow-wrap: anywhere; }
+.comms-records small, .comms-document-actions small { display: block; font-size: 11px; color: var(--site-muted); margin-top: 4px; }
+.comms-library .pagination { flex-wrap: wrap; }
+.comms-document, .comms-fields { min-width: 0; }
+.comms-document-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--site-border); }
+.comms-document-actions > div:first-child { flex: 1; min-width: 120px; overflow-wrap: anywhere; }
+.comms-compose { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .7fr); gap: 24px; align-items: start; }
+.comms-fields { display: grid; gap: 18px; }
+.comms-fields input:not([type="color"]), .comms-fields textarea, .comms-fields select { width: 100%; min-width: 0; }
+.comms-fields select, .comms-seo-filters select { min-height: 40px; padding: 8px; border-radius: 6px; }
+.comms-fields textarea { resize: vertical; line-height: 1.55; padding: 10px; }
+.comms-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.comms-preview { position: sticky; top: 100px; min-width: 0; max-height: calc(100svh - 130px); overflow: auto; border-left: 1px solid var(--site-border); padding-left: 22px; overflow-wrap: anywhere; }
+.comms-preview > h3 { margin-top: 16px; color: var(--site-primary); font-size: 24px; }
+.comms-preview p, .comms-preview li, .comms-preview strong { line-height: 1.6; }
+.comms-prose { white-space: pre-wrap; margin-top: 18px; }
+.comms-export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.comms-qr-preview { display: grid; justify-items: center; gap: 18px; text-align: center; }
+.comms-qr-preview > img, .comms-qr-placeholder { width: min(100%, 280px); aspect-ratio: 1; height: auto; display: grid; place-items: center; background: #fff; border-radius: 4px; color: #102820; }
+.comms-qr-preview > a { display: inline-flex; align-items: center; gap: 8px; }
+.comms-assets { border-top: 1px solid var(--site-border); padding-top: 20px; }
+.comms-assets > header { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.comms-assets h3 { font-size: 17px; margin: 0; }
+.comms-assets > article { display: grid; grid-template-columns: 70px minmax(0, 1fr) 40px; align-items: start; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--site-border); }
+.comms-assets > article > div { display: grid; gap: 10px; }
+.comms-assets img { width: 70px; height: 80px; object-fit: contain; }
+.comms-empty { min-height: 320px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; text-align: center; }
+.comms-empty > svg { color: var(--site-primary); }
+.comms-empty h3 { font-size: 20px; margin: 0; }
+.comms-resource-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.comms-resource-links article { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 12px; border-bottom: 1px solid var(--site-border); padding: 0 0 20px; }
+.comms-resource-links article > span { display: flex; align-items: center; gap: 8px; color: var(--site-primary); }
+.comms-resource-links article > a { grid-row: 2; min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.comms-resource-links article > button { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+.comms-seo-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin: 28px 0 18px; }
+.comms-seo-heading h3 { margin: 0; font-size: 20px; }
+.comms-seo-heading .comms-export-actions { margin: 0; }
+.comms-seo-filters { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 16px; align-items: end; }
+.comms-seo-list > article { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 40px; gap: 20px; padding: 22px 0; border-bottom: 1px solid var(--site-border); align-items: start; }
+.comms-seo-result { overflow-wrap: anywhere; }
+.comms-seo-result a { font-size: 12px; }
+.comms-seo-result h4 { margin: 10px 0 8px; color: var(--site-primary); font-size: 17px; }
+.comms-seo-result p { margin: 0; line-height: 1.6; font-size: 13px; }
+.comms-seo-list ul { padding-left: 18px; font-size: 12px; line-height: 1.6; color: var(--site-muted); }
+.comms-check { display: inline-flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--site-success); font-size: 12px; }
+.comms-service-links { display: flex; gap: 24px; flex-wrap: wrap; padding-top: 24px; }
+.comms-service-links a { display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 1250px) { .comms-compose { grid-template-columns: minmax(0, 1fr); } .comms-preview { position: static; max-height: none; border-left: 0; border-top: 1px solid var(--site-border); padding: 22px 0 0; } }
+@media (max-width: 850px) { .comms-workspace { grid-template-columns: minmax(0, 1fr); } .comms-records { grid-template-columns: repeat(2, minmax(0, 1fr)); } .comms-resource-links { grid-template-columns: minmax(0, 1fr); } .comms-seo-list > article { grid-template-columns: minmax(0, 1fr) 40px; } .comms-seo-list > article > div:nth-child(2) { grid-row: 2; } .comms-seo-list > article > button { grid-column: 2; grid-row: 1; } }
+@media (max-width: 520px) { .comms-studio { padding: 14px; } .comms-field-pair, .comms-seo-filters { grid-template-columns: minmax(0, 1fr); } .comms-tabs button { flex: 1 1 100%; } .comms-assets > article { grid-template-columns: minmax(0, 1fr) 40px; } .comms-assets img { grid-column: 1; } .comms-assets > article > div { grid-column: 1; } .comms-assets > article > button { grid-column: 2; grid-row: 1; } }

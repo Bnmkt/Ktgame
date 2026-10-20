@@ -21,6 +21,9 @@ import { createDiscordPresence, registerDiscordPresence } from "./services/disco
 import { normalizeLobbyNotice, updateLobbyNotice } from "./services/lobby-notice.js";
 import { normalizeTheme } from "../../client/src/features/theme/config.js";
 import { registerThemeRoutes } from "./services/site-themes.js";
+import { createCommunicationStore } from "./services/communication-store.js";
+import { registerCommunicationRoutes } from "./services/communication.js";
+import { registerRssRoute } from "./services/rss.js";
 import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
 import { activeModeration, activeParentalRevocation, createParentalControlStore, defaultMinorRestrictions, exactAge, featureAccess, isUnder13, minorRestrictionOptions, normalizeMinorRestrictions, registrationMarker, turnsThirteenAt } from "./services/parental-controls.js";
@@ -5207,6 +5210,9 @@ registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(p
 const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, settings: platformSettings, directory: path.join(path.dirname(databaseFilename), "media-library") });
 registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });
 registerThemeRoutes({ app, auth, requireAdmin, readDb, updateDb, settings: platformSettings, mediaLibrary });
+const communication = createCommunicationStore(`${databaseFilename}.communication.sqlite`);
+registerCommunicationRoutes({ app, auth, requireAdmin, requireBackOffice, store: communication, mediaLibrary, settings: platformSettings, website: publicWebsiteUrl, games: configuredGames, notes: () => patchnotes.list(), pages: () => customPages.list(true) });
+registerRssRoute({ app, notes: () => patchnotes.list(), website: publicWebsiteUrl, settings: platformSettings });
 await registerSourceEditorRoutes({ app, auth, requireAdmin, root: path.resolve(__dirname, "../.."), directory: path.join(path.dirname(databaseFilename), "source-editor"),
   readUser: getUser, hasOpenTables: () => readDb().rooms.some(room => !room.finished),
   verifyCredential: async (user, method, credential) => {
