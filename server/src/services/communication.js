@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import QRCode from "qrcode";
 import { ZipFile } from "yazl";
 import rateLimit from "express-rate-limit";
-import { pageMetadata } from "../../../client/src/seo/metadata.js";
+import { publicDestinations } from "./public-catalog.js";
+export { publicDestinations } from "./public-catalog.js";
 import { campaignUrl } from "../../../client/src/features/communication/config.js";
 
 const clean = (value, max) => {
@@ -29,21 +30,6 @@ export function normalizePressKit(input, mediaLibrary) {
     return { id: asset.id, caption: clean(asset.caption ?? "", 200), credit: clean(asset.credit ?? "", 200) };
   });
   return value;
-}
-
-export function publicDestinations({ settings, games, notes, pages, website }) {
-  const origin = new URL(website).origin;
-  const basePath = new URL(website).pathname.replace(/\/$/, "");
-  const sources = { siteName: settings.siteName, games, notes: notes.filter(note => note.status === "published"), customPages: pages, basePath };
-  const paths = ["/", "/jeux", "/faq", "/guide", "/patchnotes", "/conditions", "/mentions-legales", "/confidentialite", "/cookies", "/parents"];
-  paths.push(...games.filter(game => game.enabled !== false).map(game => `/jeux/${encodeURIComponent(game.id)}`));
-  paths.push(...sources.notes.map(note => `/patchnotes?version=${encodeURIComponent(note.version)}`));
-  paths.push(...pages.map(page => `/pages/${encodeURIComponent(page.slug)}`));
-  return [...new Set(paths)].map(route => {
-    const url = new URL(basePath + route, origin);
-    const meta = pageMetadata({ ...sources, pathname: url.pathname, search: url.search });
-    return { url: url.href, path: url.pathname + url.search, ...meta };
-  });
 }
 
 export function normalizeCampaign(input, website, destinations) {

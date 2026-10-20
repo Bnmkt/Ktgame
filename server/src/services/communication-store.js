@@ -14,10 +14,24 @@ export function createCommunicationStore(filename, now = Date.now) {
       revision INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS communication_kind_date ON communication_documents(kind, updated_at DESC);`);
+  db.exec("CREATE TABLE IF NOT EXISTS communication_platform_cache(id TEXT PRIMARY KEY, data TEXT NOT NULL)");
   const decode = row => row && ({ ...JSON.parse(row.data), id: row.id, revision: row.revision, createdAt: row.created_at, updatedAt: row.updated_at });
   const get = (kind, id) => decode(db.prepare("SELECT * FROM communication_documents WHERE kind=? AND id=?").get(kind, id));
   return {
     get,
+    platformCache: id => { const row = db.prepare("SELECT data FROM communication_platform_cache WHERE id=?").get(id); return row ? JSON.parse(row.data) : null; },
+    savePlatformCache: (id, value) => db.prepare("INSERT INTO communication_platform_cache VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data").run(id, JSON.stringify(value)),
+    deletePlatformCache: id => db.prepare("DELETE FROM communication_platform_cache WHERE id=?").run(id),
+    reorderPlatforms(items) {
+      if (!Array.isArray(items)) throw failure("Ordre invalide.");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const current = db.prepare("SELECT id,revision,data FROM communication_documents WHERE kind='platform'").all();
+        if (items.length !== current.length || new Set(items.map(item => item.id)).size !== current.length || current.some(row => !items.some(item => item.id === row.id && item.revision === row.revision))) throw failure("La liste a changé. Recharge les plateformes.", 409);
+        for (const [position, item] of items.entries()) { const row = current.find(row => row.id === item.id); db.prepare("UPDATE communication_documents SET data=?,revision=revision+1 WHERE id=?").run(JSON.stringify({ ...JSON.parse(row.data), position }), row.id); }
+        db.exec("COMMIT");
+      } catch (error) { db.exec("ROLLBACK"); throw error; }
+    },
     list(kind) {
       return db.prepare("SELECT * FROM communication_documents WHERE kind=? ORDER BY updated_at DESC,id").all(kind).map(decode).map(row => kind === "kit" ? { id: row.id, name: row.name, locale: row.locale, updatedAt: row.updatedAt, assetCount: row.assets.length } : row);
     },
@@ -27,7 +41,7 @@ export function createCommunicationStore(filename, now = Date.now) {
         // Limit creation and write atomically, including when another process uses this database.
         db.exec("BEGIN IMMEDIATE");
         try {
-          if (db.prepare("SELECT count(*) AS n FROM communication_documents WHERE kind=?").get(kind).n >= (kind === "kit" ? 100 : 500)) throw failure("La limite de documents est atteinte.");
+          if (db.prepare("SELECT count(*) AS n FROM communication_documents WHERE kind=?").get(kind).n >= (kind === "platform" ? 50 : kind === "kit" ? 100 : 500)) throw failure("La limite de documents est atteinte.");
           id = randomUUID();
           db.prepare("INSERT INTO communication_documents VALUES(?,?,?,?,?,?)").run(id, kind, JSON.stringify(input), 1, date, date);
           db.exec("COMMIT");

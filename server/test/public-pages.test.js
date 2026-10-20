@@ -69,6 +69,16 @@ test("public caches expire and do not multiply for tracking or verification quer
   time = 30001; service.document("/faq"); assert.equal(count, 2);
 });
 
+test("sitemap reads publication changes immediately and preserves canonical base paths", () => {
+  let liveGames = [game], pages = [{ slug: "club", title: "Club", indexable: true }], releases = [release];
+  const service = fixture({ games: () => liveGames, customPages: () => pages, catalog: () => ({ notes: releases }), basePath: "/ktga" });
+  service.document("/ktga/jeux");
+  assert.match(service.sitemap(), /https:\/\/www.ktga.me\/ktga\/pages\/club/);
+  liveGames = []; pages = [{ ...pages[0], indexable: false }]; releases = [{ ...release, status: "draft" }];
+  const xml = service.sitemap();
+  for (const excluded of ["/jeux/yahtzee", "/pages/club", "version=0.2.0"]) assert.ok(!xml.includes(excluded), excluded);
+});
+
 test("custom pages use published content, clear public caches after publication and respect indexing", () => {
   let revision = 0, title = "Le club";
   const service = fixture({ customPages: () => [{ slug:"le-club", title, description:"Notre club", indexable:true, showFooter:true }, { slug:"discret", title:"Page discrète", indexable:false }], customPage: slug => ({ slug, title, format:"html", html:"<p>Publié</p>" }), customRevision: () => revision });

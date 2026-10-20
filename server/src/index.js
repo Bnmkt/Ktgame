@@ -24,6 +24,9 @@ import { registerThemeRoutes } from "./services/site-themes.js";
 import { createCommunicationStore } from "./services/communication-store.js";
 import { registerCommunicationRoutes } from "./services/communication.js";
 import { registerRssRoute } from "./services/rss.js";
+import { registerPlatformRoutes } from "./services/platforms.js";
+import { createIndexNow, registerIndexNowRoutes } from "./services/indexnow.js";
+import { indexNowCatalog } from "./services/indexnow-catalog.js";
 import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
 import { activeModeration, activeParentalRevocation, createParentalControlStore, defaultMinorRestrictions, exactAge, featureAccess, isUnder13, minorRestrictionOptions, normalizeMinorRestrictions, registrationMarker, turnsThirteenAt } from "./services/parental-controls.js";
@@ -757,6 +760,7 @@ const {
 } = accountDomain;
 
 const app = express();
+let indexNow;
 const requestLogs = createRequestLogStore({ filename: process.env.REQUEST_LOG_PATH || path.join(__dirname, "..", "data", "request-logs.sqlite") });
 process.on("exit", () => requestLogs.close());
 const statusMonitor = createStatusMonitor({ filename: process.env.STATUS_DB_PATH || path.join(__dirname, "..", "data", "status.sqlite") });
@@ -899,6 +903,11 @@ app.use("/api/admin/page-templates", express.json({ limit: "1mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use("/api/admin/source", express.json({ limit: "1mb" }));
 app.use(express.json());
+app.use("/api/admin", (req, res, next) => {
+  const changed = !["GET", "HEAD", "OPTIONS"].includes(req.method) && /^\/api\/admin\/(?:games|pages|page-templates|patchnotes|help|settings|themes)(?:\/|$)/.test(req.originalUrl.split("?")[0]);
+  if (changed) res.once("finish", () => { if (res.statusCode >= 200 && res.statusCode < 300) indexNow?.schedule(); });
+  next();
+});
 let gameplayResetPending = false;
 app.use("/api", (req, res, next) => {
   if (gameplayResetPending && req.path !== "/health") return res.status(503).json({ code: "GAMEPLAY_RESET_PENDING", error: "Réinitialisation du casino en cours. Reconnecte-toi dans quelques instants." });
@@ -5213,6 +5222,11 @@ registerThemeRoutes({ app, auth, requireAdmin, readDb, updateDb, settings: platf
 const communication = createCommunicationStore(`${databaseFilename}.communication.sqlite`);
 registerCommunicationRoutes({ app, auth, requireAdmin, requireBackOffice, store: communication, mediaLibrary, settings: platformSettings, website: publicWebsiteUrl, games: configuredGames, notes: () => patchnotes.list(), pages: () => customPages.list(true) });
 registerRssRoute({ app, notes: () => patchnotes.list(), website: publicWebsiteUrl, settings: platformSettings });
+registerPlatformRoutes({ app, auth, requireAdmin, requireBackOffice, store: communication });
+indexNow = createIndexNow({ filename: `${databaseFilename}.indexnow.sqlite`, website: publicWebsiteUrl, enabled: process.env.NODE_ENV === "production", catalog: () => indexNowCatalog({ settings: platformSettings, games: configuredGames, notes: version => version ? patchnotes.get(version) : patchnotes.list(), pages: () => customPages.list(true), page: slug => customPages.published(slug), help: () => playerHelp.read(true), website: publicWebsiteUrl }) });
+registerIndexNowRoutes({ app, auth, requireAdmin, requireBackOffice, service: indexNow, website: publicWebsiteUrl });
+indexNow.start();
+process.on("exit", () => indexNow.close());
 await registerSourceEditorRoutes({ app, auth, requireAdmin, root: path.resolve(__dirname, "../.."), directory: path.join(path.dirname(databaseFilename), "source-editor"),
   readUser: getUser, hasOpenTables: () => readDb().rooms.some(room => !room.finished),
   verifyCredential: async (user, method, credential) => {
@@ -5257,7 +5271,8 @@ app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
       complexity: String(req.body.complexity ?? "").trim().slice(0, 40),
       entryPot: Math.max(0, Math.floor(Number(req.body.entryPot) || 0)),
       position: Math.max(1, Math.floor(Number(req.body.position) || 1)),
-      enabled: req.body.enabled !== false
+      enabled: req.body.enabled !== false,
+      updatedAt: new Date().toISOString()
     };
     if (req.params.id === "texas-holdem") {
       db.settings.platform = normalizePlatformSettings({
