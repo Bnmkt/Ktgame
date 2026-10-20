@@ -19,7 +19,7 @@ export function artworkCropBounds(width, height, crop = {}, ratio = 16 / 7) {
   return { zoom, x, y, width: cropWidth, height: cropHeight, left: x * width - cropWidth / 2, top: y * height - cropHeight / 2 };
 }
 
-export async function encodeArtworkCrop(image, crop, format, mime = "image/png") {
+export async function encodeArtworkCrop(image, crop, format, mime = "image/png", maxBytes = 3 * 1024 * 1024) {
   const bounds = artworkCropBounds(image.naturalWidth, image.naturalHeight, crop, format.width / format.height);
   const canvas = document.createElement("canvas");
   canvas.width = format.width; canvas.height = format.height;
@@ -30,6 +30,7 @@ export async function encodeArtworkCrop(image, crop, format, mime = "image/png")
   else context.clearRect(0, 0, canvas.width, canvas.height);
   drawTransformedCrop(context, image, crop, bounds, format.width, format.height);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, 0.92));
-  if (!blob || blob.size > 3 * 1024 * 1024) throw new Error("L’image recadrée dépasse 3 Mo. Choisis une autre image.");
+  if (!blob) throw new Error("L’image recadrée ne peut pas être encodée.");
+  if (blob.size > maxBytes) throw new Error(`L’image recadrée dépasse ${maxBytes / (1024 * 1024)} Mo. Réduis ses dimensions ou change son format.`);
   return blob;
 }

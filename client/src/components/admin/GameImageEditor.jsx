@@ -93,7 +93,7 @@ export function GameImageEditor({ gameId, gameName, field, value, onApply, onClo
     if (!source || busy || loading || mediaUpload && mediaMaxMb === null) return;
     setBusy(true); setError("");
     try {
-      const blob = source.animated ? source.file : await encodeArtworkCrop(source.image, crop, format, selectableFormat ? mime : "image/png");
+      const blob = source.animated ? source.file : await encodeArtworkCrop(source.image, crop, format, selectableFormat ? mime : "image/png", (mediaUpload ? mediaMaxMb : 3) * 1024 * 1024);
       if (mediaUpload && blob.size > mediaMaxMb * 1024 * 1024) throw new Error(localeText("L’image recadrée dépasse {value0} Mo. Réduis ses dimensions ou change son format.", { value0: mediaMaxMb }));
       const result = await api(uploadPath ?? `/api/admin/games/${encodeURIComponent(gameId)}/images/${field}`, { method: "POST", body: blob, headers: { "Content-Type": blob.type }, deduplicate: false });
       onApply(result.image);

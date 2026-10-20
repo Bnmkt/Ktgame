@@ -1,10 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { artworkCropBounds, gameArtworkFormats } from "../src/features/games/artwork-crop.js";
+import { artworkCropBounds, encodeArtworkCrop, gameArtworkFormats } from "../src/features/games/artwork-crop.js";
 
 test("game images use distinct landscape formats", () => {
   assert.equal(gameArtworkFormats.coverImage.width / gameArtworkFormats.coverImage.height, 16 / 7);
   assert.equal(gameArtworkFormats.descriptiveImage.width / gameArtworkFormats.descriptiveImage.height, 4 / 3);
+});
+
+test("crop encoding honors the media limit while other uploads retain their default", async t => {
+  const previous = globalThis.document;
+  t.after(() => { if (previous === undefined) delete globalThis.document; else globalThis.document = previous; });
+  const blob = new Blob([new Uint8Array(4 * 1024 * 1024)], { type: "image/png" });
+  const context = new Proxy({}, { get: (target, key) => target[key] ?? (() => {}) });
+  globalThis.document = { createElement: () => ({ getContext: () => context, toBlob: callback => callback(blob) }) };
+  const image = { naturalWidth: 1672, naturalHeight: 940 };
+  const format = { width: 1672, height: 940 };
+  await assert.rejects(encodeArtworkCrop(image, {}, format), /3 Mo/);
+  assert.equal(await encodeArtworkCrop(image, {}, format, "image/png", 5 * 1024 * 1024), blob);
+  await assert.rejects(encodeArtworkCrop(image, {}, format, "image/png", 1024 * 1024), /1 Mo/);
 });
 
 test("crop fits portrait and landscape sources without empty margins", () => {
