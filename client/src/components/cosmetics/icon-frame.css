@@ -1,0 +1,11 @@
+.cosmetic-icon.cosmetic-icon-unframed {
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+}
+.cosmetic-icon.cosmetic-icon-unframed::before,
+.cosmetic-icon.cosmetic-icon-unframed::after { display: none !important; }
+.branding-logo-frame { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+.branding-logo-frame input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 auto; }

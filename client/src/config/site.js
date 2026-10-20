@@ -1,7 +1,9 @@
 
 
 export const defaultPublicSettings = {
+  mediaUploadMaxMb: 3,
   siteName: "KTGA.ME",
+  siteIconFramed: true,
   siteIcon: "landmark",
   featuredGameId: "",
   lobbyNotice: { enabled: false, title: "", content: "", backgroundImage: "", updatedAt: "" },

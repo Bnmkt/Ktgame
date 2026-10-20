@@ -3,7 +3,7 @@ import { mediaPath } from "./media-library.js";
 
 export function normalizeBranding(value = {}) {
   const pwa = value.pwaIcons && typeof value.pwaIcons === "object" ? value.pwaIcons : {};
-  return { siteIconMode: value.siteIconMode === "icon" ? "icon" : "image", siteIconImage: mediaPath(value.siteIconImage), faviconImage: mediaPath(value.faviconImage), pwaIcons: Object.fromEntries(["180", "192", "512", "maskable"].map(key => [key, mediaPath(pwa[key])])) };
+  return { siteIconFramed: value.siteIconFramed !== false, siteIconMode: value.siteIconMode === "icon" ? "icon" : "image", siteIconImage: mediaPath(value.siteIconImage), faviconImage: mediaPath(value.faviconImage), pwaIcons: Object.fromEntries(["180", "192", "512", "maskable"].map(key => [key, mediaPath(pwa[key])])) };
 }
 
 export function validateBranding(value, library) {

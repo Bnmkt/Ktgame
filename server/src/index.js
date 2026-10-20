@@ -3,7 +3,7 @@ import { registerGameplayResetRoutes } from "./services/gameplay-reset-routes.js
 import { createRoomCommands } from "./services/room-commands.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
-import { registerMediaRoutes } from "./services/media-library.js";
+import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
 import { normalizeBranding, validateBranding, registerBrandingRoutes } from "./services/site-branding.js";
 import { registerSourceEditorRoutes } from "./services/source-editor.js";
 import { createEditorDuplicationLimit, isEditorDuplication, validateEditorDuplicationUsers } from "./services/editor-duplication.js";
@@ -517,6 +517,7 @@ function normalizePlatformSettings(value = {}) {
     siteName: String(value.siteName ?? defaultPlatformSettings.siteName).trim().slice(0, 36) || defaultPlatformSettings.siteName,
     ...normalizeBranding(value),
     appearance: normalizeTheme(value.appearance),
+    mediaUploadMaxMb: mediaUploadLimit(value.mediaUploadMaxMb),
     contactEmail: siteContactEmail(value),
     siteIcon: String(value.siteIcon ?? defaultPlatformSettings.siteIcon).trim().slice(0, 6000) || defaultPlatformSettings.siteIcon,
     siteSubtitle: String(value.siteSubtitle ?? defaultPlatformSettings.siteSubtitle).trim().slice(0, 120) || defaultPlatformSettings.siteSubtitle,
@@ -4902,6 +4903,7 @@ app.patch("/api/admin/settings", auth, requireAdmin, (req, res) => {
   let editorDuplicationUserIds;
   try {
     if (Object.hasOwn(req.body, "appearance")) throw new Error("Utilise l'editeur de themes pour modifier l'apparence.");
+    if (Object.hasOwn(req.body, "mediaUploadMaxMb")) validateMediaUploadLimit(req.body.mediaUploadMaxMb);
     if (["siteIconImage", "siteIconMode", "faviconImage", "pwaIcons"].some(key => Object.hasOwn(req.body, key))) validateBranding({ ...platformSettings(), ...req.body }, mediaLibrary);
     if (req.body.editorDuplicationUserIds !== undefined) editorDuplicationUserIds = validateEditorDuplicationUsers(req.body.editorDuplicationUserIds, readDb().users);
     if (req.body.softBanRestrictions !== undefined && !validSoftBanRestrictions(req.body.softBanRestrictions, games)) throw new Error("Restrictions de softban invalides.");
@@ -5201,7 +5203,7 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 });
 
 registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
-const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, directory: path.join(path.dirname(databaseFilename), "media-library") });
+const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, settings: platformSettings, directory: path.join(path.dirname(databaseFilename), "media-library") });
 registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });
 registerThemeRoutes({ app, auth, requireAdmin, readDb, updateDb, settings: platformSettings, mediaLibrary });
 await registerSourceEditorRoutes({ app, auth, requireAdmin, root: path.resolve(__dirname, "../.."), directory: path.join(path.dirname(databaseFilename), "source-editor"),
@@ -5276,7 +5278,7 @@ app.post("/api/admin/shop", auth, requireBackOffice, (req, res) => {
   }
   let pack;
   try { pack = normalizeShopPack(req.body.packName); } catch (error) { return res.status(400).json({ error: error.message }); }
-  const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack, createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
+  const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, iconFramed: req.body.iconFramed !== false, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack, createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
   updateDb((currentDb) => { currentDb.settings ??= {}; currentDb.settings.customShopItems ??= []; currentDb.settings.customShopItems.push(item); });
   res.json(item);
 });
@@ -5298,7 +5300,7 @@ app.patch("/api/admin/shop/:id", auth, requireBackOffice, (req, res) => {
     try { pack = req.body.packName === undefined ? { packs: current.packs ?? [], packName: current.packName ?? "" } : normalizeShopPack(req.body.packName); } catch (error) { return { error: error.message }; }
     const design = req.body.design === undefined ? current?.design ?? null : normalizeCosmeticDesign(req.body.design, type);
     const motion = req.body.motion === undefined ? current?.motion ?? null : normalizeCosmeticMotion(req.body.motion);
-    db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack };
+    db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, iconFramed: (req.body.iconFramed ?? current.iconFramed) !== false, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack };
     return "updated";
   });
   if (result === "missing") return res.status(404).json({ error: "Objet introuvable." });

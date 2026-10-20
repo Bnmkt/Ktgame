@@ -8,8 +8,8 @@ function crc32(buffer) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-export function sanitizeBugImage(body) {
-  if (!Buffer.isBuffer(body) || body.length > 3 * 1024 * 1024 || body.length < 45 || !body.subarray(0, 8).equals(signature)) throw new Error("Une capture PNG valide de 3 Mo maximum est nécessaire.");
+export function sanitizeBugImage(body, maxBytes = 3 * 1024 * 1024) {
+  if (!Buffer.isBuffer(body) || body.length > maxBytes || body.length < 45 || !body.subarray(0, 8).equals(signature)) throw new Error(`Une capture PNG valide de ${maxBytes / (1024 * 1024)} Mo maximum est nécessaire.`);
   const chunks = [signature];
   let position = 8, header = false, pixels = false;
   while (position + 12 <= body.length) {

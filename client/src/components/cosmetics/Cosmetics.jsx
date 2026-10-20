@@ -13,6 +13,7 @@ import { gameTitle } from "../../features/games/config.js";
 import { gameImageUrl } from "../../features/games/presentation.js";
 import { API_URL } from "../../api.js";
 import { cosmeticImage, cosmeticImageBackground, cosmeticImageSettings } from "../../utils/cosmetic-images.js";
+import "./icon-frame.css";
 
 export let cosmeticCatalogItems = [];
 
@@ -68,13 +69,16 @@ export function sanitizedSvgIcon(source) {
   return new XMLSerializer().serializeToString(svg);
 }
 
-export function CosmeticIcon({ value, source, style }) {
+export function CosmeticIcon({ value, source, style, framed }) {
+  const item = cosmeticCatalogItems.find(entry => entry.type === "icons" && entry.value === value);
+  const unframed = (framed ?? item?.iconFramed) === false;
+  const iconStyle = unframed ? { ...style, background: "none", border: "none", borderRadius: 0, boxShadow: "none", clipPath: "none" } : style;
   const siteImage = value === "site" && gameImageUrl(source);
-  if (siteImage) return <span className="cosmetic-icon cosmetic-icon-site" style={style}><img src={siteImage.startsWith("/api/") ? `${API_URL}${siteImage}` : siteImage} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></span>;
-  const catalogSource = cosmeticCatalogItems.find((item) => item.type === "icons" && item.value === value)?.icon;
+  if (siteImage) return <span className={`cosmetic-icon cosmetic-icon-site${unframed ? " cosmetic-icon-unframed" : ""}`} style={iconStyle}><img src={siteImage.startsWith("/api/") ? `${API_URL}${siteImage}` : siteImage} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></span>;
+  const catalogSource = item?.icon;
   const configuredSource = String(source ?? catalogSource ?? "").trim();
   const imageSource = cosmeticImage(configuredSource);
-  if (imageSource) return <span className={`cosmetic-icon cosmetic-icon-${String(value ?? "preview").replace(/[^a-zA-Z0-9_-]/g, "")}`} style={style}><img src={`${API_URL}${imageSource}`} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }}/></span>;
+  if (imageSource) return <span className={`cosmetic-icon${unframed ? " cosmetic-icon-unframed" : ""} cosmetic-icon-${String(value ?? "preview").replace(/[^a-zA-Z0-9_-]/g, "")}`} style={iconStyle}><img src={`${API_URL}${imageSource}`} width="24" height="24" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }}/></span>;
   const iconKey = configuredSource && !configuredSource.startsWith("<svg") ? defaultIconKey(configuredSource.toLowerCase()) : defaultIconKey(value);
   const lucideName = normalizeLucideIconName(configuredSource || iconKey);
   const icons = {
@@ -117,7 +121,7 @@ export function CosmeticIcon({ value, source, style }) {
     : icons[iconKey] ?? (lucideIconNameSet.has(lucideName)
       ? <DynamicIcon name={lucideName} size={18} fallback={Coins} />
       : configuredSource ? <span className="custom-text-icon">{configuredSource.slice(0, 8)}</span> : icons.chip);
-  return <span className={`cosmetic-icon cosmetic-icon-${value ?? "chip"}`} style={style}>{content}</span>;
+  return <span className={`cosmetic-icon${unframed ? " cosmetic-icon-unframed" : ""} cosmetic-icon-${value ?? "chip"}`} style={iconStyle}>{content}</span>;
 }
 
 export function LucideIconPicker({ value, onChange }) {
@@ -732,7 +736,7 @@ export function CosmeticPreview({ user, item, stats = [] }) {
       {showMemberCard && <ProfileCosmeticShell user={previewUser} className="profile-cosmetic-preview"><div className={`vip-card preview-card member-${cardTier}`}>
         <span className="vip-label">{memberCardOptions[cardTier] ?? item?.name ?? localeText("Carte membre")}{" " + localeText("· KTGA.ME")}</span>
         <strong className={`display-name name-${previewUser.cosmetics?.equipped?.nameEffect ?? "none"}`}>
-          <CosmeticIcon value={previewUser.cosmetics?.equipped?.icon} source={previewType === "icons" ? item?.icon : undefined} />
+          <CosmeticIcon value={previewUser.cosmetics?.equipped?.icon} source={previewType === "icons" ? item?.icon : undefined} framed={previewType === "icons" ? item?.iconFramed : undefined}/>
           <span className="display-name-text">{previewUser.profile?.displayName ?? previewUser.pseudo}</span>
         </strong>
         <small>{previewUser.friendCode ? localeText("Code ami · {value0}", { value0: previewUser.friendCode }) : localeText("MEMBRE · APERÇU")}</small>

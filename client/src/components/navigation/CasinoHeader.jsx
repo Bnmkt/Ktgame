@@ -7,7 +7,7 @@ import { LanguagePicker , useLocale } from "../../locales/LocaleProvider.jsx";
 import { softBanLimited } from "../../features/accounts/softban.js";
 import { SoundControl } from "../feedback/InterfaceSounds.jsx";
 
-export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
+export function CasinoHeader({ user, siteName, siteIcon, siteIconFramed = true, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
   const { t: localeText } = useLocale();
   const [menuOpen, setMenuOpen] = useState(false);
   const restrictions = user.minor?.restrictions ?? [];
@@ -32,7 +32,7 @@ export function CasinoHeader({ user, siteName, siteIcon, view, roomCode, eventSl
   const link = ([key, label, Icon]) => <a key={key} href={appPath(key, key === "room" ? roomCode : key === "event" ? eventSlug : "")} className={view === key ? "active" : ""} aria-current={view === key ? "page" : undefined} onClick={(event) => follow(event, key)}><Icon size={20}/><span>{localeText(label)}</span></a>;
   return <header className="casino-header">
     <div className="casino-header-inner">
-      <a className="casino-brand" href={appPath("lobby")} onClick={(event) => follow(event, "lobby")}><CosmeticIcon value="site" source={siteIcon} /> <span>{siteName}</span></a>
+      <a className="casino-brand" href={appPath("lobby")} onClick={(event) => follow(event, "lobby")}><CosmeticIcon value="site" source={siteIcon} framed={siteIconFramed}/> <span>{siteName}</span></a>
       <nav className="casino-navigation" aria-label={localeText("Navigation du casino")}>
         {destinations.map(link)}
       </nav>

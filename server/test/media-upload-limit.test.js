@@ -1,0 +1,50 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import express from "express";
+import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit, sanitizeMedia } from "../src/services/media-library.js";
+import { sanitizeBugImage } from "../src/services/bug-images.js";
+import { normalizeBranding } from "../src/services/site-branding.js";
+
+test("media limits validate admin values and branding retains opt-out without changing defaults", () => {
+  for (const value of [0, 21, 1.5, "10", null, NaN, Infinity]) assert.throws(() => validateMediaUploadLimit(value));
+  for (const value of [1, 3, 20]) assert.equal(validateMediaUploadLimit(value), value);
+  assert.equal(mediaUploadLimit(undefined), 3);
+  assert.equal(mediaUploadLimit(100), 3);
+  assert.equal(normalizeBranding().siteIconFramed, true);
+  assert.equal(normalizeBranding({ siteIconFramed: false }).siteIconFramed, false);
+});
+
+test("media uploads honor new limits immediately without relaxing bug screenshot limits", async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ktga-media-limit-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const png = await fs.readFile(new URL("../../client/public/pwa/icon-192.png", import.meta.url));
+  const large = Buffer.concat([png, Buffer.alloc(4 * 1024 * 1024 - png.length)]);
+  assert.throws(() => sanitizeMedia(large, "image/png"));
+  assert.throws(() => sanitizeBugImage(large));
+  assert.deepEqual(sanitizeMedia(large, "image/png", 4).data, sanitizeBugImage(png));
+  let maxMb = 3;
+  const app = express();
+  const auth = (req, res, next) => { if (!req.get("X-Editor")) return res.sendStatus(401); req.auth = { id: "editor" }; next(); };
+  await registerMediaRoutes({ app, directory, auth, requireBackOffice: (_req, _res, next) => next(), settings: () => ({ mediaUploadMaxMb: maxMb }) });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise(resolve => server.once("listening", resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const upload = body => fetch(`${origin}/api/admin/media`, { method: "POST", headers: { "Content-Type": "image/png", "X-Editor": "1" }, body });
+  assert.equal((await fetch(`${origin}/api/admin/media/limits`)).status, 401);
+  assert.equal((await upload(large)).status, 413);
+  maxMb = 4;
+  assert.deepEqual(await (await fetch(`${origin}/api/admin/media/limits`, { headers: { "X-Editor": "1" } })).json(), { maxMb: 4 });
+  const uploaded = await upload(large);
+  assert.equal(uploaded.status, 201);
+  assert.equal((await uploaded.json()).width, 192);
+  const list = await (await fetch(`${origin}/api/admin/media`, { headers: { "X-Editor": "1" } })).json();
+  assert.ok(Array.isArray(list));
+  assert.equal(list.length, 1);
+  maxMb = 1;
+  assert.equal((await upload(large)).status, 413);
+  assert.equal((await upload(png)).status, 201);
+});

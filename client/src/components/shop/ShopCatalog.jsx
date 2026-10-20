@@ -19,7 +19,7 @@ function ItemVisual({ item, user }) {
   const preview = previewUserForItem(user, item);
   return <div className={`catalog-visual catalog-visual-${item.type}`} aria-hidden="true">
     {(item.design || item.motion || item.css) && <style>{cosmeticCssRules([item])}</style>}
-    {item.type === "icons" ? <CosmeticIcon value={item.value} source={item.icon} /> :
+    {item.type === "icons" ? <CosmeticIcon value={item.value} source={item.icon} framed={item.iconFramed}/> :
       item.type === "diceSkins" ? <>{[2, 4, 6].map((value) => <Die key={value} value={value} skin={item.value} animate={false} />)}</> :
       item.type === "cardSkins" ? <><PlayingCard hidden skin={item.value} animate={false} /><PlayingCard card={{ rank: "A", suit: "H" }} skin={item.value} animate={false} /></> :
       item.type === "nameEffects" ? <DisplayName user={preview} interactive={false} /> :
