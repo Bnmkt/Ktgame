@@ -37,7 +37,7 @@ export function normalizePageTemplate(input) {
   if (!name) throw new Error("Indique un nom pour le modèle.");
   if (!["html", "markdown"].includes(input.format)) throw new Error("Choisis le format du modèle.");
   if (typeof input.layout !== "string" || !input.layout.trim() || input.layout.length > 100000) throw new Error("Le layout doit contenir entre 1 et 100 000 caractères.");
-  if (!Array.isArray(input.variables ?? []) || (input.variables ?? []).length > 32) throw new Error("Un modèle peut contenir jusqu’à 32 variables.");
+  if (!Array.isArray(input.variables ?? []) || (input.variables ?? []).length > 128) throw new Error("Un modèle peut contenir jusqu’à 128 variables.");
   const keys = new Set(reserved);
   const variables = (input.variables ?? []).map(field => {
     if (!field || typeof field !== "object") throw new Error("Variable invalide.");
@@ -50,7 +50,7 @@ export function normalizePageTemplate(input) {
     const normalized = { key, label, type: field.type, required: field.required === true, help: text(field.help, 240), options };
     return { ...normalized, defaultValue: variableValue(normalized, field.defaultValue) };
   });
-  const tokens = [...input.layout.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map(match => match[1]);
+  const tokens = [...input.layout.matchAll(/\{\{\s*([^{}]+?)\s*\}\}|\{([a-z][a-z0-9_]*)\}/g)].map(match => match[1] ?? match[2]);
   if (tokens.filter(token => token === "content").length !== 1) throw new Error("Le layout doit contenir exactement une zone {{content}}.");
   for (const token of tokens) if (!keys.has(token) || ["constructor", "prototype", "__proto__"].includes(token)) throw new Error(`Variable inconnue dans le layout : ${token}.`);
   const presentation = input.presentation ?? {};
@@ -74,7 +74,8 @@ export function resolveTemplatePage(page, template, { strict = false } = {}) {
   };
   function substitute(source, content) {
     let size = source.length;
-    return source.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (token, key) => {
+    return source.replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}|\{([a-z][a-z0-9_]*)\}/g, (token, doubleKey, singleKey) => {
+      const key = doubleKey ?? singleKey;
       const value = key === "content" && content !== undefined ? content : Object.hasOwn(variables, key) ? escape(key, variables[key]) : token;
       size += value.length - token.length;
       if (size > 150000) throw new Error("La page générée dépasse 150 000 caractères.");

@@ -892,6 +892,7 @@ app.use((req, res, next) => {
 });
 app.use("/api/admin/help", express.json({ limit: "2mb" }));
 app.use("/api/admin/pages", express.json({ limit: "1mb" }));
+app.use("/api/admin/page-templates", express.json({ limit: "1mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use("/api/admin/source", express.json({ limit: "1mb" }));
 app.use(express.json());

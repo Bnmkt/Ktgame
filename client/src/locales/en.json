@@ -4832,5 +4832,10 @@
   "Modèle publié. Les pages liées utilisent cette version.": "Template published. Linked pages now use this version.",
   "Texte long": "Long text",
   "Oui / non": "Yes / no",
-  "Liste de choix": "Choice list"
+  "Liste de choix": "Choice list",
+  "Variables en bloc": "Bulk variables",
+  "Ajouter / mettre à jour": "Add / update",
+  "Annuler la saisie": "Discard input",
+  "Modifications à appliquer": "Changes waiting to be applied",
+  "Options avancées des variables": "Advanced variable options"
 }

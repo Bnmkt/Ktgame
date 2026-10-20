@@ -64,6 +64,8 @@ test("variables are typed and safely interpolated, required values are checked a
 
 test("schema validation rejects reserved keys, malformed placeholders, oversized output and invalid scripts", t => {
   const store = fixture(t);
+  const short = store.saveTemplate({ ...model, layout: "<h2>{headline}</h2>{content}" }, { publish: true });
+  assert.match(store.preview({ ...page, templateId: short.id }).html, /<h2>Bienvenue<\/h2>/);
   for (const layout of ["No slot", "{{content}}{{content}}", "{{content}}{{missing}}", "{{content}}{{constructor}}"] ) assert.throws(() => normalizePageTemplate({ ...model, layout }));
   for (const key of ["content", "__proto__", "constructor", "invalid-key"]) assert.throws(() => normalizePageTemplate({ ...model, variables: [{ ...model.variables[0], key }] }));
   assert.throws(() => store.saveTemplate({ ...model, script: "const = ;" }));

@@ -51,7 +51,7 @@ export function normalizeCustomPage(input, { allowEmpty = false } = {}) {
   const { style, script } = pageCode(input);
   const templateId = input.templateId ?? "", variableValues = input.variableValues ?? {};
   if (typeof templateId !== "string" || templateId && !/^[a-zA-Z0-9-]{1,80}$/.test(templateId)) throw new Error("Modèle invalide.");
-  if (!variableValues || typeof variableValues !== "object" || Array.isArray(variableValues) || Object.keys(variableValues).length > 32 || JSON.stringify(variableValues).length > 64000 || Object.values(variableValues).some(value => value !== null && !["string", "boolean", "number"].includes(typeof value))) throw new Error("Valeurs de variables invalides.");
+  if (!variableValues || typeof variableValues !== "object" || Array.isArray(variableValues) || Object.keys(variableValues).length > 128 || JSON.stringify(variableValues).length > 64000 || Object.values(variableValues).some(value => value !== null && !["string", "boolean", "number"].includes(typeof value))) throw new Error("Valeurs de variables invalides.");
   return { title, slug, description: clean(input.description, 280), format: input.format, content, html, style, script, templateId, variableValues, showFooter: input.showFooter === true, footerLabel: clean(input.footerLabel, 60), indexable: input.indexable !== false, position: Math.max(0, Math.min(999, Math.trunc(Number(input.position) || 0))) };
 }
 

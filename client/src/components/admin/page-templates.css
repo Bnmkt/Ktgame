@@ -17,3 +17,7 @@
 .page-template-link { display: grid; gap: 12px; padding-block: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--site-border,#514b38); }
 .page-template-link select { width: 100%; min-width: 0; }
 .page-template-link label { display: grid; gap: 8px; }
+.page-template-bulk { margin-bottom: 24px; }
+.page-template-bulk textarea { font-family: ui-monospace, monospace; min-height: 260px; line-height: 1.6; resize: vertical; }
+.page-template-bulk .custom-pages-actions { margin-top: 12px; }
+.page-template-advanced summary { cursor: pointer; padding: 14px 0; color: var(--site-primary,#e8c777); }
