@@ -1,0 +1,66 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createCustomPageStore, registerCustomPageRoutes } from "../../server/src/services/custom-pages.js";
+const require = createRequire(new URL("../../server/package.json", import.meta.url));
+const express = require("express");
+const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
+const app = express(), store = createCustomPageStore({ filename: ":memory:" });
+app.use(express.json());
+registerCustomPageRoutes({ app, store, auth: (req, _res, next) => { req.auth = { id: "admin" }; req.backOfficeUser = { admin: true }; next(); }, requireBackOffice: (_req, _res, next) => next() });
+app.get("/api/locales/:locale", (_req, res) => res.json({ messages: {} }));
+const server = app.listen(0, "127.0.0.1"); await new Promise(resolve => server.once("listening", resolve));
+const origin = `http://127.0.0.1:${server.address().port}`;
+const output = new URL(`../../docs/previews/page-templates-20261020/${Date.now()}/`, import.meta.url); await fs.mkdir(output, { recursive: true });
+const browser = await chromium.launch({ channel: "msedge", headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }), errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  if (process.env.BLOCKER_MODULE) {
+    const { PlaywrightBlocker } = await import(pathToFileURL(process.env.BLOCKER_MODULE).href);
+    await (await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch)).enableBlockingInPage(page);
+  }
+  await page.route("**/api/**", async route => {
+    const request = route.request(), url = new URL(request.url());
+    const headers = { "Access-Control-Allow-Origin": request.headers().origin || "http://127.0.0.1:5197", "Access-Control-Allow-Credentials": "true", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    const response = await fetch(origin + url.pathname + url.search, { method: request.method(), headers: { "Content-Type": "application/json" }, ...(request.postData() ? { body: request.postData() } : {}) });
+    return route.fulfill({ status: response.status, body: await response.text(), contentType: response.headers.get("Content-Type") || "application/json", headers });
+  });
+  const fixture = "http://127.0.0.1:5197/test/fixtures/custom-pages.html";
+  await page.goto(fixture);
+  await page.getByRole("button", { name: "Modèles", exact: true }).click();
+  await page.getByRole("button", { name: "Nouveau modèle", exact: true }).click();
+  await page.getByLabel("Nom du modèle", { exact: true }).fill("Guide des salons");
+  await page.getByRole("button", { name: "CSS / JavaScript", exact: true }).click();
+  await page.getByRole("textbox", { name: "JavaScript partagé", exact: true }).fill("root.dataset.headline = variables.headline;");
+  await page.waitForFunction(() => document.querySelector(".custom-pages-preview .custom-page-runtime")?.dataset.headline === "Bienvenue");
+  await page.getByRole("button", { name: "Variables", exact: true }).click();
+  await page.screenshot({ path: fileURLToPath(new URL("template-desktop.png", output)), fullPage: true });
+  await page.getByRole("button", { name: "Publier", exact: true }).click();
+  await page.getByRole("button", { name: "Publier", exact: true }).last().click();
+  await page.getByText("Modèle publié. Les pages liées utilisent cette version.", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Retour", exact: true }).click();
+  await page.getByRole("button", { name: "Retour", exact: true }).last().click();
+  await page.getByRole("button", { name: "Créer une page", exact: true }).click();
+  await page.getByLabel("Titre", { exact: true }).fill("La salle des joueurs");
+  await page.getByRole("button", { name: "Variables", exact: true }).click();
+  await page.getByLabel("Titre principal", { exact: false }).fill("Bienvenue au club");
+  await page.getByLabel("Introduction", { exact: false }).fill("Une soirée entre amis.");
+  await page.waitForFunction(() => document.querySelector(".custom-pages-preview .custom-page-runtime")?.dataset.headline === "Bienvenue au club");
+  await page.getByRole("button", { name: "Publier", exact: true }).click();
+  await page.getByText("Page publiée.", { exact: true }).waitFor();
+  const published = store.published("la-salle-des-joueurs");
+  assert.match(published.html, /Bienvenue au club/);
+  assert.match(published.style, /cp-intro/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: fileURLToPath(new URL("page-mobile.png", output)), fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await page.goto(`${fixture}?slug=la-salle-des-joueurs`);
+  await page.waitForFunction(() => document.querySelector(".custom-page-runtime")?.dataset.headline === "Bienvenue au club");
+  await page.screenshot({ path: fileURLToPath(new URL("public-mobile.png", output)), fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  assert.deepEqual(errors, []);
+  console.log("Template creation, shared scripts, typed page variables, publication and mobile rendering passed", fileURLToPath(output));
+} finally { await browser.close(); await new Promise(resolve => server.close(resolve)); store.close(); }

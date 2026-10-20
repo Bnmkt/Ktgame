@@ -9,4 +9,4 @@ import "../../src/styles.css";
 import "../../src/navigation/casino.css";
 
 const slug = new URLSearchParams(location.search).get("slug");
-createRoot(document.getElementById("root")).render(<LocaleProvider>{slug ? <CustomPage slug={slug}/> : <main className="app-shell admin-shell"><CustomPagesAdmin/></main>}<footer className="legal-footer"><CustomPageLinks/></footer></LocaleProvider>);
+createRoot(document.getElementById("root")).render(<LocaleProvider>{slug ? <CustomPage slug={slug}/> : <main className="app-shell admin-shell"><CustomPagesAdmin admin/></main>}<footer className="legal-footer"><CustomPageLinks/></footer></LocaleProvider>);
