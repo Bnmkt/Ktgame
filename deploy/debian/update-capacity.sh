@@ -9,7 +9,7 @@ if [[ $# -eq 2 ]]; then
   enableGames=true
 fi
 stage=$(realpath -- "$1")
-[[ $stage == /tmp/ktga-capacity-release-* && -d $stage ]] || { echo 'Unexpected release directory.' >&2; exit 1; }
+[[ ( $stage == /var/tmp/ktga-capacity-release-* || $stage == /tmp/ktga-capacity-release-* ) && -d $stage ]] || { echo 'Unexpected release directory.' >&2; exit 1; }
 exec 9>/run/ktga-deployment.lock
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 files=(

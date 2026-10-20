@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly KTGA deployment retention
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=60
+Unit=ktga-retention.service
+
+[Install]
+WantedBy=timers.target

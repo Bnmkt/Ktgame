@@ -1,0 +1,11 @@
+[Unit]
+Description=Keep five KTGA deployment rollbacks and remove idle preparations
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ktga-prune-deployments --apply
+TimeoutStartSec=20min
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=10

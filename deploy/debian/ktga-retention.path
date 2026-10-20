@@ -1,0 +1,10 @@
+[Unit]
+Description=Prune KTGA rollbacks after deployment changes
+
+[Path]
+PathChanged=/var/backups/ktga
+PathChanged=/var/backups/ktga/source-editor
+Unit=ktga-retention.service
+
+[Install]
+WantedBy=multi-user.target

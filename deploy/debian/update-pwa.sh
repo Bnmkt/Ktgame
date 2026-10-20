@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 [[ $EUID -eq 0 && $# -eq 1 ]] || { echo 'Run with sudo and one extracted PWA release directory.' >&2; exit 1; }
 stage=$(realpath -- "$1")
-[[ $stage == /tmp/ktga-pwa-release-* && -d $stage ]] || { echo 'Unexpected release directory.' >&2; exit 1; }
+[[ ( $stage == /var/tmp/ktga-pwa-release-* || $stage == /tmp/ktga-pwa-release-* ) && -d $stage ]] || { echo 'Unexpected release directory.' >&2; exit 1; }
 exec 9>/run/ktga-deployment.lock
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 files=(

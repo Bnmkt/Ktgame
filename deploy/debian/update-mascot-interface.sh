@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 [[ $EUID -eq 0 && $# -eq 1 ]] || { echo 'Run with sudo and one release directory.' >&2; exit 1; }
 stage=$(realpath -- "$1")
-[[ $stage == /tmp/ktga-mascot-release-* && -d $stage ]] || exit 1
+[[ ( $stage == /var/tmp/ktga-mascot-release-* || $stage == /tmp/ktga-mascot-release-* ) && -d $stage ]] || exit 1
 exec 9>/run/ktga-deployment.lock
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 files=(

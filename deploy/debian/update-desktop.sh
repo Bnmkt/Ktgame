@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 [[ $EUID -eq 0 && $# -eq 1 ]] || { echo 'Run with sudo and a release directory.' >&2; exit 1; }
 stage=$(realpath -- "$1")
-[[ $stage == /tmp/ktga-desktop-release-* && -d $stage ]] || exit 1
+[[ ( $stage == /var/tmp/ktga-desktop-release-* || $stage == /tmp/ktga-desktop-release-* ) && -d $stage ]] || exit 1
 files=(server/src/index.js server/src/services/desktop-supervision.js server/src/services/online-presence.js)
 for file in "${files[@]}"; do [[ -f $stage/$file && ! -L $stage/$file ]] || exit 1; done
 exec 9>/run/ktga-deployment.lock

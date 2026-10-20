@@ -39,6 +39,7 @@ install -m 0755 "$REPO/deploy/debian/renew-hook.sh" /etc/letsencrypt/renewal-hoo
 install -m 0644 "$REPO/deploy/debian/ktga-backup.service" /etc/systemd/system/ktga-backup.service
 install -m 0644 "$REPO/deploy/debian/ktga-backup.timer" /etc/systemd/system/ktga-backup.timer
 install -m 0644 "$REPO/deploy/debian/ktga-logrotate.conf" /etc/logrotate.d/ktga
+bash "$REPO/deploy/debian/setup-retention.sh"
 node "$REPO/deploy/debian/nginx-capacity.mjs" --apply
 nginx -t
 systemctl daemon-reload
