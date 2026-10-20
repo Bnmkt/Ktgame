@@ -15,10 +15,16 @@ export function createCommunicationStore(filename, now = Date.now) {
     );
     CREATE INDEX IF NOT EXISTS communication_kind_date ON communication_documents(kind, updated_at DESC);`);
   db.exec("CREATE TABLE IF NOT EXISTS communication_platform_cache(id TEXT PRIMARY KEY, data TEXT NOT NULL)");
+  db.exec("CREATE TABLE IF NOT EXISTS communication_google_cache(cache_key TEXT PRIMARY KEY, data TEXT NOT NULL)");
   const decode = row => row && ({ ...JSON.parse(row.data), id: row.id, revision: row.revision, createdAt: row.created_at, updatedAt: row.updated_at });
   const get = (kind, id) => decode(db.prepare("SELECT * FROM communication_documents WHERE kind=? AND id=?").get(kind, id));
   return {
     get,
+    googleCache: key => { const row = db.prepare("SELECT data FROM communication_google_cache WHERE cache_key=?").get(key); return row ? JSON.parse(row.data) : null; },
+    saveGoogleCache(key, value) {
+      db.prepare("INSERT INTO communication_google_cache VALUES(?,?) ON CONFLICT(cache_key) DO UPDATE SET data=excluded.data").run(key, JSON.stringify(value));
+      db.prepare("DELETE FROM communication_google_cache WHERE json_extract(data,'$.attemptedAt') < ?").run(now() - 90 * 86400000);
+    },
     platformCache: id => { const row = db.prepare("SELECT data FROM communication_platform_cache WHERE id=?").get(id); return row ? JSON.parse(row.data) : null; },
     savePlatformCache: (id, value) => db.prepare("INSERT INTO communication_platform_cache VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data").run(id, JSON.stringify(value)),
     deletePlatformCache: id => db.prepare("DELETE FROM communication_platform_cache WHERE id=?").run(id),

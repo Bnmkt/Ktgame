@@ -87,12 +87,31 @@ export async function pressKitArchive(kit, website, mediaLibrary) {
   return zip.outputStream;
 }
 
-export function registerCommunicationRoutes({ app, auth, requireBackOffice, requireAdmin, store, mediaLibrary, settings, website, games, notes, pages }) {
+export function registerCommunicationRoutes({ app, auth, requireBackOffice, requireAdmin, store, mediaLibrary, settings, website, games, notes, pages, indexNow = () => null, googleInspection }) {
   const catalog = () => publicDestinations({ settings: settings(), website: website(), games: games(), notes: notes(), pages: pages() });
   const heavy = rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false, message: { error: "Attends un instant avant de générer un nouvel export." } });
   const wrap = handler => async (req, res, next) => { res.set("Cache-Control", "private, no-store"); try { await handler(req, res); } catch (error) { if (res.headersSent) return next(error); res.status(error.status || 400).json({ error: error.message }); } };
   app.get("/api/admin/communication", auth, requireBackOffice, wrap((_req, res) => res.json({ kits: store.list("kit"), campaigns: store.list("campaign"), destinations: catalog(), media: Object.fromEntries(mediaLibrary.list().map(({ id, name, image }) => [id, { name, image }])), site: { siteName: settings().siteName, supportEmail: settings().supportEmail, website: website() } })));
-  app.get("/api/admin/communication/seo", auth, requireBackOffice, wrap((_req, res) => res.json({ pages: seoReport(catalog()), sitemap: new URL("sitemap.xml", website().replace(/\/?$/, "/")).href, robots: new URL("robots.txt", website().replace(/\/?$/, "/")).href, checkedAt: new Date().toISOString() })));
+  app.get("/api/admin/communication/seo", auth, requireBackOffice, wrap((_req, res) => {
+    const service = indexNow(); service?.reconcile();
+    const statuses = service?.urlStatuses() ?? {};
+    res.json({
+      pages: seoReport(catalog()).map(page => ({ ...page,
+        indexNow: !page.indexable ? { state: "excluded" } : statuses[page.url] ?? { state: "pending" },
+        google: !page.indexable ? { state: "excluded" } : googleInspection?.view(page.url) ?? { state: "not-configured" }
+      })),
+      google: googleInspection?.configuration() ?? { configured: false, consoleUrl: "https://search.google.com/search-console" },
+      sitemap: new URL("sitemap.xml", website().replace(/\/?$/, "/")).href,
+      robots: new URL("robots.txt", website().replace(/\/?$/, "/")).href, checkedAt: new Date().toISOString()
+    });
+  }));
+  const inspectionLimit = rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false, message: { error: "Trop de vérifications Google. Réessaie dans un instant." } });
+  app.post("/api/admin/communication/google/inspect", auth, requireBackOffice, inspectionLimit, wrap(async (req, res) => {
+    const page = catalog().find(row => row.url === req.body.url && row.indexable && row.status === 200);
+    if (!page) return res.status(400).json({ error: "Choisis une URL publique canonique du site." });
+    if (!googleInspection) return res.status(503).json({ error: "Connecte Google Search Console pour vérifier l’indexation." });
+    res.json({ url: page.url, google: await googleInspection.inspect(page.url) });
+  }));
   for (const [path, kind, normalize] of [["kits", "kit", input => normalizePressKit(input, mediaLibrary)], ["campaigns", "campaign", input => normalizeCampaign(input, website(), catalog())]]) {
     app.post(`/api/admin/communication/${path}`, auth, requireBackOffice, wrap((req, res) => res.status(201).json(store.save(kind, null, normalize(req.body)))));
     app.get(`/api/admin/communication/${path}/:id`, auth, requireBackOffice, wrap((req, res) => { const value = store.get(kind, req.params.id); if (!value) return res.status(404).json({ error: "Document introuvable." }); res.json(value); }));

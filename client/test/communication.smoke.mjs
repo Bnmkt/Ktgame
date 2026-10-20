@@ -13,10 +13,21 @@ const app = express(), store = createCommunicationStore(":memory:");
 const asset = { id: `${"a".repeat(64)}.png`, name: "Mascotte KTGA", image: `/api/media/${"a".repeat(64)}.png`, width: 100, height: 100, mime: "image/png", tags: ["mascottes"], alt: "Mascotte" };
 const mediaLibrary = { list: () => [asset], get: id => id === asset.id ? asset : null };
 app.use(express.json());
-registerCommunicationRoutes({ app, store, mediaLibrary, auth: (_req, _res, next) => next(), requireAdmin: (_req, _res, next) => next(), requireBackOffice: (_req, _res, next) => next(), settings: () => ({ siteName: "KTGA.ME", supportEmail: "contact@example.test" }), website: () => "https://www.ktga.me/", games: () => [{ id: "yahtzee", name: "Yahtzee", description: "Des dés entre amis" }], notes: () => [], pages: () => [] });
+const googleResults = new Map(); let googleConfigured = true;
+const googleInspection = {
+  configuration: () => ({ configured: googleConfigured, consoleUrl: "https://search.google.com/search-console" }),
+  view: url => googleConfigured ? googleResults.get(url) ?? { state: "unknown" } : { state: "not-configured" },
+  inspect: async url => { const result = { state: "indexed", checkedAt: Date.now(), coverageState: "URL indexée" }; googleResults.set(url, result); return result; }
+};
+registerCommunicationRoutes({ app, store, mediaLibrary, auth: (_req, _res, next) => next(), requireAdmin: (_req, _res, next) => next(), requireBackOffice: (_req, _res, next) => next(), settings: () => ({ siteName: "KTGA.ME", supportEmail: "contact@example.test" }), website: () => "https://www.ktga.me/", games: () => [{ id: "yahtzee", name: "Yahtzee", description: "Des dés entre amis" }], notes: () => [], pages: () => [], indexNow: () => indexNow, googleInspection });
 const allow = (_req, _res, next) => next();
 registerPlatformRoutes({ app, store, auth: allow, requireAdmin: allow, requireBackOffice: allow, validateRemote: async () => {}, fetchJson: async () => ({ stats: { views: 1234, votes: 42 }, rating: 4.8 }) });
-const indexNow = createIndexNow({ filename: ":memory:", website: () => "https://www.ktga.me/", catalog: () => [] });
+let statusCode = 202;
+const indexPages = [{ url: "https://www.ktga.me/", status: 200, indexable: true, content: "home" }];
+const indexNow = createIndexNow({ filename: ":memory:", website: () => "https://www.ktga.me/", enabled: true, catalog: () => indexPages, send: async () => new Response(null, { status: statusCode }) });
+indexNow.reconcile(); await indexNow.flush();
+indexPages.push({ ...indexPages[0], url: "https://www.ktga.me/faq" }); statusCode = 200;
+indexNow.reconcile(); await indexNow.flush();
 registerIndexNowRoutes({ app, service: indexNow, auth: allow, requireAdmin: allow, requireBackOffice: allow, website: () => "https://www.ktga.me/" });
 app.get("/api/admin/media", (_req, res) => res.json([asset]));
 app.get("/api/media/:id", (_req, res) => res.type("image/svg+xml").send('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#173e30"/><circle cx="50" cy="50" r="30" fill="#dcb74f"/></svg>'));
@@ -70,10 +81,20 @@ try {
   await page.getByRole("button", { name: "Référencement", exact: true }).click();
   await page.getByRole("link", { name: "https://www.ktga.me/rss.xml", exact: false }).waitFor();
   await page.locator(".comms-seo-list article").first().waitFor();
+  const home = page.locator(".comms-seo-list article").filter({ has: page.locator('.comms-seo-result > a[href="https://www.ktga.me/"]') });
+  await home.getByText("IndexNow En attente", { exact: true }).waitFor();
+  assert.match(await home.getByText("IndexNow En attente", { exact: true }).getAttribute("title"), /HTTP 202/);
+  await home.getByRole("button", { name: "Vérifier sur Google", exact: true }).click();
+  await home.getByText("Google Indexée", { exact: true }).waitFor();
+  await page.locator(".comms-seo-list article").filter({ has: page.locator('.comms-seo-result > a[href="https://www.ktga.me/faq"]') }).getByText("IndexNow OK", { exact: true }).waitFor();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await page.screenshot({ path: fileURLToPath(new URL("seo-mobile.png", output)), fullPage: true });
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.screenshot({ path: fileURLToPath(new URL("seo-desktop.png", output)), fullPage: true });
+  googleConfigured = false;
+  await page.getByRole("button", { name: "Actualiser le bilan", exact: true }).click();
+  await home.getByText("Google À connecter", { exact: true }).waitFor();
+  assert.equal(await home.getByRole("button", { name: "Vérifier sur Google", exact: true }).count(), 0);
   await page.getByRole("heading", { name: "IndexNow", exact: true }).waitFor();
   await page.getByRole("button", { name: "Plateformes", exact: true }).click();
   await page.getByRole("button", { name: "Ajouter une plateforme", exact: true }).click();

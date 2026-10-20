@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import express from "express";
+import { DatabaseSync } from "node:sqlite";
 import { createIndexNow, registerIndexNowRoutes } from "../src/services/indexnow.js";
 import { indexNowCatalog } from "../src/services/indexnow-catalog.js";
 
@@ -15,14 +16,40 @@ test("IndexNow sends only changed canonical pages and persists tombstones and re
   let service = createIndexNow(options);
   try {
     const key = service.key; service.reconcile(); await service.flush(); assert.equal(sends[0].urlList.length, 1); assert.match(sends[0].keyLocation, new RegExp(`${key}\\.txt$`));
+    assert.equal(service.urlStatuses()[rows[0].url].state, "validating");
     service.reconcile(); await service.flush(); assert.equal(sends.length, 1);
-    rows[0].content.text = "Updated"; service.reconcile(); fail = true; await service.flush(); assert.equal(service.status().pending, 1);
+    rows[0].content.text = "Updated"; service.reconcile();
+    assert.equal(service.urlStatuses()[rows[0].url].state, "pending");
+    fail = true; await service.flush(); assert.equal(service.status().pending, 1);
+    assert.equal(service.urlStatuses()[rows[0].url].state, "error");
     await service.flush(); assert.equal(sends.length, 2);
     service.close(); service = createIndexNow(options); assert.equal(service.key, key);
+    assert.equal(service.urlStatuses()[rows[0].url].httpStatus, 429);
     fail = false; time += 120001; await service.flush(); assert.equal(service.status().pending, 0);
     rows = []; service.reconcile(); await service.flush(); assert.equal(sends.at(-1).urlList[0], "https://www.ktga.me/pages/hello");
     service.reconcile(); await service.flush(); assert.equal(service.status().pending, 0);
   } finally { service.close(); await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test("per-URL receipts do not spread another batch's error and migrate legacy submissions honestly", async () => {
+  let rows = [{ url: "https://www.ktga.me/", indexable: true, status: 200, content: "home" }], fail = false;
+  const service = createIndexNow({ filename: ":memory:", website: () => "https://www.ktga.me/", catalog: () => rows, enabled: true, send: async () => new Response(null, { status: fail ? 503 : 200 }) });
+  try {
+    service.reconcile(); await service.flush();
+    rows.push({ ...rows[0], url: "https://www.ktga.me/faq" }); fail = true;
+    service.reconcile(); await service.flush();
+    assert.equal(service.urlStatuses()[rows[0].url].state, "ok");
+    assert.equal(service.urlStatuses()[rows[1].url].state, "error");
+    rows[1].content = "new FAQ"; service.reconcile();
+    assert.equal(service.urlStatuses()[rows[1].url].state, "pending");
+    service.setEnabled(false); assert.equal(service.urlStatuses()[rows[1].url].state, "disabled");
+  } finally { service.close(); }
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ktga-indexnow-legacy-"));
+  const filename = path.join(directory, "old.sqlite"), db = new DatabaseSync(filename);
+  db.exec("CREATE TABLE indexnow_urls(url TEXT PRIMARY KEY,desired TEXT NOT NULL,sent TEXT,changed_at INTEGER NOT NULL); INSERT INTO indexnow_urls VALUES('https://www.ktga.me/','legacy','legacy',1)"); db.close();
+  const migrated = createIndexNow({ filename, website: () => "https://www.ktga.me/", catalog: () => [] });
+  try { assert.equal(migrated.urlStatuses()["https://www.ktga.me/"].state, "sent"); assert.equal(migrated.urlStatuses()["https://www.ktga.me/"].httpStatus, null); }
+  finally { migrated.close(); await fs.rm(directory, { recursive: true, force: true }); }
 });
 test("in-flight acknowledgements never discard a newer pending change", async () => {
   let release, calls = 0; const rows = [{ url: "https://www.ktga.me/", indexable: true, status: 200, content: "first" }];

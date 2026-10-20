@@ -27,6 +27,7 @@ import { registerRssRoute } from "./services/rss.js";
 import { registerPlatformRoutes } from "./services/platforms.js";
 import { createIndexNow, registerIndexNowRoutes } from "./services/indexnow.js";
 import { indexNowCatalog } from "./services/indexnow-catalog.js";
+import { createGoogleInspection } from "./services/google-inspection.js";
 import { registerPublicPages } from "./services/public-pages.js";
 import { registrationAuthorization } from "./services/parental-approval.js";
 import { activeModeration, activeParentalRevocation, createParentalControlStore, defaultMinorRestrictions, exactAge, featureAccess, isUnder13, minorRestrictionOptions, normalizeMinorRestrictions, registrationMarker, turnsThirteenAt } from "./services/parental-controls.js";
@@ -5220,7 +5221,8 @@ const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requir
 registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });
 registerThemeRoutes({ app, auth, requireAdmin, readDb, updateDb, settings: platformSettings, mediaLibrary });
 const communication = createCommunicationStore(`${databaseFilename}.communication.sqlite`);
-registerCommunicationRoutes({ app, auth, requireAdmin, requireBackOffice, store: communication, mediaLibrary, settings: platformSettings, website: publicWebsiteUrl, games: configuredGames, notes: () => patchnotes.list(), pages: () => customPages.list(true) });
+const googleInspection = createGoogleInspection({ store: communication, website: publicWebsiteUrl });
+registerCommunicationRoutes({ app, auth, requireAdmin, requireBackOffice, store: communication, mediaLibrary, settings: platformSettings, website: publicWebsiteUrl, games: configuredGames, notes: () => patchnotes.list(), pages: () => customPages.list(true), indexNow: () => indexNow, googleInspection });
 registerRssRoute({ app, notes: () => patchnotes.list(), website: publicWebsiteUrl, settings: platformSettings });
 registerPlatformRoutes({ app, auth, requireAdmin, requireBackOffice, store: communication });
 indexNow = createIndexNow({ filename: `${databaseFilename}.indexnow.sqlite`, website: publicWebsiteUrl, enabled: process.env.NODE_ENV === "production", catalog: () => indexNowCatalog({ settings: platformSettings, games: configuredGames, notes: version => version ? patchnotes.get(version) : patchnotes.list(), pages: () => customPages.list(true), page: slug => customPages.published(slug), help: () => playerHelp.read(true), website: publicWebsiteUrl }) });
