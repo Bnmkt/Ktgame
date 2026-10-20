@@ -8,6 +8,20 @@ export function variableLines(fields) {
   }).join("\n");
 }
 
+export function pageVariableLines(fields, values = {}) {
+  return variableLines(fields.map(field => ({ ...field, defaultValue: values[field.key] ?? field.defaultValue })));
+}
+
+export function applyPageVariableLines(source, fields, values = {}) {
+  const keys = new Set(fields.map(field => field.key));
+  const converted = applyVariableLines(source, fields);
+  for (const field of converted) if (!keys.has(field.key)) throw new Error(`Variable inconnue : ${field.key}`);
+  const provided = new Set(source.split(/\r?\n/).filter(line => line.trim()).map(line => line.match(/^\s*\{([^}]+)\}/)[1]));
+  const result = { ...values };
+  for (const field of converted) if (provided.has(field.key)) result[field.key] = field.defaultValue;
+  return result;
+}
+
 export function applyVariableLines(source, fields = []) {
   const updates = new Map(), existing = new Map(fields.map(field => [field.key, field]));
   for (const [index, line] of source.split(/\r?\n/).entries()) {

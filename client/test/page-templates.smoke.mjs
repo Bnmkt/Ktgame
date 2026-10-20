@@ -56,8 +56,14 @@ try {
   await page.getByRole("button", { name: "Créer une page", exact: true }).click();
   await page.getByLabel("Titre", { exact: true }).fill("La salle des joueurs");
   await page.getByRole("button", { name: "Variables", exact: true }).click();
-  await page.getByLabel("Titre principal", { exact: false }).fill("Bienvenue au club");
-  await page.getByLabel("Introduction", { exact: false }).fill("Une soirée entre amis.");
+  await bulk.fill("{headline} : Bienvenue au club\n{intro} : Une soirée entre amis.");
+  assert.ok(await page.getByRole("button", { name: "Publier", exact: true }).isDisabled());
+  await page.getByRole("button", { name: "Contenu", exact: true }).click();
+  assert.ok(await page.getByRole("button", { name: "Publier", exact: true }).isDisabled());
+  await page.getByRole("button", { name: "Variables", exact: true }).click();
+  assert.match(await bulk.inputValue(), /Bienvenue au club/);
+  await page.getByRole("button", { name: "Ajouter / mettre à jour", exact: true }).click();
+  assert.equal(store.listTemplates(true)[0].variables[0].defaultValue, "Bienvenue");
   await page.waitForFunction(() => document.querySelector(".custom-pages-preview .custom-page-runtime")?.dataset.headline === "Bienvenue au club");
   await page.getByRole("button", { name: "Publier", exact: true }).click();
   await page.getByText("Page publiée.", { exact: true }).waitFor();
