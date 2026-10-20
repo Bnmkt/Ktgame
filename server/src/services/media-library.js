@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import express from "express";
 import { sanitizeBugImage } from "./bug-images.js";
+import { initialMediaTags, normalizeMediaTags } from "./media-tags.js";
 
 const filePattern = /^[a-f0-9]{64}\.(png|jpg|webp|gif)$/;
 export const DEFAULT_MEDIA_UPLOAD_MB = 3;
@@ -69,6 +70,8 @@ export async function createMediaLibrary(directory, { uploadLimit = () => DEFAUL
   try { rows = JSON.parse(await fs.readFile(filename, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; rows = []; }
   let queue = Promise.resolve();
   const change = operation => { const task = queue.then(async () => { const next = structuredClone(rows), result = await operation(next); const temporary = `${filename}.${randomUUID()}.tmp`; await fs.writeFile(temporary, JSON.stringify(next), { mode: 0o640 }); await fs.rename(temporary, filename); rows = next; return result; }); queue = task.catch(() => {}); return task; };
+  // Seed legacy entries once; an intentionally emptied tag list stays empty.
+  if (rows.some(row => !Array.isArray(row.tags))) await change(next => { for (const row of next) if (!Array.isArray(row.tags)) row.tags = initialMediaTags(row); });
   return {
     list: () => rows.filter(row => !row.archived),
     get: id => rows.find(row => row.id === id),
@@ -79,11 +82,19 @@ export async function createMediaLibrary(directory, { uploadLimit = () => DEFAUL
       if (!row) {
         if (next.length >= 2000 || next.reduce((sum, entry) => sum + entry.bytes, 0) + image.data.length > 200 * 1024 * 1024) throw new Error("La médiathèque est pleine.");
         await fs.writeFile(path.join(directory, id), image.data, { mode: 0o640, flag: "wx" }).catch(error => { if (error.code !== "EEXIST") throw error; });
-        row = { id, image: `/api/media/${id}`, mime: image.mime, width: image.width, height: image.height, bytes: image.data.length, name: String(name || "Image").slice(0, 120), alt: "", createdAt: new Date().toISOString(), createdBy: actor }; next.unshift(row);
+        row = { id, image: `/api/media/${id}`, mime: image.mime, width: image.width, height: image.height, bytes: image.data.length, name: String(name || "Image").slice(0, 120), alt: "", createdAt: new Date().toISOString(), createdBy: actor };
+        row.tags = initialMediaTags(row); next.unshift(row);
       }
       row.archived = false; return row;
     }),
-    update: (id, input) => change(next => { const row = next.find(entry => entry.id === id); if (!row) throw new Error("Image introuvable."); for (const key of ["name", "alt"]) if (typeof input[key] === "string") row[key] = input[key].trim().slice(0, key === "name" ? 120 : 300); if (typeof input.archived === "boolean") row.archived = input.archived; return row; })
+    update: (id, input) => change(next => { const row = next.find(entry => entry.id === id); if (!row) throw new Error("Image introuvable."); for (const key of ["name", "alt"]) if (typeof input[key] === "string") row[key] = input[key].trim().slice(0, key === "name" ? 120 : 300); if (input.tags !== undefined) row.tags = normalizeMediaTags(input.tags); if (typeof input.archived === "boolean") row.archived = input.archived; return row; }),
+    tagMany: ({ ids, tags, operation }) => change(next => {
+      if (!Array.isArray(ids) || !ids.length || ids.length > 200 || ids.some(id => !filePattern.test(id)) || !["add", "remove", "replace"].includes(operation)) throw new Error("Sélectionne de 1 à 200 images et une opération valide.");
+      const normalized = normalizeMediaTags(tags), targets = [...new Set(ids)].map(id => next.find(row => row.id === id && !row.archived));
+      if (targets.some(row => !row)) throw new Error("Une image sélectionnée n’est plus disponible. Actualise la médiathèque.");
+      for (const row of targets) row.tags = normalizeMediaTags(operation === "replace" ? normalized : operation === "add" ? [...new Set([...row.tags, ...normalized])] : row.tags.filter(tag => !normalized.includes(tag)));
+      return targets;
+    })
   };
 }
 
@@ -100,6 +111,9 @@ export async function registerMediaRoutes({ app, auth, requireAdmin, requireBack
     });
   }, async (req, res) => {
     try { res.status(201).json(await store.save(req.body, req.get("Content-Type")?.split(";")[0], req.query.name, req.auth.id)); } catch (error) { res.status(400).json({ error: error.message }); }
+  });
+  app.patch("/api/admin/media/tags", auth, requireBackOffice, async (req, res) => {
+    try { res.json({ updated: await store.tagMany(req.body) }); } catch (error) { res.status(400).json({ error: error.message }); }
   });
   app.patch("/api/admin/media/:id", auth, requireBackOffice, async (req, res) => {
     if (req.body.archived !== undefined && !req.backOfficeUser?.admin) return res.status(403).json({ error: "Accès administrateur requis." });
