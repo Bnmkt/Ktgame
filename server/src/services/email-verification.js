@@ -248,12 +248,19 @@ export async function sendPasswordReset({ user, token, siteName }, environment =
   });
 }
 
-export async function sendMfaCode({ user, code, siteName }, environment = process.env) {
+export async function sendMfaCode({ user, code, siteName, purpose = "login" }, environment = process.env) {
   const displayName = user.profile?.displayName || user.pseudo || "joueur";
   const casinoName = siteName || "KTGA.ME";
   const name = escapeHtml(displayName);
   const casino = escapeHtml(casinoName);
   const safeCode = escapeHtml(String(code));
+  const passkeyAction = purpose === "passkey-register" ? "l’ajout d’une passkey" : purpose === "passkey-delete" ? "la suppression d’une passkey" : "";
+  if (passkeyAction) {
+    return mailTransport(environment).sendMail({ from: environment.EMAIL_FROM, to: user.email,
+      subject: `Confirme ${passkeyAction} sur ${casinoName}`,
+      text: `Bonjour ${displayName},\n\nTon code pour confirmer ${passkeyAction} sur ${casinoName} est ${code}. Il expire dans 5 minutes. Ne le communique à personne. Si tu n’as pas demandé cette modification de sécurité, ne valide pas la demande et contacte le support.`,
+      html: `<div style="padding:28px 16px;background:#080d0c;font-family:Arial,sans-serif;color:#f7ecd2"><div style="max-width:560px;margin:auto;padding:28px;background:#121918;border:1px solid #66552d;border-radius:8px"><h1 style="font-size:24px;color:#f4d675">Confirme ${passkeyAction}</h1><p style="line-height:1.6">Bonjour ${name}, ce code autorise uniquement ${passkeyAction} sur <strong>${casino}</strong>.</p><div style="padding:18px;text-align:center;background:#0b1110;color:#f4d675;font:800 32px monospace;letter-spacing:6px">${safeCode}</div><p style="line-height:1.6;color:#cfc5ad">Il expire dans 5 minutes. Ne le communique à personne. Si tu n’as pas demandé cette modification de sécurité, ne valide pas la demande et contacte le support.</p></div></div>` });
+  }
   await mailTransport(environment).sendMail({
     from: environment.EMAIL_FROM,
     to: user.email,

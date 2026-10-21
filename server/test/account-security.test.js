@@ -7,6 +7,7 @@ import {
   decryptTotpSecret,
   encryptTotpSecret,
   lockDurationMinutes,
+  mfaSummary,
   passwordPolicyError,
   recordAuthFailure,
   resetAuthFailures,
@@ -14,6 +15,13 @@ import {
   verifyTotp,
   verifyUserMfa
 } from "../src/services/account-security.js";
+
+test("passkeys preserve optional password MFA while satisfying mandatory administrator protection", () => {
+  assert.equal(mfaSummary({ passkeyCount: 1 }).enabled, false);
+  assert.equal(mfaSummary({ passkeyCount: 1 }).passkeyEnabled, true);
+  assert.equal(mfaSummary({ admin: true, passkeyCount: 1 }).required, true);
+  assert.equal(mfaSummary({ admin: true, passkeyCount: 1 }).enabled, true);
+});
 
 test("les paliers de verrouillage suivent 3/1, 5/15, 10/60 et 15/1440", () => {
   assert.equal(lockDurationMinutes(2), 0);

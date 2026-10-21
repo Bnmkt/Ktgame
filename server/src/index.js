@@ -21,6 +21,7 @@ import { createDiscordPresence, registerDiscordPresence } from "./services/disco
 import { normalizeLobbyNotice, updateLobbyNotice } from "./services/lobby-notice.js";
 import { normalizeTheme } from "../../client/src/features/theme/config.js";
 import { registerThemeRoutes } from "./services/site-themes.js";
+import { registerPasskeyRoutes } from "./services/passkeys.js";
 import { createCommunicationStore } from "./services/communication-store.js";
 import { registerCommunicationRoutes } from "./services/communication.js";
 import { registerRssRoute } from "./services/rss.js";
@@ -2633,7 +2634,7 @@ app.post("/api/auth/register", async (req, res) => {
   res.status(201).json({ token, user: sanitizeUser(result.user), verificationSent: Boolean(result.verificationToken) });
 });
 
-async function beginAccountLogin(req, res, db, user, method, failureKey, { verifiedActivity = false } = {}) {
+async function beginAccountLogin(req, res, db, user, method, failureKey, { verifiedActivity = false, verifiedPasskey = false } = {}) {
   if (req.headers.origin === discordActivityOrigin() && !discordAgeAllowed(user)) return res.status(403).json({ error: "La connexion Discord est réservée aux comptes de 13 ans et plus avec une date de naissance renseignée." });
   if (user.active === false) return res.status(403).json({ error: "Ce compte est désactivé." });
   const moderation = activeModeration(user);
@@ -2664,16 +2665,18 @@ async function beginAccountLogin(req, res, db, user, method, failureKey, { verif
     }
     return res.status(403).json({ code: "PASSWORD_UPGRADE_REQUIRED", email: maskedEmail(user.email), error: "Ce compte utilise une ancienne politique de mot de passe. Un lien de renouvellement a été envoyé." });
   }
+  user.passkeyCount = passkeys.count(user.id);
   const summary = mfaSummary(user);
-  // Only the server-verified embedded OAuth exchange can waive KTGA's second step.
+  // Trusted Activity OAuth and user-verified WebAuthn satisfy the second step server-side.
   const activitySignIn = verifiedActivity && method === "discord" && req.headers.origin === discordActivityOrigin();
-  if (summary.enabled && !activitySignIn) {
+  const passkeySignIn = verifiedPasskey && method === "passkey";
+  if (summary.enabled && !activitySignIn && !passkeySignIn) {
     const emailAvailable = validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured() && (user.admin || summary.emailEnabled);
     let challenge;
     try { challenge = createMfaChallenge(user, authFingerprint(req), emailAvailable, Date.now(), method); }
     catch { return res.status(503).json({ code: "MFA_METHOD_UNAVAILABLE", error: "Aucune méthode de double authentification n’est utilisable. Contacte l’administration." }); }
     let emailCodeSent = false;
-    if (!summary.totpEnabled && challenge.methods.includes("email")) {
+    if (!summary.totpEnabled && !summary.passkeyEnabled && challenge.methods.includes("email")) {
       const issued = issueMfaEmailCode(challenge.id, authFingerprint(req), JWT_SECRET);
       try {
         await sendMfaCode({ user, code: issued.code, siteName: settings.siteName });
@@ -2713,6 +2716,15 @@ app.post("/api/auth/login", async (req, res) => {
   }
   return beginAccountLogin(req, res, db, user, "password", failureKey);
 });
+
+const passkeys = registerPasskeyRoutes({ app, auth, filename: `${databaseFilename}.passkeys.sqlite`, readDb, writeDb,
+  website: publicWebsiteUrl, siteName: () => platformSettings().siteName, bcrypt, secret: JWT_SECRET,
+  fingerprint: authFingerprint, requestCookie, beginAccountLogin, sendAuthLocked, cookiePath: APP_BASE_PATH || "/",
+  secureCookies: NODE_ENV === "production" || Boolean(HTTPS_KEY_PATH || HTTPS_PFX_PATH),
+  emailAvailable: user => validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured(),
+  sendCode: (user, code, purpose) => sendMfaCode({ user, code, siteName: platformSettings().siteName, purpose: `passkey-${purpose}` })
+});
+process.on("exit", () => passkeys.close());
 
 registerDiscordRoutes({ app, auth, platformSettings, readDb, sanitizeUser, bcrypt, isUnder13, requestCookie,
   publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, recordAuthFailure, sendAuthLocked, writeDb,
@@ -2847,7 +2859,7 @@ app.get("/api/me/security", auth, (req, res) => {
   if (req.auth.guest) return res.status(400).json({ error: "Les invités ne disposent pas de réglages de sécurité." });
   const user = readDb().users.find((entry) => entry.id === req.auth.id);
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
-  res.json({ ...mfaSummary(user), emailVerified: Boolean(user.emailVerifiedAt), email: maskedEmail(user.email), emailAvailable: validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured() });
+  res.json({ ...mfaSummary({ ...user, passkeyCount: passkeys.count(user.id) }), emailVerified: Boolean(user.emailVerifiedAt), email: maskedEmail(user.email), emailAvailable: validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured() });
 });
 
 app.post("/api/me/security/totp/setup", auth, (req, res) => {
@@ -2876,7 +2888,7 @@ app.patch("/api/me/security/email", auth, (req, res) => {
     const user = db.users.find((entry) => entry.id === req.auth.id && !entry.guest);
     if (!user) return null;
     if (enabled && (!validEmail(user.email) || !user.emailVerifiedAt || !emailDeliveryConfigured())) return "unavailable";
-    if (!enabled && user.admin && !user.mfa?.totpSecret) return "admin-required";
+    if (!enabled && user.admin && !user.mfa?.totpSecret && !passkeys.count(user.id)) return "admin-required";
     user.mfa ??= {};
     user.mfa.emailEnabled = enabled;
     if (!enabled && !user.mfa.totpSecret) delete user.mfa;
@@ -2895,7 +2907,7 @@ app.delete("/api/me/security/totp", auth, (req, res) => {
     if (!user.mfa?.totpSecret) return "disabled";
     if (!verifyUserMfa(user, String(req.body.method ?? "totp"), req.body.code, JWT_SECRET, Date.now(), false)) return "invalid";
     const emailAvailable = validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured();
-    if (user.admin && !(emailAvailable && user.mfa.emailEnabled)) return "admin-required";
+    if (user.admin && !(emailAvailable && user.mfa.emailEnabled) && !passkeys.count(user.id)) return "admin-required";
     disableTotp(user);
     return user;
   });
@@ -2953,7 +2965,7 @@ registerDataRequestRoutes({ app, auth, requireAdmin, store: dataRequests, readDb
   logs: path.resolve(process.env.REQUEST_LOG_PATH || path.join(__dirname, "..", "data", "request-logs.sqlite")),
   notes: path.resolve(process.env.PATCHNOTES_DB_PATH || path.join(__dirname, "..", "data", "patchnotes.sqlite")),
   noteImages: path.resolve(process.env.PATCHNOTES_UPLOAD_DIR || path.join(__dirname, "..", "data", "patchnote-images")),
-  help: helpFilename, requests: dataRequestFilename
+  help: helpFilename, requests: dataRequestFilename, passkeys: `${databaseFilename}.passkeys.sqlite`
 }, notifyContact: (key, notice) => contactNotices.enqueue(key, notice) });
 
 app.get("/api/me", auth, (req, res) => {
@@ -5214,6 +5226,7 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
   if (result === "last-admin") return res.status(409).json({ error: "Le dernier administrateur du casino ne peut pas être supprimé." });
   if (result === "active-room") return res.status(409).json({ error: "Ce joueur est encore présent dans une table active. Exclue-le ou ferme la table avant de supprimer son compte." });
   if (result === "deleted") {
+    passkeys.deleteForUser(req.params.id);
     parentalControls.deleteForUser(req.params.id);
     tribunal.deleteForUser(req.params.id);
     chat.deleteForUser(req.params.id);

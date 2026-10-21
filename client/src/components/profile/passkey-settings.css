@@ -1,0 +1,17 @@
+.passkey-settings { min-width: 0; border-top: 1px solid var(--site-border, #514b38); padding-top: 20px; }
+.passkey-settings > header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.passkey-settings > header > svg { color: var(--site-primary, #e8c777); flex-shrink: 0; }
+.passkey-settings > header > div { flex: 1; min-width: 0; }
+.passkey-settings h3 { font-size: 17px; margin: 0 0 3px; }
+.passkey-settings header span, .passkey-caption, .passkey-entry small { color: var(--site-muted, #b8ae99); font-size: 12px; line-height: 1.6; }
+.passkey-entry { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--site-border, #514b38); }
+.passkey-entry > svg { color: var(--site-secondary, #69d5aa); flex-shrink: 0; }
+.passkey-entry > div:first-of-type { display: grid; gap: 3px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.passkey-entry-tools { display: flex; gap: 6px; flex-shrink: 0; }
+.passkey-entry-tools button { width: 36px; height: 36px; padding: 6px; }
+.passkey-dialog { max-width: 520px; }
+.passkey-dialog .segmented-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.passkey-dialog .segmented-tabs button { flex: 1; }
+.passkey-dialog .actions { justify-content: flex-end; }
+.auth-passkey-button { justify-content: center; min-height: 46px; width: 100%; }
+@media (max-width: 420px) { .passkey-entry { flex-wrap: wrap; } .passkey-entry-tools { margin-left: auto; } .passkey-dialog .actions > button { flex: 1; } }

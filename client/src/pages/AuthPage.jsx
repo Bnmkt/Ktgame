@@ -1,6 +1,6 @@
 import { useLocale } from "../locales/LocaleProvider.jsx";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Clock3, DoorOpen, Gamepad2, KeyRound, Landmark, Link, LogIn, MailCheck, RefreshCw, ShieldAlert, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Check, Clock3, DoorOpen, Fingerprint, Gamepad2, KeyRound, Landmark, Link, LogIn, MailCheck, RefreshCw, ShieldAlert, UserPlus, X } from "lucide-react";
 import { api, setToken } from "../api.js";
 import { CosmeticIcon } from "../components/cosmetics/Cosmetics.jsx";
 import { siteMarkSource } from "../features/site-branding.js";
@@ -11,6 +11,8 @@ import { Dialog } from "../components/common/Dialog.jsx";
 import { PasswordField } from "../components/common/PasswordField.jsx";
 import { startDiscordLogin } from "../features/accounts/discord-login.js";
 import { isDiscordActivityLocation } from "../features/discord/context.js";
+import { loginWithPasskey, passkeyError, preferredMfaMethod, supportsPasskeys } from "../features/accounts/passkeys.js";
+import "../components/profile/passkey-settings.css";
 import "../components/profile/account-connections.css";
 import { Mascot } from "../components/mascots/Mascot.jsx";
 import "./auth-experience.css";
@@ -67,9 +69,21 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
   const [restrictedAccess, setRestrictedAccess] = useState(null);
   const [mfa, setMfa] = useState(null);
   const [mfaCode, setMfaCode] = useState("");
+  const [passkeyAvailable, setPasskeyAvailable] = useState(false);
+  useEffect(() => { setPasskeyAvailable(supportsPasskeys()); }, []);
+  async function connectPasskey() {
+    setBusy("passkey"); setError("");
+    try {
+      const result = await loginWithPasskey();
+      setToken(result.token); onAuth(result.user);
+    } catch (failure) {
+      if (["HARD_BAN", "PARENTAL_ACCESS_REVOKED"].includes(failure.code)) setRestrictedAccess({ code: failure.code, reason: failure.data?.reason || failure.message, endsAt: failure.data?.endsAt || "" });
+      else setError(passkeyError(failure));
+    } finally { setBusy(""); }
+  }
   useEffect(() => {
     if (discordResult?.mfaRequired) {
-      setMfa({ ...discordResult, method: discordResult.methods.includes("totp") ? "totp" : discordResult.methods[0] });
+      setMfa({ ...discordResult, method: preferredMfaMethod(discordResult.methods) });
       setMfaCode(""); setMode("mfa");
     } else if (discordResult?.error) {
       const err = discordResult.error;
@@ -82,7 +96,7 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
     try {
       const result = await startDiscordLogin(pendingRoomCode);
       if (!result) return;
-      if (result.mfaRequired) { setMfa({ ...result, method: result.methods.includes("totp") ? "totp" : result.methods[0] }); setMfaCode(""); setMode("mfa"); }
+      if (result.mfaRequired) { setMfa({ ...result, method: preferredMfaMethod(result.methods) }); setMfaCode(""); setMode("mfa"); }
       else { setToken(result.token); onAuth(result.user); }
       setBusy("");
     }
@@ -139,7 +153,7 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
         return;
       }
       if (data.mfaRequired) {
-        const preferredMethod = data.methods.includes("totp") ? "totp" : data.methods[0];
+        const preferredMethod = preferredMfaMethod(data.methods);
         setMfa({ ...data, method: preferredMethod, login: login.identifier });
         setMfaCode("");
         setMode("mfa");
@@ -165,12 +179,12 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
     setBusy("mfa");
     setError("");
     try {
-      const result = await api("/api/auth/mfa/verify", { method: "POST", body: JSON.stringify({ challengeId: mfa.challengeId, method: mfa.method, code: mfaCode, login: mfa.login }) });
+      const result = mfa.method === "passkey" ? await loginWithPasskey(mfa.challengeId) : await api("/api/auth/mfa/verify", { method: "POST", body: JSON.stringify({ challengeId: mfa.challengeId, method: mfa.method, code: mfaCode, login: mfa.login }) });
       setToken(result.token);
       setMfa(null);
       setMfaCode("");
       onAuth(result.user);
-    } catch (requestError) { setError(requestError.message); }
+    } catch (requestError) { setError(passkeyError(requestError)); }
     finally { setBusy(""); }
   }
 
@@ -279,8 +293,18 @@ export function Auth({ onAuth, onClearSession, onRecoveryComplete, currentUser, 
       {verification && <VerificationNotice value={verification} pending={busy === "resend"} onResend={resendVerification} canResend={verification.type === "pending" && Boolean(pendingEmail)} />}
       {mode === "login" && settings.discordLoginAvailable && <button type="button" className={`${activity ? "" : "secondary "}account-link-entry`} disabled={Boolean(busy)} onClick={connectDiscord}><LogIn size={18} />{busy === "discord" ? localeText("Connexion…") : localeText("Se connecter avec Discord")}</button>}
       {mode === "login" && activity && <button type="button" className="secondary" aria-expanded={emailOpen} onClick={() => setEmailOpen(value => !value)}>{localeText(emailOpen ? "Masquer les autres connexions" : "Autre méthode de connexion")}</button>}
+      {mode === "login" && passkeyAvailable && <button type="button" className="secondary auth-passkey-button" disabled={Boolean(busy)} onClick={connectPasskey}><Fingerprint size={20}/>{localeText(busy === "passkey" ? "Vérification…" : "Se connecter avec une passkey")}</button>}
       {mode === "login" && (!activity || emailOpen) && <form className="form-stack" onSubmit={(event) => { event.preventDefault(); submit("login"); }}><label>{localeText("Adresse email")}<input required autoComplete="username" value={login.identifier} onChange={(event) => setLogin({ ...login, identifier: event.target.value })} placeholder={localeText("nom@exemple.be")} /></label><small className="legacy-login-hint">{localeText("Ancien compte sans email ? Utilise une dernière fois ton ancien identifiant.")}</small><PasswordField label={localeText("Mot de passe")} required autoComplete="current-password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} placeholder={localeText("Votre mot de passe")} /><button type="submit" disabled={busy === "login"}>{busy === "login" ? localeText("Connexion…") : localeText("Se connecter")}</button><button type="button" className="secondary" onClick={() => { setError(""); setVerification(null); setRecoveryEmail(login.identifier.includes("@") ? login.identifier : ""); setMode("forgot-password"); }}><KeyRound size={17} />{" " + localeText("Mot de passe oublié ?")}</button></form>}
-      {mode === "mfa" && mfa && <form className="form-stack auth-mfa" onSubmit={verifyMfa}><div className="account-setup-heading"><ShieldAlert size={25} /><div><span className="eyebrow">{localeText("Connexion sécurisée")}</span><h2>{localeText("Deuxième étape")}</h2></div></div><p className="account-setup-copy">{localeText("Confirme cette connexion avec une méthode associée à ton compte.")}</p>{mfa.methods.length > 1 && <div className="segmented-tabs mfa-methods">{mfa.methods.map((method) => <button key={method} type="button" className={mfa.method === method ? "active" : ""} onClick={() => { setMfa({ ...mfa, method }); setMfaCode(""); }}>{method === "totp" ? localeText("Application") : method === "email" ? localeText("Email") : localeText("Code de secours")}</button>)}</div>}<label>{mfa.method === "recovery" ? localeText("Code de secours") : localeText("Code à 6 chiffres")}<input required autoFocus inputMode={mfa.method === "recovery" ? "text" : "numeric"} autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} placeholder={mfa.method === "recovery" ? localeText("XXXXXX-XXXXXX") : "000000"} /></label>{mfa.method === "email" && <><small>{localeText("Le code est envoyé à") + " "}{mfa.email || localeText("l’adresse vérifiée du compte")}{" " + localeText("et expire avec cette tentative.")}</small><button type="button" className="secondary" disabled={busy === "mfa-email"} onClick={sendMfaEmail}><RefreshCw size={17} />{busy === "mfa-email" ? localeText("Envoi…") : mfa.emailCodeSent ? localeText("Renvoyer le code") : localeText("Envoyer le code")}</button></>}<button type="submit" disabled={busy === "mfa" || !mfaCode.trim()}>{busy === "mfa" ? localeText("Vérification…") : localeText("Confirmer la connexion")}</button><button type="button" className="secondary" onClick={() => { setMfa(null); setMfaCode(""); setError(""); setMode("login"); }}>{localeText("Annuler")}</button></form>}
+      {mode === "mfa" && mfa && <form className="form-stack auth-mfa" onSubmit={verifyMfa}>
+        <div className="account-setup-heading"><ShieldAlert size={25}/><div><span className="eyebrow">{localeText("Connexion sécurisée")}</span><h2>{localeText("Deuxième étape")}</h2></div></div>
+        <p className="account-setup-copy">{localeText("Confirme cette connexion avec une méthode associée à ton compte.")}</p>
+        {mfa.methods.length > 1 && <div className="segmented-tabs mfa-methods">{mfa.methods.map(method => <button key={method} type="button" disabled={Boolean(busy)} className={mfa.method === method ? "active" : ""} onClick={() => { setMfa({ ...mfa, method }); setMfaCode(""); }}>{localeText(method === "passkey" ? "Passkey" : method === "totp" ? "Application" : method === "email" ? "Email" : "Code de secours")}</button>)}</div>}
+        {mfa.method !== "passkey" && <label>{localeText(mfa.method === "recovery" ? "Code de secours" : "Code à 6 chiffres")}<input required autoFocus inputMode={mfa.method === "recovery" ? "text" : "numeric"} autoComplete="one-time-code" value={mfaCode} onChange={event => setMfaCode(event.target.value)} placeholder={mfa.method === "recovery" ? localeText("XXXXXX-XXXXXX") : "000000"}/></label>}
+        {mfa.method === "email" && <><small>{localeText("Le code est envoyé à") + " "}{mfa.email || localeText("l’adresse vérifiée du compte")}{" " + localeText("et expire avec cette tentative.")}</small><button type="button" className="secondary" disabled={Boolean(busy)} onClick={sendMfaEmail}><RefreshCw size={17}/>{localeText(busy === "mfa-email" ? "Envoi…" : mfa.emailCodeSent ? "Renvoyer le code" : "Envoyer le code")}</button></>}
+        {mfa.method === "passkey" && !passkeyAvailable && <p>{localeText("Ouvre KTGA dans un navigateur compatible pour utiliser une passkey.")}</p>}
+        <button type="submit" disabled={Boolean(busy) || (mfa.method === "passkey" ? !passkeyAvailable : !mfaCode.trim())}>{mfa.method === "passkey" && <Fingerprint size={20}/>} {localeText(busy === "mfa" ? "Vérification…" : mfa.method === "passkey" ? "Valider avec une passkey" : "Confirmer la connexion")}</button>
+        <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => { setMfa(null); setMfaCode(""); setError(""); setMode("login"); }}>{localeText("Annuler")}</button>
+      </form>}
       {mode === "forgot-password" && <form className="form-stack" onSubmit={requestPasswordReset}><div className="account-setup-heading"><KeyRound size={25} /><div><span className="eyebrow">{localeText("Récupération du compte")}</span><h2>{localeText("Mot de passe oublié")}</h2></div></div><p className="account-setup-copy">{localeText("Saisis l’adresse email du compte. Un lien valable 30 minutes te permettra de choisir un nouveau mot de passe.")}</p><label>{localeText("Adresse email")}<input required type="email" autoComplete="email" value={recoveryEmail} onChange={(event) => setRecoveryEmail(event.target.value)} placeholder={localeText("nom@exemple.be")} /></label><button type="submit" disabled={busy === "password-reset-request"}><MailCheck size={17} />{busy === "password-reset-request" ? localeText("Envoi…") : localeText("Envoyer le lien")}</button><button type="button" className="secondary" onClick={() => { setError(""); setMode("login"); }}>{localeText("Retour à la connexion")}</button></form>}
       {mode === "reset-password" && <form className="form-stack" onSubmit={completePasswordReset}><div className="account-setup-heading"><KeyRound size={25} /><div><span className="eyebrow">{localeText("Récupération du compte")}</span><h2>{localeText("Nouveau mot de passe")}</h2></div></div><PasswordField label={localeText("Nouveau mot de passe")} required minLength={10} maxLength={128} autoComplete="new-password" value={resetPassword.password} onChange={(event) => setResetPassword({ ...resetPassword, password: event.target.value })} placeholder={localeText("10 caractères, lettre, chiffre, majuscule et symbole")} /><PasswordField label={localeText("Confirmer le mot de passe")} required minLength={10} maxLength={128} autoComplete="new-password" value={resetPassword.confirm} onChange={(event) => setResetPassword({ ...resetPassword, confirm: event.target.value })} feedback={resetPassword.confirm ? { matches: resetPassword.password === resetPassword.confirm } : null} placeholder={localeText("Saisissez à nouveau le mot de passe")} /><button type="submit" disabled={busy === "password-reset" || !resetPassword.confirm || resetPassword.password !== resetPassword.confirm}>{busy === "password-reset" ? localeText("Modification…") : localeText("Modifier le mot de passe")}</button></form>}
       {mode === "register" && <form className="form-stack" onSubmit={(event) => { event.preventDefault(); submit("register"); }}><label>{localeText("Adresse email")}<input required type="email" autoComplete="email" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} placeholder={localeText("nom@exemple.be")} /></label><label>{localeText("Pseudo en jeu")}<input required autoComplete="nickname" minLength="3" maxLength="32" value={register.pseudo} onChange={(event) => setRegister({ ...register, pseudo: event.target.value })} placeholder={localeText("Nom affiché sur ta member card")} /></label><EnrollmentFields value={register} onChange={setRegister} /><PasswordField label={localeText("Mot de passe")} blockClipboard required autoComplete="new-password" minLength={10} maxLength={128} value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} placeholder={localeText("Choisis un mot de passe sécurisé")} /><PasswordRequirements value={register.password} /><PasswordField label={localeText("Confirmer le mot de passe")} blockClipboard required autoComplete="new-password" minLength={10} maxLength={128} value={register.passwordConfirm} onChange={(event) => setRegister({ ...register, passwordConfirm: event.target.value })} feedback={register.passwordConfirm ? { matches: register.password === register.passwordConfirm } : null} placeholder={localeText("Saisissez à nouveau le mot de passe")} /><button type="submit" disabled={busy === "register" || !registrationPasswordReady || !register.passwordConfirm || register.password !== register.passwordConfirm}>{busy === "register" ? localeText("Création…") : localeText("Créer le compte")}</button></form>}

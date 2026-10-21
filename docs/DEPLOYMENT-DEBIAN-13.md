@@ -728,6 +728,28 @@ aux secrets ou aux donnees du site.
 brouillons, publier de fichiers ou redemarrer le site. Les reconstructions
 demandees depuis l'admin refusent toujours une bascule avec des tables ouvertes.
 
+## Passkeys
+
+Les passkeys utilisent WebAuthn avec validation locale obligatoire de
+l'utilisateur. Aucun service payant ou secret de fournisseur n'est necessaire.
+`PUBLIC_APP_URL` doit correspondre exactement a l'origine HTTPS du navigateur,
+par exemple `https://www.ktga.me`. Son nom d'hote devient le RP ID : ne pas le
+changer sans prevoir le renouvellement des cles existantes. Les en-tetes Host
+du client ne servent jamais a choisir l'origine autorisee. HTTP n'est accepte
+que sur localhost pour le developpement.
+
+Les cles publiques et leurs compteurs sont conserves dans
+`${SQLITE_PATH}.passkeys.sqlite`, a inclure dans les sauvegardes SQLite
+coherentes du site. Les profils ne conservent qu'un compteur de cles. Les
+challenges expirent apres cinq minutes et sont lies au navigateur ; un
+redemarrage les invalide. Aucune cle privee ni donnee biometrique n'est stockee.
+L'activite Discord conserve sa connexion Discord ; l'ajout et l'utilisation
+des passkeys se font dans le navigateur normal ou la PWA.
+
+Cette mise a jour ajoute des dependances aux deux manifestes npm. Installer
+les lockfiles cote serveur et client et renouveler l'environnement de
+reconstruction de l'editeur de sources avec `setup-source-editor.sh`.
+
 ## Sources techniques
 
 Les fichiers fournis implementent les reglages propres a KTGA.ME ; les

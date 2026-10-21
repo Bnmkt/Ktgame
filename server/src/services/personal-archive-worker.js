@@ -31,9 +31,10 @@ try {
       counts[name] = count;
     })())));
   };
-  const security = { hasPassword: Boolean(user.passwordHash), totpEnabled: Boolean(user.mfa?.totpSecret), emailMfaEnabled: Boolean(user.mfa?.emailEnabled), administratorMfaRequired: Boolean(user.admin), recoveryCodesRemaining: user.mfa?.recoveryCodeHashes?.length ?? 0 };
+  const security = { hasPassword: Boolean(user.passwordHash), totpEnabled: Boolean(user.mfa?.totpSecret), emailMfaEnabled: Boolean(user.mfa?.emailEnabled), passkeyCount: Math.max(0, Number(user.passkeyCount) || 0), administratorMfaRequired: Boolean(user.admin), recoveryCodesRemaining: user.mfa?.recoveryCodeHashes?.length ?? 0 };
   const account = removePersonalSecrets(user);
   account.mfa = security;
+  if (paths.passkeys && fs.existsSync(paths.passkeys)) rows("passkeys", open("passkeys"), "SELECT name,created_at,last_used_at,backed_up FROM passkeys WHERE user_id=? ORDER BY created_at");
   json("compte.json", account);
   rows("inventaire", main, "SELECT i.type,i.item_id,c.data AS definition FROM user_inventory i LEFT JOIN item_catalog c ON c.type=i.type AND c.id=i.item_id WHERE i.user_id=? ORDER BY i.type,i.position", [userId], (row) => ({ ...row, definition: row.definition ? JSON.parse(row.definition) : null }));
   rows("succes", main, "SELECT a.achievement_id,a.unlocked,a.suppressed,a.unlocked_at,c.data AS definition FROM user_achievements a LEFT JOIN achievement_catalog c ON c.id=a.achievement_id WHERE a.user_id=?", [userId], (row) => ({ ...row, definition: row.definition ? JSON.parse(row.definition) : null }));
