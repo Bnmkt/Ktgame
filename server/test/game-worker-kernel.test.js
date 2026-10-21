@@ -184,6 +184,17 @@ test("a successful human action renews the deadline on a recovered room", async 
   assert.deepEqual(f.kernel.due(Date.now() + 20000), []);
 });
 
+test("an abandoned guest table can expire after its in-memory session disappeared", async () => {
+  const original = fixture(); await original.command("POST /api/rooms");
+  const room = (await original.command("POST /api/rooms/:code/start")).result.room;
+  room.lastActionAt = new Date(Date.now() - ROOM_INACTIVITY_MS - 1).toISOString();
+  const f = fixture("yahtzee", room); f.context.users = [];
+  const closed = (await f.command("tick")).result;
+  assert.equal(closed.room, null); assert.deepEqual(closed.effects, []);
+  assert.ok(closed.events.some((event) => event.event === "room-closed"));
+  assert.equal(f.kernel.health().rooms, 0);
+});
+
 test("account presentation refreshes in the owner's draft without losing game state", async () => {
   const f = fixture(); await f.command("POST /api/rooms"); await f.command("POST /api/rooms/:code/start");
   f.context.users = [{ ...user, roomPlayer: { id: user.id, pseudo: "Updated player", cosmetics: { equipped: { nameEffect: "gold" } } } }];

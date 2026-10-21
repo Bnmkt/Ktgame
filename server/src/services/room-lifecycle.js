@@ -36,18 +36,18 @@ export function closeRoom(room, db, dependencies, { reason = "owner", actorId = 
     room.ranked.cancelled = { reason: reason === "inactivity" ? "Table fermée après une heure d'inactivité." : "Table fermée par un administrateur.", by: actorId || "system", at: new Date(now).toISOString() };
     for (const player of room.ranked.roster.filter((row) => !row.isBot)) {
       const refund = room.stake - (room.state.departedPayouts?.[player.id] ?? 0);
-      if (refund > 0) addTokens(db, player.id, refund, { gameId: room.gameId, roomId: room.id, reason: "ranked-technical-refund" });
+      if (refund > 0 && getUser(player.id)) addTokens(db, player.id, refund, { gameId: room.gameId, roomId: room.id, reason: "ranked-technical-refund" });
     }
     room.state.finished = true;
     room.state.winners = [];
     room.pacing = null;
     finishRoomIfNeeded(room, db);
   } else if (room.state?.gameId === "texas-holdem" && unfinished) {
-    for (const player of [...room.players]) cashOutPokerPlayer(room, db, player.id, "poker-table-closed");
+    for (const player of [...room.players]) if (player.isBot || getUser(player.id)) cashOutPokerPlayer(room, db, player.id, "poker-table-closed");
   } else if (reason === "inactivity" && room.state && unfinished) {
     for (const player of room.players.filter((row) => !row.isBot)) {
       const refund = (Number(room.stake) || 0) + (room.gameId === "blackjack" ? Number(room.state.bets?.[player.id]) || 0 : 0);
-      if (refund > 0) addTokens(db, player.id, refund, { gameId: room.gameId, roomId: room.id, reason: "room-inactivity-refund" });
+      if (refund > 0 && getUser(player.id)) addTokens(db, player.id, refund, { gameId: room.gameId, roomId: room.id, reason: "room-inactivity-refund" });
     }
   }
   if (reason === "inactivity" && unfinished) {
