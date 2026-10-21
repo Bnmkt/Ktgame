@@ -14,7 +14,7 @@ import { RankedTurnTimer } from "../features/games/RankedPlay.jsx";
 import { useRoomSounds } from "../components/game/useRoomSounds.js";
 import "./spectator.css";
 
-export function SpectatorPage({ code, user, onBack, onJoin }) {
+export function SpectatorPage({ code, user, onBack, onJoin, onClosed }) {
   const { t: localeText } = useLocale();
   const [room, setRoom] = useState(null);
   useBugGameContext("spectator", code, room?.gameId, room?.activityMatchId);
@@ -66,10 +66,14 @@ export function SpectatorPage({ code, user, onBack, onJoin }) {
     socket.on("connect", () => { socket.emit("watch-room", { roomId: room.id, token: getToken(), spectator: true }); setConnected(true); });
     socket.on("disconnect", () => setConnected(false));
     socket.on("room", accept);
-    socket.on("room-closed", () => { setClosed(true); setConnected(false); });
+    socket.on("room-closed", (payload) => {
+      if (payload?.code !== code) return;
+      setClosed(true); setConnected(false);
+      onClosed?.(payload);
+    });
     socket.on("room-error", (payload) => { setError(payload.error); setConnected(false); setRoom(null); });
     return () => { disposeDiagnostics(); socket.disconnect(); };
-  }, [room?.id, accept]);
+  }, [room?.id, code, accept, onClosed]);
   async function unlock(event) {
     event.preventDefault(); setBusy(true); setError("");
     try { accept(await api(`/api/rooms/${encodeURIComponent(code)}/spectate`, { method: "POST", body: JSON.stringify({ password }) })); }

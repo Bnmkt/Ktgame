@@ -5079,5 +5079,9 @@
   "Table fermée.": "Table closed.",
   "Fermer « {name} » ? Tous les participants seront déconnectés de cette table.": "Close ‘{name}’? All participants will be disconnected from this table.",
   "La partie classée sera annulée sans modifier les classements.": "The ranked game will be cancelled without changing ratings.",
-  "Aucune table à afficher.": "No tables to display."
+  "Aucune table à afficher.": "No tables to display.",
+  "Table fermée pour inactivité": "Table closed due to inactivity",
+  "Cette table a été fermée automatiquement après une heure sans action des joueurs.": "This table was closed automatically after one hour without player actions.",
+  "Tu peux créer une nouvelle table ou rejoindre une autre partie.": "You can create a new table or join another game.",
+  "Remboursement · table inactive": "Refund · inactive table"
 }

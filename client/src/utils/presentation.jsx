@@ -149,6 +149,7 @@ export function transactionLabel(reason) {
     "signup-bonus": "Bonus d'inscription",
     "daily-claim": "Bonus journalier",
     "room-stake": "Mise de salon",
+    "room-inactivity-refund": "Remboursement · table inactive",
     "room-pot-win": "Gain de salon",
     "blackjack-bet": "Mise Blackjack",
     "blackjack-double": "Doublement Blackjack",

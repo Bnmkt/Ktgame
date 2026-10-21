@@ -4,20 +4,21 @@ import { createGameRoomKernel } from "../src/services/game-room-kernel.js";
 import { games } from "../src/games/shared.js";
 import { normalizeProgressionConfig } from "../src/services/game-progression.js";
 import { normalizeRankedConfig, RANKED_GAMES } from "../src/services/ranked.js";
+import { ROOM_INACTIVITY_MS } from "../src/services/room-lifecycle.js";
 
 const platform = { minRoomStake: 10, minPokerBuyIn: 100, signupTokens: 10000, pokerDefaultBigBlind: 10,
   pokerTurnSeconds: 300, botThinkingSeconds: 0, turnEndDelaySeconds: 1, roundResultsSeconds: 0,
   minorRestrictions: [], gameProgression: normalizeProgressionConfig() };
 const user = { id: "player", pseudo: "Player", tokens: 10000, active: true, profile: { birthDate: "1990-01-01" } };
-function fixture(gameId = "yahtzee") {
+function fixture(gameId = "yahtzee", initialRoom = null) {
   const kernel = createGameRoomKernel(); kernel.configure({ id: "1", platform, games });
-  kernel.register({ roomId: "room", epoch: "epoch", version: 0, room: null });
+  kernel.register({ roomId: "room", epoch: "epoch", version: 0, room: initialRoom });
   let version = 0, sequence = 0;
   const context = { actor: { id: user.id }, users: [user] };
-  return { kernel, context,
-    async command(command, body = {}, commit = true) {
+  return { kernel, context, code: initialRoom?.code,
+    async command(command, body = {}, commit = true, now) {
       const input = { roomId: "room", epoch: "epoch", version, commandId: String(++sequence), configurationId: "1", command, context,
-        params: { code: this.code }, body: command === "POST /api/rooms" ? { gameId, name: "Test table", ...body } : body };
+        params: { code: this.code }, body: command === "POST /api/rooms" ? { gameId, name: "Test table", ...body } : body, now };
       const result = await kernel.prepare(input);
       if (result.room) this.code = result.room.code;
       if (commit) { version = result.version; kernel.commit({ ...input, version }); }
@@ -135,6 +136,52 @@ test("an idle tick and activity recording do not publish room or lobby snapshots
   const f = fixture(); await f.command("POST /api/rooms"); await f.command("POST /api/rooms/:code/start");
   const tick = await f.command("tick"); assert.equal(tick.result.written, false); assert.equal(tick.result.publishRoom, false); assert.equal(tick.result.publishLobby, false);
   const activity = await f.command("activity"); assert.equal(activity.result.publishRoom, false); assert.equal(activity.result.publishLobby, false);
+});
+
+test("waiting and active rooms expire after one hour even with connected players, and release their owner", async () => {
+  for (const playing of [false, true]) {
+    const f = fixture(); let result = (await f.command("POST /api/rooms")).result;
+    if (playing) result = (await f.command("POST /api/rooms/:code/start")).result;
+    f.context.sockets = [{ id: "socket", data: { userId: user.id, roomId: "room" } }];
+    const deadline = Date.parse(result.room.lastActionAt) + ROOM_INACTIVITY_MS;
+    assert.deepEqual(f.kernel.due(deadline - 1), []);
+    assert.deepEqual(f.kernel.due(deadline), ["room"]);
+    const before = await f.command("tick", {}, true, deadline - 1);
+    assert.ok(before.result.room);
+    const closed = (await f.command("tick", {}, true, deadline)).result;
+    assert.equal(closed.room, null);
+    assert.equal(closed.effects.filter((effect) => effect.kind === "notification").length, 1);
+    assert.deepEqual(closed.effects.filter((effect) => effect.kind === "tokens").map(({ amount }) => amount), playing ? [10] : []);
+    assert.equal(closed.events.find((event) => event.event === "room-closed").payload.reason, "inactivity");
+    assert.equal(f.kernel.health().rooms, 0); assert.deepEqual(f.kernel.due(deadline + 1000), []);
+  }
+});
+
+test("passive events and invalid actions do not renew room inactivity", async () => {
+  const f = fixture(); await f.command("POST /api/rooms");
+  const original = (await f.command("POST /api/rooms/:code/start")).result.room.lastActionAt;
+  const passive = await f.command("activity"); assert.equal(passive.result.room.lastActionAt, original);
+  const invalid = await f.command("POST /api/rooms/:code/action", { type: "score", category: "chance" });
+  assert.equal(invalid.result.status, 400); assert.equal(invalid.result.room.lastActionAt, original);
+});
+
+test("a finished room is scheduled for expiration without issuing rewards or warnings again", async () => {
+  const f = fixture("yahtzee", { id: "room", code: "FINISH", players: [user], finished: true, createdAt: new Date(Date.now() - ROOM_INACTIVITY_MS - 1).toISOString(), state: { finished: true } });
+  assert.deepEqual(f.kernel.due(), ["room"]);
+  const closed = (await f.command("tick")).result;
+  assert.equal(closed.room, null); assert.deepEqual(closed.effects, []);
+  assert.equal(closed.events.find((event) => event.event === "room-closed").payload.unfinished, false);
+});
+
+test("a successful human action renews the deadline on a recovered room", async () => {
+  const original = fixture(); await original.command("POST /api/rooms");
+  const room = (await original.command("POST /api/rooms/:code/start")).result.room;
+  room.lastActionAt = new Date(Date.now() - ROOM_INACTIVITY_MS + 10000).toISOString();
+  const f = fixture("yahtzee", room);
+  const roll = (await f.command("POST /api/rooms/:code/action", { type: "roll", lastActionAt: "2000-01-01" })).result;
+  assert.equal(roll.status, 200);
+  assert.ok(Date.parse(roll.room.lastActionAt) > Date.parse(room.lastActionAt));
+  assert.deepEqual(f.kernel.due(Date.now() + 20000), []);
 });
 
 test("account presentation refreshes in the owner's draft without losing game state", async () => {

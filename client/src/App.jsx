@@ -10,6 +10,7 @@ import { DisplayName, cosmeticCssRules, setCosmeticCatalogItems } from "./compon
 import { CasinoHeader } from "./components/navigation/CasinoHeader.jsx";
 import { DailyBonusButton } from "./components/navigation/DailyBonusButton.jsx";
 import { Dialog } from "./components/common/Dialog.jsx";
+import { RoomClosedNotice } from "./components/game/RoomClosedNotice.jsx";
 import { JoinTable } from "./components/navigation/JoinTable.jsx";
 import { useCasinoRoute } from "./navigation/useCasinoRoute.js";
 import { RankedCoordinator } from "./features/games/RankedPlay.jsx";
@@ -94,6 +95,7 @@ export default function App() {
   const [tribunalAvailable, setTribunalAvailable] = useState(false);
   const [bonusFeedback, setBonusFeedback] = useState(null);
   const [exclusion, setExclusion] = useState(null);
+  const [roomClosure, setRoomClosure] = useState(null);
   const activeUserId = useRef(null);
   activeUserId.current = user?.id;
   const [notifications, setNotifications] = useState([]);
@@ -190,6 +192,16 @@ export default function App() {
     setExclusion(notification);
   }, []);
 
+  const showRoomClosure = useCallback((payload) => {
+    const code = payload.roomCode ?? payload.code;
+    const key = `ktga-room-inactivity:${activeUserId.current}:${code}`;
+    try {
+      if (window.localStorage.getItem(key)) return;
+      window.localStorage.setItem(key, "shown");
+    } catch { /* The notice remains usable when local storage is unavailable. */ }
+    setRoomClosure({ code });
+  }, []);
+
   const handleExclusion = useCallback((payload) => {
     if (payload.playerId !== activeUserId.current) return;
     const notification = payload.notification ?? { id: `exclusion-${Date.now()}`, type: "room-exclusion", title: "Vous avez été exclu", message: payload.reason === "timeout" ? "Votre place a été libérée après une période d’inactivité." : "Vous avez été exclu de cette table." };
@@ -218,6 +230,8 @@ export default function App() {
     if (!rows || ownerId !== activeUserId.current || revision !== inboxRevision.current) return;
     const lastExclusion = rows.find((row) => row.type === "room-exclusion");
     if (lastExclusion) showExclusion(lastExclusion);
+    const inactiveTable = rows.find((row) => row.type === "room-inactivity");
+    if (inactiveTable) showRoomClosure(inactiveTable);
     const nextIds = new Set(rows.map((row) => row.id));
     if (toastNew && inboxInitialized.current) {
       const newRows = rows.filter((row) => !knownNotificationIds.current.has(row.id));
@@ -299,6 +313,7 @@ export default function App() {
     await api("/api/auth/logout", { method: "POST", background: true }).catch(() => {});
     setBonusFeedback(null);
     setExclusion(null);
+    setRoomClosure(null);
     setToken("");
     setUser(null);
     setRoomCode(null);
@@ -319,6 +334,12 @@ export default function App() {
     setNotificationsOpen(false);
     goTo("lobby");
   }, [goTo]);
+
+  const handleRoomClosed = useCallback((payload) => {
+    if (payload?.reason === "inactivity" && payload.unfinished) showRoomClosure(payload);
+    setRoomCode((current) => current === payload?.code ? null : current);
+    if (["room", "spectator"].includes(route.view) && route.id === payload?.code) returnToCasino();
+  }, [returnToCasino, showRoomClosure, route.view, route.id]);
 
   const openCasinoRoom = useCallback((code, spectator = false) => {
     setPublicProfile(null);
@@ -389,9 +410,9 @@ export default function App() {
       {bonusFeedback && <div className={`casino-bonus-feedback ${bonusFeedback.error ? "error" : "daily-bonus-feedback"}`} role={bonusFeedback.error ? "alert" : "status"}><Coins size={18} /><span>{bonusFeedback.message}</span><button type="button" className="secondary icon-toggle" aria-label={localeText("Fermer le message du bonus")} onClick={() => setBonusFeedback(null)}><X size={16} /></button></div>}
       {!user.guest && <RankedCoordinator key={user.id} user={user} onOpenRoom={openCasinoRoom}/>}
       <Suspense fallback={<main className="app-shell"><section className="panel route-loading" role="status">{localeText("Chargement de l’interface…")}</section></main>}>
-        {roomCode && <div hidden={view !== "room" || route.id !== roomCode}><Room key={roomCode} code={roomCode} user={user} setUser={setUser} onBack={returnToCasino} onExcluded={handleExclusion} onAchievements={notifyAchievements} /></div>}
+        {roomCode && <div hidden={view !== "room" || route.id !== roomCode}><Room key={roomCode} code={roomCode} user={user} setUser={setUser} onBack={returnToCasino} onClosed={handleRoomClosed} onExcluded={handleExclusion} onAchievements={notifyAchievements} /></div>}
         {view === "room" && route.id !== roomCode && <JoinTable key={route.id} code={route.id} user={user} onJoined={openCasinoRoom} onBack={() => goTo("lobby")} />}
-        {view === "spectator" && <SpectatorPage key={route.id} code={route.id} user={user} onBack={() => goTo("lobby")} onJoin={openCasinoRoom} />}
+        {view === "spectator" && <SpectatorPage key={route.id} code={route.id} user={user} onBack={() => goTo("lobby")} onClosed={handleRoomClosed} onJoin={openCasinoRoom} />}
         {view === "event" && !blockedView && <CommunityEventPage key={route.id} slug={route.id} user={user} setUser={setUser} onBack={() => goTo("lobby")} />}
         {view === "leaderboard" && <LeaderboardPage user={user} />}
         {view === "tribunal" && <TribunalPage />}
@@ -404,6 +425,7 @@ export default function App() {
       {friendsOpen && <Suspense fallback={<div role="status" className="casino-modal-loading">{localeText("Chargement des amis…")}</div>}><FriendsModal user={user} roomCode={roomCode} onClose={() => setFriendsOpen(false)} onOpenRoom={openCasinoRoom} onStartChat={(friendId) => { setConversationRequest((current) => ({ friendId, revision: current.revision + 1 })); setFriendsOpen(false); setNotificationsOpen(false); setSocialOpen(true); }} /></Suspense>}
       {!user.guest && <Suspense fallback={null}><SocialPanel key={user.id} user={user} siteIcon={siteMarkSource(publicSettings)} onNavigate={(destination, id, options) => goTo(destination, id, options)} roomCode={["room", "spectator"].includes(view) ? route.id : roomCode} open={socialOpen} onUnreadChange={setConversationUnread} requestedFriendId={conversationRequest.friendId} requestedFriendRevision={conversationRequest.revision} onClose={() => setSocialOpen(false)} onFriends={() => { setFriendsOpen(true); setSocialOpen(false); setNotificationsOpen(false); }} /></Suspense>}
       {exclusion && <Dialog title={localeText("Vous avez été exclu")} className="action-confirm-modal" layerClassName="action-confirm-layer" onClose={() => setExclusion(null)}><p>{exclusion.message}</p><div className="actions"><button type="button" onClick={() => setExclusion(null)}>{localeText("J’ai compris")}</button></div></Dialog>}
+      {roomClosure && <RoomClosedNotice onClose={() => setRoomClosure(null)}/>}
       {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} onReport={(profile) => setReportTarget(profile)} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} roomCode={roomCode ?? ""} onClose={() => setReportTarget(null)} />}
       <Suspense fallback={null}><HelpOnboarding key={user.id} user={user} /></Suspense>

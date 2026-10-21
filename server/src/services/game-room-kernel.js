@@ -5,6 +5,7 @@ import { createRoomRuntime } from "./room-runtime.js";
 import { createRoomCommands } from "./room-commands.js";
 import { featureAccess } from "./parental-controls.js";
 import { createRankedRoomRuntime } from "./ranked-room-runtime.js";
+import { closeRoom, roomIsInactive } from "./room-lifecycle.js";
 
 const fault = (code) => Object.assign(new Error("Room command unavailable."), { code });
 
@@ -111,7 +112,7 @@ export function createGameRoomKernel() {
     const rankedRuntime = { ...createRankedRoomRuntime({ cashOutPokerPlayer: runtime.cashOutPokerPlayer, removePlayerFromRoomState: runtime.removePlayerFromRoomState, finishRoomIfNeeded: finish }),
       action(target) { if (target.ranked) { target.ranked.actionAt = Date.now(); target.ranked.turnActor = target.state.players[target.state.currentPlayerIndex]?.id; } },
     };
-    const commands = createRoomCommands({ ...runtime, addTokens, appendRoomAchievementUnlocks: () => {}, applyAction, bcrypt,
+    const commandDependencies = { ...runtime, addTokens, appendRoomAchievementUnlocks: () => {}, applyAction, bcrypt,
       broadcastRooms: () => { publishLobby = true; }, configuredGames: () => activeConfiguration.games,
       consumeRoomAchievementUnlocks: () => [], displayNameFor: (user) => String(user.profile?.displayName || user.pseudo || "Joueur"),
       emitRoomUpdate: () => { written = true; publishRoom = true; }, finishRoomIfNeeded: finish,
@@ -134,7 +135,8 @@ export function createGameRoomKernel() {
       syncRoomPlayerTokens: syncTokens, tableFeatureAccess: tableAccess,
       triggerRandomAchievement: random, unlockEligibleAchievements: unlock,
       userFeatureAccess: feature, writeRoomDb: () => { written = true; }
-    });
+    };
+    const commands = createRoomCommands(commandDependencies);
     let status = 200, response;
     const res = { status(code) { status = code; return this; }, json(value) { response = value; return this; } };
     if (input.command === "start-ranked") {
@@ -167,7 +169,9 @@ export function createGameRoomKernel() {
       for (const event of input.activityEvents ?? []) effects.push({ kind: "achievement", userId: context.actor.id, event, room: ["table.activity", "game.round.activity"].includes(event.type) });
       written = effects.length > 0; response = { unlocked: [] };
     } else if (input.command === "tick") {
-      if (room?.state) {
+      if (room && roomIsInactive(room, input.now ?? Date.now())) {
+        closeRoom(room, db, commandDependencies, { reason: "inactivity", now: input.now ?? Date.now() });
+      } else if (room?.state) {
         const now = input.now ?? Date.now();
         let changed = rankedRuntime.tickRoom(room, db, (_roomId, playerId) => (context.sockets ?? []).some((socket) => socket.data.userId === playerId && !socket.data.spectator), now);
         changed = runtime.advanceRoomPacing(room, db, now) || changed;
@@ -236,8 +240,8 @@ export function createGameRoomKernel() {
     abort(input) { const entry = entryFor(input); if (entry.prepared?.commandId === input.commandId) entry.prepared = null; if (!entry.room) rooms.delete(input.roomId); return { version: entry.version }; },
     health() { return { rooms: [...rooms.values()].filter((entry) => entry.room).length, prepared: [...rooms.values()].filter((entry) => entry.prepared).length }; },
     due(now = Date.now()) {
-      return [...rooms].filter(([, entry]) => !entry.prepared && entry.room?.state &&
-        (entry.room.pacing?.endsAt <= now || !entry.room.finished && (["texas-holdem", "bataille"].includes(entry.room.gameId) || entry.room.ranked))).map(([roomId]) => roomId);
+      return [...rooms].filter(([, entry]) => !entry.prepared && entry.room && (roomIsInactive(entry.room, now) || entry.room.state &&
+        (entry.room.pacing?.endsAt <= now || !entry.room.finished && (["texas-holdem", "bataille"].includes(entry.room.gameId) || entry.room.ranked)))).map(([roomId]) => roomId);
     }
   };
 }

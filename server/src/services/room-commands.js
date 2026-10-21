@@ -6,9 +6,11 @@ import { beloteSeats, chooseBeloteTeam } from "../games/belote-seats.js";
 import { roomCredentialsError } from "./room-credentials.js";
 import { roomLevelError, roomLevelLimits } from "./game-progression.js";
 import { validateRankedAction } from "./ranked.js";
+import { closeRoom, touchRoom } from "./room-lifecycle.js";
 
 export function createRoomCommands(dependencies) {
-  const { actionAchievementSnapshot, addTokens, advanceRoomPacing, appendRoomAchievementUnlocks, applyAction, bcrypt, blackjackHandTotal, broadcastRooms, cashOutPokerPlayer, configuredGames, consumeRoomAchievementUnlocks, didRoundFinish, displayNameFor, emitRoomUpdate, finishRoomIfNeeded, gameActionAchievementEvent, getTokenBalance, getUser, grantSpectatorAccess, io, maySpectate, platformSettings, pokerBlindsFromBigBlind, processAchievementEvent, progressionConfig, pushNotification, rankedRuntime, readDb, rejectFeature, removePlayerFromRoomState, roomCode, roomPacingActive, roomPlayerFor, roomPresence, roomTiming, roundProgressSnapshot, runBotTurns, sanitizeRoom, saveRoom, startRoomPacing, startRoomRound, startRoundResultsIfNeeded, syncRoomPlayerTokens, tableFeatureAccess, triggerRandomAchievement, unlockEligibleAchievements, userFeatureAccess, writeRoomDb } = dependencies;
+  const { actionAchievementSnapshot, addTokens, advanceRoomPacing, appendRoomAchievementUnlocks, applyAction, bcrypt, blackjackHandTotal, broadcastRooms, cashOutPokerPlayer, configuredGames, consumeRoomAchievementUnlocks, didRoundFinish, displayNameFor, emitRoomUpdate, finishRoomIfNeeded, gameActionAchievementEvent, getTokenBalance, getUser, grantSpectatorAccess, io, maySpectate, platformSettings, pokerBlindsFromBigBlind, processAchievementEvent, progressionConfig, pushNotification, rankedRuntime, readDb, rejectFeature, removePlayerFromRoomState, roomCode, roomPacingActive, roomPlayerFor, roomPresence, roomTiming, roundProgressSnapshot, runBotTurns, sanitizeRoom, saveRoom, startRoomPacing, startRoomRound, startRoundResultsIfNeeded, syncRoomPlayerTokens, tableFeatureAccess, triggerRandomAchievement, unlockEligibleAchievements, userFeatureAccess, writeRoomDb: persistRoomDb } = dependencies;
+  const writeRoomDb = (db, room, additionalUsers) => { touchRoom(room); return persistRoomDb(db, room, additionalUsers); };
   const commands = new Map([
     ["POST /api/rooms", async (req, res) => {
   if (req.body.ranked || req.body.mode === "ranked") return res.status(403).json({ error: "Le classé passe exclusivement par la file d'attente." });
@@ -51,7 +53,8 @@ export function createRoomCommands(dependencies) {
     players: [roomPlayerFor(user)],
     state: null,
     finished: false,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    lastActionAt: new Date().toISOString()
   };
   saveRoom(room);
   broadcastRooms();
@@ -117,23 +120,7 @@ export function createRoomCommands(dependencies) {
   if (!room) return res.status(404).json({ error: "Table introuvable." });
   const administrator = getUser(req.auth.id)?.admin === true;
   if (room.ownerId !== req.auth.id && !administrator) return res.status(403).json({ error: "Seul le créateur ou un administrateur peut fermer cette table." });
-  if (administrator && room.ranked && room.state && !room.finished) {
-    room.ranked.cancelled = { reason: "Table fermée par un administrateur.", by: req.auth.id, at: new Date().toISOString() };
-    for (const player of room.ranked.roster.filter((row) => !row.isBot)) {
-      const refund = room.stake - (room.state.departedPayouts?.[player.id] ?? 0);
-      if (refund > 0) addTokens(db, player.id, refund, { gameId: room.gameId, roomId: room.id, reason: "ranked-technical-refund" });
-    }
-    room.state.finished = true;
-    room.state.winners = [];
-    room.pacing = null;
-    finishRoomIfNeeded(room, db);
-  } else if (room.state?.gameId === "texas-holdem" && !room.finished) {
-    for (const player of [...room.players]) cashOutPokerPlayer(room, db, player.id, "poker-table-closed");
-  }
-  db.rooms = db.rooms.filter((r) => r.id !== room.id);
-  writeRoomDb(db, room);
-  io.to(room.id).emit("room-closed", { code: room.code });
-  broadcastRooms();
+  closeRoom(room, db, dependencies, { reason: administrator ? "admin" : "owner", actorId: req.auth.id });
   res.json({ ok: true });
 }],
     ["POST /api/rooms/:code/kick", (req, res) => {
@@ -348,7 +335,7 @@ export function createRoomCommands(dependencies) {
     || (room.pacing?.kind === "turn-end" && room.pacing.actorIsBot && room.state.gameId === "midnight-dice" && room.state.phase === "contract" && req.body.type === "choose-contract");
   if (roomPacingActive(room) && !actionAllowedDuringPacing) {
     if (pacingAdvanced) {
-      writeRoomDb(db, room);
+      persistRoomDb(db, room);
       emitRoomUpdate(room, db);
     }
     const pacingError = room.pacing.kind === "round-results"

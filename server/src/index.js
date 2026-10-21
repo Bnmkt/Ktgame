@@ -2,6 +2,7 @@ import "./services/reset-bootstrap.js";
 import { registerGameplayResetRoutes } from "./services/gameplay-reset-routes.js";
 import { createRoomCommands } from "./services/room-commands.js";
 import { adminRoomList } from "./services/admin-rooms.js";
+import { closeRoom as closeInactiveTable, roomIsInactive } from "./services/room-lifecycle.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
 import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
@@ -5968,6 +5969,9 @@ setInterval(() => {
   let changed = false;
   const changedRooms = new Set();
   const now = Date.now();
+  for (const room of [...db.rooms]) if (roomIsInactive(room, now)) {
+    closeInactiveTable(room, db, { addTokens, cashOutPokerPlayer, finishRoomIfNeeded, writeRoomDb, io, roomPresence, broadcastRooms, pushNotification, getUser }, { reason: "inactivity", now });
+  }
   for (const room of db.rooms.filter((entry) => entry.pacing)) {
     if (!advanceRoomPacing(room, db, now)) continue;
     changed = true;

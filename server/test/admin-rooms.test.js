@@ -28,7 +28,7 @@ function fixture({ ranked = false, poker = false, finished = false } = {}) {
     addTokens: (_db, userId, amount) => ledger.push({ userId, amount }),
     finishRoomIfNeeded: (target) => { assert.ok(target.ranked.cancelled); target.finished = true; settlements++; },
     cashOutPokerPlayer: (_room, _db, id) => ledger.push({ userId: id, poker: true }),
-    writeRoomDb: () => writes++, io: { to: () => ({ emit: (...args) => events.push(args) }) }, broadcastRooms: () => {} }).get("DELETE /api/rooms/:code");
+    writeRoomDb: () => writes++, io: { to: () => ({ emit: (...args) => events.push(args) }) }, roomPresence: new Map(), broadcastRooms: () => {} }).get("DELETE /api/rooms/:code");
   return { room, db, ledger, events, get writes() { return writes; }, get settlements() { return settlements; }, close(id) {
     let status = 200, data;
     command({ auth: { id, admin: true }, params: { code: "abc123" } }, { status(value) { status = value; return this; }, json(value) { data = value; } });

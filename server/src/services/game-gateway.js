@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createGameWorkers } from "./game-workers.js";
 import { createRoomDirectory } from "./room-directory.js";
 import { selectedCollectionRows } from "../storage/selected-rows.js";
+import { releaseRoomPresence } from "./room-lifecycle.js";
 
 const conflict = () => Object.assign(new Error("La table a change pendant le traitement. Reessaie."), { code: "GAME_CONFLICT" });
 const userFields = ["id", "pseudo", "tokens", "guest", "active", "admin", "gameXp", "moderation"];
@@ -130,7 +131,10 @@ export function createGameGateway(dependencies) {
         else if (event.kind === "leave") {
           const socket = io.sockets.sockets.get(event.socketId);
           socket?.leave(id); roomPresence.get(id)?.delete(event.socketId); if (socket) delete socket.data.roomId;
-        } else if (event.event) io.to(event.target).emit(event.event, event.payload);
+        } else if (event.event) {
+          io.to(event.target).emit(event.event, event.payload);
+          if (event.event === "room-closed") releaseRoomPresence(id, io, roomPresence);
+        }
       }
       if (room && (result.publishRoom || command === "activity" && result.response.unlocked?.length)) emitRoomUpdate(room);
       if (result.publishLobby) broadcastRooms();

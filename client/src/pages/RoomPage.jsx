@@ -135,7 +135,7 @@ function BetLimitsEditor({ minimum, maximum, maxAllowed = 100000000, disabled, o
   </section>;
 }
 
-export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }) {
+export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, onClosed }) {
   const { t: localeText } = useLocale();
   const compact = useCompactLayout();
   const [mobilePanel, setMobilePanel] = useState("");
@@ -231,14 +231,14 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded }
       if (!nextRoom.players?.some((p) => p.id === user.id)) onBack();
     });
     socket.on("room-closed", (payload) => {
-      if (payload?.code === code) onBack();
+      if (payload?.code === code) { if (onClosed) onClosed(payload); else onBack(); }
     });
     socket.on("room-player-kicked", (payload) => {
       if (payload?.code === code && payload?.playerId === user.id) onExcluded(payload);
     });
     socket.on("room-error", (payload) => setError(payload?.error ?? "Connexion temps réel interrompue."));
     return () => { disposeDiagnostics(); socket.disconnect(); };
-  }, [code, room?.id, user.id, onBack, onExcluded, commitRoom]);
+  }, [code, room?.id, user.id, onBack, onExcluded, onClosed, commitRoom]);
 
   async function action(body, { background = false } = {}) {
     const isPresidentAction = room?.gameId === "president" && ["play", "pass"].includes(body.type);
