@@ -1,0 +1,11 @@
+/* Keep the wallpaper on html, with a continuous reading surface under page content. */
+html[data-site-wallpaper="true"] .app-shell:not(.table-fullscreen):not(:fullscreen) {
+  background-color: var(--site-page, #07080a);
+  background-color: rgb(from var(--site-page, #07080a) r g b / .94);
+}
+
+/* These images sit behind text; foreground artwork remains sharp and unchanged. */
+.game-grid .game-card > .game-artwork-backdrop { opacity: .06; }
+.game-grid .game-artwork-soft-edge .game-artwork-glow { opacity: .1; }
+.public-game-featured > .game-artwork-backdrop::after { background: rgba(8, 16, 13, .88); }
+.auth-screen.ktga-entry .entry-scene::after { background: rgba(5, 17, 14, .86); }

@@ -14,6 +14,7 @@ import "../../src/styles.css";
 import "../../src/privacy/privacy.css";
 import "../../src/navigation/casino.css";
 import "../../src/navigation/mobile-casino.css";
+import "../../src/features/theme/readability.css";
 
 const user = { id: "one", pseudo: "Alice", profile: { displayName: "Alice", favoriteGames: ["yahtzee"] }, cosmetics: { equipped: {} } };
 const players = [user, { id: "two", pseudo: "Camille" }];

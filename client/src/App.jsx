@@ -33,6 +33,7 @@ import "./navigation/mobile-casino.css";
 import { siteMarkSource } from "./features/site-branding.js";
 import { useSiteTheme } from "./features/theme/useSiteTheme.js";
 import "./features/theme/theme.css";
+import "./features/theme/readability.css";
 
 const Admin = lazy(() => import("./pages/AdminPage.jsx").then((module) => ({ default: module.Admin })));
 const LegalPage = lazy(() => import("./privacy/LegalPage.jsx").then((module) => ({ default: module.LegalPage })));
