@@ -76,6 +76,30 @@ test("ranked bot completion is admin-only and starts and settles through the own
     assert.ok(observation.ranked.results.every((row)=>row.before===undefined && row.beforeProgression===undefined));
   } finally { await request("admin","/api/ranked/queue","DELETE");await request("admin","/api/admin/ranked","PUT",original); }
 });
+test("administrators list every private room and close through its worker without widening public access", async () => {
+  for (const actor of [null, "player", "editor"]) assert.equal((await request(actor, "/api/admin/rooms")).status, actor ? 403 : 401);
+  const codes = [];
+  try {
+    for (let i = 0; i < 8; i++) {
+      const created = await request("player", "/api/rooms", "POST", { gameId: "yahtzee", name: `Private ${i}`, isPublic: false, password: "table-only-secret" });
+      assert.equal(created.status, 200, JSON.stringify(created.data));
+      codes.push(created.data.code);
+    }
+    const listing = await request("admin", "/api/admin/rooms");
+    assert.equal(listing.status, 200);
+    assert.equal(listing.data.filter((room) => codes.includes(room.code)).length, 8);
+    assert.ok(listing.data.filter((room) => codes.includes(room.code)).every((room) => !room.isPublic && room.protected && room.state === undefined && room.passwordHash === undefined));
+    const publicRooms = await request(null, "/api/rooms");
+    assert.ok(publicRooms.data.every((room) => !codes.includes(room.code)));
+    for (const actor of [null, "friend", "editor"]) assert.equal((await request(actor, `/api/admin/rooms/${codes[0]}`, "DELETE")).status, actor ? 403 : 401);
+    assert.equal((await request("editor", `/api/rooms/${codes[0]}`, "DELETE")).status, 403);
+    assert.equal((await request("admin", `/api/admin/rooms/${codes[0]}`, "DELETE")).status, 200);
+    assert.equal((await request("admin", `/api/admin/rooms/${codes[0]}`, "DELETE")).status, 404);
+    assert.equal((await request("player", `/api/rooms/${codes[0]}`)).status, 404);
+    assert.ok(!(await request("admin", "/api/admin/rooms")).data.some((room) => room.code === codes[0]));
+  } finally { for (const code of codes) await request("admin", `/api/admin/rooms/${code}`, "DELETE"); }
+});
+
 test("lobby notices are admin-managed, versioned and dismissible per account", async () => {
   const old = (await request("admin", "/api/config")).data.lobbyNotice;
   const notice = { enabled: true, title: "Bienvenue", content: "**Annonce** @!ktga-dice-6" };

@@ -65,7 +65,7 @@ export function AdminOverview({ overview, settings, onNavigate, formatDate }) {
       </section>
 
       <section className="admin-dashboard-panel admin-live-panel">
-        <div className="admin-dashboard-panel-heading"><div><span className="eyebrow">{localeText("Temps réel")}</span><h3>{localeText("Tables actives")}</h3></div><span className="admin-live-indicator"><i />{" " + localeText("Direct")}</span></div>
+        <div className="admin-dashboard-panel-heading"><div><span className="eyebrow">{localeText("Temps réel")}</span><h3>{localeText("Tables actives")}</h3></div><button type="button" className="secondary" onClick={() => onNavigate("rooms")}>{localeText("Toutes les tables")}<ArrowRight size={16}/></button></div>
         <div className="admin-room-list">{(overview.activeRooms ?? []).map((room) => <article key={room.id}><div><strong>{room.name}</strong><small>{localeText(gameTitle(room.gameId))}{" " + localeText("· code") + " "}{room.code}</small></div><span className={`status-badge ${room.playing ? "status-live" : "status-waiting"}`}>{room.playing ? localeText("En cours") : localeText("En attente")}</span><b>{room.players}{" " + localeText("joueur(s)")}</b></article>)}{!(overview.activeRooms ?? []).length && <div className="admin-dashboard-empty"><Radio size={22} /><div><strong>{localeText("Aucune table ouverte")}</strong><span>{localeText("Les nouvelles tables apparaîtront ici.")}</span></div></div>}</div>
       </section>
     </div>

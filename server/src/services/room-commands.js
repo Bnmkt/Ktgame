@@ -115,8 +115,19 @@ export function createRoomCommands(dependencies) {
   const db = readDb();
   const room = db.rooms.find((r) => r.code === req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: "Table introuvable." });
-  if (room.ownerId !== req.auth.id) return res.status(403).json({ error: "Seul le créateur peut fermer cette table." });
-  if (room.state?.gameId === "texas-holdem") {
+  const administrator = getUser(req.auth.id)?.admin === true;
+  if (room.ownerId !== req.auth.id && !administrator) return res.status(403).json({ error: "Seul le créateur ou un administrateur peut fermer cette table." });
+  if (administrator && room.ranked && room.state && !room.finished) {
+    room.ranked.cancelled = { reason: "Table fermée par un administrateur.", by: req.auth.id, at: new Date().toISOString() };
+    for (const player of room.ranked.roster.filter((row) => !row.isBot)) {
+      const refund = room.stake - (room.state.departedPayouts?.[player.id] ?? 0);
+      if (refund > 0) addTokens(db, player.id, refund, { gameId: room.gameId, roomId: room.id, reason: "ranked-technical-refund" });
+    }
+    room.state.finished = true;
+    room.state.winners = [];
+    room.pacing = null;
+    finishRoomIfNeeded(room, db);
+  } else if (room.state?.gameId === "texas-holdem" && !room.finished) {
     for (const player of [...room.players]) cashOutPokerPlayer(room, db, player.id, "poker-table-closed");
   }
   db.rooms = db.rooms.filter((r) => r.id !== room.id);

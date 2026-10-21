@@ -23,6 +23,7 @@ import { GameEditor } from "../components/admin/GameEditor.jsx";
 import { ShopStudio } from "../components/admin/ShopStudio.jsx";
 import { PatchnotesAdmin } from "../components/admin/PatchnotesAdmin.jsx";
 import { AdminOverview } from "../components/admin/AdminOverview.jsx";
+import { RoomsAdmin } from "../components/admin/RoomsAdmin.jsx";
 import { TribunalAdmin } from "../components/admin/TribunalAdmin.jsx";
 import { shopPackName } from "../utils/shop-packs.js";
 import { HelpAdmin } from "../components/admin/HelpAdmin.jsx";
@@ -225,6 +226,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
     { label: "Pilotage", items: [
       { value: "overview", label: "Vue d’ensemble", icon: LayoutDashboard },
       { value: "health", label: "Supervision", icon: HeartPulse },
+      { value: "rooms", label: "Tables", icon: Gamepad2 },
       { value: "tests", label: "Debug / Tests", icon: FlaskConical },
       { value: "bugs", label: "Signalements de bugs", icon: Bug }
     ] },
@@ -285,6 +287,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
 
 
         {isAdministrator && tab === "health" && <ServerHealth reportError={setError} />}
+        {isAdministrator && tab === "rooms" && <RoomsAdmin games={data.games} reportError={setError} notifySuccess={notifySuccess} />}
         {isAdministrator && tab === "tests" && <CapacityTests reportError={setError} />}
         {tab === "bugs" && <BugReportsAdmin />}
 

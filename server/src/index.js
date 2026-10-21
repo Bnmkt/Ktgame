@@ -1,6 +1,7 @@
 import "./services/reset-bootstrap.js";
 import { registerGameplayResetRoutes } from "./services/gameplay-reset-routes.js";
 import { createRoomCommands } from "./services/room-commands.js";
+import { adminRoomList } from "./services/admin-rooms.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
 import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
@@ -5660,6 +5661,11 @@ function dispatchRoomCommand(key, req, res, next) {
     return gameGateway.dispatch(key, req, res);
   }).catch(next);
 }
+
+app.get("/api/admin/rooms", auth, requireAdmin, (_req, res) => {
+  res.set("Cache-Control", "no-store").json(adminRoomList(readDb(), displayNameFor));
+});
+app.delete("/api/admin/rooms/:code", auth, requireAdmin, (req, res, next) => dispatchRoomCommand("DELETE /api/rooms/:code", req, res, next));
 
 const insigniaStore = registerRankInsigniaRoutes({ app, auth, requireAdmin,
   directory: process.env.RANK_INSIGNIA_UPLOAD_DIR ? path.resolve(process.env.RANK_INSIGNIA_UPLOAD_DIR) : path.join(path.dirname(databaseFilename), "rank-insignia-images") });

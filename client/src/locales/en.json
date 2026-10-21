@@ -5069,5 +5069,15 @@
   "Cette passkey est déjà enregistrée ou la limite est atteinte.": "This passkey is already registered or the limit has been reached.",
   "Cette passkey a changé. Recommence la connexion.": "This passkey has changed. Start signing in again.",
   "Passkey introuvable.": "Passkey not found.",
-  "Conserve une autre méthode de double authentification avant de supprimer la dernière passkey.": "Keep another two-factor authentication method before deleting the last passkey."
+  "Conserve une autre méthode de double authentification avant de supprimer la dernière passkey.": "Keep another two-factor authentication method before deleting the last passkey.",
+  "Toutes les tables": "All tables",
+  "Tables publiques et privées, y compris les parties en cours.": "Public and private tables, including games in progress.",
+  "Rechercher une table": "Search tables",
+  "Table, code ou joueur…": "Table, code or player…",
+  "Publiques": "Public",
+  "Privées": "Private",
+  "Table fermée.": "Table closed.",
+  "Fermer « {name} » ? Tous les participants seront déconnectés de cette table.": "Close ‘{name}’? All participants will be disconnected from this table.",
+  "La partie classée sera annulée sans modifier les classements.": "The ranked game will be cancelled without changing ratings.",
+  "Aucune table à afficher.": "No tables to display."
 }

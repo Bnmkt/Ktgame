@@ -93,6 +93,28 @@ test("the worker accepts authorized virtual bots in every ranked engine but reje
     assert.equal((await denied.kernel.prepare(input)).status,400);
   }
 });
+test("an administrator outside a ranked room can close it through its owner worker", async () => {
+  const f = fixture(), config = normalizeRankedConfig().games.yahtzee;
+  f.context.users = [{ ...user, admin: true }, { ...user, id: "other" }];
+  const players = f.context.users.map(({ id, pseudo, tokens }) => ({ id, pseudo, tokens }));
+  const template = { id: "room", code: "RANKED", gameId: "yahtzee", ownerId: "ranked-server", stake: 10, players,
+    readyPlayerIds: players.map(({ id }) => id), ranked: { config, roster: players, forfeits: {}, actionAt: Date.now() } };
+  const input = { roomId: "room", epoch: "epoch", version: 0, commandId: "start", configurationId: "1", command: "start-ranked", context: f.context, template };
+  const started = await f.kernel.prepare(input);
+  assert.equal(started.status, 200);
+  f.kernel.commit({ ...input, version: started.version });
+  const close = { ...input, version: started.version, commandId: "close", command: "DELETE /api/rooms/:code", params: { code: template.code } };
+  const closed = await f.kernel.prepare(close);
+  assert.equal(closed.status, 200);
+  assert.equal(closed.room, null);
+  assert.equal(closed.deletedRoom.ranked.cancelled.by, user.id);
+  assert.deepEqual(closed.effects.filter((effect) => effect.kind === "tokens").map(({ userId, amount }) => ({ userId, amount })), [{ userId: user.id, amount: 10 }, { userId: "other", amount: 10 }]);
+  assert.equal(closed.effects.filter((effect) => effect.kind === "settle").length, 1);
+  assert.ok(closed.events.some((event) => event.event === "room-closed"));
+  f.kernel.commit({ ...close, version: closed.version });
+  assert.equal(f.kernel.health().rooms, 0);
+});
+
 test("Yahtzee roll and scoring preserve pacing and achievement events", async () => {
   const f = fixture(); await f.command("POST /api/rooms"); await f.command("POST /api/rooms/:code/start");
   const roll = (await f.command("POST /api/rooms/:code/action", { type: "roll" })).result;
