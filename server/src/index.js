@@ -2724,7 +2724,6 @@ const passkeys = registerPasskeyRoutes({ app, auth, filename: `${databaseFilenam
   emailAvailable: user => validEmail(user.email) && Boolean(user.emailVerifiedAt) && emailDeliveryConfigured(),
   sendCode: (user, code, purpose) => sendMfaCode({ user, code, siteName: platformSettings().siteName, purpose: `passkey-${purpose}` })
 });
-process.on("exit", () => passkeys.close());
 
 registerDiscordRoutes({ app, auth, platformSettings, readDb, sanitizeUser, bcrypt, isUnder13, requestCookie,
   publicWebsiteUrl, beginAccountLogin, authFailureKey, authLockStatus, recordAuthFailure, sendAuthLocked, writeDb,
@@ -6141,6 +6140,7 @@ async function shutdown(restart = false) {
   try { executionHistory.sample(serviceExecution.health(readingWork.health(), gameGateway?.health()), true); } catch {}
   await gameGateway?.close();
   await Promise.all([readingWork.close(), bcrypt.close(), accountsWork?.close(), capacityTests.close()]);
+  passkeys.close();
   executionHistory.close();
   io.close(() => process.exit(restart === true ? 1 : 0));
 }
