@@ -32,7 +32,7 @@ export function createGoogleInspection({ store, website, credentialFile = proces
   }
   function configuration() { return { configured: Boolean(privateKey), error: configError, consoleUrl: consoleUrl(property) }; }
   async function requestJson(url, options) {
-    const response = await send(url, { ...options, redirect: "error", signal: AbortSignal.timeout(6000) });
+    const response = await send(url, { ...options, redirect: "error", signal: AbortSignal.timeout(20000) });
     if (!response.ok) {
       await response.body?.cancel();
       throw failure([401, 403].includes(response.status) ? "Accès Google refusé. Vérifie le compte de service, la propriété et l’activation de l’API."
