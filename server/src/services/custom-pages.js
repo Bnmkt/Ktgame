@@ -12,7 +12,7 @@ const length = /^(?:0|auto|(?:\d{1,4}(?:\.\d{1,2})?)(?:px|rem|em|%|vh|vw))$/;
 const lengths = /^(?:0|auto|\d{1,4}(?:\.\d{1,2})?(?:px|rem|em|%))(?:\s+(?:0|auto|\d{1,4}(?:\.\d{1,2})?(?:px|rem|em|%))){0,3}$/;
 const htmlOptions = {
   allowedTags: [...sanitizeHtml.defaults.allowedTags, "img", "figure", "figcaption", "details", "summary"],
-  allowedAttributes: { "*": ["class", "title", "style", "lang", "dir"], a: ["href", "target", "rel"], img: ["src", "alt", "width", "height", "loading"], th: ["scope", "colspan", "rowspan"], td: ["colspan", "rowspan"], ol: ["start"], li: ["value"] },
+  allowedAttributes: { "*": ["id", "class", "title", "style", "lang", "dir"], a: ["href", "target", "rel"], img: ["src", "alt", "width", "height", "loading"], th: ["scope", "colspan", "rowspan"], td: ["colspan", "rowspan"], ol: ["start"], li: ["value"] },
   allowedClasses: { "*": [/^cp-[a-z0-9_-]+$/, /^custom-media-(?:left|right)$/] },
   allowedSchemes: ["http", "https", "mailto"],
   allowedSchemesByTag: { img: ["http", "https"] },
@@ -29,7 +29,8 @@ const htmlOptions = {
     "border-width": [length], "border-style": [/^(solid|dashed|dotted|none)$/], "border-radius": [lengths], float: [/^(left|right|none)$/], clear: [/^(both|left|right|none)$/], "object-fit": [/^(contain|cover)$/]
   } },
   transformTags: {
-    a: (_tag, attributes) => ({ tagName: "a", attribs: { ...attributes, target: "_blank", rel: "noopener noreferrer" } }),
+    "*": (tagName, attributes) => { if (attributes.id && !/^cp-[a-zA-Z0-9_-]{1,100}$/.test(attributes.id)) delete attributes.id; return { tagName, attribs: attributes }; },
+    a: (_tag, attributes) => ({ tagName: "a", attribs: { ...attributes, target: /^(?:https?:)?\/\//i.test(attributes.href || "") ? "_blank" : "_self", rel: "noopener noreferrer" } }),
     img: (_tag, attributes) => ({ tagName: "img", attribs: { ...attributes, loading: "lazy" } })
   }
 };
@@ -72,7 +73,7 @@ function wrapPageScript(script, variables = {}) {
 }
 
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
-export function createCustomPageStore({ filename, now = Date.now }) {
+export function createCustomPageStore({ filename, now = Date.now, systemContext = () => ({}) }) {
   if (filename !== ":memory:") fs.mkdirSync(path.dirname(filename), { recursive: true });
   const db = new DatabaseSync(filename);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=1000;
@@ -87,6 +88,8 @@ export function createCustomPageStore({ filename, now = Date.now }) {
     );
     CREATE INDEX IF NOT EXISTS custom_pages_draft_template ON custom_pages(json_extract(draft_json,'$.templateId'));
     CREATE INDEX IF NOT EXISTS custom_pages_published_template ON custom_pages(json_extract(published_json,'$.templateId'));`);
+  if (!db.prepare("PRAGMA table_info(custom_pages)").all().some(column => column.name === "system_route")) db.exec("ALTER TABLE custom_pages ADD COLUMN system_route TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS custom_pages_system_route ON custom_pages(system_route) WHERE system_route IS NOT NULL");
   let revision = 0;
   let publicCache;
   const row = id => typeof id === "string" ? db.prepare("SELECT * FROM custom_pages WHERE id=?").get(id) : null;
@@ -94,6 +97,7 @@ export function createCustomPageStore({ filename, now = Date.now }) {
   const liveTemplate = id => { const record = templateRow(id); return record?.published_json ? { ...JSON.parse(record.published_json), publishedAt: record.published_at } : null; };
   const templateUsage = id => db.prepare("SELECT count(*) AS total FROM custom_pages WHERE json_extract(draft_json,'$.templateId')=? OR json_extract(published_json,'$.templateId')=?").get(id, id).total;
   function render(input, { strict = false, template } = {}) {
+    if (input.systemRoute) input = { ...input, variableValues: { ...(systemContext(input.systemRoute).values ?? {}), ...input.variableValues } };
     let result = input;
     if (template || input.templateId) {
       const model = template ?? liveTemplate(input.templateId);
@@ -104,34 +108,36 @@ export function createCustomPageStore({ filename, now = Date.now }) {
   }
   const summary = record => {
     const draft = JSON.parse(record.draft_json);
-    return { id: record.id, title: draft.title, slug: draft.slug, format: draft.format, status: record.published_json ? "published" : "draft", hasChanges: Boolean(record.published_json && record.draft_json !== record.published_json), revision: record.revision, updatedAt: record.updated_at, publishedAt: record.published_at, liveSlug: record.published_slug };
+    return { id: record.id, title: draft.title, slug: draft.slug, format: draft.format, systemRoute: record.system_route || "", status: record.published_json ? "published" : "draft", hasChanges: Boolean(record.published_json && record.draft_json !== record.published_json), revision: record.revision, updatedAt: record.updated_at, publishedAt: record.published_at, liveSlug: record.published_slug };
   };
   const publicDocument = record => {
-    if (!record?.published_json) return null;
-    const { content, variableValues, ...document } = render(JSON.parse(record.published_json));
+    if (!record?.published_json || record.system_route && systemContext(record.system_route).available === false) return null;
+    const { content, variableValues, ...document } = render({ ...JSON.parse(record.published_json), systemRoute: record.system_route || "" });
     return { ...document, ...(document.format === "markdown" ? { content } : {}), scriptUrl: document.script?.trim() ? `/api/pages/${document.slug}/script.js?v=${encodeURIComponent(`${record.published_at}-${document.templateVersion ?? 0}`)}` : "", updatedAt: document.templateUpdatedAt > record.published_at ? document.templateUpdatedAt : record.published_at };
   };
   function list(publicOnly = false) {
     if (!publicOnly) return db.prepare(`SELECT id, draft_slug AS slug, json_extract(draft_json,'$.title') AS title,
       json_extract(draft_json,'$.format') AS format, CASE WHEN published_json IS NULL THEN 'draft' ELSE 'published' END AS status,
       published_json IS NOT NULL AND draft_json<>published_json AS hasChanges, revision, updated_at AS updatedAt,
-      published_at AS publishedAt, published_slug AS liveSlug FROM custom_pages ORDER BY updated_at DESC`).all().map(record => ({ ...record, hasChanges: Boolean(record.hasChanges) }));
-    if (publicCache?.revision === revision) return publicCache.rows;
+      published_at AS publishedAt, published_slug AS liveSlug, system_route AS systemRoute FROM custom_pages ORDER BY updated_at DESC`).all().map(record => ({ ...record, hasChanges: Boolean(record.hasChanges) }));
+    const available = rows => rows.filter(record => !record.systemRoute || systemContext(record.systemRoute).available !== false);
+    if (publicCache?.revision === revision) return available(publicCache.rows);
     const rows = db.prepare(`SELECT published_slug AS slug, json_extract(published_json,'$.title') AS title,
       json_extract(published_json,'$.description') AS description, json_extract(published_json,'$.format') AS format,
       json_extract(published_json,'$.showFooter') AS showFooter, json_extract(published_json,'$.footerLabel') AS footerLabel,
-      json_extract(published_json,'$.indexable') AS indexable, json_extract(published_json,'$.position') AS position,
+      json_extract(published_json,'$.indexable') AS indexable, json_extract(published_json,'$.position') AS position, system_route AS systemRoute,
       max(published_at,coalesce((SELECT published_at FROM custom_page_templates WHERE id=json_extract(custom_pages.published_json,'$.templateId')),published_at)) AS updatedAt FROM custom_pages WHERE published_json IS NOT NULL ORDER BY position, title`).all().map(record => ({ ...record, showFooter: Boolean(record.showFooter), indexable: Boolean(record.indexable) }));
-    publicCache = { revision, rows }; return rows;
+    publicCache = { revision, rows }; return available(rows);
   }
   function get(id) {
     const record = row(id);
-    return record ? { ...JSON.parse(record.draft_json), ...summary(record) } : null;
+    return record ? { ...JSON.parse(record.draft_json), ...summary(record), ...(record.system_route ? { systemValues: systemContext(record.system_route).values ?? {} } : {}) } : null;
   }
   function published(slug) { return publicDocument(db.prepare("SELECT * FROM custom_pages WHERE published_slug=?").get(slug)); }
+  function publishedRoute(route) { return publicDocument(db.prepare("SELECT * FROM custom_pages WHERE system_route=?").get(route)); }
   function save(input, { id = randomUUID(), actorId = "", publish = false } = {}) {
     const document = normalizeCustomPage(input);
-    render(document, { strict: publish });
+    render({ ...document, systemRoute: row(id)?.system_route || "" }, { strict: publish });
     const data = JSON.stringify(document);
     db.exec("BEGIN IMMEDIATE");
     try {
@@ -139,7 +145,7 @@ export function createCustomPageStore({ filename, now = Date.now }) {
       if (previous && input.revision !== previous.revision) throw fail("Cette page a été modifiée ailleurs. Recharge-la avant d’enregistrer.", 409);
       if (db.prepare("SELECT 1 FROM custom_pages WHERE id<>? AND (draft_slug=? OR published_slug=?)").get(id, document.slug, document.slug)) throw fail("Cette URL est déjà utilisée par une autre page.", 409);
       const timestamp = new Date(now()).toISOString();
-      db.prepare(`INSERT INTO custom_pages VALUES(?,?,?,?,?,?,?,?,?,?)
+      db.prepare(`INSERT INTO custom_pages(id,draft_slug,published_slug,draft_json,published_json,revision,created_at,updated_at,published_at,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET draft_slug=excluded.draft_slug, published_slug=excluded.published_slug,
         draft_json=excluded.draft_json, published_json=excluded.published_json, revision=excluded.revision,
         updated_at=excluded.updated_at, published_at=excluded.published_at, updated_by=excluded.updated_by`).run(
@@ -157,11 +163,11 @@ export function createCustomPageStore({ filename, now = Date.now }) {
     return record;
   }
   function unpublish(id, expected) {
-    check(id, expected);
+    if (check(id, expected).system_route) throw fail("Cette page intégrée doit rester publiée. Modifie son contenu ou désactive le jeu dans ses paramètres.");
     if (!db.prepare("UPDATE custom_pages SET published_slug=NULL, published_json=NULL, revision=revision+1, updated_at=? WHERE id=? AND revision=?").run(new Date(now()).toISOString(), id, expected).changes) throw fail("La page a changé. Recharge-la avant de continuer.", 409);
     revision++; return get(id);
   }
-  function remove(id, expected) { check(id, expected); if (!db.prepare("DELETE FROM custom_pages WHERE id=? AND revision=?").run(id, expected).changes) throw fail("La page a changé. Recharge-la avant de continuer.", 409); revision++; }
+  function remove(id, expected) { if (check(id, expected).system_route) throw fail("Cette page intégrée ne peut pas être supprimée."); if (!db.prepare("DELETE FROM custom_pages WHERE id=? AND revision=?").run(id, expected).changes) throw fail("La page a changé. Recharge-la avant de continuer.", 409); revision++; }
   function template(id) {
     const record = templateRow(id);
     return record ? { ...JSON.parse(record.draft_json), id, revision: record.revision, status: record.published_json ? "published" : "draft", hasChanges: Boolean(record.published_json && record.draft_json !== record.published_json), usedPages: templateUsage(id) } : null;
@@ -182,10 +188,10 @@ export function createCustomPageStore({ filename, now = Date.now }) {
       if (previous && input.revision !== previous.revision) throw fail("Ce modèle a été modifié ailleurs. Recharge-le avant d’enregistrer.", 409);
       const version = (previous?.revision ?? 0) + 1;
       if (publish) {
-        const dependents = db.prepare("SELECT published_json FROM custom_pages WHERE json_extract(published_json,'$.templateId')=?").all(id);
+        const dependents = db.prepare("SELECT published_json,system_route FROM custom_pages WHERE json_extract(published_json,'$.templateId')=?").all(id);
         for (const record of dependents) {
           const page = JSON.parse(record.published_json);
-          try { render(page, { strict: true, template: model }); }
+          try { render({ ...page, systemRoute: record.system_route || "" }, { strict: true, template: model }); }
           catch (error) { throw fail(`Publication impossible pour la page « ${page.title} » : ${error.message}`); }
         }
       }
@@ -207,14 +213,33 @@ export function createCustomPageStore({ filename, now = Date.now }) {
   }
   function preview(input, template) {
     const document = normalizeCustomPage({ ...input, title: input.title?.trim() || "Aperçu", slug: /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.slug ?? "") ? input.slug : "apercu", content: input.content ?? "" }, { allowEmpty: true });
-    return render(document, { template });
+    return render({ ...document, systemRoute: row(input.id)?.system_route || "" }, { template });
   }
-  return { list, get, published, save, unpublish, remove, render, preview, template, listTemplates, saveTemplate, removeTemplate, revision: () => revision, close: () => db.close() };
+  function seedSystemPages({ templates, pages }) {
+    for (const model of templates) if (!templateRow(model.id)) saveTemplate(model, { id: model.id, publish: true, actorId: "system-pages-migration" });
+    for (const page of pages) {
+      if (db.prepare("SELECT 1 FROM custom_pages WHERE system_route=?").get(page.systemRoute)) continue;
+      if (row(page.id)) throw fail("Un identifiant de migration est déjà utilisé.");
+      let slug = page.slug, suffix = 2;
+      while (db.prepare("SELECT 1 FROM custom_pages WHERE draft_slug=? OR published_slug=?").get(slug, slug)) slug = `${page.slug}-${suffix++}`;
+      const normalized = normalizeCustomPage({ ...page, slug });
+      render({ ...normalized, systemRoute: page.systemRoute }, { strict: true });
+      const timestamp = new Date(now()).toISOString(), data = JSON.stringify(normalized);
+      db.prepare("INSERT INTO custom_pages(id,draft_slug,published_slug,draft_json,published_json,revision,created_at,updated_at,published_at,updated_by,system_route) VALUES(?,?,?,?,?,1,?,?,?,'system-pages-migration',?)").run(page.id, slug, slug, data, data, timestamp, timestamp, timestamp, page.systemRoute);
+      revision++;
+    }
+  }
+  return { list, get, published, publishedRoute, save, unpublish, remove, render, preview, template, listTemplates, saveTemplate, removeTemplate, seedSystemPages, revision: () => revision, close: () => db.close() };
 }
 
 export function registerCustomPageRoutes({ app, store, auth, requireBackOffice }) {
   const action = handler => (req, res) => { try { handler(req, res); } catch (error) { res.status(error.status ?? 400).json({ error: error.message }); } };
   const previews = new Map();
+  app.get("/api/page-content", (req, res) => {
+    const page = typeof req.query.path === "string" ? store.publishedRoute(req.query.path) : null;
+    if (!page) return res.status(404).json({ error: "Page introuvable." });
+    res.set("Cache-Control", "no-cache").json(page);
+  });
   const previewScript = (script, variables = {}) => {
     if (!script?.trim()) return "";
     for (const [key, entry] of previews) if (entry.expires <= Date.now()) previews.delete(key);

@@ -3,7 +3,7 @@ import { ArrowLeft, Coins, Mail, ShieldCheck } from "lucide-react";
 import { appPath } from "../navigation/routes.js";
 import { legalLinks } from "./Privacy.jsx";
 
-function legalDocuments(email, localeText) {
+export function legalDocuments(email, localeText) {
 const contact = <a href={`mailto:${email}`}>{email}</a>;
 return {
   parents: {

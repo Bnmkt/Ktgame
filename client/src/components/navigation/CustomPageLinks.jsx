@@ -11,5 +11,5 @@ export function CustomPageLinks() {
     load(); window.addEventListener("ktga-pages-updated", load);
     return () => { active = false; window.removeEventListener("ktga-pages-updated", load); };
   }, []);
-  return pages.filter(page => page.showFooter).map(page => <a key={page.slug} href={appPath("page", page.slug)}>{page.footerLabel || page.title}</a>);
+  return pages.filter(page => page.showFooter && !page.systemRoute).map(page => <a key={page.slug} href={appPath("page", page.slug)}>{page.footerLabel || page.title}</a>);
 }

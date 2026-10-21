@@ -40,7 +40,7 @@ export function createPublicPageService({ template, render, styles = [], setting
     }
     const canonical = canonicalOrigin + meta.canonicalPath;
     const image = canonicalOrigin + basePath + "/ktga-preview.png";
-    const structured = meta.indexable ? { "@context": "https://schema.org", "@type": meta.view === "games" && meta.id ? "VideoGame" : meta.view === "lobby" ? "WebSite" : "WebPage", name: meta.view === "lobby" ? data.settings.siteName : meta.title, description: meta.description, url: canonical, inLanguage: "fr-BE", ...(meta.view === "games" && meta.id ? { isAccessibleForFree: true, gamePlatform: "Web browser" } : {}) } : null;
+    const structured = meta.indexable ? { "@context": "https://schema.org", "@type": meta.gameId ? "VideoGame" : meta.view === "lobby" ? "WebSite" : "WebPage", name: meta.view === "lobby" ? data.settings.siteName : meta.title, description: meta.description, url: canonical, inLanguage: "fr-BE", ...(meta.gameId ? { isAccessibleForFree: true, gamePlatform: "Web browser" } : {}) } : null;
     const head = `<meta name="description" content="${escape(meta.description)}"><meta name="robots" content="${meta.robots}"><link rel="canonical" href="${escape(canonical)}"><meta property="og:title" content="${escape(meta.title)}"><meta property="og:description" content="${escape(meta.description)}"><meta property="og:url" content="${escape(canonical)}"><meta property="og:type" content="website"><meta property="og:locale" content="fr_BE"><meta property="og:image" content="${escape(image)}"><meta name="twitter:card" content="summary_large_image">${styles.map((href) => `<link rel="stylesheet" href="${escape(basePath + href)}">`).join("")}${structured ? `<script type="application/ld+json">${json(structured)}</script>` : ""}`;
     const html = template.replace(/<title>.*?<\/title>/s, `<title>${escape(meta.title)}</title>`).replace("</head>", `${head}</head>`).replace('<div id="root"></div>', `<div id="root">${render(data)}</div><script type="application/json" id="ktga-page-data">${json(data)}</script>`);
     const result = { html, meta };
@@ -58,7 +58,8 @@ export function createPublicPageService({ template, render, styles = [], setting
 export async function registerPublicPages({ app, clientDist, ...sources }) {
   const rendererPath = new URL("../../../client/dist-ssr/render.js", import.meta.url);
   const styleDirectory = new URL("../../../client/dist-ssr/assets/", import.meta.url);
-  const { renderPublicPage } = await import(rendererPath.href);
+  const { renderPublicPage, systemPageSeeds } = await import(rendererPath.href);
+  if (sources.seedSystemPages && systemPageSeeds) sources.seedSystemPages(systemPageSeeds({ settings: sources.settings(), games: sources.games() }));
   const styles = fs.readdirSync(styleDirectory).filter((name) => name.endsWith(".css")).map((name) => `/assets/${name}`);
   const service = createPublicPageService({ ...sources, template: fs.readFileSync(path.join(clientDist, "index.html"), "utf8"), render: renderPublicPage, styles });
   app.get("/robots.txt", (_req, res) => res.type("text/plain").send(service.robots()));
@@ -68,6 +69,8 @@ export async function registerPublicPages({ app, clientDist, ...sources }) {
     if (req.method !== "GET" && req.method !== "HEAD" || /^\/(?:api|socket\.io)(?:\/|$)/.test(req.path) || /\.[a-zA-Z0-9]+$/.test(req.path) && !req.path.startsWith("/patchnotes/")) return next();
     const normalizedPath = req.path.replace(/\/{2,}/g, "/").replace(/\/$/, "") || "/";
     if (req.path !== normalizedPath) return res.redirect(308, `${sources.basePath || ""}${normalizedPath}${req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""}`);
+    const metadata = service.metadata(req.url);
+    if (metadata.view === "page" && req.path.startsWith("/pages/") && !metadata.canonicalPath.includes("/pages/") && !req.query.preview) return res.redirect(308, metadata.canonicalPath);
     const { html, meta } = service.document(req.url);
     res.status(meta.status).set("X-Robots-Tag", meta.robots).set("Cache-Control", meta.indexable ? "public, max-age=0, must-revalidate" : "private, no-store").type("html").send(html);
   });

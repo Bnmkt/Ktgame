@@ -784,7 +784,13 @@ const helpFilename = process.env.HELP_DB_PATH ? path.resolve(process.cwd(), proc
 const playerHelp = createHelpStore({ filename: helpFilename, uploadDirectory: path.join(path.dirname(helpFilename), "help-images") });
 process.on("exit", () => playerHelp.close());
 const customPagesFilename = process.env.CUSTOM_PAGES_DB_PATH ? path.resolve(process.cwd(), process.env.CUSTOM_PAGES_DB_PATH) : `${databaseFilename}.pages.sqlite`;
-const customPages = createCustomPageStore({ filename: customPagesFilename });
+const customPages = createCustomPageStore({ filename: customPagesFilename, systemContext: route => {
+  const settings = platformSettings(), game = route.startsWith("/jeux/") ? configuredGames().find(entry => `/jeux/${entry.id}` === route) : null;
+  return { available: !route.startsWith("/jeux/") || Boolean(game && game.enabled !== false), values: {
+    site_name: settings.siteName, contact_email: settings.supportEmail,
+    ...(game ? { game_name: game.name, game_description: game.description, game_players: game.minPlayers === game.maxPlayers ? String(game.minPlayers) : `${game.minPlayers} à ${game.maxPlayers}`, game_type: game.type === "dice" ? "Jeu de dés" : "Jeu de cartes", game_image: game.coverImage || game.descriptiveImage || "/favicon.svg" } : {})
+  } };
+} });
 process.on("exit", () => customPages.close());
 const serverStartedAt = Date.now();
 const requestTelemetry = {
@@ -6085,7 +6091,7 @@ if (CLIENT_DIST) {
   if (!fs.existsSync(CLIENT_DIST)) {
     console.warn(`CLIENT_DIST is configured but does not exist: ${CLIENT_DIST}`);
   } else {
-    await registerPublicPages({ app, clientDist: CLIENT_DIST, settings: platformSettings, games: configuredGames, help: () => playerHelp.read(true), catalog: () => ({ currentVersion: patchnotes.currentVersion, notes: patchnotes.list() }), note: (version) => version ? patchnotes.get(version) : null, customPages: () => customPages.list(true), customPage: slug => customPages.published(slug), customRevision: customPages.revision, basePath: APP_BASE_PATH });
+    await registerPublicPages({ app, clientDist: CLIENT_DIST, settings: platformSettings, games: configuredGames, help: () => playerHelp.read(true), catalog: () => ({ currentVersion: patchnotes.currentVersion, notes: patchnotes.list() }), note: (version) => version ? patchnotes.get(version) : null, customPages: () => customPages.list(true), customPage: slug => customPages.published(slug), customRevision: customPages.revision, seedSystemPages: customPages.seedSystemPages, basePath: APP_BASE_PATH });
     app.use(express.static(CLIENT_DIST, { index: false, dotfiles: "deny" }));
     app.use((_req, res) => res.status(404).set("X-Robots-Tag", "noindex").type("text/plain").send("Not found"));
   }

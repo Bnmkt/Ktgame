@@ -1,0 +1,53 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createCustomPageStore, registerCustomPageRoutes } from "../../server/src/services/custom-pages.js";
+import { systemPageSeeds } from "../dist-ssr/render.js";
+import { games } from "../../server/src/games/shared.js";
+const require = createRequire(new URL("../../server/package.json", import.meta.url)), express = require("express");
+const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE).href);
+const app = express(), store = createCustomPageStore({ filename: ":memory:", systemContext: route => ({ values: { site_name: "KTGA.ME", contact_email: "contact@netdis.org", game_name: "Yahtzee", game_description: "Marquer le plus de points", game_players: "1 à 6", game_type: "Jeu de dés", game_image: "/favicon.svg" } }) });
+store.seedSystemPages(systemPageSeeds({ settings: { siteName: "KTGA.ME", supportEmail: "contact@netdis.org" }, games }));
+app.use(express.json());
+registerCustomPageRoutes({ app, store, auth: (req, _res, next) => { req.auth = { id: "admin" }; req.backOfficeUser = { admin: true }; next(); }, requireBackOffice: (_req, _res, next) => next() });
+app.get("/api/locales/:locale", (_req, res) => res.json({ messages: {} }));
+const server = app.listen(0, "127.0.0.1"); await new Promise(resolve => server.once("listening", resolve));
+const output = new URL(`../../docs/previews/system-pages-20261021/${Date.now()}/`, import.meta.url); await fs.mkdir(output, { recursive: true });
+const browser = await chromium.launch({ channel: "msedge", headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }), errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  if (process.env.BLOCKER_MODULE) { const { PlaywrightBlocker } = await import(pathToFileURL(process.env.BLOCKER_MODULE).href); await (await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch)).enableBlockingInPage(page); }
+  await page.route("**/api/**", async route => {
+    const request = route.request(), url = new URL(request.url()), headers = { "Access-Control-Allow-Origin": "http://127.0.0.1:5197", "Access-Control-Allow-Credentials": "true", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    const response = await fetch(`http://127.0.0.1:${server.address().port}${url.pathname}${url.search}`, { method: request.method(), headers: { "Content-Type": "application/json" }, ...(request.postData() ? { body: request.postData() } : {}) });
+    return route.fulfill({ status: response.status, body: await response.text(), contentType: response.headers.get("Content-Type") || "application/json", headers });
+  });
+  const fixture = "http://127.0.0.1:5197/test/fixtures/custom-pages.html";
+  await page.goto(fixture);
+  await page.getByRole("searchbox").fill("Conditions");
+  await page.getByRole("button", { name: "Modifier", exact: true }).click();
+  assert.equal(await page.getByLabel("URL de la page", { exact: true }).inputValue(), "/conditions");
+  await page.getByRole("button", { name: "Réglages", exact: true }).click();
+  assert.equal(await page.getByRole("button", { name: "Supprimer", exact: true }).count(), 0);
+  await page.screenshot({ path: fileURLToPath(new URL("editor-desktop.png", output)), fullPage: true });
+  await page.goto(`${fixture}?path=${encodeURIComponent("/conditions")}`);
+  await page.locator("#cp-tribunal").waitFor();
+  await page.screenshot({ path: fileURLToPath(new URL("conditions-desktop.png", output)), fullPage: true });
+  await page.getByLabel("Langue", { exact: true }).selectOption("en");
+  await page.getByRole("heading", { name: "Terms of use", exact: true }).waitFor();
+  await page.getByLabel("Language", { exact: true }).selectOption("fr");
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await page.screenshot({ path: fileURLToPath(new URL("conditions-mobile.png", output)), fullPage: true });
+  await page.goto(`${fixture}?path=${encodeURIComponent("/jeux/yahtzee")}`);
+  await page.locator("#cp-regles-0").waitFor();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await page.screenshot({ path: fileURLToPath(new URL("yahtzee-mobile.png", output)), fullPage: true });
+  await page.goto(`${fixture}?path=${encodeURIComponent("/jeux")}`);
+  await page.locator(".public-games-grid .public-game-entry").first().waitFor();
+  assert.deepEqual(errors, []);
+  console.log("System page editor, original URLs, legal content, translations, game catalog, mobile and content blocker passed", fileURLToPath(output));
+} finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); store.close(); }

@@ -32,14 +32,16 @@ export function pageMetadata({ pathname = "/", search = "", basePath = "", siteN
   let [title, description] = pages[view] || ["Accès au site", "Connectez-vous à KTGA.ME pour accéder à cet espace."];
   const game = id && view === "games" ? games.find((entry) => entry.id === id && entry.enabled !== false) : null;
   const note = id && view === "patchnotes" ? notes.find((entry) => entry.version === id && entry.status === "published") : null;
-  const custom = id && view === "page" ? customPages.find(entry => entry.slug === id) : null;
+  const bound = customPages.find(entry => entry.systemRoute === (relative.replace(/\/$/, "") || "/"));
+  const custom = id && view === "page" ? customPages.find(entry => entry.slug === id) : bound;
   if (game) { title = `${game.name} : règles et jeu gratuit`; description = `${game.description || `Découvrez ${game.name} sur ${siteName}.`} Retrouvez les règles et jouez gratuitement avec des jetons virtuels sans valeur monétaire.`; }
   if (note) { title = `Patchnote ${note.version} - ${note.title}`; description = String(note.summary || `Les nouveautés de la version ${note.version} de ${siteName}.`).replace(/[#*`\[\]]/g, " "); canonical = `/patchnotes?version=${encodeURIComponent(note.version)}`; }
   if (custom) { title = custom.title; description = custom.description || custom.title; }
   if (!view || (view === "page" && !custom) || (view === "games" && id && !game) || (view === "patchnotes" && id && !note)) { status = 404; view = "not-found"; title = "Page introuvable"; description = "Cette page n’existe pas ou n’est pas disponible publiquement."; }
+  if (custom && status === 200) { view = "page"; id = custom.slug; canonical = custom.systemRoute || `/pages/${custom.slug}`; }
   const sensitive = [...query.keys()].some((key) => /token|password|verify|parental|receipt|secret|challenge|code|preview/i.test(key));
   const indexable = Boolean(pages[view] || custom) && custom?.indexable !== false && status === 200 && !sensitive;
-  return { view, id, status, indexable, title: `${siteName} - ${title}`, description: description.replace(/\s+/g, " ").trim().slice(0, 220), canonicalPath: `${base}${canonical}`, robots: indexable ? "index, follow" : "noindex, follow" };
+  return { view, id, gameId: game?.id || "", systemRoute: custom?.systemRoute || "", status, indexable, title: `${siteName} - ${title}`, description: description.replace(/\s+/g, " ").trim().slice(0, 220), canonicalPath: `${base}${canonical}`, robots: indexable ? "index, follow" : "noindex, follow" };
 }
 
 export function readPublicPageData() {

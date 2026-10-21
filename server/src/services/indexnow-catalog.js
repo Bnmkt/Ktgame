@@ -15,6 +15,7 @@ export function indexNowCatalog({ settings, games, notes, pages, page, help, web
     }
     else if (["faq", "guide"].includes(row.view)) content.help = help().entries.filter(entry => entry.kind === row.view);
     else if (row.view === "lobby") content.games = publicGames;
+    if (row.systemRoute === "/jeux") content.games = publicGames;
     return { ...row, content };
   });
 }

@@ -5014,5 +5014,9 @@
   "Trop de vérifications Google en cours. Réessaie dans un instant.": "Too many Google checks are running. Try again shortly.",
   "La vérification Google a échoué. Les dernières données valides sont conservées.": "Google verification failed. The last valid data is retained.",
   "Trop de vérifications Google. Réessaie dans un instant.": "Too many Google checks. Try again shortly.",
-  "Choisis une URL publique canonique du site.": "Choose a canonical public URL from this website."
+  "Choisis une URL publique canonique du site.": "Choose a canonical public URL from this website.",
+  "Page intégrée": "Built-in page",
+  "Cette page intégrée doit rester publiée. Modifie son contenu ou désactive le jeu dans ses paramètres.": "This built-in page must remain published. Edit its content or disable the game in its settings.",
+  "Cette page intégrée ne peut pas être supprimée.": "This built-in page cannot be deleted.",
+  "Un identifiant de migration est déjà utilisé.": "A migration identifier is already in use."
 }
