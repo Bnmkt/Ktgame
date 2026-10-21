@@ -4,7 +4,7 @@ import express from "express";
 import { registerThemeRoutes, validateThemeLibrary } from "../src/services/site-themes.js";
 import { DEFAULT_THEME, normalizeTheme } from "../../client/src/features/theme/config.js";
 
-const custom = () => ({ ...structuredClone(DEFAULT_THEME), id: "theme-test", name: "Test", tokens: { ...DEFAULT_THEME.tokens, primary: "#00aa99" } });
+const custom = () => ({ ...structuredClone(DEFAULT_THEME), id: "theme-test", name: "Test", tokens: { ...DEFAULT_THEME.tokens, primary: "#00aa99", contentOpacity: .7, contentBlur: 8, contentShadowOpacity: .5, contentShadowBlur: 24 } });
 
 test("theme libraries validate capacity, identifiers and stored images", () => {
   const model = { version: 1, activeId: "theme-test", themes: [custom()] };
@@ -40,14 +40,22 @@ test("admin themes persist drafts, apply explicitly, reject stale writes and pro
     assert.equal((await request("PUT", { ...catalog, activeId: "theme-test" })).status, 400);
     catalog = await (await request("PUT", { ...catalog, activeId: "theme-test", apply: true })).json();
     assert.equal(db.settings.platform.appearance.tokens.primary, "#00aa99");
+    assert.equal(db.settings.platform.appearance.tokens.contentOpacity, .7);
+    assert.equal(db.settings.platform.appearance.tokens.contentBlur, 8);
     const css = await request("GET", null, "", "/api/site-theme.css");
     assert.match(css.headers.get("content-type"), /text\/css/);
-    assert.match(await css.text(), /--site-primary:#00aa99/);
+    const stylesheet = await css.text();
+    assert.match(stylesheet, /--site-primary:#00aa99/);
+    assert.match(stylesheet, /--site-content-opacity:0.7/);
+    assert.match(stylesheet, /--site-content-blur:8px/);
+    assert.match(stylesheet, /--site-content-shadow-opacity:0.5/);
     catalog.themes[0].tokens.primary = "#112233";
     catalog = await (await request("PUT", catalog)).json();
     assert.equal(db.settings.platform.appearance.tokens.primary, "#00aa99", "saving the active template must not publish edits");
     db = JSON.parse(JSON.stringify(db));
     assert.equal((await (await request()).json()).themes[0].tokens.primary, "#112233");
+    assert.equal((await (await request()).json()).themes[0].tokens.contentShadowBlur, 24);
+    assert.equal((await request("PUT", { ...catalog, themes: [{ ...custom(), tokens: { ...custom().tokens, contentBlur: 999 } }] })).status, 400);
     catalog = await (await request("PUT", { ...catalog, activeId: DEFAULT_THEME.id, apply: true })).json();
     assert.deepEqual(catalog.appearance, DEFAULT_THEME);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

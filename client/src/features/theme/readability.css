@@ -1,7 +1,23 @@
 /* Keep the wallpaper on html, with a continuous reading surface under page content. */
-html[data-site-wallpaper="true"] .app-shell:not(.table-fullscreen):not(:fullscreen) {
+html[data-site-wallpaper="true"] .app-shell:not(.table-fullscreen):not(:fullscreen),
+.theme-sample-scene[data-theme-wallpaper="true"] > .theme-sample-body {
+  position: relative;
   background-color: var(--site-page, #07080a);
-  background-color: rgb(from var(--site-page, #07080a) r g b / .94);
+  background-color: rgb(from var(--site-page, #07080a) r g b / var(--site-content-opacity, .94));
+  box-shadow: var(--site-content-shadow-x, 0px) var(--site-content-shadow-y, 8px) var(--site-content-shadow-blur, 32px) var(--site-content-shadow-spread, 0px) rgb(from var(--site-content-shadow-color, #000000) r g b / var(--site-content-shadow-opacity, 0));
+}
+
+/* A separate layer blurs the scenery without blurring text or trapping fixed dialogs. */
+html[data-site-wallpaper="true"] .app-shell:not(.table-fullscreen):not(:fullscreen)::before,
+.theme-sample-scene[data-theme-wallpaper="true"] > .theme-sample-body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: transparent;
+  backdrop-filter: var(--site-content-backdrop, none);
+  -webkit-backdrop-filter: var(--site-content-backdrop, none);
+  pointer-events: none;
 }
 
 /* These images sit behind text; foreground artwork remains sharp and unchanged. */

@@ -21,7 +21,15 @@ export const THEME_FIELDS = [
   { group: "Composants", key: "radius", label: "Arrondi des cartes", value: 8, min: 0, max: 8, unit: "px" },
   { group: "Composants", key: "buttonRadius", label: "Arrondi des boutons", value: 8, min: 0, max: 8, unit: "px" },
   { group: "Composants", key: "borderWidth", label: "Épaisseur des bordures", value: 1, min: 0, max: 3, unit: "px" },
-  { group: "Image de fond", key: "imageOpacity", label: "Opacité de l'image", value: 0.2, min: 0, max: 1, step: 0.05 }
+  { group: "Image de fond", key: "imageOpacity", label: "Opacité de l'image", value: 0.2, min: 0, max: 1, step: 0.05 },
+  { group: "Lisibilité", key: "contentOpacity", label: "Opacité du voile", value: 0.94, min: 0, max: 1, step: 0.01, percent: true },
+  { group: "Lisibilité", key: "contentBlur", label: "Flou du décor intérieur", value: 0, min: 0, max: 24, unit: "px" },
+  { group: "Ombre du contenu", key: "contentShadowColor", label: "Couleur de l'ombre", value: "#000000" },
+  { group: "Ombre du contenu", key: "contentShadowOpacity", label: "Opacité de l'ombre", value: 0, min: 0, max: 1, step: 0.01, percent: true },
+  { group: "Ombre du contenu", key: "contentShadowX", label: "Décalage horizontal", value: 0, min: -64, max: 64, unit: "px" },
+  { group: "Ombre du contenu", key: "contentShadowY", label: "Décalage vertical", value: 8, min: -64, max: 64, unit: "px" },
+  { group: "Ombre du contenu", key: "contentShadowBlur", label: "Diffusion de l'ombre", value: 32, min: 0, max: 96, unit: "px" },
+  { group: "Ombre du contenu", key: "contentShadowSpread", label: "Étendue de l'ombre", value: 0, min: -32, max: 64, unit: "px" }
 ];
 export const DEFAULT_TOKENS = Object.fromEntries(THEME_FIELDS.map(field => [field.key, field.value]));
 export const DEFAULT_THEME = { id: "ktga-default", name: "KTGA original", tokens: DEFAULT_TOKENS, backgroundImage: "" };
@@ -54,6 +62,7 @@ export function themeVariables(value, resolveImage = image => image) {
   const theme = normalizeTheme(value);
   const variables = Object.fromEntries(THEME_FIELDS.map(field => [`--site-${field.key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)}`, `${theme.tokens[field.key]}${field.unit || ""}`]));
   variables["--site-image"] = theme.backgroundImage ? `url("${resolveImage(theme.backgroundImage)}")` : "none";
+  variables["--site-content-backdrop"] = theme.tokens.contentBlur > 0 ? `blur(${theme.tokens.contentBlur}px)` : "none";
   return variables;
 }
 

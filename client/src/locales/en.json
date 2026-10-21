@@ -5018,5 +5018,20 @@
   "Page intégrée": "Built-in page",
   "Cette page intégrée doit rester publiée. Modifie son contenu ou désactive le jeu dans ses paramètres.": "This built-in page must remain published. Edit its content or disable the game in its settings.",
   "Cette page intégrée ne peut pas être supprimée.": "This built-in page cannot be deleted.",
-  "Un identifiant de migration est déjà utilisé.": "A migration identifier is already in use."
+  "Un identifiant de migration est déjà utilisé.": "A migration identifier is already in use.",
+  "Lisibilité": "Readability",
+  "Ombre du contenu": "Content shadow",
+  "Opacité du voile": "Overlay opacity",
+  "Flou du décor intérieur": "Inner scenery blur",
+  "Couleur de l'ombre": "Shadow colour",
+  "Opacité de l'ombre": "Shadow opacity",
+  "Décalage horizontal": "Horizontal offset",
+  "Décalage vertical": "Vertical offset",
+  "Diffusion de l'ombre": "Shadow blur",
+  "Étendue de l'ombre": "Shadow spread",
+  "Rétablir cette rubrique": "Reset this section",
+  "Rétablir : {value0}": "Reset: {value0}",
+  "Aperçu du thème": "Theme preview",
+  "Version en ligne": "Published version",
+  "Modifications": "Changes"
 }

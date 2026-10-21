@@ -10,7 +10,7 @@ test("themes round-trip through export and strip unrecognised declarations", () 
   assert.equal(theme.extra, undefined);
   assert.deepEqual(importTheme(JSON.stringify({ version: 1, theme })), theme);
   assert.deepEqual(normalizeTheme(undefined), DEFAULT_THEME);
-  assert.equal(Object.keys(themeVariables(theme)).length, THEME_FIELDS.length + 1);
+  assert.equal(Object.keys(themeVariables(theme)).length, THEME_FIELDS.length + 2);
 });
 
 test("themes reject CSS injection, arbitrary URLs, invalid dimensions and malformed imports", () => {
