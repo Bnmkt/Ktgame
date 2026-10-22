@@ -3,6 +3,7 @@ import { createGameWorkers } from "./game-workers.js";
 import { createRoomDirectory } from "./room-directory.js";
 import { selectedCollectionRows } from "../storage/selected-rows.js";
 import { releaseRoomPresence } from "./room-lifecycle.js";
+import { isFundedPlayer, walletTokens } from "../../../client/src/features/games/token-economy.js";
 
 const conflict = () => Object.assign(new Error("La table a change pendant le traitement. Reessaie."), { code: "GAME_CONFLICT" });
 const userFields = ["id", "pseudo", "tokens", "guest", "active", "admin", "gameXp", "moderation"];
@@ -11,7 +12,7 @@ function workerAccount(user, presentation) {
     profile: { displayName: user.profile?.displayName, birthDate: user.profile?.birthDate }, cosmetics: { equipped: user.cosmetics?.equipped },
     registrationAuthorization: { ageBand: user.registrationAuthorization?.ageBand },
     parentalAccess: { status: user.parentalAccess?.status, revokedUntil: user.parentalAccess?.revokedUntil, reason: user.parentalAccess?.reason },
-    roomPlayer: presentation };
+    tokens: walletTokens(user), roomPlayer: presentation };
 }
 
 // The Gateway supplies a sparse account view and commits effects against fresh
@@ -74,6 +75,7 @@ export function createGameGateway(dependencies) {
           for (const effect of result.effects) {
             const user = db.users.find((target) => target.id === effect.userId);
             if (effect.kind === "tokens") {
+              if (!isFundedPlayer(getUser(effect.userId))) throw conflict();
               const balance = getUser(effect.userId)?.tokens;
               if (!Number.isFinite(effect.amount) || balance === undefined || balance + effect.amount < 0 || effect.meta?.roomId !== roomId) throw conflict();
               addTokens(db, effect.userId, effect.amount, effect.meta);

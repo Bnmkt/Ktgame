@@ -1,5 +1,6 @@
 import { cardValue, createDeck, shuffle } from "../shared.js";
 import { appendLog, publicPlayers } from "../engine-context.js";
+import { isFundedPlayer } from "../../../../client/src/features/games/token-economy.js";
 
 export const POKER_HAND_NAMES = ["Carte haute", "Paire", "Deux paires", "Brelan", "Suite", "Couleur", "Full", "Carré", "Quinte flush"];
 const POKER_RESOLUTION_DELAY_MS = 7000;
@@ -289,7 +290,7 @@ export function createTexasHoldemState(players, options = {}) {
   const bigBlind = postBlind(bigBlindIndex, configuredBigBlind);
   const firstIndex = tablePlayers.length === 2 ? dealerIndex : (bigBlindIndex + 1) % tablePlayers.length;
   const now = Date.now();
-  return { gameId: "texas-holdem", players: tablePlayers, deck, hands, community: [], buyIn, realBankroll: buyIn * tablePlayers.filter((player) => !player.isBot).length, dealerIndex, smallBlindIndex, bigBlindIndex, smallBlind, bigBlind: configuredBigBlind, maximumBet, stacks, streetBets, contributions, pot: postedSmallBlind + bigBlind, currentBet: bigBlind, minRaise: configuredBigBlind, street: "preflop", handNumber: 1, turnDurationMs, turnStartedAt: now, turnDeadline: now + turnDurationMs, resolutionStartedAt: null, actedPlayerIds: [], foldedPlayerIds: [], allInPlayerIds: [], autoCheckFoldPlayerIds: [], autoCheckFoldEnabledAt: {}, shownPlayerIds: [], currentPlayerIndex: firstIndex, logs: [], finished: false, showdown: false, winners: [], payouts: {}, pots: [], departedPayouts: {}, departedPlayers: [] };
+  return { gameId: "texas-holdem", players: tablePlayers, deck, hands, community: [], buyIn, realBankroll: buyIn * tablePlayers.filter(isFundedPlayer).length, dealerIndex, smallBlindIndex, bigBlindIndex, smallBlind, bigBlind: configuredBigBlind, maximumBet, stacks, streetBets, contributions, pot: postedSmallBlind + bigBlind, currentBet: bigBlind, minRaise: configuredBigBlind, street: "preflop", handNumber: 1, turnDurationMs, turnStartedAt: now, turnDeadline: now + turnDurationMs, resolutionStartedAt: null, actedPlayerIds: [], foldedPlayerIds: [], allInPlayerIds: [], autoCheckFoldPlayerIds: [], autoCheckFoldEnabledAt: {}, shownPlayerIds: [], currentPlayerIndex: firstIndex, logs: [], finished: false, showdown: false, winners: [], payouts: {}, pots: [], departedPayouts: {}, departedPlayers: [] };
 }
 
 export function applyTexasHoldemAction(state, actorId, action) {

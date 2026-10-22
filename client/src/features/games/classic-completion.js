@@ -1,3 +1,5 @@
+import { isFundedPlayer } from "./token-economy.js";
+
 const lowScoreGames = new Set(["shut-the-box", "golf-solitaire", "accordion"]);
 
 export function classicResults(room) {
@@ -21,16 +23,17 @@ export function classicResults(room) {
     if (state.gameId === "golf-solitaire") unit = "cartes restantes";
     if (state.gameId === "texas-holdem") unit = "Tapis final";
     if (state.gameId === "blackjack") score = Math.abs(raw);
-    const recovered = state.gameId === "texas-holdem"
+    const funded = isFundedPlayer(player);
+    const recovered = !funded ? 0 : state.gameId === "texas-holdem"
       ? Number(state.departedPayouts?.[entry.id] ?? state.roomPayouts?.[entry.id] ?? 0)
       : Number(state.payouts?.[entry.id] ?? 0) + Number(state.roomPayouts?.[entry.id] ?? 0);
     const rerollsKnown = state.gameId !== "421" || !state.modifiers?.paidRerollsEnabled || state.paidRerollSpent !== undefined;
-    const spent = Number(room.stake ?? 0) + (state.gameId === "blackjack" ? Number(state.bets?.[entry.id] ?? 0) : 0) + Number(state.paidRerollSpent?.[entry.id] ?? 0);
+    const spent = funded ? Number(room.stake ?? 0) + (state.gameId === "blackjack" ? Number(state.bets?.[entry.id] ?? 0) : 0) + Number(state.paidRerollSpent?.[entry.id] ?? 0) : 0;
     const tied = state.gameId !== "president" && previous?.raw === raw && previous.winner === winner;
     const rank = tied ? previous.rank : index + 1;
     previous = { raw, winner, rank };
     const push = state.gameId === "blackjack" && !state.foldedPlayerIds?.includes(entry.id) && Number(state.bets?.[entry.id]) > 0 && Number(state.payouts?.[entry.id]) === Number(state.bets[entry.id]);
     return { ...player, rank, score, unit, winner, push, recovered, spent,
-      net: player.isBot || !rerollsKnown ? null : recovered - spent };
+      net: !funded || !rerollsKnown ? null : recovered - spent };
   });
 }

@@ -28,7 +28,7 @@ before(async () => {
   const listener = net.createServer(); await new Promise((resolve) => listener.listen(0, "127.0.0.1", resolve));
   const port = listener.address().port; await new Promise((resolve) => listener.close(resolve)); url = `http://127.0.0.1:${port}`;
   child = spawn(process.execPath, ["src/index.js"], { cwd: new URL("../", import.meta.url), windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: {
-    ...process.env, DOTENV_CONFIG_PATH: path.join(directory, "disabled.env"), NODE_ENV: "production", GAME_WORKERS_ENABLED: "1", GAME_WORKERS: "2", ACCOUNTS_PROCESS_ENABLED: "0",
+    ...process.env, DOTENV_CONFIG_PATH: path.join(directory, "disabled.env"), NODE_ENV: "production", GAME_WORKERS_ENABLED: process.env.TEST_GAME_WORKERS_ENABLED ?? "1", GAME_WORKERS: "2", ACCOUNTS_PROCESS_ENABLED: "0",
     HOST: "127.0.0.1", PORT: String(port), APP_BASE_PATH: "", JWT_SECRET: secret, CLIENT_DIST: "", CLIENT_ORIGIN: url, PUBLIC_APP_URL: url,
     CONTACT_EMAIL: "contact@example.test", HTTPS_KEY_PATH: "", HTTPS_CERT_PATH: "", HTTPS_PFX_PATH: "", SMTP_HOST: "", SMTP_USER: "", SMTP_PASS: "", EMAIL_FROM: "",
     SQLITE_PATH: path.join(directory, "main.sqlite"), PATCHNOTES_UPLOAD_DIR: path.join(directory, "images"), BUG_REPORT_UPLOAD_DIR: path.join(directory, "bugs"),
@@ -219,4 +219,49 @@ test("profile, equipment and shop changes never write a worker-owned room direct
     assert.equal(started.data.state.players[0].cosmetics.equipped.nameEffect, packItem.type === "nameEffects" ? packItem.value : "gold");
     assert.equal((await request("player", `/api/rooms/${code}/action`, "POST", { type: "roll" })).status, 200);
   } finally { assert.equal((await request("player", `/api/rooms/${code}`, "DELETE")).status, 200); }
+});
+
+test("guest play cannot transfer its virtual balance into a registered account", async () => {
+  const settings = (await request("admin", "/api/config")).data;
+  await request("admin", "/api/admin/settings", "PATCH", { guestAccessEnabled: true });
+  let code;
+  try {
+    const signedIn = await request(null, "/api/auth/guest", "POST", { pseudo: "Economy guest" });
+    assert.equal(signedIn.status, 200); assert.equal(signedIn.data.user.tokens, 10000);
+    const guestId = signedIn.data.user.id;
+    const guestRequest = async (path, method = "GET", body) => {
+      const response = await fetch(url + path, { method, headers: { Authorization: `Bearer ${signedIn.data.token}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      return { status: response.status, data: await response.json() };
+    };
+    const before = (await request("editor", "/api/me")).data.tokens;
+    const created = await guestRequest("/api/rooms", "POST", { gameId: "421", name: "Guest economy check", stake: 100 });
+    assert.equal(created.status, 200, JSON.stringify(created.data)); code = created.data.code;
+    assert.equal((await request("editor", `/api/rooms/${code}/join`, "POST", {})).status, 200);
+    assert.equal((await request("editor", `/api/rooms/${code}/ready`, "POST", {})).status, 200);
+    assert.equal((await guestRequest(`/api/rooms/${code}/game-settings`, "POST", { rounds: 1, rollsPerTurn: 1 })).status, 200);
+    const started = await guestRequest(`/api/rooms/${code}/start`, "POST", {});
+    assert.equal(started.status, 200, JSON.stringify(started.data));
+    assert.equal((await guestRequest("/api/me")).data.tokens, 10000);
+    assert.equal((await request("editor", "/api/me")).data.tokens, before - 100);
+    let room = started.data;
+    for (let i = 0; i < 20 && !room.finished; i++) {
+      if (room.pacing) {
+        const skipped = await guestRequest(`/api/rooms/${code}/pacing/skip`, "POST", { pacingId: room.pacing.id });
+        assert.equal(skipped.status, 200, JSON.stringify(skipped.data)); room = skipped.data; continue;
+      }
+      const body = { type: room.state.dice.length ? "bank" : "roll", guest: false, tokens: 999999 };
+      const actorId = room.state.players[room.state.currentPlayerIndex].id;
+      const acted = actorId === guestId ? await guestRequest(`/api/rooms/${code}/action`, "POST", body) : await request("editor", `/api/rooms/${code}/action`, "POST", body);
+      assert.equal(acted.status, 200, JSON.stringify(acted.data)); room = acted.data;
+    }
+    assert.equal(room.finished, true);
+    assert.equal((await guestRequest("/api/me")).data.tokens, 10000);
+    assert.equal(room.players.find(({ id }) => id === guestId).tokens, 10000);
+    assert.equal(room.state.roomPayouts[guestId], undefined);
+    assert.ok(Object.values(room.state.roomPayouts).reduce((sum, value) => sum + value, 0) <= 100);
+    assert.ok((await request("editor", "/api/me")).data.tokens <= before);
+  } finally {
+    if (code) await request("admin", `/api/admin/rooms/${code}`, "DELETE");
+    await request("admin", "/api/admin/settings", "PATCH", { guestAccessEnabled: settings.guestAccessEnabled });
+  }
 });

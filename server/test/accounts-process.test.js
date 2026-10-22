@@ -80,7 +80,7 @@ test("Unicode search, blocking, missing users and ephemeral guests retain their 
     assert.equal((await work.run("public-profile", { userId: "alice", targetId: "absent", configuration })).status, 404);
     assert.equal((await work.run("account", { userId: "absent", configuration })).status, 404);
     const guest = { id: "guest-only", guest: true, pseudo: "Guest", tokens: 10 };
-    assert.equal(parsed(await work.run("account", { userId: guest.id, guest, configuration })).tokens, 10);
+    assert.equal(parsed(await work.run("account", { userId: guest.id, guest, configuration })).tokens, 10000);
     assert.equal(readDb().users.some((user) => user.id === guest.id), false);
     assert.equal((await work.run("account", { userId: "absent", guest, configuration })).status, 404);
   } finally { await work.close(); }

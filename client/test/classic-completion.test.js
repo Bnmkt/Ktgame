@@ -13,6 +13,14 @@ test("classic recap separates net profit from returned funds and skips bot finan
   assert.equal(rows[0].recovered, 20); assert.equal(rows[0].net, 10);
   assert.equal(rows[1].net, -10); assert.equal(rows[2].net, null);
 });
+
+test("guest recaps keep the gameplay result but never show virtual money as spent or recovered", () => {
+  const game = room("blackjack", [21, 20], { bets: { self: 100 }, payouts: { self: 200 } });
+  game.players = game.players.map((player) => player.id === "self" ? { ...player, guest: true } : player);
+  const own = classicResults(game)[0];
+  assert.equal(own.winner, true); assert.equal(own.score, 21);
+  assert.equal(own.net, null); assert.equal(own.spent, 0); assert.equal(own.recovered, 0);
+});
 test("equal scores share a place without overriding winner eligibility", () => {
   const rows = classicResults(room("yahtzee", [300, 300, 200], { winners: ["self", "other"] }));
   assert.deepEqual(rows.map((row) => row.rank), [1, 1, 3]);

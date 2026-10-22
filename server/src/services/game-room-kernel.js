@@ -6,6 +6,7 @@ import { createRoomCommands } from "./room-commands.js";
 import { featureAccess } from "./parental-controls.js";
 import { createRankedRoomRuntime } from "./ranked-room-runtime.js";
 import { closeRoom, roomIsInactive } from "./room-lifecycle.js";
+import { GUEST_TOKENS, walletTokens } from "../../../client/src/features/games/token-economy.js";
 
 const fault = (code) => Object.assign(new Error("Room command unavailable."), { code });
 
@@ -55,10 +56,11 @@ export function createGameRoomKernel() {
     // already use fresh profiles; account changes must not mutate Gateway rooms.
     for (const target of [...(room?.players ?? []), ...(room?.state?.players ?? [])]) {
       const account = !target.isBot && player(target.id);
+      if (account) { target.guest = Boolean(account.guest); if (account.guest) target.tokens = GUEST_TOKENS; }
       if (account?.roomPlayer) { target.pseudo = account.roomPlayer.pseudo; target.cosmetics = account.roomPlayer.cosmetics; }
     }
     const settings = () => activeConfiguration.platform;
-    const balances = new Map(context.users.map((user) => [user.id, Number(user.tokens) || 0]));
+    const balances = new Map(context.users.map((user) => [user.id, walletTokens(user)]));
     let written = false, settlement = false, publishRoom = false, publishLobby = false;
     const finish = (target) => {
       if (target.state?.finished && !target.finished && !settlement) { effects.push({ kind: "settle", ranking: runtime.roomRanking(target) }); settlement = true; }
@@ -70,7 +72,9 @@ export function createGameRoomKernel() {
     const presence = new Map([[input.roomId, new Set(sockets.keys())]]);
     const syncTokens = (target) => { target.players = target.players.map((row) => ({ ...row, tokens: row.isBot ? row.tokens : balances.get(row.id) ?? row.tokens })); };
     const addTokens = (_db, userId, amount, meta) => {
-      if (!Number.isFinite(amount) || !balances.has(userId) || balances.get(userId) + amount < 0) throw fault("GAME_BALANCE");
+      if (!Number.isFinite(amount) || !balances.has(userId)) throw fault("GAME_BALANCE");
+      if (player(userId)?.guest) return GUEST_TOKENS;
+      if (balances.get(userId) + amount < 0) throw fault("GAME_BALANCE");
       const balance = balances.get(userId) + amount;
       balances.set(userId, balance); player(userId).tokens = balance;
       effects.push({ kind: "tokens", userId, amount, meta });
@@ -128,7 +132,7 @@ export function createGameRoomKernel() {
         effects.push({ kind: "notification", userId: user.id, notification }); return notification;
       }, rankedRuntime, readDb: () => db, rejectFeature,
       roomCode: () => randomBytes(3).toString("hex").toUpperCase(),
-      roomPlayerFor: (user) => user.roomPlayer ? { ...user.roomPlayer, tokens: Math.max(0, Number(user.tokens) || 0) } : { id: user.id, pseudo: String(user.profile?.displayName || user.pseudo || "Joueur"), tokens: Math.max(0, Number(user.tokens) || 0), guest: Boolean(user.guest), cosmetics: { equipped: user.cosmetics?.equipped ?? {} } },
+      roomPlayerFor: (user) => user.roomPlayer ? { ...user.roomPlayer, guest: Boolean(user.guest), tokens: walletTokens(user) } : { id: user.id, pseudo: String(user.profile?.displayName || user.pseudo || "Joueur"), tokens: walletTokens(user), guest: Boolean(user.guest), cosmetics: { equipped: user.cosmetics?.equipped ?? {} } },
       roomPresence: presence,
       sanitizeRoom: (target, viewerId, _db, spectator = false) => ({ roomView: { roomId: target.id, viewerId, spectator } }),
       saveRoom: (target) => { db.rooms = [target, ...db.rooms.filter((other) => other.id !== target.id)]; written = true; },

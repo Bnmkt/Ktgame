@@ -1,9 +1,12 @@
+import { walletTokens } from "../../../client/src/features/games/token-economy.js";
+
 export function publicPlayers(players) {
   return players.map((player) => ({
     id: player.id,
     pseudo: player.pseudo,
-    tokens: player.tokens,
+    tokens: walletTokens(player),
     isBot: player.isBot,
+    guest: Boolean(player.guest),
     cosmetics: player.cosmetics
   }));
 }

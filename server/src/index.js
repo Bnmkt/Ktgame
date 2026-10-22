@@ -3,6 +3,8 @@ import { registerGameplayResetRoutes } from "./services/gameplay-reset-routes.js
 import { createRoomCommands } from "./services/room-commands.js";
 import { adminRoomList } from "./services/admin-rooms.js";
 import { closeRoom as closeInactiveTable, roomIsInactive } from "./services/room-lifecycle.js";
+import { GUEST_TOKENS, walletTokens } from "../../client/src/features/games/token-economy.js";
+import { classicRoomPayouts, fundedRoomPlayers, pokerRoomPayouts } from "./services/room-economy.js";
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
 import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
@@ -234,7 +236,6 @@ const defaultPlatformSettings = Object.freeze({
   pokerDefaultBigBlind: 20,
   pokerTurnSeconds: 300
 });
-const ROOM_PAYOUT_RATES = [0.6, 0.3, 0.1];
 const DEFAULT_BOT_THINKING_MS = 1000;
 const DEFAULT_TURN_END_DELAY_MS = 5000;
 const DEFAULT_ROUND_RESULTS_MS = 30000;
@@ -1468,7 +1469,7 @@ function roomPlayerFor(user) {
   return {
     id: user.id,
     pseudo: displayNameFor(user),
-    tokens: Math.max(0, Number(user.tokens) || 0),
+    tokens: walletTokens(user),
     guest: Boolean(user.guest),
     cosmetics: { equipped: cosmetics.equipped }
   };
@@ -1499,6 +1500,8 @@ function serializeRoom(room, viewerId, db, forceSpectator, playerPresentations =
     const sanitized = !fullUser
       ? { ...player, profile: publicProfileFor(player), profileStats: normalizeProfileStats(player.profileStats) }
       : { ...player, ...presentation };
+    const account = fullUser ?? sessions.get(player.id);
+    if (account?.guest || player.guest) { sanitized.guest = true; sanitized.tokens = GUEST_TOKENS; }
     sanitizedPlayers.set(player.id, sanitized);
     return sanitized;
   };
@@ -1861,15 +1864,7 @@ function gameFinishedAchievementEvent(room, player, achievementEvents, roomPayou
 
 
 function roomPotPayouts(room, pot) {
-  const payouts = {};
-  const humans = roomRanking(room).filter((player) => !player.isBot);
-  const rates = humans.length <= 1 ? [1] : humans.length === 2 ? [0.7, 0.3] : ROOM_PAYOUT_RATES;
-  rates.forEach((rate, index) => {
-    const player = humans[index];
-    if (!player || pot <= 0) return;
-    payouts[player.id] = Math.floor(pot * rate);
-  });
-  return payouts;
+  return classicRoomPayouts(room, roomRanking(room), pot, getUser);
 }
 
 function addAchievementEvent(events, playerId, id) {
@@ -2087,6 +2082,7 @@ function writeRoomDb(db, room, additionalUsers = []) {
 
 function addTokens(db, userId, amount, meta = {}) {
   const persistent = db.users.find((u) => u.id === userId);
+  if (persistent?.guest || sessions.get(userId)?.guest) return GUEST_TOKENS;
   if (persistent) {
     persistent.tokens = (Number(persistent.tokens) || 0) + amount;
     db.transactions.push({ id: randomUUID(), userId, amount, balance: persistent.tokens, gameId: meta.gameId ?? null, roomId: meta.roomId ?? null, eventId: meta.eventId ?? null, requestId: meta.requestId ?? null, reason: meta.reason ?? "adjustment", ...(meta.note ? { note: normalizePlainText(meta.note, 160) } : {}), ...(meta.dailyBonusMultiplier ? { dailyBonusMultiplier: meta.dailyBonusMultiplier } : {}), ...(meta.dailyBonusClaims ? { dailyBonusClaims: meta.dailyBonusClaims } : {}), ...(meta.dailyBonusStreak ? { dailyBonusStreak: meta.dailyBonusStreak } : {}), ...(meta.eventPurchaseQuantity ? { eventPurchaseQuantity: meta.eventPurchaseQuantity, eventOverflowQuantity: meta.eventOverflowQuantity ?? 0, eventUnitPrices: meta.eventUnitPrices ?? [] } : {}), createdAt: new Date().toISOString() });
@@ -2231,7 +2227,7 @@ function applyTribunalDecision(caseId, body, adminId, now = Date.now()) {
 }
 
 function getTokenBalance(db, userId) {
-  return db.users.find((u) => u.id === userId)?.tokens ?? sessions.get(userId)?.tokens ?? 0;
+  return walletTokens(db.users.find((u) => u.id === userId) ?? sessions.get(userId));
 }
 
 function syncRoomPlayerTokens(room, db) {
@@ -2297,26 +2293,16 @@ function finishRoomIfNeeded(room, db, { ranking } = {}) {
     db.history.push({id:randomUUID(),roomId:room.id,code:room.code,name:room.name,gameId:room.gameId,players:room.ranked.roster.map((p)=>({id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? p.pseudo ?? "Joueur",isBot:Boolean(p.isBot)})),winners:[],ranking:[],pot:0,finishedAt:new Date().toISOString(),ranked:{matchId:room.ranked.matchId,cancelled:room.ranked.cancelled}});
     return;
   }
-  const paidPlayers = room.players.filter((p) => !p.isBot);
-  const pot = room.stake * (room.ranked ? room.ranked.roster.filter((player)=>!player.isBot).length : paidPlayers.length);
+  const paidPlayers = fundedRoomPlayers(room.players, getUser);
+  const pot = room.stake * (room.ranked ? fundedRoomPlayers(room.ranked.roster, getUser).length : paidPlayers.length);
   const winners = room.state.winners ?? [];
   const achievementEvents = roomAchievementEvents(room);
   if (room.state.gameId === "blackjack") {
-    for (const [playerId, amount] of Object.entries(room.state.payouts ?? {})) addTokens(db, playerId, amount, { gameId: room.gameId, roomId: room.id, reason: "blackjack-payout" });
+    room.state.payouts = Object.fromEntries(Object.entries(room.state.payouts ?? {}).filter(([id]) => paidPlayers.some((player) => player.id === id)));
+    for (const [playerId, amount] of Object.entries(room.state.payouts)) addTokens(db, playerId, amount, { gameId: room.gameId, roomId: room.id, reason: "blackjack-payout" });
   }
   const roomPayouts = room.state.gameId === "texas-holdem"
-    ? (() => {
-      const recovered = Object.values(room.state.departedPayouts ?? {}).reduce((sum, value) => sum + Number(value || 0), 0);
-      const available = Math.max(0, (room.state.realBankroll ?? pot) - recovered);
-      const weights = paidPlayers.map((player) => Math.max(0, room.state.stacks?.[player.id] ?? 0));
-      const totalWeight = weights.reduce((sum, value) => sum + value, 0);
-      let distributed = 0;
-      return Object.fromEntries(paidPlayers.map((player, index) => {
-        const amount = index === paidPlayers.length - 1 ? available - distributed : totalWeight ? Math.floor(available * weights[index] / totalWeight) : 0;
-        distributed += amount;
-        return [player.id, amount];
-      }));
-    })()
+    ? pokerRoomPayouts(room, getUser)
     : winners.length > 0 ? roomPotPayouts(room, pot) : {};
   if (room.state.gameId === "texas-holdem") {
     for (const [playerId, amount] of Object.entries(roomPayouts)) if (amount > 0) addTokens(db, playerId, amount, { gameId: room.gameId, roomId: room.id, reason: "poker-cash-out" });
@@ -2935,7 +2921,7 @@ app.post("/api/auth/guest", (req, res) => {
   const settings = platformSettings();
   if (!settings.guestAccessEnabled) return res.status(403).json({ error: "L'accès invité est temporairement fermé." });
   const pseudo = String(req.body.pseudo ?? "").trim() || `Invité-${randomBytes(2).toString("hex")}`;
-  const user = ensureUserSocial({ id: randomUUID(), pseudo, tokens: settings.signupTokens, guest: true, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
+  const user = ensureUserSocial({ id: randomUUID(), pseudo, tokens: GUEST_TOKENS, guest: true, cosmetics: structuredClone(defaultCosmetics), achievements: normalizeAchievements(), profileStats: normalizeProfileStats() });
   sessions.set(user.id, user);
   const token = makeToken(user);
   setSessionCookie(res, token);

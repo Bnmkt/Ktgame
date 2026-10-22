@@ -61,6 +61,41 @@ test("all existing games can start in the same isolated runtime", async () => {
   }
 });
 
+test("guests can start every classic game without a stake debit or economic effects", async () => {
+  for (const game of games) {
+    const f = fixture(game.id);
+    f.context.users = [{ ...user, guest: true, tokens: 123, roomPlayer: { ...user, guest: false } }];
+    assert.equal((await f.command("POST /api/rooms")).result.status, 200);
+    const started = (await f.command("POST /api/rooms/:code/start")).result;
+    assert.equal(started.status, 200, `${game.id}: ${JSON.stringify(started.response)}`);
+    assert.equal(started.room.players.find(({ id }) => id === user.id).tokens, 10000);
+    assert.equal(started.room.players.find(({ id }) => id === user.id).guest, true);
+    assert.equal(started.effects.filter((effect) => effect.kind === "tokens").length, 0);
+    const expired = (await f.command("tick", {}, true, Date.parse(started.room.lastActionAt) + ROOM_INACTIVITY_MS)).result;
+    assert.equal(expired.room, null);
+    assert.equal(expired.effects.filter((effect) => effect.kind === "tokens").length, 0);
+  }
+});
+
+test("guest blackjack betting and doubling never produce transferable token effects", async () => {
+  const f = fixture("blackjack");
+  f.context.users = [{ ...user, guest: true }];
+  await f.command("POST /api/rooms");
+  const started = (await f.command("POST /api/rooms/:code/start")).result;
+  const bet = (await f.command("POST /api/rooms/:code/action", { type: "bet", amount: started.room.state.modifiers.minimumBet, guest: false, tokens: 1000000 })).result;
+  assert.equal(bet.status, 200, JSON.stringify(bet.response));
+  assert.equal(bet.effects.filter((effect) => effect.kind === "tokens").length, 0);
+  assert.equal(bet.room.players[0].tokens, 10000);
+  bet.room.state.hands.player = [{ rank: "5" }, { rank: "6" }];
+  const recovered = fixture("blackjack", bet.room); recovered.context.users = [{ ...user, guest: true }];
+  const doubled = (await recovered.command("POST /api/rooms/:code/action", { type: "double" })).result;
+  assert.equal(doubled.status, 200, JSON.stringify(doubled.response));
+  assert.equal(doubled.effects.filter((effect) => effect.kind === "tokens").length, 0);
+  assert.equal(doubled.room.players[0].tokens, 10000);
+  const stopped = (await recovered.command("DELETE /api/rooms/:code")).result;
+  assert.equal(stopped.effects.filter((effect) => effect.kind === "tokens").length, 0);
+});
+
 test("workers enforce live softban policies for room controls and games while keeping the exit available", async () => {
   const f = fixture(); await f.command("POST /api/rooms");
   const moderation = { softBan: { active: true, reason: "Fixture", restrictions: null } };

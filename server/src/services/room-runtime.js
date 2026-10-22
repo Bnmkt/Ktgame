@@ -15,6 +15,8 @@ import { beloteSeats } from "../games/belote-seats.js";
 import { texasHoldemBotAction } from "../games/engines/texas-holdem.js";
 import { battleBotAction } from "../games/engines/bataille.js";
 import { roomLevelError } from "./game-progression.js";
+import { isFundedPlayer } from "../../../client/src/features/games/token-economy.js";
+import { fundedRoomPlayers, pokerAvailableFunds } from "./room-economy.js";
 
 export function createRoomRuntime(dependencies) {
   const scheduleBot = dependencies.scheduleBot ?? setTimeout;
@@ -181,10 +183,10 @@ export function createRoomRuntime(dependencies) {
     if (state?.gameId !== "texas-holdem" || state.departedPayouts?.[playerId] !== undefined) return 0;
     if (state.currentPlayerIndex >= 0 && state.players[state.currentPlayerIndex]?.id === playerId && !state.foldedPlayerIds.includes(playerId)) applyAction(state, playerId, { type: "fold" });
     const player = state.players.find((entry) => entry.id === playerId);
-    const alreadyRecovered = Object.values(state.departedPayouts ?? {}).reduce((sum, value) => sum + Number(value || 0), 0);
-    const availableRealFunds = Math.max(0, (state.realBankroll ?? state.buyIn ?? 0) - alreadyRecovered);
-    const amount = player?.isBot ? 0 : Math.min(Math.max(0, state.stacks?.[playerId] ?? 0), availableRealFunds);
-    if (amount && !player?.isBot) addTokens(db, playerId, amount, { gameId: room.gameId, roomId: room.id, reason });
+    const account = (id) => db.users.find((user) => user.id === id) ?? room.players.find((row) => row.id === id);
+    const availableRealFunds = pokerAvailableFunds(room, account);
+    const amount = isFundedPlayer(player) && isFundedPlayer(account(playerId)) ? Math.min(Math.max(0, state.stacks?.[playerId] ?? 0), availableRealFunds) : 0;
+    if (amount) addTokens(db, playerId, amount, { gameId: room.gameId, roomId: room.id, reason });
     state.departedPayouts ??= {};
     state.departedPlayers ??= [];
     state.departedPayouts[playerId] = amount;
@@ -430,7 +432,7 @@ export function createRoomRuntime(dependencies) {
       if (levelError) return `${player.pseudo} : ${levelError}`;
       if (getTokenBalance(db, player.id) < room.stake) return `${player.pseudo} n'a pas assez de jetons.`;
     }
-    for (const player of room.players.filter((p) => !p.isBot)) {
+    for (const player of fundedRoomPlayers(room.players, (id) => db.users.find((user) => user.id === id) ?? room.players.find((row) => row.id === id))) {
       if (room.stake > 0) addTokens(db, player.id, -room.stake, { gameId: room.gameId, roomId: room.id, reason: "room-stake" });
       appendRoomAchievementUnlocks(room, player.id, unlockEligibleAchievements(db.users.find((u) => u.id === player.id), db));
       triggerRandomAchievement(db, player.id, room);

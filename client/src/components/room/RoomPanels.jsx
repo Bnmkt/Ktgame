@@ -10,6 +10,7 @@ import { gameModifierDefinitions, gameTitle, payoutRatesForPlayerCount, scoreCat
 import { midnightContractInfo, midnightContractLabel, midnightContractTiers } from "../../features/games/midnightDice/model.js";
 import { CompactNumber, formatTime } from "../../utils/presentation.jsx";
 import { RankBadge } from "../../features/games/RankedPlay.jsx";
+import { isFundedPlayer } from "../../features/games/token-economy.js";
 
 function MidnightContractBadge({ contract }) {
   const { t: localeText } = useLocale();
@@ -61,7 +62,7 @@ export function WagerPanel({ room, state }) {
   const hasRoomStake = Number(room.stake) > 0;
   const isBlackjack = state.gameId === "blackjack";
   if (!hasRoomStake && !isBlackjack) return null;
-  const paidPlayers = room.players.filter((p) => !p.isBot);
+  const paidPlayers = room.players.filter(isFundedPlayer);
   const pot = Number(room.stake) * paidPlayers.length;
   const projectedRanks = state.gameId === "yahtzee" ? [...paidPlayers].sort((a, b) => yahtzeeTotal(state.scores?.[b.id]) - yahtzeeTotal(state.scores?.[a.id])).slice(0, 3) : paidPlayers.slice(0, 3);
   const payoutRates = payoutRatesForPlayerCount(paidPlayers.length);
@@ -74,12 +75,13 @@ export function WagerPanel({ room, state }) {
         <thead><tr><th>{localeText("Joueur")}</th><th>{localeText("Mise")}</th><th>{localeText("Gain possible")}</th></tr></thead>
         <tbody>
           {state.players.filter((p) => !p.isBot).map((p) => {
+            const funded = isFundedPlayer(p);
             const blackjackBet = state.bets?.[p.id] ?? 0;
             const rankIndex = projectedRanks.findIndex((player) => player.id === p.id);
             const projectedRoomGain = rankIndex >= 0 ? Math.floor(pot * ((payoutRates[rankIndex] ?? 0) / 100)) : 0;
             const actualRoomGain = state.roomPayouts?.[p.id] ?? 0;
-            const possible = (state.finished ? actualRoomGain : projectedRoomGain) + (isBlackjack && blackjackBet ? blackjackBet * 2 : 0);
-            return <tr key={p.id}><td><DisplayName user={p} /></td><td><CompactNumber value={Number(room.stake) + blackjackBet} label={localeText("Mise exacte")} /></td><td>{possible ? <CompactNumber value={possible} label={localeText("Gain possible exact")} /> : "-"}</td></tr>;
+            const possible = funded ? (state.finished ? actualRoomGain : projectedRoomGain) + (isBlackjack && blackjackBet ? blackjackBet * 2 : 0) : 0;
+            return <tr key={p.id}><td><DisplayName user={p} /></td><td>{funded ? <CompactNumber value={Number(room.stake) + blackjackBet} label={localeText("Mise exacte")} /> : localeText("Démonstration")}</td><td>{possible ? <CompactNumber value={possible} label={localeText("Gain possible exact")} /> : "-"}</td></tr>;
           })}
         </tbody>
       </table>

@@ -1,6 +1,7 @@
 import { cardValue, createDeck, shuffle } from "../shared.js";
 import { normalizeGameModifiers } from "../modifiers.js";
 import { appendLog, cardsText, cardText, publicPlayers } from "../engine-context.js";
+import { isFundedPlayer } from "../../../../client/src/features/games/token-economy.js";
 
 export function blackjackTotal(hand = []) {
   let total = 0;
@@ -31,12 +32,16 @@ function finishBlackjack(state) {
     if (state.foldedPlayerIds?.includes(player.id)) appendLog(state, player.id, "s'est couché et perd sa mise.", "result");
     else if (total <= 21 && (dealerTotal > 21 || total > dealerTotal)) {
       state.winners.push(player.id);
-      state.payouts[player.id] = state.bets[player.id] * 2;
-      player.tokens += state.payouts[player.id];
+      if (isFundedPlayer(player)) {
+        state.payouts[player.id] = state.bets[player.id] * 2;
+        player.tokens += state.payouts[player.id];
+      }
       appendLog(state, player.id, `gagne contre le dealer avec ${total}.`, "result");
     } else if (total === dealerTotal && total <= 21) {
-      state.payouts[player.id] = state.bets[player.id];
-      player.tokens += state.payouts[player.id];
+      if (isFundedPlayer(player)) {
+        state.payouts[player.id] = state.bets[player.id];
+        player.tokens += state.payouts[player.id];
+      }
       appendLog(state, player.id, `fait égalité avec le dealer à ${total}.`, "result");
     } else appendLog(state, player.id, `perd contre le dealer avec ${total > 21 ? `${total} (bust)` : total}.`, "result");
   }

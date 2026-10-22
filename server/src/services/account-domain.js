@@ -1,4 +1,5 @@
 import { games } from "../games/shared.js";
+import { GUEST_TOKENS } from "../../../client/src/features/games/token-economy.js";
 import { RANKED_GAMES, competitiveFor, equippedRankedBadge } from "./ranked.js";
 import { equippedGameTitle, gameProgress, unlockedGameTitles } from "./game-progression.js";
 import { mfaSummary } from "./account-security.js";
@@ -126,6 +127,7 @@ export function createAccountDomain({ configurationCache, platformSettings, rank
   }
 
   function serializeUserInternal(user, db) {
+    if (user.guest) user = { ...user, tokens: GUEST_TOKENS };
     ensureUserSocial(user);
     const verificationRequired = platformSettings(db).emailVerificationRequired;
     const settings = platformSettings(db);
