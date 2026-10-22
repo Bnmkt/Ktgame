@@ -123,7 +123,8 @@ import {
   consumeAchievementEvent,
   normalizeAchievementDefinition
 } from "./services/achievement-rules.js";
-import { casinoDateKey, casinoTimeParts, shiftDateKey, validDateOnly } from "./services/time.js";
+import { casinoDateKey, casinoTimeParts, recordedDateKey, shiftDateKey, validDateOnly } from "./services/time.js";
+import { adminActivity, recordedBefore, registrationDate } from "./services/admin-activity.js";
 import { calculateDailyBonusStatus, defaultDailyBonusRules, normalizeDailyBonusConfig } from "./services/daily-bonus.js";
 import { createRequestLogStore, requestLogMiddleware } from "./services/request-logs.js";
 import {
@@ -3581,52 +3582,28 @@ app.post("/api/secrets/:secret", auth, (req, res) => {
   res.json({ unlocked });
 });
 
-function adminOverview(db) {
+function adminOverview(db, days = 7) {
   const users = db.users.filter((user) => !user.guest);
   const activeRooms = db.rooms.filter((room) => !room.finished);
-  const today = casinoDateKey();
-  const todayHistory = archiveDays(db.history, today, today);
-  const todayTransactions = archiveDays(db.transactions, today, today);
-  const weekStart = shiftDateKey(today, -6);
-  const activePlayersToday = new Set(todayHistory.flatMap((game) => (game.players ?? []).filter((player) => !player.isBot).map((player) => player.id)).filter(Boolean));
+  const activity = adminActivity(db, days, { isOnline: onlinePresence.has });
   const customShopIds = new Set((db.settings?.customShopItems ?? []).map((item) => item.id));
   const gamesCatalog = configuredGames(db);
   const shopCatalog = configuredShop(db);
   const achievementsCatalog = achievementCatalog(db, { includeDisabled: true });
   const events = db.communityEvents ?? [];
-  const transactionTotal = (positive) => todayTransactions.reduce((total, entry) => {
-    const amount = Number(entry.amount) || 0;
-    return total + (positive ? Math.max(0, amount) : Math.max(0, -amount));
-  }, 0);
+  const health = serverHealthPayload(30);
+  const usersById = new Map(users.map((user) => [user.id, user]));
   return {
+    ...activity,
+    health: { status: health.status, cpuPercent: health.process.cpuPercent, eventLoopP95: health.eventLoop.p95Ms },
     detectedIncidents: statusMonitor.detections.summary(),
+    pendingWork: { bugs: bugReports.summary(), tribunal: tribunal.summary(), parental: parentalControls.summary() },
     users: {
-      total: users.length,
+      ...activity.users,
       dataRequests: dataRequests.summary(),
-      active: users.filter((user) => user.active !== false).length,
-      inactive: users.filter((user) => user.active === false).length,
       admins: users.filter((user) => user.admin).length,
       pendingVerification: users.filter((user) => validEmail(user.email) && !user.emailVerifiedAt).length,
-      legacyLogins: users.filter((user) => !validEmail(user.email)).length,
-      newToday: users.filter((user) => casinoDateKey(user.createdAt) === today).length,
-      new7d: users.filter((user) => {
-        const created = casinoDateKey(user.createdAt);
-        return created && created >= weekStart && created <= today;
-      }).length
-    },
-    rooms: {
-      active: activeRooms.length,
-      playing: activeRooms.filter((room) => room.state).length,
-      waiting: activeRooms.filter((room) => !room.state).length,
-      seatedHumans: activeRooms.reduce((total, room) => total + room.players.filter((player) => !player.isBot).length, 0),
-      seatedBots: activeRooms.reduce((total, room) => total + room.players.filter((player) => player.isBot).length, 0)
-    },
-    activity: { gamesToday: todayHistory.length, gamesTotal: db.history.length, activePlayersToday: activePlayersToday.size },
-    economy: {
-      circulatingTokens: users.reduce((total, user) => total + Math.max(0, Number(user.tokens) || 0), 0),
-      creditsToday: transactionTotal(true),
-      debitsToday: transactionTotal(false),
-      transactionsToday: todayTransactions.length
+      legacyLogins: users.filter((user) => !validEmail(user.email)).length
     },
     catalog: {
       games: gamesCatalog.length,
@@ -3643,7 +3620,10 @@ function adminOverview(db) {
       draft: events.filter((event) => event.status === "draft").length
     },
     activeRooms: activeRooms.slice(0, 6).map((room) => ({ id: room.id, code: room.code, name: room.name, gameId: room.gameId, players: room.players.length, playing: Boolean(room.state), createdAt: room.createdAt })),
-    recentUsers: users.filter((user) => user.createdAt).sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt)).slice(0, 5).map((user) => ({ id: user.id, displayName: displayNameFor(user), emailVerified: Boolean(user.emailVerifiedAt), legacyLogin: !validEmail(user.email), active: user.active !== false, createdAt: user.createdAt }))
+    recentUsers: activity.recentUsers.map((entry) => {
+      const user = usersById.get(entry.id);
+      return { ...entry, displayName: displayNameFor(user), emailVerified: Boolean(user.emailVerifiedAt), legacyLogin: !validEmail(user.email), active: user.active !== false };
+    })
   };
 }
 
@@ -3654,22 +3634,20 @@ function adminMetrics(db, requestedDays = 90) {
   const todayKey = casinoDateKey(now);
   const startKey = shiftDateKey(todayKey, -days + 1);
   const inRange = (value) => {
-    const key = casinoDateKey(value);
-    return Boolean(key && key >= startKey && key <= todayKey);
+    const key = recordedDateKey(value);
+    return Boolean(key && key >= startKey && key <= todayKey && recordedBefore(value, now));
   };
-  const signupDates = new Map(users.map((user) => {
-    const fallback = user.createdAt ? null : archiveRows(db.transactions, { userId: user.id, reason: "signup-bonus" }, { limit: 1 })[0]?.createdAt;
-    return [user.id, user.createdAt ?? fallback ?? null];
-  }));
-  const histories = archiveDays(db.history, startKey, todayKey);
-  const transactions = archiveDays(db.transactions, startKey, todayKey);
+  const signupDates = new Map(users.map((user) => [user.id, registrationDate(user, db.transactions, now)]));
+  const registeredIds = new Set(users.map((user) => user.id));
+  const histories = archiveDays(db.history, startKey, todayKey).filter((row) => !row.ranked?.cancelled && inRange(row.finishedAt));
+  const transactions = archiveDays(db.transactions, startKey, todayKey).filter((row) => registeredIds.has(row.userId) && inRange(row.createdAt));
   const daily = new Map();
   for (let index = 0; index < days; index += 1) {
     const key = shiftDateKey(startKey, index);
     daily.set(key, { date: key, games: 0, participants: new Set(), pot: 0, credits: 0, debits: 0, net: 0, transactions: 0, bonuses: 0, bonusAmount: 0, signups: 0, eventActions: 0, eventParticipants: new Set(), eventDamage: 0, eventContribution: 0, eventPotInflow: 0, eventPurchases: 0, eventPurchaseRevenue: 0 });
   }
   for (const user of users) {
-    const key = casinoDateKey(signupDates.get(user.id));
+    const key = recordedDateKey(signupDates.get(user.id));
     if (daily.has(key)) daily.get(key).signups += 1;
   }
   for (const row of histories) {
@@ -3677,7 +3655,7 @@ function adminMetrics(db, requestedDays = 90) {
     if (!bucket) continue;
     bucket.games += 1;
     bucket.pot += Math.max(0, Number(row.pot) || 0);
-    for (const player of row.players ?? []) if (!player.isBot) bucket.participants.add(player.id);
+    for (const player of row.players ?? []) if (!player.isBot && !player.guest && registeredIds.has(player.id)) bucket.participants.add(player.id);
   }
   for (const entry of transactions) {
     const bucket = daily.get(casinoDateKey(entry.createdAt));
@@ -3695,8 +3673,8 @@ function adminMetrics(db, requestedDays = 90) {
   }
   const allCommunityEvents = db.communityEvents ?? [];
   const allEventParticipants = db.communityEventParticipants ?? [];
-  const periodEventActions = archiveDays(db.communityEventActions, startKey, todayKey);
-  const periodEventPotEntries = archiveDays(db.communityEventPotEntries, startKey, todayKey);
+  const periodEventActions = archiveDays(db.communityEventActions, startKey, todayKey).filter((row) => inRange(row.createdAt));
+  const periodEventPotEntries = archiveDays(db.communityEventPotEntries, startKey, todayKey).filter((row) => inRange(row.createdAt));
   const periodEventRewards = (db.communityEventRewards ?? []).filter((entry) => inRange(entry.distributedAt));
   const periodEventTransactions = transactions.filter((entry) => entry.eventId);
   const periodEventJoins = allEventParticipants.filter((entry) => inRange(entry.joinedAt));
@@ -3781,17 +3759,18 @@ function adminMetrics(db, requestedDays = 90) {
   const topEventParticipants = [...eventParticipantMetrics.values()].map((entry) => ({ ...entry, events: [...entry.events] })).sort((left, right) => right.contribution - left.contribution || right.damage - left.damage).slice(0, 15);
   const eventStatusCounts = ["draft", "scheduled", "active", "finished", "cancelled"].map((status) => ({ id: status, status, count: allCommunityEvents.filter((event) => event.status === status).length }));
   const dailySeries = [...daily.values()].map((entry) => ({ ...entry, activePlayers: entry.participants.size, eventParticipants: entry.eventParticipants.size, participants: undefined }));
-  const activeInPeriod = new Set(dailySeries.flatMap((entry) => []));
-  for (const row of histories) for (const player of row.players ?? []) if (!player.isBot) activeInPeriod.add(player.id);
+  const activeInPeriod = new Set();
+  for (const row of histories) for (const player of row.players ?? []) if (!player.isBot && !player.guest && registeredIds.has(player.id)) activeInPeriod.add(player.id);
   for (const entry of transactions) if (entry.userId && users.some((user) => user.id === entry.userId)) activeInPeriod.add(entry.userId);
 
   const gameMetrics = configuredGames(db).map((game) => {
     const rows = histories.filter((row) => row.gameId === game.id);
-    const realPlayers = rows.flatMap((row) => (row.players ?? []).filter((player) => !player.isBot));
+    const realPlayers = rows.flatMap((row) => (row.players ?? []).filter((player) => !player.isBot && !player.guest && registeredIds.has(player.id)));
     const bots = rows.flatMap((row) => (row.players ?? []).filter((player) => player.isBot));
+    const seats = rows.reduce((total, row) => total + (row.players?.length ?? 0), 0);
     const uniquePlayers = new Set(realPlayers.map((player) => player.id));
     const pot = rows.reduce((sum, row) => sum + (Number(row.pot) || 0), 0);
-    return { id: game.id, name: game.name, type: game.type, games: rows.length, uniquePlayers: uniquePlayers.size, seats: realPlayers.length + bots.length, realSeats: realPlayers.length, botSeats: bots.length, averagePlayers: rows.length ? (realPlayers.length + bots.length) / rows.length : 0, botRate: realPlayers.length + bots.length ? bots.length / (realPlayers.length + bots.length) : 0, pot, averagePot: rows.length ? pot / rows.length : 0 };
+    return { id: game.id, name: game.name, type: game.type, games: rows.length, uniquePlayers: uniquePlayers.size, seats, realSeats: realPlayers.length, guestSeats: seats - realPlayers.length - bots.length, botSeats: bots.length, averagePlayers: rows.length ? seats / rows.length : 0, botRate: seats ? bots.length / seats : 0, pot, averagePot: rows.length ? pot / rows.length : 0 };
   }).sort((left, right) => right.games - left.games);
 
   const reasonMetrics = Object.values(transactions.reduce((groups, entry) => {
@@ -3856,8 +3835,8 @@ function adminMetrics(db, requestedDays = 90) {
     const cutoffKey = shiftDateKey(todayKey, -numberOfDays + 1);
     const ids = new Set();
     const userIds = new Set(users.map((user) => user.id));
-    for (const row of archiveDays(db.history, cutoffKey, todayKey)) for (const player of row.players ?? []) if (!player.isBot) ids.add(player.id);
-    for (const entry of archiveDays(db.transactions, cutoffKey, todayKey)) if (userIds.has(entry.userId)) ids.add(entry.userId);
+    for (const row of archiveDays(db.history, cutoffKey, todayKey).filter((row) => !row.ranked?.cancelled && recordedBefore(row.finishedAt, now))) for (const player of row.players ?? []) if (!player.isBot && !player.guest && userIds.has(player.id)) ids.add(player.id);
+    for (const entry of archiveDays(db.transactions, cutoffKey, todayKey)) if (userIds.has(entry.userId) && recordedBefore(entry.createdAt, now)) ids.add(entry.userId);
     return ids.size;
   };
   const totalCredits = transactions.filter((entry) => Number(entry.amount) >= 0).reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
@@ -4479,8 +4458,7 @@ app.get("/api/admin", auth, requireBackOffice, (req, res) => {
   const dataRequestCounts = isAdministrator ? dataRequests.pendingCounts() : {};
   const registeredUsers = db.users.filter((user) => !user.guest).map((user) => {
     const statistics = playerStatistics(db, user.id);
-    const signupTransaction = user.createdAt ? null : archiveRows(db.transactions, { userId: user.id, reason: "signup-bonus" }, { limit: 1 })[0];
-    return { id: user.id, login: user.email ?? user.pseudo, legacyLogin: !validEmail(user.email), emailVerified: Boolean(user.emailVerifiedAt), displayName: displayNameFor(user), bio: user.profile?.bio ?? "", tokens: user.tokens, active: user.active !== false, admin: Boolean(user.admin), editor: Boolean(user.editor), gamesPlayed: statistics.gamesPlayed, wins: statistics.wins, lastDailyClaim: user.lastDailyClaim ?? null, createdAt: user.createdAt ?? signupTransaction?.createdAt ?? null, lastLoginAt: user.lastLoginAt ?? null, dataRequestPending: dataRequestCounts[user.id] ?? 0 };
+    return { id: user.id, login: user.email ?? user.pseudo, legacyLogin: !validEmail(user.email), emailVerified: Boolean(user.emailVerifiedAt), displayName: displayNameFor(user), bio: user.profile?.bio ?? "", tokens: user.tokens, active: user.active !== false, admin: Boolean(user.admin), editor: Boolean(user.editor), gamesPlayed: statistics.gamesPlayed, wins: statistics.wins, lastDailyClaim: user.lastDailyClaim ?? null, createdAt: registrationDate(user, db.transactions), lastLoginAt: user.lastLoginAt ?? null, dataRequestPending: dataRequestCounts[user.id] ?? 0 };
   });
   const permissions = {
     role: isAdministrator ? "admin" : "editor",
@@ -4510,6 +4488,11 @@ app.get("/api/admin", auth, requireBackOffice, (req, res) => {
     settings: { ...settings, ...(isAdministrator ? { editorDuplicationUserIds: db.settings?.editorDuplicationUserIds ?? [] } : {}), emailVerificationAvailable: emailDeliveryConfigured(), discordConfigured: discordConfiguration().available },
     overview: isAdministrator ? adminOverview(db) : { catalog: { shopItems: configuredShop(db).length, customShopItems: db.settings?.customShopItems?.length ?? 0 } }
   });
+});
+
+app.get("/api/admin/overview", auth, requireAdmin, (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json(adminOverview(readDb(), req.query.days));
 });
 
 app.get("/api/admin/tribunal", auth, requireAdmin, (_req, res) => {

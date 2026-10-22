@@ -47,6 +47,25 @@ after(async () => {
   fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
+test("admin overview is private and missing legacy registration dates never count as recent", async () => {
+  for (const actor of [null, "player", "editor"]) assert.equal((await request(actor, "/api/admin/overview")).status, actor ? 403 : 401);
+  for (const days of [1, 7, 30]) {
+    const response = await request("admin", `/api/admin/overview?days=${days}`);
+    assert.equal(response.status, 200, JSON.stringify(response.data));
+    assert.equal(response.data.period.days, days);
+    assert.equal(response.data.activity.daily.length, days);
+    assert.equal(response.data.users.newInPeriod, 0);
+    assert.equal(response.data.users.unknownRegistrationDates, 4);
+    assert.ok(response.data.health.status);
+  }
+  assert.equal((await request("admin", "/api/admin/overview?days=100000")).data.period.days, 7);
+  const legacy = (await request("admin", "/api/admin")).data;
+  assert.equal(legacy.overview.users.new7d, 0);
+  assert.ok(legacy.users.every((user) => user.createdAt === null));
+  const metrics = (await request("admin", "/api/admin/metrics?days=30")).data;
+  assert.equal(metrics.summary.newAccounts, 0);
+});
+
 test("ranked bot completion is admin-only and starts and settles through the owning worker", async () => {
   assert.equal((await request("player","/api/ranked/queue/fill-bots","POST")).status,403);
   assert.equal((await request("editor","/api/ranked/queue/fill-bots","POST")).status,403);

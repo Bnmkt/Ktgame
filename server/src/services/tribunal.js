@@ -408,11 +408,14 @@ export function createTribunalStore({ filename, random = Math.random }) {
         .run(clean(note, 500) || "Dossier classé sans suite", adminId, iso(now), caseId);
       return result.changes > 0;
     },
+    summary() {
+      const count = (table, status) => Number(db.prepare(`SELECT count(*) AS count FROM ${table} WHERE status = ?`).get(status)?.count) || 0;
+      return { pendingReports: count("tribunal_reports", "pending"), voting: count("tribunal_cases", "voting"), awaitingEnforcement: count("tribunal_cases", "awaiting-enforcement"), resolved: count("tribunal_cases", "resolved") };
+    },
     adminSnapshot() {
       const reports = db.prepare("SELECT * FROM tribunal_reports ORDER BY created_at DESC LIMIT 500").all().map(mapReport);
       const cases = db.prepare("SELECT c.*, (SELECT count(*) FROM tribunal_votes v WHERE v.case_id = c.id) AS vote_count FROM tribunal_cases c ORDER BY c.created_at DESC LIMIT 500").all().map((row) => ({ ...mapCase(row), voteCount: Number(row.vote_count) || 0 }));
-      const count = (table, status) => Number(db.prepare(`SELECT count(*) AS count FROM ${table} WHERE status = ?`).get(status)?.count) || 0;
-      return { settings: store.settings(), reports, cases, counts: { pendingReports: count("tribunal_reports", "pending"), voting: count("tribunal_cases", "voting"), awaitingEnforcement: count("tribunal_cases", "awaiting-enforcement"), resolved: count("tribunal_cases", "resolved") } };
+      return { settings: store.settings(), reports, cases, counts: store.summary() };
     },
     reportIdsForCase(caseId) {
       return db.prepare("SELECT id FROM tribunal_reports WHERE case_id = ?").all(caseId).map((row) => row.id);

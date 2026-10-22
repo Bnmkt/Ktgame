@@ -30,6 +30,12 @@ export function casinoDateKey(value = new Date()) {
   return remember(dateKeys, second, `${parts.year}-${parts.month}-${parts.day}`);
 }
 
+// Recorded events must never inherit the current date when their timestamp is absent.
+export function recordedDateKey(value) {
+  if (value == null || (typeof value === "string" && !value.trim()) || (!["string", "number"].includes(typeof value) && !(value instanceof Date))) return "";
+  return casinoDateKey(value);
+}
+
 export function shiftDateKey(dateKey, days) {
   const date = new Date(`${dateKey}T12:00:00.000Z`);
   if (!Number.isFinite(date.getTime())) return "";

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CASINO_TIME_ZONE, casinoDateKey, casinoTimeParts, shiftDateKey, validDateOnly } from "../src/services/time.js";
+import { CASINO_TIME_ZONE, casinoDateKey, casinoTimeParts, recordedDateKey, shiftDateKey, validDateOnly } from "../src/services/time.js";
+
+test("recorded dates cannot turn missing timestamps into today", () => {
+  for (const value of [undefined, null, "", false, true, "invalid"]) assert.equal(recordedDateKey(value), "");
+  assert.equal(recordedDateKey("2026-10-21T22:00:00Z"), "2026-10-22");
+  assert.match(casinoDateKey(), /^\d{4}-\d{2}-\d{2}$/);
+});
 
 test("la journée du casino suit Europe/Brussels plutôt que la date UTC", () => {
   assert.equal(CASINO_TIME_ZONE, process.env.CASINO_TIME_ZONE || "Europe/Brussels");

@@ -1,4 +1,4 @@
-import { casinoDateKey } from "../services/time.js";
+import { recordedDateKey } from "../services/time.js";
 
 // Immutable journals stay on disk. Only uncommitted inserts are held in memory.
 // The iterable methods preserve the engines' existing collection contract.
@@ -90,14 +90,11 @@ export function archiveRows(collection, filters, options) {
 }
 
 export function archiveDays(collection, start, end) {
-  if (!(collection instanceof Archive) || !collection.columns.day) return collection.filter((row) => {
-    const day = casinoDateKey(row.finishedAt ?? row.createdAt);
-    return day >= start && day <= end;
-  });
+  const matches = (row) => {
+    const day = recordedDateKey(row.finishedAt ?? row.createdAt);
+    return Boolean(day && day >= start && day <= end);
+  };
+  if (!(collection instanceof Archive) || !collection.columns.day) return collection.filter(matches);
   const persisted = collection.sqlite.prepare(`SELECT * FROM ${collection.table} WHERE ${collection.columns.day} >= ? AND ${collection.columns.day} <= ? ORDER BY ${collection.columns.day}, rowid`).all(start, end).map(collection.decode);
-  const pending = collection.pending.filter((row) => {
-    const day = casinoDateKey(row.finishedAt ?? row.createdAt);
-    return day >= start && day <= end;
-  });
-  return [...persisted, ...pending];
+  return [...persisted.filter(matches), ...collection.pending.filter(matches)];
 }

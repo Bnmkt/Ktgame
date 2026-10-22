@@ -241,6 +241,9 @@ export function createParentalControlStore({ filename, secret }) {
       const row = db.prepare("SELECT * FROM parental_requests WHERE user_id=? AND status='approved' ORDER BY reviewed_at DESC LIMIT 1").get(userId);
       return row ? signPortal(row) : "";
     },
+    summary(now = Date.now()) {
+      return db.prepare("SELECT COUNT(*) AS pending FROM parental_requests WHERE status='admin_pending' AND expires_at>?").get(new Date(now).toISOString());
+    },
     approvedGuardians() { return db.prepare("SELECT * FROM parental_requests WHERE status='approved' AND user_id IS NOT NULL").all().map((row) => ({ ...publicRequest(row), portalToken: signPortal(row) })); },
     recordActivity(userId, { day, category, label, count = 1, durationSeconds = 0 }, now = Date.now()) {
       const at = new Date(now).toISOString();
