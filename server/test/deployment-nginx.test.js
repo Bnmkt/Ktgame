@@ -60,6 +60,11 @@ test("Linux Nginx templates serve root routes, preserve API cookies and forward 
     assert.match((await call("www.ktga.me", "/ktga/guide")).headers.location, /\/guide$/);
     assert.match((await call("www.ktga.me", "/ktga?verify-email=fixture-token")).headers.location, /\/\?verify-email=fixture-token$/);
     assert.equal((await call("ktga.me", "/faq")).headers.location, "https://www.ktga.me/faq");
+    for (const route of ["/", "/parents", "/cookies", "/mentions-legales", "/jeux/yahtzee", "/pages/club", "/patchnotes?version=0.2.1", "/sitemap.xml", "/robots.txt", "/rss.xml"]) {
+      const duplicate = await call("api.ktga.me", route);
+      assert.equal(duplicate.status, 308, route);
+      assert.equal(duplicate.headers.location, `https://www.ktga.me${route}`, route);
+    }
     const api = await call("api.ktga.me", "/api/health", { "X-Forwarded-For": "forged-address" });
     const diagnostic = JSON.parse(api.body); assert.equal(diagnostic.path, "/api/health"); assert.equal(diagnostic.protocol, "https"); assert.equal(diagnostic.forwardedFor, "127.0.0.1");
     assert.match(api.headers["x-robots-tag"], /noindex/);
