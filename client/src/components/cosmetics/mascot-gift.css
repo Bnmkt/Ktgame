@@ -22,7 +22,14 @@
 .mascot-gift-footer strong { font-size: 13px; }
 .mascot-gift-footer small { display: block; margin-top: 5px; max-width: 480px; color: var(--site-muted, #c2c8b9); font-size: 12px; line-height: 1.5; }
 .mascot-gift-footer > div:last-child { display: flex; gap: 10px; flex-wrap: wrap; }
-.mascot-gift-recall { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; max-width: 1440px; margin: 14px auto; padding: 12px 16px; background: var(--site-surface, #101a18); border-block: 1px solid var(--site-primary, #e8c777); color: var(--site-text, #f8ecd2); }
+.mascot-gift-recall { display:flex; align-items:center; justify-content:center; gap:16px; max-width:1440px; margin:14px auto 22px; padding:12px 16px; background:#282719; border:1px solid #e8c777; border-radius:6px; color:#ffe6a3; overflow:hidden; }
+.mascot-gift-recall > div:not(.mascot-gift-companions) { display:grid; justify-items:center; text-align:center; gap:10px; }
+.mascot-gift-recall strong { font-size:17px; }
+.mascot-gift-recall button { background:#e8c777; color:#1a180d; }
+.mascot-gift-companions { display:flex; flex-shrink:0; align-self:end; }
+.mascot-gift-companions .ktga-mascot { width:78px; height:98px; margin-inline:-8px; transform:rotate(-6deg); }
+.mascot-gift-companions:last-child .ktga-mascot { transform:rotate(6deg) scaleX(-1); }
+@media(max-width:700px) { .mascot-gift-recall { gap:6px; padding:12px 8px; } .mascot-gift-companions .ktga-mascot { width:52px; height:76px; } .mascot-gift-companions .ktga-mascot:not(:first-child) { display:none; } .mascot-gift-recall strong { font-size:14px; } }
 @media (max-width: 700px) {
   .mascot-gift-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .mascot-gift-choices { display: flex; overflow-x: auto; padding-bottom: 8px; }

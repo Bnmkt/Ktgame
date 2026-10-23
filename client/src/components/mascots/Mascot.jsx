@@ -3,10 +3,11 @@ import { mascotAsset, mascotCycles } from "../../features/mascots/catalog.js";
 import "./mascot.css";
 export { gameMascot } from "../../features/mascots/catalog.js";
 
-export function Mascot({ character = "lucky", pose = "welcome", className = "", size = "small", priority = false, cycle = "", flip = false, tilt = 0, docked = false }) {
+export function Mascot({ character = "lucky", pose = "welcome", className = "", size = "small", priority = false, cycle = "", cycleInterval = 0, flip = false, tilt = 0, docked = false }) {
   const base = import.meta.env.BASE_URL;
   const root = useRef(null);
   const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(true);
   const frames = Object.hasOwn(mascotCycles, cycle) ? mascotCycles[cycle] : null;
   useEffect(() => {
     setActive(0);
@@ -17,6 +18,7 @@ export function Mascot({ character = "lucky", pose = "welcome", className = "", 
     let visible = false;
     const schedule = () => {
       clearTimeout(timer);
+      setPaused(!visible || document.hidden || motion.matches);
       if (!visible || document.hidden || motion.matches) return;
       timer = setTimeout(() => {
         if (!visible || document.hidden || motion.matches) return;
@@ -29,7 +31,7 @@ export function Mascot({ character = "lucky", pose = "welcome", className = "", 
           return current;
         });
         schedule();
-      }, 18000 + Math.random() * 10000);
+      }, cycleInterval ? Math.max(3000, cycleInterval) : 18000 + Math.random() * 10000);
     };
     const observer = typeof IntersectionObserver === "function" ? new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
@@ -45,8 +47,8 @@ export function Mascot({ character = "lucky", pose = "welcome", className = "", 
       document.removeEventListener("visibilitychange", schedule);
       motion.removeEventListener("change", schedule);
     };
-  }, [frames]);
-  return <span ref={root} className={`ktga-mascot mascot-size-${size} ${frames ? "mascot-cycling" : ""} ${docked ? "mascot-docked" : ""} ${className}`} aria-hidden="true">
+  }, [frames, cycleInterval]);
+  return <span ref={root} style={frames ? { "--mascot-cycle-play": paused ? "paused" : "running" } : undefined} className={`ktga-mascot mascot-size-${size} ${frames ? "mascot-cycling" : ""} ${docked ? "mascot-docked" : ""} ${className}`} aria-hidden="true">
     {(frames ?? [{ character, pose, flip, tilt }]).map((frame, index) => <img key={`${frame.character}:${frame.pose}`} className={index === active || !frames ? "mascot-visible" : ""} style={{ "--mascot-facing": frame.flip ? -1 : 1, "--mascot-tilt": `${Math.max(-12, Math.min(12, Number(frame.tilt) || 0))}deg` }} src={`${base}${mascotAsset(frame.character, frame.pose)}`} srcSet={`${base}${mascotAsset(frame.character, frame.pose)} 360w, ${base}${mascotAsset(frame.character, frame.pose, 720)} 720w`} sizes={size === "large" ? "(max-width: 760px) 100px, 300px" : "(max-width: 600px) 64px, 160px"} alt="" width={360} height={360} loading={priority && index === 0 ? "eager" : "lazy"} fetchPriority={priority && index === 0 ? "high" : "auto"} decoding="async" draggable={false}/>)}
   </span>;
 }

@@ -8,6 +8,7 @@ import { classicRoomPayouts, fundedRoomPlayers, pokerRoomPayouts } from "./servi
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
 import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
+import { registerResourceManifest } from "./services/resource-manifest.js";
 import { registerMascotGiftRoutes, syncMascotPackOwners } from "./services/mascot-gift.js";
 import { normalizeBranding, validateBranding, registerBrandingRoutes } from "./services/site-branding.js";
 import { registerSourceEditorRoutes } from "./services/source-editor.js";
@@ -5210,6 +5211,7 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 
 registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
 const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, settings: platformSettings, directory: path.join(path.dirname(databaseFilename), "media-library") });
+registerResourceManifest({ app, sources: () => [platformSettings(), configuredGames().filter(game => game.enabled !== false), configuredShop(), rankedConfig(), customPages.list(true), playerHelp.read(true)], media: () => mediaLibrary.list() });
 registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });
 registerThemeRoutes({ app, auth, requireAdmin, readDb, updateDb, settings: platformSettings, mediaLibrary });
 const communication = createCommunicationStore(`${databaseFilename}.communication.sqlite`);

@@ -1,0 +1,14 @@
+.cosmetic-item-visual { width:100%; min-width:0; min-height:250px; display:grid; place-items:center; padding:20px; box-sizing:border-box; overflow:hidden; }
+.cosmetic-item-icons > .cosmetic-icon { width:112px; height:112px; flex-shrink:0; }
+.cosmetic-item-icons > .cosmetic-icon > svg { width:65%; height:65%; }
+.cosmetic-item-nameEffects > .display-name { font-size:30px; max-width:100%; overflow-wrap:anywhere; text-align:center; }
+.cosmetic-item-visual .vip-card { width:100%; max-width:420px; min-width:0; box-sizing:border-box; }
+.cosmetic-item-visual .cosmetic-item-surface.profile-cosmetic-preview { width:100%; min-height:0; height:auto; aspect-ratio:1.58; padding:0; isolation:isolate; box-sizing:border-box; }
+.cosmetic-item-profileFrames .cosmetic-item-surface,.cosmetic-item-profileEffects .cosmetic-item-surface { background:#142522; }
+.cosmetic-item-specimen { display:grid; place-items:center; min-height:100%; padding:24px; box-sizing:border-box; color:#fff4d7; }
+.cosmetic-item-compact { min-height:140px; padding:12px; }
+.cosmetic-item-compact.cosmetic-item-icons > .cosmetic-icon { width:72px; height:72px; }
+.cosmetic-item-compact .display-name { font-size:17px; }
+.cosmetic-item-compact .vip-card { padding:12px; gap:8px; font-size:12px; }
+.cosmetic-item-compact .vip-stats { display:none; }
+@media(max-width:480px) { .cosmetic-item-visual { padding:12px; min-height:210px; } .cosmetic-item-compact { min-height:140px; } .cosmetic-item-visual .vip-card { padding:14px; } .cosmetic-item-nameEffects > .display-name { font-size:24px; } }

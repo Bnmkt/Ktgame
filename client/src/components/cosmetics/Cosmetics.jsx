@@ -14,6 +14,7 @@ import { gameImageUrl } from "../../features/games/presentation.js";
 import { API_URL } from "../../api.js";
 import { cosmeticImage, cosmeticImageBackground, cosmeticImageSettings } from "../../utils/cosmetic-images.js";
 import "./icon-frame.css";
+import "./cosmetic-item-preview.css";
 
 export let cosmeticCatalogItems = [];
 
@@ -737,28 +738,30 @@ export function VisualDesigner({ type, design, onChange, onActivate, onDisable, 
   </section>;
 }
 
+export function CosmeticItemVisual({ user, item, stats = [], compact = false }) {
+  const { t } = useLocale();
+  const neutral = { ...user, cosmetics: { ...user.cosmetics, equipped: { icon: "chip", nameEffect: "none", memberCard: "default", profileBanner: "default", profileFrame: "none", profileEffect: "none" } } };
+  const preview = previewUserForItem(neutral, item);
+  const type = item?.type ?? "memberCards";
+  const name = <span className={`display-name name-${preview.cosmetics.equipped.nameEffect}`}><span className="display-name-text">{user.profile?.displayName ?? user.pseudo}</span></span>;
+  return <div className={`cosmetic-item-visual cosmetic-item-${type}${compact ? " cosmetic-item-compact" : ""}`}>
+    {type === "icons" && <CosmeticIcon value={item?.value} source={item?.icon} framed={item?.iconFramed}/>}
+    {type === "nameEffects" && name}
+    {type === "memberCards" && <div className={`vip-card preview-card member-${item?.value ?? "default"}`}><span className="vip-label">{item?.name ?? t("Carte membre")} · KTGA.ME</span><strong className="display-name">{name}</strong><small>{user.friendCode ? t("Code ami · {value0}", { value0: user.friendCode }) : t("MEMBRE · APERÇU")}</small><div className="vip-stats">{(stats.length ? stats : [{ label: "Winrate", value: "0%", icon: <Trophy size={18}/> }, { label: "Succès", value: "0/0", icon: <BadgeCheck size={18}/> }]).map((stat, index) => <div className="vip-ratio" key={index}>{stat.icon}<span>{t(stat.label)}</span><strong>{stat.value}</strong></div>)}</div></div>}
+    {["profileBanners", "profileFrames", "profileEffects"].includes(type) && <ProfileCosmeticShell user={preview} className="profile-cosmetic-preview cosmetic-item-surface">{type !== "profileBanners" && <span className="cosmetic-item-specimen">{name}</span>}</ProfileCosmeticShell>}
+    {["diceSkins", "cardSkins"].includes(type) && <PiecePreview type={type} skin={item?.value}/>}
+  </div>;
+}
+
 export function CosmeticPreview({ user, item, stats = [] }) {
   const { t: localeText } = useLocale();
   const previewItem = item?.value ? item : { ...item, value: "admin-preview" };
-  const previewUser = previewUserForItem(user, previewItem);
-  const cardTier = previewUser.cosmetics?.equipped?.memberCard ?? "default";
-  const previewStats = stats.length ? stats : [{ icon: <Trophy size={18} />, label: "Winrate", value: "0%" }, { icon: <BadgeCheck size={18} />, label: "Succès", value: "0/0" }];
   const previewType = item?.type ?? "memberCards";
-  const showMemberCard = ["icons", "nameEffects", "memberCards", "profileBanners", "profileFrames", "profileEffects"].includes(previewType);
   return (
     <div className={`shop-preview preview-type-${previewType}`}>
       {(previewItem?.design || previewItem?.motion || previewItem?.css) && <style>{cosmeticCssRules([previewItem])}</style>}
       <span>{localeText("Aperçu ·") + " "}{localeText(shopTypeLabel(previewType))}</span>
-      {showMemberCard && <ProfileCosmeticShell user={previewUser} className="profile-cosmetic-preview"><div className={`vip-card preview-card member-${cardTier}`}>
-        <span className="vip-label">{memberCardOptions[cardTier] ?? item?.name ?? localeText("Carte membre")}{" " + localeText("· KTGA.ME")}</span>
-        <strong className={`display-name name-${previewUser.cosmetics?.equipped?.nameEffect ?? "none"}`}>
-          <CosmeticIcon value={previewUser.cosmetics?.equipped?.icon} source={previewType === "icons" ? item?.icon : undefined} framed={previewType === "icons" ? item?.iconFramed : undefined}/>
-          <span className="display-name-text">{previewUser.profile?.displayName ?? previewUser.pseudo}</span>
-        </strong>
-        <small>{previewUser.friendCode ? localeText("Code ami · {value0}", { value0: previewUser.friendCode }) : localeText("MEMBRE · APERÇU")}</small>
-        <div className="vip-stats">{previewStats.map((stat, index) => <div className="vip-ratio" key={`${stat.label}-${index}`}>{stat.icon}<span>{localeText(stat.label)}</span><strong>{stat.value}</strong></div>)}</div>
-      </div></ProfileCosmeticShell>}
-      {["diceSkins", "cardSkins"].includes(previewType) && <PiecePreview type={previewType} skin={previewType === "diceSkins" ? previewUser.cosmetics?.equipped?.diceSkin : previewUser.cosmetics?.equipped?.cardSkin}/>}
+      <CosmeticItemVisual user={user} item={previewItem} stats={stats}/>
       {!item && <small>{localeText("Sélectionne un article pour afficher son rendu.")}</small>}
     </div>
   );

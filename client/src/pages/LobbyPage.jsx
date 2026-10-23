@@ -163,6 +163,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       <div className="page-heading lobby-heading lounge-heading"><div><span className="eyebrow"><Gamepad2 size={18}/>{localeText("Le casino")}</span><h1>{localeText("À quelle table joues-tu ?")}</h1><div className="lounge-mode-label"><span>{localeText(playMode === "ranked" ? "Classé" : "Classique")}</span><span><Users size={14}/>{localeText("Multijoueur")}</span></div></div></div>
       {error && !selectedGame && <div className="error">{localeText(error)}</div>}
       {(user.minor?.restricted || user.moderation?.type === "soft") && <div className="account-limitation-notice"><ShieldCheck size={18} /><span><strong>{localeText("Accès adapté")}</strong>{localeText("Certaines fonctions et certains jeux ne sont pas disponibles pour ce compte.")}</span></div>}
+      <div id="lobby-collection-entry"/>
       <LobbyNotice notice={notice} user={user} setUser={setUser}/>
       {activeCarouselEvent && <section className="lobby-event-carousel" aria-label={localeText("Événements communautaires")}>
         <button className="secondary icon-toggle event-carousel-arrow" disabled={eventIndex === 0} onClick={() => setEventIndex((index) => Math.max(0, index - 1))} aria-label={localeText("Événement précédent")}><ChevronLeft /></button>

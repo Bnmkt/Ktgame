@@ -84,7 +84,7 @@ test("manifest assets have actual PNG dimensions and safe standalone root naviga
   assert.ok(manifest.icons.some((icon) => icon.purpose === "maskable"));
   const template = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8"); assert.match(template, /rel="manifest"/); assert.match(template, /apple-touch-icon/);
 });
-test("service worker only caches the static offline page and icons, never navigation responses or API data", async () => {
+test("offline fallback keeps only its static files and never navigation responses or private APIs", async () => {
   const handlers = {}, added = [], deleted = []; let offline = false, currentCache;
   const fallback = { staticOffline: true };
   const context = {
@@ -92,12 +92,15 @@ test("service worker only caches the static offline page and icons, never naviga
     caches: { open: async name => { currentCache = name; return { addAll: async urls => added.push(...urls) }; }, keys: async () => ["ktga-offline-obsolete", currentCache, "other-cache"], delete: async (key) => deleted.push(key), match: async () => fallback },
     fetch: async () => { if (offline) throw Error("offline"); return { online: true }; }
   };
-  vm.runInNewContext(fs.readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), context);
+  context.importScripts = () => {};
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(new URL("../public/resource-cache-policy.js", import.meta.url), "utf8"), context);
+  vm.runInContext(fs.readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), context);
   let task; handlers.install({ waitUntil(promise) { task = promise; } }); await task;
   assert.equal(added.length, 5); assert.ok(added.every((url) => /\/offline\.html$|\/pwa\/icon-[\w-]+\.png$/.test(url)));
   handlers.activate({ waitUntil(promise) { task = promise; } }); await task; assert.deepEqual(deleted, ["ktga-offline-obsolete"]);
-  for (const request of [{ url: "https://www.ktga.me/api/me", mode: "cors", method: "GET" }, { url: "https://api.ktga.me/api/me", mode: "navigate", method: "GET" }, { url: "https://www.ktga.me/api/login", mode: "navigate", method: "POST" }, { url: "https://www.ktga.me/assets/app.js", mode: "cors", method: "GET" }]) {
-    let intercepted = false; handlers.fetch({ request, respondWith() { intercepted = true; } }); assert.equal(intercepted, false);
+  for (const request of [{ url: "https://www.ktga.me/api/me", mode: "cors", method: "GET" }, { url: "https://api.ktga.me/api/me", mode: "navigate", method: "GET" }, { url: "https://www.ktga.me/api/login", mode: "navigate", method: "POST" }, { url: "https://www.ktga.me/assets/app.js?ktga_resource_fill=v2", mode: "cors", method: "GET" }]) {
+    let intercepted = false; handlers.fetch({ request: { ...request, cache:"reload" }, respondWith() { intercepted = true; } }); assert.equal(intercepted, false);
   }
   const request = { url: "https://www.ktga.me/profil?secret=never-cache", mode: "navigate", method: "GET" };
   handlers.fetch({ request, respondWith(promise) { task = promise; } }); assert.equal((await task).online, true);

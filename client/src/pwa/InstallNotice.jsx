@@ -3,7 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Download, Share, Smartphone } from "lucide-react";
 import { Dialog } from "../components/common/Dialog.jsx";
 import { usePrivacyChoice } from "../privacy/Privacy.jsx";
-import { createInstallController, registerOfflineWorker } from "./install.js";
+import { createInstallController } from "./install.js";
 import "./install.css";
 
 export function InstallNotice() {
@@ -15,7 +15,6 @@ export function InstallNotice() {
   const choice = usePrivacyChoice();
   useEffect(() => {
     controller.start();
-    if (import.meta.env.PROD) registerOfflineWorker(window, import.meta.env.BASE_URL);
     const sync = () => setFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", sync);
     return () => { controller.stop(); document.removeEventListener("fullscreenchange", sync); };

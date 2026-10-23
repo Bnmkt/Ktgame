@@ -30,6 +30,7 @@ import "./styles.css";
 import "./navigation/casino.css";
 import "./components/social/social.css";
 import { InstallNotice } from "./pwa/InstallNotice.jsx";
+import { ResourcePreparation, useResourcePreparation } from "./pwa/ResourcePreparation.jsx";
 import { LanguagePicker, LocaleProvider, useLocale } from "./locales/LocaleProvider.jsx";
 import "./navigation/mobile-casino.css";
 import { siteMarkSource } from "./features/site-branding.js";
@@ -59,6 +60,7 @@ const publicPageData = readPublicPageData();
 
 export default function App() {
   useInterfaceSounds();
+  const preparingResources = useResourcePreparation();
   const { t: localeText } = useLocale();
   const [user, setUser] = useState(null);
   const [mascotGiftPending, setMascotGiftPending] = useState(true);
@@ -432,14 +434,14 @@ export default function App() {
       {roomClosure && <RoomClosedNotice onClose={() => setRoomClosure(null)}/>}
       {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} onReport={(profile) => setReportTarget(profile)} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} roomCode={roomCode ?? ""} onClose={() => setReportTarget(null)} />}
-      {!user.guest && <Suspense fallback={null}><MascotGift key={user.id} user={user} onClaim={setUser} onPendingChange={setMascotGiftPending}/></Suspense>}
-      <Suspense fallback={null}><HelpOnboarding key={user.id} user={user} paused={!user.guest && mascotGiftPending}/></Suspense>
+      {!user.guest && !preparingResources && <Suspense fallback={null}><MascotGift key={user.id} user={user} lobby={view === "lobby"} onClaim={setUser} onPendingChange={setMascotGiftPending}/></Suspense>}
+      <Suspense fallback={null}><HelpOnboarding key={user.id} user={user} paused={preparingResources || !user.guest && mascotGiftPending}/></Suspense>
     </>
   );
 }
 
 export function CasinoApplication({ children, embedded = false }) {
-  const content = <><div className="locale-visitor"><LanguagePicker /></div><PrivacyProvider><BugReportProvider>{!embedded && <InstallNotice />}{children}<App /></BugReportProvider></PrivacyProvider></>;
+  const content = <><div className="locale-visitor"><LanguagePicker /></div><PrivacyProvider><BugReportProvider><ResourcePreparation>{!embedded && <InstallNotice />}{children}<App /></ResourcePreparation></BugReportProvider></PrivacyProvider></>;
   return embedded ? content : <LocaleProvider>{content}</LocaleProvider>;
 }
 

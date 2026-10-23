@@ -55,6 +55,7 @@ try {
   await dialog.waitFor();
   await dialog.getByRole("button", { name: "Plus tard", exact: true }).click();
   await page.locator('.mascot-gift-recall').waitFor();
+  assert.ok(await page.locator('.mascot-gift-recall').evaluate(node => node.getBoundingClientRect().top < document.querySelector('[data-lobby-notice]').getBoundingClientRect().top));
   assert.equal(await page.locator("[data-gift-pending]").getAttribute("data-gift-pending"), "false");
   await page.getByRole("button", { name: "Choisir mon pack", exact: true }).click();
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }], ["small-mobile", { width: 320, height: 740 }]]) {
@@ -70,6 +71,22 @@ try {
   }
   await dialog.getByRole("button", { name: "Recevoir le pack Midnight", exact: true }).click();
   await dialog.waitFor({ state: "detached" });
+  const reveal = page.locator('.cosmetic-receipt-dialog');
+  await reveal.waitFor();
+  assert.equal(await page.locator("[data-gift-pending]").getAttribute("data-gift-pending"), "true");
+  await reveal.locator('.cosmetic-receipt-stage.recap-transform').waitFor();
+  await page.screenshot({ path:fileURLToPath(new URL('reward-mobile.png', output)) });
+  await reveal.getByRole('button', { name:'Tout afficher', exact:true }).click();
+  assert.equal(await reveal.locator('.cosmetic-receipt-grid > button').count(), packs.find(pack => pack.id === 'midnight').items.length);
+  await reveal.getByRole('button', { name:'Revoir l’animation', exact:true }).click();
+  await reveal.locator('.cosmetic-receipt-stage').waitFor();
+  assert.equal(posts,1,'replaying never claims a second time');
+  await page.emulateMedia({ reducedMotion:'reduce' });
+  await page.waitForTimeout(100);
+  assert.equal(await reveal.locator('.ranked-recap-emblem').evaluate(node => getComputedStyle(node).animationName),'none');
+  await reveal.getByRole('button', { name:'Tout afficher', exact:true }).click();
+  await reveal.getByRole('button', { name:'Terminer', exact:true }).click();
+  await reveal.waitFor({ state:'detached' });
   assert.equal(posts, 1);
   const user = await page.evaluate(() => window.giftFixtureUser());
   assert.equal(user.tokens, 1500);

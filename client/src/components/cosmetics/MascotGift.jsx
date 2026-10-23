@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, Eye, Gift } from "lucide-react";
 import { api } from "../../api.js";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
@@ -8,12 +9,16 @@ import { Mascot } from "../mascots/Mascot.jsx";
 import { PublicProfileModal } from "../profile/PublicProfileModal.jsx";
 import { CosmeticPreview, cosmeticCssRules, shopTypeLabel } from "./Cosmetics.jsx";
 import "./mascot-gift.css";
+import { CosmeticRewardReveal } from "./CosmeticRewardReveal.jsx";
 
-export function MascotGift({ user, onClaim, onPendingChange }) {
+export function MascotGift({ user, onClaim, onPendingChange, lobby = false }) {
   const { t } = useLocale();
   const [packs, setPacks] = useState([]), [claim, setClaim] = useState(null), [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(true), [selectedId, setSelectedId] = useState(""), [itemId, setItemId] = useState("");
   const [profileOpen, setProfileOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [retry, setRetry] = useState(0);
+  const [rewards, setRewards] = useState(null);
+  const [offerTarget, setOfferTarget] = useState(null);
+  useEffect(() => { setOfferTarget(lobby ? document.getElementById("lobby-collection-entry") : null); }, [lobby]);
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError("");
@@ -22,7 +27,8 @@ export function MascotGift({ user, onClaim, onPendingChange }) {
     }).catch((failure) => { if (!cancelled) setError(failure.message); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [user.id, retry]);
-  useEffect(() => { onPendingChange(loading || !claim && packs.length > 0 && open); }, [loading, claim, packs.length, open, onPendingChange]);
+  useEffect(() => { onPendingChange(Boolean(rewards) || loading || !claim && packs.length > 0 && open); }, [rewards, loading, claim, packs.length, open, onPendingChange]);
+  if (rewards) return <CosmeticRewardReveal pack={rewards.pack} user={rewards.user} onClose={() => setRewards(null)}/>;
   if (loading || claim || !packs.length && !error) return null;
   const selected = packs.find((pack) => pack.id === selectedId) ?? packs[0];
   const preview = selected && mascotPackPreview(user, selected.items);
@@ -32,13 +38,15 @@ export function MascotGift({ user, onClaim, onPendingChange }) {
     setBusy(true); setError("");
     try {
       const result = await api("/api/me/mascot-gift", { method: "POST", body: JSON.stringify({ packId: selected.id }), deduplicate: false });
-      setClaim(result.claim); onClaim(result.user);
+      setRewards({ pack:selected, user:result.user }); setClaim(result.claim); onClaim(result.user);
     } catch (failure) { setError(failure.message); }
     finally { setBusy(false); }
   }
-  if (!open || !selected) return <section className="mascot-gift-recall"><Gift size={22}/><span>{t("Ton pack de mascotte offert t’attend.")}</span><button type="button" className="secondary" onClick={() => selected ? setOpen(true) : setRetry((value) => value + 1)}>{t(selected ? "Choisir mon pack" : "Réessayer")}</button>{error && <span role="alert">{error}</span>}</section>;
-  if (profileOpen) return <><style>{cosmeticCssRules(selected.items)}</style><PublicProfileModal profile={preview} currentUser={user} preview onClose={() => setProfileOpen(false)}/></>;
-  return <Dialog title={t("Choisis ton pack de mascotte offert")} className="mascot-gift-dialog" onClose={() => setOpen(false)} dismissible={!busy}>
+  const offer = <section className="mascot-gift-recall"><div className="mascot-gift-companions" aria-hidden="true">{["lucky", "midnight"].map(character => <Mascot key={character} character={character}/>)}</div><div><strong>{t("Ton pack de mascotte offert t’attend.")}</strong><button type="button" onClick={() => selected ? setOpen(true) : setRetry((value) => value + 1)}><Gift size={20}/>{t(selected ? "Choisir mon pack" : "Réessayer")}</button>{error && <span role="alert">{error}</span>}</div><div className="mascot-gift-companions" aria-hidden="true">{["jacky", "nixie", "milo"].map(character => <Mascot key={character} character={character}/>)}</div></section>;
+  const entry = offerTarget ? createPortal(offer, offerTarget) : !open ? offer : null;
+  if (!open || !selected) return entry;
+  if (profileOpen) return <>{entry}<style>{cosmeticCssRules(selected.items)}</style><PublicProfileModal profile={preview} currentUser={user} preview onClose={() => setProfileOpen(false)}/></>;
+  return <>{entry}<Dialog title={t("Choisis ton pack de mascotte offert")} className="mascot-gift-dialog" onClose={() => setOpen(false)} dismissible={!busy}>
     <style>{cosmeticCssRules(selected.items)}</style>
     <div className="mascot-gift-layout">
       <div className="mascot-gift-choices" role="group" aria-label={t("Packs de mascottes")}>
@@ -54,5 +62,5 @@ export function MascotGift({ user, onClaim, onPendingChange }) {
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     <footer className="mascot-gift-footer"><div><strong>{t("Un pack offert par compte. Le choix est définitif.")}</strong><small>{t("Les futurs objets de cette collection seront ajoutés gratuitement à ton inventaire.")}</small></div><div><button type="button" className="secondary" disabled={busy} onClick={() => setOpen(false)}>{t("Plus tard")}</button><button type="button" disabled={busy} onClick={receive}><Gift size={18}/>{busy ? t("Enregistrement…") : t("Recevoir le pack {value0}", { value0: selected.name })}</button></div></footer>
-  </Dialog>;
+  </Dialog></>;
 }

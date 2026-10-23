@@ -1,0 +1,15 @@
+.cosmetic-receipt-dialog.casino-dialog { width:min(860px,calc(100vw - 24px)); max-height:92dvh; overflow:auto; }
+.cosmetic-receipt-heading { display:flex; align-items:center; gap:12px; color:#e8c777; }
+.cosmetic-receipt-heading > span { margin-left:auto; font-size:13px; color:#d0c7b5; }
+.cosmetic-receipt-stage { position:relative; display:grid; place-items:center; min-height:310px; overflow:hidden; isolation:isolate; }
+.cosmetic-receipt-stage > .ranked-recap-emblem { width:min(100%,510px); filter:drop-shadow(0 8px 22px #e8c77730); }
+.cosmetic-receipt-caption { text-align:center; min-height:102px; }
+.cosmetic-receipt-caption h2 { margin:8px 0; font-size:26px; color:#ffe6a3; }
+.cosmetic-receipt-caption > span:last-child { display:inline-flex; align-items:center; gap:6px; color:#87d6b1; font-size:14px; }
+.cosmetic-receipt-actions { display:flex; justify-content:space-between; gap:12px; padding-top:18px; border-top:1px solid #e8c77733; }
+.cosmetic-receipt-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr)); gap:12px; margin:20px 0; }
+.cosmetic-receipt-grid > button { display:flex; flex-direction:column; padding:8px; gap:6px; min-width:0; white-space:normal; }
+.cosmetic-receipt-grid > button > strong { overflow-wrap:anywhere; }
+.cosmetic-receipt-grid > button > small { color:#d0c7b5; }
+@media(max-width:480px) { .cosmetic-receipt-stage { min-height:260px; } .cosmetic-receipt-actions > button { white-space:normal; } .cosmetic-receipt-grid { grid-template-columns:1fr; } }
+@media(prefers-reduced-motion:reduce) { .cosmetic-receipt-stage * { animation:none!important; transition:none!important; } }

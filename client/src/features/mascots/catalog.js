@@ -35,6 +35,13 @@ export const mascotScenes = {
 };
 
 export const mascotCycles = {
+  preparation: [
+    { character: "lucky", pose: "point", tilt: -4 },
+    { character: "midnight", pose: "dice", flip: true, tilt: 3 },
+    { character: "jacky", pose: "cards", tilt: -3 },
+    { character: "nixie", pose: "victory", tilt: 4 },
+    { character: "milo", pose: "point", flip: true, tilt: -2 }
+  ],
   dice: [
     { character: "lucky", pose: "dice", tilt: -4 },
     { character: "midnight", pose: "dice", flip: true, tilt: 3 },
