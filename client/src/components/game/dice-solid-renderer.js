@@ -4,10 +4,20 @@ import {
 } from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createDieThrowVisual, dieMaterialFaces, diePips, dieThrowPose } from "../../features/games/dice-solid.js";
+import { paintDiceSurface, shadowFilter } from "./dice-surface.js";
 
 const materialFaces = dieMaterialFaces;
 const entries = new Set();
-let engine, frame = 0, idleTimer, lastFrame = 0, renderedFrames = 0;
+let engine, frame = 0, idleTimer, cosmeticTimer = 0, styleObserver, lastFrame = 0, renderedFrames = 0;
+
+function refreshStyles() {
+  for (const entry of entries) entry.refreshCss = true;
+  schedule();
+}
+
+function stylesheetLoaded(event) {
+  if (event.target.matches?.('link[rel="stylesheet"]')) refreshStyles();
+}
 
 function getEngine() {
   clearTimeout(idleTimer);
@@ -46,40 +56,69 @@ function getEngine() {
   return engine;
 }
 
-function paintTexture(value, palette, image) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 256;
-  const context = canvas.getContext("2d");
-  const gradient = palette.radial
-    ? context.createRadialGradient(85, 65, 0, 128, 128, 240)
-    : context.createLinearGradient(0, 0, 256, 256);
-  palette.colors.forEach((color, i) => gradient.addColorStop(i / Math.max(1, palette.colors.length - 1), color));
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, 256, 256);
-  if (image) {
-    const scale = Math.max(256 / image.width, 256 / image.height);
-    context.drawImage(image, (256 - image.width * scale) / 2, (256 - image.height * scale) / 2, image.width * scale, image.height * scale);
-  }
-  for (const dot of diePips[value]) {
-    const x = 128 + ((dot - 1) % 3 - 1) * 59;
-    const y = 128 + (Math.floor((dot - 1) / 3) - 1) * 59;
-    const radius = palette.pipSize;
-    // A small inset lip gives pips depth without multiplying meshes/draw calls.
-    context.beginPath(); context.arc(x, y + 1.4, radius + 1.5, 0, Math.PI * 2);
-    context.fillStyle = "rgba(255,255,255,.25)"; context.fill();
-    context.fillStyle = palette.pip;
-    context.beginPath();
-    if (palette.squarePips) context.roundRect(x - radius, y - radius, radius * 2, radius * 2, 3);
-    else context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fill();
-  }
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
-
 function disposeMaterials(entry) {
   for (const material of entry.materials ?? []) { material.map.dispose(); material.dispose(); }
+}
+
+function cosmeticPlayback(entry) {
+  const active = entry.visible && !document.hidden && !entry.motion.matches;
+  for (const animation of [...(entry.sources ?? []), ...(entry.nativeAnimations ?? [])]) {
+    if (!active) { animation.pause(); if (entry.motion.matches) animation.currentTime = 0; }
+    else if (animation.playState === "paused") animation.play();
+  }
+}
+
+function syncAnimations(entry) {
+  const sources = entry.probe.getAnimations({ subtree: true });
+  const info = sources.map((animation) => ({ frames: animation.effect.getKeyframes(), timing: animation.effect.getTiming() }));
+  const signature = JSON.stringify(info);
+  if (entry.animationKey === signature && sources.every((source, i) => source === entry.sources?.[i])) return;
+  for (const animation of entry.nativeAnimations ?? []) animation.cancel();
+  entry.sources = sources; entry.animationKey = signature; entry.nativeAnimations = [];
+  entry.sampleCosmetics = false;
+  info.forEach(({ frames, timing }, i) => {
+    const pipAnimation = sources[i].effect.target !== entry.probe;
+    if (pipAnimation || frames.some((keyframe) => Object.keys(keyframe).some((key) => /^(background|border|boxShadow|color|width|height)/.test(key)))) entry.sampleCosmetics = true;
+    if (pipAnimation) return;
+    const allowed = new Set(["offset", "easing", "composite", "transform", "filter", "opacity"]);
+    const nativeFrames = frames.map((keyframe) => Object.fromEntries(Object.entries(keyframe).filter(([key]) => allowed.has(key))));
+    if (!nativeFrames.some((keyframe) => ["transform", "filter", "opacity"].some((key) => key in keyframe))) return;
+    const animation = entry.canvas.animate(nativeFrames, timing);
+    animation.currentTime = sources[i].currentTime;
+    entry.nativeAnimations.push(animation);
+  });
+  cosmeticPlayback(entry);
+}
+
+function samplePalette(entry) {
+  const body = getComputedStyle(entry.probe), pip = getComputedStyle(entry.probe.firstChild);
+  const transform = new DOMMatrixReadOnly(pip.transform === "none" ? undefined : pip.transform);
+  const palette = {
+    backgroundColor: body.backgroundColor, backgroundImage: body.backgroundImage,
+    backgroundSize: body.backgroundSize, backgroundPosition: body.backgroundPosition,
+    borderWidth: parseFloat(body.borderTopWidth) || 0, borderStyle: body.borderTopStyle, borderColor: body.borderTopColor,
+    pip: pip.backgroundColor, pipSize: Math.max(14, Math.min(27, (parseFloat(pip.width) || 12) / 76 * 128)),
+    pipRadius: Math.max(0, (parseFloat(pip.borderTopLeftRadius) || 0) / 76 * 256),
+    pipTransform: [transform.a, transform.b, transform.c, transform.d, 0, 0],
+    pipGlow: Math.min(30, parseFloat(/\)\s+[^,]*?(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px/.exec(pip.boxShadow)?.[3]) || 0)
+  };
+  entry.host.style.filter = shadowFilter(body.boxShadow, entry.control.clientWidth / 76);
+  entry.canvas.style.filter = body.filter;
+  entry.canvas.style.opacity = body.opacity;
+  entry.canvas.style.transform = body.transform;
+  const key = JSON.stringify([palette, Boolean(entry.image)]);
+  if (entry.paletteKey === key) return;
+  entry.paletteKey = key;
+  if (!entry.materials) entry.materials = materialFaces.map(() => {
+    const canvas = document.createElement("canvas"); canvas.width = canvas.height = 256;
+    const texture = new CanvasTexture(canvas); texture.colorSpace = SRGBColorSpace;
+    return new MeshStandardMaterial({ map: texture, roughness: .48, metalness: .06 });
+  });
+  entry.materials.forEach((material, i) => {
+    paintDiceSurface(material.map.image, materialFaces[i], palette, entry.image, diePips);
+    material.map.needsUpdate = true;
+  });
+  entry.dirty = true;
 }
 
 function applyPalette(entry, props) {
@@ -88,49 +127,44 @@ function applyPalette(entry, props) {
   probe.removeAttribute("style");
   for (const [key, value] of Object.entries(props.faceStyle ?? {})) {
     if (key.startsWith("--")) probe.style.setProperty(key, value);
-    else if (["background", "backgroundColor", "backgroundImage", "backgroundSize", "borderColor", "color"].includes(key)) probe.style[key] = value;
+    else if (["background", "backgroundColor", "backgroundImage", "backgroundSize", "backgroundPosition", "border", "borderColor", "borderWidth", "borderStyle", "borderRadius", "boxShadow", "color", "filter", "opacity", "animation", "transform"].includes(key)) probe.style[key] = value;
   }
-  const body = getComputedStyle(probe), pip = getComputedStyle(probe.firstChild);
-  const colors = body.backgroundImage.match(/rgba?\([^)]*\)/g) ?? [body.backgroundColor];
-  const palette = {
-    colors: colors.length > 1 ? colors : [colors[0] === "rgba(0, 0, 0, 0)" ? "#f4edda" : colors[0], colors[0] === "rgba(0, 0, 0, 0)" ? "#e1d7bd" : colors[0]],
-    radial: body.backgroundImage.startsWith("radial-gradient"), pip: pip.backgroundColor,
-    pipSize: Math.max(18, Math.min(24, parseFloat(pip.width) / (probe.offsetWidth || 76) * 128)),
-    squarePips: parseFloat(pip.borderRadius) < 3
-  };
-  const key = JSON.stringify([palette, body.backgroundImage]);
-  if (entry.paletteKey === key) return;
-  entry.paletteKey = key;
-  const build = (image) => {
-    if (!entries.has(entry) || entry.paletteKey !== key) return;
-    disposeMaterials(entry);
-    entry.materials = materialFaces.map((face) => new MeshStandardMaterial({
-      map: paintTexture(face, palette, image), roughness: .48, metalness: .06
-    }));
-    entry.dirty = true;
-    schedule();
-  };
-  build();
-  const imageUrl = /url\(["']?([^"')]+)["']?\)/.exec(body.backgroundImage)?.[1];
-  if (imageUrl) {
+  const imageUrl = /url\(["']?([^"')]+)["']?\)/.exec(getComputedStyle(probe).backgroundImage)?.[1];
+  if (entry.imageUrl !== imageUrl) {
+    entry.image = null; entry.imageUrl = imageUrl;
+  }
+  if (imageUrl && !entry.image && entry.loadingImage !== imageUrl) {
+    entry.loadingImage = imageUrl;
     const image = new Image();
     image.crossOrigin = "anonymous";
-    image.onload = () => build(image);
+    image.onload = () => {
+      if (entries.has(entry) && entry.imageUrl === imageUrl) { entry.image = image; samplePalette(entry); schedule(); }
+    };
     image.src = imageUrl;
   }
+  syncAnimations(entry);
+  samplePalette(entry);
+  schedule();
 }
 
 function schedule() {
+  clearTimeout(cosmeticTimer); cosmeticTimer = 0;
   if (!frame) frame = requestAnimationFrame(draw);
 }
 
 function draw(now) {
   frame = 0;
   if (!engine || engine.lost) return;
+  for (const entry of entries) {
+    if (entry.refreshCss) { entry.refreshCss = false; applyPalette(entry, entry.props); }
+  }
   const active = [...entries].some((entry) => entry.visible && entry.duration && now < entry.started + entry.duration);
   if (active && now - lastFrame < 30) { schedule(); return; }
   lastFrame = now;
   for (const entry of entries) {
+    if (entry.visible && !document.hidden && !entry.motion.matches && entry.sampleCosmetics && now - (entry.sampledAt ?? 0) >= 80) {
+      samplePalette(entry); entry.sampledAt = now;
+    }
     if (!entry.visible || !entry.width || !entry.height || !entry.materials || (!entry.dirty && !entry.duration)) continue;
     const progress = entry.duration ? Math.min(1, (now - entry.started) / entry.duration) : 1;
     const pose = dieThrowPose(entry.value, progress, entry.index, entry.visual);
@@ -159,10 +193,13 @@ function draw(now) {
     renderedFrames += 1;
   }
   if (active) schedule();
+  else if (!document.hidden && [...entries].some((entry) => entry.visible && !entry.motion.matches && entry.sampleCosmetics && entry.sources.some((animation) => animation.playState === "running"))) {
+    cosmeticTimer = setTimeout(() => { cosmeticTimer = 0; schedule(); }, 80);
+  }
 }
 
 export function diceRendererStats() {
-  return { contexts: engine ? 1 : 0, dice: entries.size, scheduled: Boolean(frame), renderedFrames };
+  return { contexts: engine ? 1 : 0, dice: entries.size, scheduled: Boolean(frame || cosmeticTimer), renderedFrames };
 }
 
 export function mountDie(host, initial) {
@@ -171,14 +208,26 @@ export function mountDie(host, initial) {
   const probe = document.createElement("span"), pip = document.createElement("span");
   pip.className = "pip"; probe.append(pip);
   const control = host.closest(".die");
-  host.append(canvas, probe);
+  probe.setAttribute("aria-hidden", "true");
+  host.append(canvas); document.body.append(probe);
   const slot = host.closest(".dice-throw-slot");
   const index = slot ? Array.prototype.indexOf.call(slot.parentElement.children, slot) : 0;
   const entry = { host, control, canvas, probe, context: canvas.getContext("2d"), index, visible: true, dirty: true, duration: 0 };
   entries.add(entry);
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
+  entry.motion = motion;
+  if (!styleObserver) {
+    styleObserver = new MutationObserver((records) => {
+      if (records.some((record) => record.type === "attributes" || record.target.nodeName === "STYLE" || record.target.parentElement?.closest("style") || [...record.addedNodes, ...record.removedNodes].some((node) => node.nodeName === "STYLE" || node.nodeName === "LINK"))) refreshStyles();
+    });
+    styleObserver.observe(document.head, { childList: true, subtree: true, characterData: true });
+    styleObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    styleObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
+    document.addEventListener("load", stylesheetLoaded, true);
+  }
   let previous;
   const update = (props) => {
+    entry.props = props;
     applyPalette(entry, props);
     if (!previous || props.value !== previous.value || props.rollKey !== previous.rollKey) {
       if (!previous || props.animate) entry.visual = createDieThrowVisual();
@@ -200,16 +249,22 @@ export function mountDie(host, initial) {
       entry.dirty = true;
       schedule();
     }
+    if (entry.materials) samplePalette(entry);
   };
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(host);
   const intersection = new IntersectionObserver(([record]) => {
     entry.visible = record.isIntersecting;
+    cosmeticPlayback(entry);
     if (entry.visible) { entry.dirty = true; schedule(); }
   });
   intersection.observe(host);
   const settle = () => {
-    if (document.hidden || motion.matches) { entry.duration = 0; entry.dirty = true; schedule(); }
+    syncAnimations(entry);
+    cosmeticPlayback(entry);
+    if (document.hidden || motion.matches) { entry.duration = 0; entry.dirty = true; }
+    samplePalette(entry);
+    schedule();
   };
   document.addEventListener("visibilitychange", settle);
   motion.addEventListener("change", settle);
@@ -219,9 +274,13 @@ export function mountDie(host, initial) {
     destroy() {
       entries.delete(entry); resizeObserver.disconnect(); intersection.disconnect();
       document.removeEventListener("visibilitychange", settle); motion.removeEventListener("change", settle);
+      for (const animation of entry.nativeAnimations ?? []) animation.cancel();
       disposeMaterials(entry); canvas.remove(); probe.remove(); delete control.dataset.diceSolid;
       if (!entries.size) {
         cancelAnimationFrame(frame); frame = 0;
+        clearTimeout(cosmeticTimer); cosmeticTimer = 0;
+        styleObserver.disconnect(); styleObserver = null;
+        document.removeEventListener("load", stylesheetLoaded, true);
         idleTimer = setTimeout(() => {
           engine.geometry.dispose(); engine.renderer.dispose(); engine.renderer.forceContextLoss(); engine = null;
         }, 1000);

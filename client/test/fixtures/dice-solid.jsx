@@ -5,6 +5,7 @@ import { DiceThrowTray, Die } from "../../src/components/game/GamePieces.jsx";
 import { DiceScoreStrip } from "../../src/components/game/DiceScoreStrip.jsx";
 import { FarkleBoard } from "../../src/components/game/GameBoards.jsx";
 import { diceRendererStats } from "../../src/components/game/dice-solid-renderer.js";
+import { cosmeticCssRules, defaultVisualDesign } from "../../src/components/cosmetics/Cosmetics.jsx";
 import "../../src/styles.css";
 import "../../src/features/theme/theme.css";
 import "../../src/components/room/mobile-room.css";
@@ -31,4 +32,12 @@ function ThemeGallery() {
     ["Ivoire", "classic-ivory"], ["Charbon", "classic-charcoal"], ["Or", "premium-gold"], ["Rubis", "premium-ruby"], ["Saphir", "classic-sapphire"]
   ].map(([name, skin]) => <div style={{ marginBottom: 20 }} key={skin}><DiceThrowTray label={name} caption="1 - 2 - 3 - 4 - 5 - 6">{[1, 2, 3, 4, 5, 6].map((value) => <Die key={value} value={value} skin={skin} animate={false}/>)}</DiceThrowTray></div>)}</main>;
 }
-createRoot(document.getElementById("root")).render(<LocaleProvider>{new URLSearchParams(location.search).has("themes") ? <ThemeGallery/> : <Fixture />}</LocaleProvider>);
+function SkinVerification() {
+  const items = [
+    { type: "diceSkins", value: "fixture-inlay", design: { ...defaultVisualDesign("diceSkins"), primaryColor: "#0b1834", secondaryColor: "#183858", borderColor: "#ff314f", borderStyle: "double", borderWidth: 5, pipColor: "#ffe28a", pipShape: "diamond", pipGlow: 3, glow: 14 }, motion: { preset: "float", duration: 1.2, distance: 8, iterations: "infinite", respectReducedMotion: true } },
+    { type: "diceSkins", value: "fixture-river", design: { ...defaultVisualDesign("diceSkins"), primaryColor: "#ff8d4a", secondaryColor: "#0d3b81", borderColor: "#8df9ea", borderStyle: "dashed", borderWidth: 3, pipColor: "#fffaf0", animation: "flow", animationSpeed: 1.2, glow: 8 } }
+  ];
+  return <main className="app-shell room-app-shell room-render-budget" style={{ maxWidth: 1000 }}><style>{cosmeticCssRules(items)}</style><h1>Apparences du studio</h1>{items.map((item) => <div key={item.value} data-dice-case={item.value} style={{ marginBlock: 30 }}><DiceThrowTray label={item.value} caption="3D">{[2, 5, 6].map((value) => <Die key={value} value={value} skin={item.value} animate={false}/>)}</DiceThrowTray></div>)}<DiceThrowTray label="Yahtzee">{[1, 2, 3, 4, 5].map((value) => <Die key={value} value={value} animate={false}/>)}</DiceThrowTray></main>;
+}
+const params = new URLSearchParams(location.search);
+createRoot(document.getElementById("root")).render(<LocaleProvider>{params.has("cosmetics") ? <SkinVerification/> : params.has("themes") ? <ThemeGallery/> : <Fixture />}</LocaleProvider>);

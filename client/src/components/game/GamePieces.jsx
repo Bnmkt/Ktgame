@@ -47,12 +47,13 @@ const diceRestingPositions = [
 
 export function DiceThrowTray({ children, label = "Piste de lancer", caption = "Zone de jeu", className = "", compact = false }) {
   const { t: localeText } = useLocale();
+  const dice = React.Children.toArray(children);
   return (
-    <section className={`dice-throw-tray ${compact ? "compact" : ""} ${className}`.trim()}>
+    <section className={`dice-throw-tray ${compact ? "compact" : ""} ${className}`.trim()} style={{ "--dice-tray-columns": dice.length > 5 ? Math.ceil(dice.length / 2) : Math.max(1, dice.length) }}>
       <header className="dice-throw-tray-label"><span aria-hidden="true" /><strong>{localeText(label)}</strong><small>{caption}</small></header>
       <div className="dice-throw-surface">
         <DiceTrayContext.Provider value={true}><div className="dice-row">
-          {React.Children.toArray(children).map((child, index) => {
+          {dice.map((child, index) => {
             const position = diceRestingPositions[index % diceRestingPositions.length];
             const rolling = Boolean(child?.props?.value) && child?.props?.animate !== false;
             const piece = React.isValidElement(child) && child.type === Die
