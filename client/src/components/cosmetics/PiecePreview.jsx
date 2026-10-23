@@ -31,8 +31,8 @@ export function PiecePreview({ type, skin = "default" }) {
   }, [type]);
   return <div className="piece-preview" data-piece-preview={type} role="img" aria-label={t(type === "cardSkins" ? "Cartes" : "Dés")}>
     {type === "diceSkins" ? <Die value={5} skin={skin} animate={false} showcase/> : <div className="piece-preview-card-turn" ref={turn} aria-hidden="true">
-      <div className="piece-preview-card-face"><PlayingCard card={{ rank: "A", suit: "H" }} skin={skin} animate={false}/></div>
-      <div className="piece-preview-card-face piece-preview-card-reverse"><PlayingCard hidden skin={skin} animate={false}/></div>
+      <div className="piece-preview-card-face"><PlayingCard card={{ rank: "A", suit: "H" }} skin={skin} animate={false} inline/></div>
+      <div className="piece-preview-card-face piece-preview-card-reverse"><PlayingCard hidden skin={skin} animate={false} inline/></div>
     </div>}
   </div>;
 }

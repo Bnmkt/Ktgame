@@ -8,11 +8,12 @@
   perspective: 700px;
 }
 .piece-preview-card-turn { position: relative; width: min(90px, 100%); aspect-ratio: 15 / 22; transform-style: preserve-3d; transform: rotateX(7deg); }
-.piece-preview-card-face { position: absolute; inset: 0; transform: translateZ(1px); backface-visibility: hidden; transform-style: preserve-3d; }
+.piece-preview-card-face { position: absolute; inset: 0; transform: translateZ(1px); backface-visibility: hidden; transform-style: flat; }
 .piece-preview-card-reverse { transform: rotateY(180deg) translateZ(1px); }
 .piece-preview .piece-preview-card-face .playing-card {
   width: 100%; min-width: 0; height: 100%; min-height: 0; padding: 9px;
   rotate: none !important; translate: none !important;
+  transform-style: flat; backface-visibility: hidden;
   --custom-pip-size: 12px; --custom-border-width: 2px;
 }
 .piece-preview .piece-preview-card-face .playing-card strong { font-size: 28px; line-height: 1; }

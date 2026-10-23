@@ -28,6 +28,8 @@ try {
   assert.equal(await tableDie.getAttribute("data-dice-pose"), before.table, "game dice must remain still");
   assert.equal(await turn.count(), 1, "one card, with two sides, not two separate cards");
   assert.deepEqual(await page.locator(".piece-preview-card-face").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backfaceVisibility)), ["hidden", "hidden"]);
+  assert.deepEqual(await page.locator(".piece-preview-card-face").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).transformStyle)), ["flat", "flat"]);
+  assert.equal(await turn.locator('.card-solid-depth, .card-solid-edge').count(), 0, "the rotating specimen must not contain a second pair of extruded cards");
   const pixels = (node) => {
     const data = node.getContext("2d").getImageData(0, 0, node.width, node.height).data;
     let red = 0, dark = 0, filled = 0;
@@ -91,6 +93,20 @@ try {
   await profile.waitFor();
   assert.equal(await profile.locator(".piece-preview-card-turn").count(), 1);
   await profile.locator('[data-dice-solid="ready"]').waitFor();
+  const specimen = profile.locator('.piece-preview-card-turn');
+  const specimenStage = profile.locator('[data-piece-preview="cardSkins"]');
+  await specimenStage.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(100);
+  for (const angle of [0, 45, 180, 225]) {
+    await specimen.evaluate((node, degrees) => { const spin = node.getAnimations()[0]; spin.pause(); spin.currentTime = degrees / 360 * 12000; }, angle);
+    await page.waitForTimeout(50);
+    const surfaces = await specimen.evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      return [...new Set(document.elementsFromPoint(box.x + box.width / 2, box.y + box.height / 2).map(element => element.closest('.playing-card')).filter(element => element && node.contains(element)))].map(element => element.classList.contains('card-back'));
+    });
+    assert.deepEqual(surfaces, [angle >= 180], `profile at ${angle}deg must expose only the intended side`);
+    await specimenStage.screenshot({ path: fileURLToPath(new URL(`single-card-${angle}.png`, output)) });
+  }
   await page.screenshot({ path: fileURLToPath(new URL("public-profile.png", output)), fullPage: true });
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
