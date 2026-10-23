@@ -3,7 +3,7 @@ import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { DailyActivityChart } from "./DailyActivityChart.jsx";
 import { GameProgression } from "./GameProgression.jsx";
 import { BadgeCheck, Eye, EyeOff, Flag, Volume2, VolumeX, X } from "lucide-react";
-import { Die, PlayingCard } from "../game/GamePieces.jsx";
+import { PiecePreview } from "../cosmetics/PiecePreview.jsx";
 import { DisplayName, FriendCode, ProfileCosmeticEffect, ProfileCosmeticFrame, profileCosmeticClassName } from "../cosmetics/Cosmetics.jsx";
 import { memberCardOptions, publicProfileStatOptions } from "../../config/site.js";
 import { gameTitle } from "../../features/games/config.js";
@@ -81,8 +81,8 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
             </div>
             {publicStats.length > 0 && <div className="public-profile-grid">{publicStats.map(([key, label, value]) => <div key={key}><span>{localeText(label)}</span><strong>{value}</strong></div>)}</div>}
             <div className="profile-cosmetics-preview" aria-label={localeText("Dés et cartes équipés")}>
-              <div><span>{localeText("Dés")}</span><Die value={5} kept={false} skin={profile.cosmetics?.equipped?.diceSkin} /></div>
-              <div><span>{localeText("Cartes")}</span><div className="skin-preview-row"><PlayingCard card={{ rank: "A", suit: "S" }} skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /><PlayingCard hidden skin={profile.cosmetics?.equipped?.cardSkin} animate={false} /></div></div>
+              <div><span>{localeText("Dés")}</span><PiecePreview type="diceSkins" skin={profile.cosmetics?.equipped?.diceSkin}/></div>
+              <div><span>{localeText("Cartes")}</span><PiecePreview type="cardSkins" skin={profile.cosmetics?.equipped?.cardSkin}/></div>
             </div>
           </aside>
           {hasDetails && <section className="public-profile-side">

@@ -25,16 +25,16 @@ export function PlayingCard({ card, hidden = false, skin = "default", style, ani
   );
 }
 
-export function Die({ value, kept, onClick, skin = "default", animate = true, selectionLabel = "Gardé", style, inline = false, rollKey }) {
+export function Die({ value, kept, onClick, skin = "default", animate = true, selectionLabel = "Gardé", style, inline = false, rollKey, showcase = false }) {
   const { t: localeText } = useLocale();
   const inTray = useContext(DiceTrayContext);
   const pips = diePips[value] ?? [];
-  const solid = !inline && pips.length > 0 && (inTray || animate);
+  const solid = !inline && pips.length > 0 && (inTray || animate || showcase);
   const DieElement = onClick ? "button" : inline ? "span" : "div";
   return (
-    <DieElement type={onClick ? "button" : undefined} role={onClick ? undefined : "img"} aria-label={value ? localeText("Dé : {value0}", { value0: value }) : localeText("Dé non lancé")} aria-pressed={onClick ? Boolean(kept) : undefined} className={`die die-skin-${skin} ${solid ? "dice-solid-control" : value && animate ? "roll-in" : ""} ${kept ? "kept" : ""} ${kept && selectionLabel === localeText("À relancer") ? "selected-reroll" : ""}`} style={style} onClick={onClick} disabled={onClick ? !value : undefined} title={onClick ? (kept ? selectionLabel : localeText("Cliquer pour marquer comme « {value0} »", { value0: selectionLabel.toLowerCase() })) : undefined}>
+    <DieElement data-die-face={value || undefined} type={onClick ? "button" : undefined} role={onClick ? undefined : "img"} aria-label={value ? localeText("Dé : {value0}", { value0: value }) : localeText("Dé non lancé")} aria-pressed={onClick ? Boolean(kept) : undefined} className={`die die-skin-${skin} ${solid ? "dice-solid-control" : value && animate ? "roll-in" : ""} ${kept ? "kept" : ""} ${kept && selectionLabel === localeText("À relancer") ? "selected-reroll" : ""}`} style={style} onClick={onClick} disabled={onClick ? !value : undefined} title={onClick ? (kept ? selectionLabel : localeText("Cliquer pour marquer comme « {value0} »", { value0: selectionLabel.toLowerCase() })) : undefined}>
       {pips.map((dot) => <span aria-hidden="true" key={dot} className="pip" data-pip={dot} />)}
-      {solid && <DieSolid value={Number(value)} animate={animate} skin={skin} faceStyle={style} rollKey={rollKey} />}
+      {solid && <DieSolid value={Number(value)} animate={animate} skin={skin} faceStyle={style} rollKey={rollKey} showcase={showcase} />}
       {kept && <span className="kept-label">{selectionLabel}</span>}
     </DieElement>
   );

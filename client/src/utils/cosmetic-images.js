@@ -5,7 +5,7 @@ export function cosmeticImage(value) {
 export function cosmeticImageSettings(value = {}) {
   const position = key => Math.max(0, Math.min(100, Number.isFinite(value[key]) ? value[key] : 50));
   return {
-    surfaceImage: cosmeticImage(value.surfaceImage), faceImage: cosmeticImage(value.faceImage), backImage: cosmeticImage(value.backImage),
+    surfaceImage: cosmeticImage(value.surfaceImage), faceImage: cosmeticImage(value.faceImage), backImage: cosmeticImage(value.backImage), oneImage: cosmeticImage(value.oneImage),
     imageFit: value.imageFit === "contain" ? "contain" : "cover",
     imagePositionX: position("imagePositionX"), imagePositionY: position("imagePositionY")
   };

@@ -93,7 +93,7 @@ export function paintDiceSurface(canvas, value, palette, image, pips) {
     } else path(8 + borderWidth / 2, borderWidth);
     context.restore();
   }
-  for (const dot of pips[value]) {
+  for (const dot of palette.hidePips ? [] : pips[value]) {
     const x = size / 2 + ((dot - 1) % 3 - 1) * size * .23;
     const y = size / 2 + (Math.floor((dot - 1) / 3) - 1) * size * .23;
     const radius = palette.pipSize;

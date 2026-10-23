@@ -115,7 +115,13 @@ export function normalizeCosmeticDesign(value, type) {
     pipColor: color("pipColor", "#17120b"),
     pipSize: number("pipSize", 12, 6, 16),
     pipShape: option("pipShape", "round", ["round", "soft", "square", "diamond"]),
-    pipGlow: number("pipGlow", 0, 0, 24)
+    pipGlow: number("pipGlow", 0, 0, 24),
+    oneEnabled: value.oneEnabled === true,
+    oneShowPip: value.oneShowPip !== false,
+    oneBackgroundMode: option("oneBackgroundMode", "solid", ["solid", "linear", "radial"]),
+    onePrimaryColor: color("onePrimaryColor", "#b11226"),
+    oneSecondaryColor: color("oneSecondaryColor", "#e8c777"),
+    onePipColor: color("onePipColor", "#fffdf8")
   };
   if (type === "cardSkins") return {
     ...common,

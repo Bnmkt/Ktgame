@@ -27,3 +27,20 @@ test("cosmetic textures reject arbitrary URLs, SVG and injection without affecti
   assert.equal(normalizeCosmeticDesign(null, "diceSkins"), null);
   assert.equal(normalizeCosmeticDesign({ primaryColor: "#123456" }, "diceSkins").primaryColor, "#123456");
 });
+
+test("the optional first die face persists independently and is disabled for existing skins", () => {
+  const legacy = normalizeCosmeticDesign({}, "diceSkins");
+  assert.equal(legacy.oneEnabled, false);
+  assert.equal(legacy.oneShowPip, true);
+  const design = normalizeCosmeticDesign({ oneEnabled: true, oneShowPip: false, oneImage: image, onePrimaryColor: "#123ABC", oneSecondaryColor: "#234567", onePipColor: "#ABCDEF", oneBackgroundMode: "radial" }, "diceSkins");
+  assert.equal(design.oneEnabled, true);
+  assert.equal(design.oneShowPip, false);
+  assert.equal(design.oneImage, image);
+  assert.equal(design.onePrimaryColor, "#123abc");
+  assert.equal(design.oneBackgroundMode, "radial");
+  const invalid = normalizeCosmeticDesign({ oneEnabled: "true", oneImage: "https://example.com/secret", onePrimaryColor: "red; color:red", oneBackgroundMode: "url()" }, "diceSkins");
+  assert.equal(invalid.oneEnabled, false);
+  assert.equal(invalid.oneImage, "");
+  assert.equal(invalid.onePrimaryColor, "#b11226");
+  assert.equal(invalid.oneBackgroundMode, "solid");
+});

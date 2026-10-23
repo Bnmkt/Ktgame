@@ -8,6 +8,11 @@ export function dieLandingQuaternion(value) {
   return new Quaternion().setFromUnitVectors(new Vector3(...(face?.normal ?? [0, 1, 0])), new Vector3(0, 1, 0));
 }
 
+export function dieShowcaseQuaternion(value, seconds) {
+  return new Quaternion().setFromEuler(new Euler(seconds * .33, seconds * .49, .12))
+    .multiply(dieLandingQuaternion(value));
+}
+
 export function createDieThrowVisual(random = Math.random) {
   return {
     yaw: random() * Math.PI * 2,

@@ -15,7 +15,7 @@ export function ShopArtworkEditor({ item, onUpdate, disabled }) {
   if (!supported) return null;
   const icon = item.type === "icons";
   const design = { ...defaultVisualDesign(item.type), ...item.design };
-  const slots = icon ? [["icon", "Image de l’icône"]] : item.type === "cardSkins" ? [["faceImage", "Face des cartes"], ["backImage", "Dos des cartes"]] : [["surfaceImage", "Image de fond"]];
+  const slots = icon ? [["icon", "Image de l’icône"]] : item.type === "cardSkins" ? [["faceImage", "Face des cartes"], ["backImage", "Dos des cartes"]] : [["surfaceImage", "Image de fond"], ...(item.type === "diceSkins" && design.oneEnabled ? [["oneImage", "Image de la face 1"]] : [])];
   function setImage(field, image) {
     if (icon) onUpdate("icon", image);
     else {

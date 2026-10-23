@@ -1,0 +1,27 @@
+.piece-preview {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 176px;
+  flex: 0 0 100%;
+  perspective: 700px;
+}
+.piece-preview-card-turn { position: relative; width: min(90px, 100%); aspect-ratio: 15 / 22; transform-style: preserve-3d; transform: rotateX(7deg); }
+.piece-preview-card-face { position: absolute; inset: 0; transform: translateZ(1px); backface-visibility: hidden; transform-style: preserve-3d; }
+.piece-preview-card-reverse { transform: rotateY(180deg) translateZ(1px); }
+.piece-preview .piece-preview-card-face .playing-card {
+  width: 100%; min-width: 0; height: 100%; min-height: 0; padding: 9px;
+  rotate: none !important; translate: none !important;
+  --custom-pip-size: 12px; --custom-border-width: 2px;
+}
+.piece-preview .piece-preview-card-face .playing-card strong { font-size: 28px; line-height: 1; }
+.piece-preview .piece-preview-card-face .playing-card > span { font-size: 38px; line-height: 1; }
+.piece-preview > .die.dice-solid-control { width: min(114px, 100%); height: auto; aspect-ratio: 1; min-width: 0; min-height: 0; padding: 10px; }
+.catalog-visual.catalog-visual-cardSkins, .catalog-visual.catalog-visual-diceSkins { height: 208px; }
+.profile-cosmetics-preview > div:has(> .piece-preview) { justify-content: center; gap: 4px; }
+.profile-cosmetics-preview > div:has(> .piece-preview) > span { width: 100%; text-align: center; }
+@media (max-width: 360px) {
+  .profile-cosmetics-preview .piece-preview-card-turn { width: min(76px, 100%); }
+  .profile-cosmetics-preview .piece-preview > .die.dice-solid-control { width: min(98px, 100%); }
+}

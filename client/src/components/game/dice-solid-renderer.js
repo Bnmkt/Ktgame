@@ -3,7 +3,7 @@ import {
   OrthographicCamera, Scene, SRGBColorSpace, WebGLRenderer, ACESFilmicToneMapping
 } from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { createDieThrowVisual, dieMaterialFaces, diePips, dieThrowPose } from "../../features/games/dice-solid.js";
+import { createDieThrowVisual, dieMaterialFaces, diePips, dieThrowPose, dieShowcaseQuaternion } from "../../features/games/dice-solid.js";
 import { paintDiceSurface, shadowFilter } from "./dice-surface.js";
 
 const materialFaces = dieMaterialFaces;
@@ -69,7 +69,7 @@ function cosmeticPlayback(entry) {
 }
 
 function syncAnimations(entry) {
-  const sources = entry.probe.getAnimations({ subtree: true });
+  const sources = [...entry.probe.getAnimations({ subtree: true }), ...entry.oneProbe.getAnimations({ subtree: true })];
   const info = sources.map((animation) => ({ frames: animation.effect.getKeyframes(), timing: animation.effect.getTiming() }));
   const signature = JSON.stringify(info);
   if (entry.animationKey === signature && sources.every((source, i) => source === entry.sources?.[i])) return;
@@ -77,9 +77,10 @@ function syncAnimations(entry) {
   entry.sources = sources; entry.animationKey = signature; entry.nativeAnimations = [];
   entry.sampleCosmetics = false;
   info.forEach(({ frames, timing }, i) => {
-    const pipAnimation = sources[i].effect.target !== entry.probe;
+    const paletteOnly = sources[i].effect.target === entry.oneProbe;
+    const pipAnimation = sources[i].effect.target !== entry.probe && !paletteOnly;
     if (pipAnimation || frames.some((keyframe) => Object.keys(keyframe).some((key) => /^(background|border|boxShadow|color|width|height)/.test(key)))) entry.sampleCosmetics = true;
-    if (pipAnimation) return;
+    if (pipAnimation || paletteOnly) return;
     const allowed = new Set(["offset", "easing", "composite", "transform", "filter", "opacity"]);
     const nativeFrames = frames.map((keyframe) => Object.fromEntries(Object.entries(keyframe).filter(([key]) => allowed.has(key))));
     if (!nativeFrames.some((keyframe) => ["transform", "filter", "opacity"].some((key) => key in keyframe))) return;
@@ -102,11 +103,18 @@ function samplePalette(entry) {
     pipTransform: [transform.a, transform.b, transform.c, transform.d, 0, 0],
     pipGlow: Math.min(30, parseFloat(/\)\s+[^,]*?(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px/.exec(pip.boxShadow)?.[3]) || 0)
   };
+  const oneBody = getComputedStyle(entry.oneProbe), onePip = getComputedStyle(entry.oneProbe.firstChild);
+  const onePalette = {
+    ...palette,
+    backgroundColor: oneBody.backgroundColor, backgroundImage: oneBody.backgroundImage,
+    backgroundSize: oneBody.backgroundSize, backgroundPosition: oneBody.backgroundPosition,
+    pip: onePip.backgroundColor, hidePips: onePip.display === "none"
+  };
   entry.host.style.filter = shadowFilter(body.boxShadow, entry.control.clientWidth / 76);
   entry.canvas.style.filter = body.filter;
   entry.canvas.style.opacity = body.opacity;
   entry.canvas.style.transform = body.transform;
-  const key = JSON.stringify([palette, Boolean(entry.image)]);
+  const key = JSON.stringify([palette, onePalette, entry.imageUrl, entry.oneImageUrl, Boolean(entry.image), Boolean(entry.oneImage)]);
   if (entry.paletteKey === key) return;
   entry.paletteKey = key;
   if (!entry.materials) entry.materials = materialFaces.map(() => {
@@ -115,33 +123,40 @@ function samplePalette(entry) {
     return new MeshStandardMaterial({ map: texture, roughness: .48, metalness: .06 });
   });
   entry.materials.forEach((material, i) => {
-    paintDiceSurface(material.map.image, materialFaces[i], palette, entry.image, diePips);
+    const one = materialFaces[i] === 1;
+    paintDiceSurface(material.map.image, materialFaces[i], one ? onePalette : palette, one ? entry.oneImage : entry.image, diePips);
     material.map.needsUpdate = true;
   });
   entry.dirty = true;
 }
 
-function applyPalette(entry, props) {
-  const { probe } = entry;
-  probe.className = `die die-skin-${props.skin} dice-solid-palette`;
-  probe.removeAttribute("style");
-  for (const [key, value] of Object.entries(props.faceStyle ?? {})) {
-    if (key.startsWith("--")) probe.style.setProperty(key, value);
-    else if (["background", "backgroundColor", "backgroundImage", "backgroundSize", "backgroundPosition", "border", "borderColor", "borderWidth", "borderStyle", "borderRadius", "boxShadow", "color", "filter", "opacity", "animation", "transform"].includes(key)) probe.style[key] = value;
-  }
+function paletteImage(entry, probe, field) {
   const imageUrl = /url\(["']?([^"')]+)["']?\)/.exec(getComputedStyle(probe).backgroundImage)?.[1];
-  if (entry.imageUrl !== imageUrl) {
-    entry.image = null; entry.imageUrl = imageUrl;
+  if (entry[`${field}Url`] !== imageUrl) {
+    entry[field] = null; entry[`${field}Url`] = imageUrl;
   }
-  if (imageUrl && !entry.image && entry.loadingImage !== imageUrl) {
-    entry.loadingImage = imageUrl;
+  if (imageUrl && !entry[field] && entry[`${field}Loading`] !== imageUrl) {
+    entry[`${field}Loading`] = imageUrl;
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.onload = () => {
-      if (entries.has(entry) && entry.imageUrl === imageUrl) { entry.image = image; samplePalette(entry); schedule(); }
+      if (entries.has(entry) && entry[`${field}Url`] === imageUrl) { entry[field] = image; samplePalette(entry); schedule(); }
     };
     image.src = imageUrl;
   }
+}
+
+function applyPalette(entry, props) {
+  for (const probe of [entry.probe, entry.oneProbe]) {
+    probe.className = `die die-skin-${props.skin} dice-solid-palette`;
+    probe.removeAttribute("style");
+    for (const [key, value] of Object.entries(props.faceStyle ?? {})) {
+      if (key.startsWith("--")) probe.style.setProperty(key, value);
+      else if (["background", "backgroundColor", "backgroundImage", "backgroundSize", "backgroundPosition", "border", "borderColor", "borderWidth", "borderStyle", "borderRadius", "boxShadow", "color", "filter", "opacity", "animation", "transform"].includes(key)) probe.style[key] = value;
+    }
+  }
+  paletteImage(entry, entry.probe, "image");
+  paletteImage(entry, entry.oneProbe, "oneImage");
   syncAnimations(entry);
   samplePalette(entry);
   schedule();
@@ -158,14 +173,16 @@ function draw(now) {
   for (const entry of entries) {
     if (entry.refreshCss) { entry.refreshCss = false; applyPalette(entry, entry.props); }
   }
-  const active = [...entries].some((entry) => entry.visible && entry.duration && now < entry.started + entry.duration);
-  if (active && now - lastFrame < 30) { schedule(); return; }
+  const throwing = [...entries].some((entry) => entry.visible && !document.hidden && entry.duration && now < entry.started + entry.duration);
+  const active = throwing || [...entries].some((entry) => entry.visible && !document.hidden && !entry.motion.matches && entry.props.showcase);
+  if (active && now - lastFrame < (throwing ? 30 : 50)) { schedule(); return; }
   lastFrame = now;
   for (const entry of entries) {
     if (entry.visible && !document.hidden && !entry.motion.matches && entry.sampleCosmetics && now - (entry.sampledAt ?? 0) >= 80) {
       samplePalette(entry); entry.sampledAt = now;
     }
-    if (!entry.visible || !entry.width || !entry.height || !entry.materials || (!entry.dirty && !entry.duration)) continue;
+    const spinning = entry.props.showcase && !entry.motion.matches && !document.hidden;
+    if (!entry.visible || !entry.width || !entry.height || !entry.materials || (!entry.dirty && !entry.duration && !spinning)) continue;
     const progress = entry.duration ? Math.min(1, (now - entry.started) / entry.duration) : 1;
     const pose = dieThrowPose(entry.value, progress, entry.index, entry.visual);
     const { renderer, scene, camera, cube } = engine;
@@ -173,21 +190,26 @@ function draw(now) {
       renderer.setSize(entry.width, entry.height, false);
       engine.width = entry.width; engine.height = entry.height;
     }
-    const half = 1.58 + (1 - progress) * .65;
+    const half = entry.props.showcase ? 1.95 : 1.58 + (1 - progress) * .65;
     const aspect = entry.width / entry.height;
     camera.left = -half * aspect; camera.right = half * aspect;
     camera.top = half; camera.bottom = -half;
     camera.updateProjectionMatrix();
     cube.material = entry.materials;
-    cube.material.forEach((material, i) => material.color.setScalar(materialFaces[i] === entry.value ? 1 : .83));
-    cube.quaternion.copy(pose.quaternion);
-    cube.position.set(pose.offset / 100, pose.height / 100, pose.depth / 100);
+    cube.material.forEach((material, i) => material.color.setScalar(entry.props.showcase || materialFaces[i] === entry.value ? 1 : .83));
+    if (entry.props.showcase) {
+      entry.showcaseTime = (entry.showcaseTime ?? 0) + (spinning ? Math.min(.1, (now - (entry.showcaseAt ?? now)) / 1000) : 0);
+      entry.showcaseAt = now;
+      cube.quaternion.copy(dieShowcaseQuaternion(entry.value, entry.showcaseTime));
+    } else cube.quaternion.copy(pose.quaternion);
+    if (entry.props.showcase) cube.position.set(0, 0, 0);
+    else cube.position.set(pose.offset / 100, pose.height / 100, pose.depth / 100);
     renderer.render(scene, camera);
     entry.context.clearRect(0, 0, entry.width, entry.height);
     entry.context.drawImage(renderer.domElement, 0, 0);
     entry.control.dataset.diceSolid = "ready";
     entry.host.dataset.dicePose = cube.quaternion.toArray().map((value) => value.toFixed(5)).join(",");
-    entry.host.dataset.diceMotion = progress === 1 ? "settled" : "rolling";
+    entry.host.dataset.diceMotion = spinning ? "showcase" : progress === 1 ? "settled" : "rolling";
     if (progress === 1) { entry.duration = 0; entry.host.dataset.diceResult = String(entry.value); }
     entry.dirty = false;
     renderedFrames += 1;
@@ -207,12 +229,14 @@ export function mountDie(host, initial) {
   const canvas = document.createElement("canvas");
   const probe = document.createElement("span"), pip = document.createElement("span");
   pip.className = "pip"; probe.append(pip);
+  const oneProbe = probe.cloneNode(true);
+  oneProbe.dataset.dieFace = "1";
   const control = host.closest(".die");
-  probe.setAttribute("aria-hidden", "true");
-  host.append(canvas); document.body.append(probe);
+  probe.setAttribute("aria-hidden", "true"); oneProbe.setAttribute("aria-hidden", "true");
+  host.append(canvas); document.body.append(probe, oneProbe);
   const slot = host.closest(".dice-throw-slot");
   const index = slot ? Array.prototype.indexOf.call(slot.parentElement.children, slot) : 0;
-  const entry = { host, control, canvas, probe, context: canvas.getContext("2d"), index, visible: true, dirty: true, duration: 0 };
+  const entry = { host, control, canvas, probe, oneProbe, context: canvas.getContext("2d"), index, visible: true, dirty: true, duration: 0 };
   entries.add(entry);
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   entry.motion = motion;
@@ -275,7 +299,7 @@ export function mountDie(host, initial) {
       entries.delete(entry); resizeObserver.disconnect(); intersection.disconnect();
       document.removeEventListener("visibilitychange", settle); motion.removeEventListener("change", settle);
       for (const animation of entry.nativeAnimations ?? []) animation.cancel();
-      disposeMaterials(entry); canvas.remove(); probe.remove(); delete control.dataset.diceSolid;
+      disposeMaterials(entry); canvas.remove(); probe.remove(); oneProbe.remove(); delete control.dataset.diceSolid;
       if (!entries.size) {
         cancelAnimationFrame(frame); frame = 0;
         clearTimeout(cosmeticTimer); cosmeticTimer = 0;

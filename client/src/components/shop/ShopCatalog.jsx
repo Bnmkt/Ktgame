@@ -2,7 +2,7 @@ import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useState } from "react";
 import { Boxes, Check, Coins, Eye, RotateCcw, Search, ShoppingBag, Trophy, X } from "lucide-react";
 import { CosmeticIcon, CosmeticPreview, DisplayName, ProfileCosmeticShell, cosmeticCssRules, previewUserForItem, shopTypeLabel } from "../cosmetics/Cosmetics.jsx";
-import { Die, PlayingCard } from "../game/GamePieces.jsx";
+import { PiecePreview } from "../cosmetics/PiecePreview.jsx";
 import { Pagination } from "../feedback/Feedback.jsx";
 import { usePagination } from "../common/usePagination.js";
 import { CompactNumber, shopCategoryLabel } from "../../utils/presentation.jsx";
@@ -20,8 +20,7 @@ function ItemVisual({ item, user }) {
   return <div className={`catalog-visual catalog-visual-${item.type}`} aria-hidden="true">
     {(item.design || item.motion || item.css) && <style>{cosmeticCssRules([item])}</style>}
     {item.type === "icons" ? <CosmeticIcon value={item.value} source={item.icon} framed={item.iconFramed}/> :
-      item.type === "diceSkins" ? <>{[2, 4, 6].map((value) => <Die key={value} value={value} skin={item.value} animate={false} />)}</> :
-      item.type === "cardSkins" ? <><PlayingCard hidden skin={item.value} animate={false} /><PlayingCard card={{ rank: "A", suit: "H" }} skin={item.value} animate={false} /></> :
+      ["diceSkins", "cardSkins"].includes(item.type) ? <PiecePreview type={item.type} skin={item.value}/> :
       item.type === "nameEffects" ? <DisplayName user={preview} interactive={false} /> :
       <ProfileCosmeticShell user={preview} className="catalog-swatch-shell"><div className={`catalog-swatch member-swatch member-${preview.cosmetics?.equipped?.memberCard ?? "default"}`}><DisplayName user={preview} interactive={false} /><span>{localeText("Carte membre")}</span></div></ProfileCosmeticShell>}
   </div>;

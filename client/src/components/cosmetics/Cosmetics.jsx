@@ -3,7 +3,7 @@ import { CodeEditor } from "../common/CodeEditor.jsx";
 import { useState } from "react";
 import { AlertTriangle, BadgeCheck, Bird, Bot, Cat, CheckCircle2, Club, Coins, Copy, Crown, Diamond, Dice5, Dog, Fish, Flame, Gem, Heart, Landmark, Medal, PawPrint, Rabbit, Rocket, Shield, Snail, Spade, Sparkles, Squirrel, Star, Swords, Trophy, Turtle, User, Zap } from "lucide-react";
 import { DynamicIcon, iconNames } from "lucide-react/dynamic.mjs";
-import { Die, PlayingCard } from "../game/GamePieces.jsx";
+import { PiecePreview } from "./PiecePreview.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { memberCardOptions } from "../../config/site.js";
 import { copyText } from "../../utils/presentation.jsx";
@@ -250,7 +250,13 @@ export function defaultVisualDesign(type) {
     pipColor: "#17120b",
     pipSize: 12,
     pipShape: "round",
-    pipGlow: 0
+    pipGlow: 0,
+    oneEnabled: false,
+    oneShowPip: true,
+    oneBackgroundMode: "solid",
+    onePrimaryColor: "#b11226",
+    oneSecondaryColor: "#e8c777",
+    onePipColor: "#fffdf8"
   };
   if (type === "cardSkins") return {
     ...common,
@@ -437,7 +443,7 @@ export function cosmeticMotionCssRules(item) {
 
 export function designAnimation(design) {
   const speed = Math.max(0.6, Number(design.animationSpeed) || 3);
-  const texture = [design.surfaceImage, design.faceImage, design.backImage].some(cosmeticImage);
+  const texture = [design.surfaceImage, design.faceImage, design.backImage, design.oneEnabled && design.oneImage].some(cosmeticImage);
   if (design.animation === "flow") return `animation: aurora-flow ${speed}s ease-in-out infinite; ${texture ? "" : "background-size: 280% 280%;"}`;
   if (design.animation === "pulse") return `animation: cosmetic-visual-pulse ${speed}s ease-in-out infinite;`;
   if (design.animation === "shimmer") return `animation: shine-sweep ${speed}s linear infinite; ${texture ? "" : "background-size: 260% 100%;"}`;
@@ -480,7 +486,8 @@ export function visualDesignCssRules(item) {
     const selector = `.die-skin-${value}`;
     const pipRadius = design.pipShape === "round" ? "999px" : design.pipShape === "soft" ? "3px" : "0";
     const pipTransform = design.pipShape === "diamond" ? "rotate(45deg)" : "none";
-    return `${selector}{background:${imageBackground("surfaceImage", designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle))};border:${border};${shape}box-shadow:${designShadow(design)};${animation}}\n${selector} .pip{background:${design.pipColor};border-radius:${pipRadius};height:var(--custom-pip-size,${design.pipSize}px);width:var(--custom-pip-size,${design.pipSize}px);transform:${pipTransform};box-shadow:0 0 var(--custom-pip-glow,${design.pipGlow}px) ${rgbaFromHex(design.pipColor, 0.65)};}`;
+    const one = design.oneEnabled ? `\n${selector}[data-die-face="1"]{background:${imageBackground("oneImage", designBackground(design.oneBackgroundMode || "solid", design.onePrimaryColor || "#b11226", design.oneSecondaryColor || "#e8c777", design.angle))};}\n${selector}[data-die-face="1"] .pip{display:${design.oneShowPip === false ? "none" : "block"};background:${design.onePipColor || design.pipColor};}` : "";
+    return `${selector}{background:${imageBackground("surfaceImage", designBackground(design.backgroundMode, design.primaryColor, design.secondaryColor, design.angle))};border:${border};${shape}box-shadow:${designShadow(design)};${animation}}\n${selector} .pip{background:${design.pipColor};border-radius:${pipRadius};height:var(--custom-pip-size,${design.pipSize}px);width:var(--custom-pip-size,${design.pipSize}px);transform:${pipTransform};box-shadow:0 0 var(--custom-pip-glow,${design.pipGlow}px) ${rgbaFromHex(design.pipColor, 0.65)};}${one}`;
   }
   if (item.type === "cardSkins") {
     const selector = `.card-skin-${value}`;
@@ -664,6 +671,15 @@ export function VisualDesigner({ type, design, onChange, onActivate, onDisable }
         <DesignerSelect label={localeText("Forme")} value={activeDesign.pipShape} onChange={(value) => set("pipShape", value)} options={[["round", "Ronds"], ["soft", "Carrés doux"], ["square", "Carrés"], ["diamond", "Diamants"]]} />
         <DesignerRange label={localeText("Halo des points")} value={activeDesign.pipGlow} min={0} max={24} suffix={localeText(" px")} onChange={(value) => set("pipGlow", value)} />
       </div></div>
+      <div className="designer-section"><h4>{localeText("Face 1 personnalisée")}</h4>
+        <label className="motion-reduced-toggle"><span>{localeText("Personnaliser la face 1")}</span><input type="checkbox" checked={Boolean(activeDesign.oneEnabled)} onChange={(event) => set("oneEnabled", event.target.checked)}/></label>
+        {activeDesign.oneEnabled && <><div className="designer-control-grid">
+          <DesignerSelect label={localeText("Fond de la face 1")} value={activeDesign.oneBackgroundMode} onChange={(value) => set("oneBackgroundMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]}/>
+          <DesignerColor label={localeText("Couleur principale de la face 1")} value={activeDesign.onePrimaryColor} onChange={(value) => set("onePrimaryColor", value)}/>
+          <DesignerColor label={localeText("Couleur secondaire de la face 1")} value={activeDesign.oneSecondaryColor} onChange={(value) => set("oneSecondaryColor", value)}/>
+          <DesignerColor label={localeText("Couleur du point de la face 1")} value={activeDesign.onePipColor} onChange={(value) => set("onePipColor", value)}/>
+        </div><label className="motion-reduced-toggle"><span>{localeText("Afficher le point de la face 1")}</span><input type="checkbox" checked={activeDesign.oneShowPip !== false} onChange={(event) => set("oneShowPip", event.target.checked)}/></label></>}
+      </div>
     </>}
 
     {type === "cardSkins" && <>
@@ -742,12 +758,7 @@ export function CosmeticPreview({ user, item, stats = [] }) {
         <small>{previewUser.friendCode ? localeText("Code ami · {value0}", { value0: previewUser.friendCode }) : localeText("MEMBRE · APERÇU")}</small>
         <div className="vip-stats">{previewStats.map((stat, index) => <div className="vip-ratio" key={`${stat.label}-${index}`}>{stat.icon}<span>{localeText(stat.label)}</span><strong>{stat.value}</strong></div>)}</div>
       </div></ProfileCosmeticShell>}
-      {previewType === "diceSkins" && <div className="admin-dice-preview">{[1, 2, 3, 4, 5, 6].map((value) => <Die key={value} value={value} kept={false} skin={previewUser.cosmetics?.equipped?.diceSkin} animate={false} />)}</div>}
-      {previewType === "cardSkins" && <div className="skin-preview-row admin-card-preview">
-        <PlayingCard card={{ rank: "A", suit: "H" }} skin={previewUser.cosmetics?.equipped?.cardSkin} />
-        <PlayingCard card={{ rank: "K", suit: "S" }} skin={previewUser.cosmetics?.equipped?.cardSkin} />
-        <PlayingCard hidden skin={previewUser.cosmetics?.equipped?.cardSkin} />
-      </div>}
+      {["diceSkins", "cardSkins"].includes(previewType) && <PiecePreview type={previewType} skin={previewType === "diceSkins" ? previewUser.cosmetics?.equipped?.diceSkin : previewUser.cosmetics?.equipped?.cardSkin}/>}
       {!item && <small>{localeText("Sélectionne un article pour afficher son rendu.")}</small>}
     </div>
   );
