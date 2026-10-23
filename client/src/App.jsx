@@ -54,12 +54,15 @@ const SocialPanel = lazy(() => import("./components/social/SocialPanel.jsx").the
 const HelpPage = lazy(() => import("./components/help/HelpContent.jsx").then((module) => ({ default: module.HelpPage })));
 const CustomPage = lazy(() => import("./pages/CustomPage.jsx").then(module => ({ default: module.CustomPage })));
 const HelpOnboarding = lazy(() => import("./components/help/HelpOnboarding.jsx").then((module) => ({ default: module.HelpOnboarding })));
+const MascotGift = lazy(() => import("./components/cosmetics/MascotGift.jsx").then((module) => ({ default: module.MascotGift })));
 const publicPageData = readPublicPageData();
 
 export default function App() {
   useInterfaceSounds();
   const { t: localeText } = useLocale();
   const [user, setUser] = useState(null);
+  const [mascotGiftPending, setMascotGiftPending] = useState(true);
+  useEffect(() => { setMascotGiftPending(true); }, [user?.id]);
   const { bindAccount } = useLocale();
   useEffect(() => { bindAccount(user, setUser); }, [user?.id, bindAccount]);
   const [accountReady, setAccountReady] = useState(false);
@@ -429,7 +432,8 @@ export default function App() {
       {roomClosure && <RoomClosedNotice onClose={() => setRoomClosure(null)}/>}
       {publicProfile && <PublicProfileModal profile={publicProfile} currentUser={user} onClose={() => setPublicProfile(null)} onFriendRequest={requestFriendFromPublicProfile} onReport={(profile) => setReportTarget(profile)} />}
       {reportTarget && <ReportPlayerDialog player={reportTarget} roomCode={roomCode ?? ""} onClose={() => setReportTarget(null)} />}
-      <Suspense fallback={null}><HelpOnboarding key={user.id} user={user} /></Suspense>
+      {!user.guest && <Suspense fallback={null}><MascotGift key={user.id} user={user} onClaim={setUser} onPendingChange={setMascotGiftPending}/></Suspense>}
+      <Suspense fallback={null}><HelpOnboarding key={user.id} user={user} paused={!user.guest && mascotGiftPending}/></Suspense>
     </>
   );
 }

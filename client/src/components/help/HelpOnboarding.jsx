@@ -3,11 +3,11 @@ import { api } from "../../api.js";
 
 const WelcomeGuide = lazy(() => import("./HelpContent.jsx").then((module) => ({ default: module.WelcomeGuide })));
 
-export function HelpOnboarding({ user }) {
+export function HelpOnboarding({ user, paused = false }) {
   const [document, setDocument] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    if (user.guest) return;
+    if (user.guest || paused) { setDocument(null); return; }
     // Existing accounts do not download the tutorial renderer or its content.
     api("/api/me/help", { background: true }).then(async (state) => {
       if (!cancelled && state.needsWelcome) {
@@ -16,7 +16,7 @@ export function HelpOnboarding({ user }) {
       }
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [user.id, user.guest]);
+  }, [user.id, user.guest, paused]);
   async function close() {
     setDocument(null);
     await api("/api/me/help/dismiss", { method: "POST", background: true }).catch(() => {});

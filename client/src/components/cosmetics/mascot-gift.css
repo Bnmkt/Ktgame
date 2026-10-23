@@ -1,0 +1,35 @@
+.mascot-gift-dialog.casino-dialog { width: min(1080px, calc(100vw - 32px)); max-width: 1080px; max-height: 92dvh; overflow: auto; background: var(--site-surface, #101a18); }
+.mascot-gift-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 24px; margin-block: 20px; }
+.mascot-gift-choices { display: grid; align-content: start; gap: 10px; }
+.mascot-gift-choices > button { display: flex; gap: 14px; align-items: center; text-align: left; min-width: 0; padding: 6px 12px; border-radius: 6px; background: #14211d; color: #f8ecd2; border: 1px solid #556258; }
+.mascot-gift-choices > button.active { border-color: var(--site-primary, #e8c777); background: #28382a; box-shadow: inset 3px 0 var(--site-primary, #e8c777); }
+.mascot-gift-choices .ktga-mascot { width: 68px; height: 76px; flex: 0 0 68px; }
+.mascot-gift-choices button > span:not(.ktga-mascot) { flex: 1; min-width: 0; }
+.mascot-gift-choices strong, .mascot-gift-choices small { display: block; overflow-wrap: anywhere; }
+.mascot-gift-choices strong { font-size: 16px; }
+.mascot-gift-choices small { font-size: 12px; color: #c2c8b9; margin-top: 5px; }
+.mascot-gift-inspect { min-width: 0; }
+.mascot-gift-inspect > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.mascot-gift-inspect h3 { font-size: 24px; color: var(--site-primary, #e8c777); margin: 4px 0 0; }
+.mascot-gift-preview .shop-preview { position: static; width: 100%; margin: 0; }
+.mascot-gift-preview .profile-cosmetic-preview { min-height: 240px; }
+.mascot-gift-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.mascot-gift-items > button { min-width: 0; padding: 10px; display: block; text-align: left; border-radius: 4px; }
+.mascot-gift-items > button.active { border-color: var(--site-primary, #e8c777); background: #28382a; color: #f8ecd2; }
+.mascot-gift-items span { display: block; font-size: 10px; opacity: .8; margin-bottom: 4px; }
+.mascot-gift-items strong { font-size: 12px; overflow-wrap: anywhere; }
+.mascot-gift-footer { position: sticky; bottom: -24px; z-index: 4; padding-block: 16px; background: var(--site-surface, #101a18); border-top: 1px solid var(--site-border, #556258); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.mascot-gift-footer strong { font-size: 13px; }
+.mascot-gift-footer small { display: block; margin-top: 5px; max-width: 480px; color: var(--site-muted, #c2c8b9); font-size: 12px; line-height: 1.5; }
+.mascot-gift-footer > div:last-child { display: flex; gap: 10px; flex-wrap: wrap; }
+.mascot-gift-recall { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; max-width: 1440px; margin: 14px auto; padding: 12px 16px; background: var(--site-surface, #101a18); border-block: 1px solid var(--site-primary, #e8c777); color: var(--site-text, #f8ecd2); }
+@media (max-width: 700px) {
+  .mascot-gift-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .mascot-gift-choices { display: flex; overflow-x: auto; padding-bottom: 8px; }
+  .mascot-gift-choices > button { flex: 0 0 126px; flex-direction: column; text-align: center; gap: 6px; }
+  .mascot-gift-choices > button > svg { display: none; }
+  .mascot-gift-footer { bottom: -16px; }
+  .mascot-gift-footer > div:last-child { width: 100%; }
+  .mascot-gift-footer button { flex: 1; justify-content: center; }
+  .mascot-gift-footer button:last-child { flex: 2; }
+}

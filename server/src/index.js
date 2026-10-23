@@ -8,6 +8,7 @@ import { classicRoomPayouts, fundedRoomPlayers, pokerRoomPayouts } from "./servi
 import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
 import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
+import { registerMascotGiftRoutes, syncMascotPackOwners } from "./services/mascot-gift.js";
 import { normalizeBranding, validateBranding, registerBrandingRoutes } from "./services/site-branding.js";
 import { registerSourceEditorRoutes } from "./services/source-editor.js";
 import { createEditorDuplicationLimit, isEditorDuplication, validateEditorDuplicationUsers } from "./services/editor-duplication.js";
@@ -3447,6 +3448,8 @@ app.get("/api/shop", (req, res) => {
   res.json(configuredShop());
 });
 
+registerMascotGiftRoutes({ app, auth, readDb, updateDb, configuredShop, normalizeCosmetics, sanitizeUser });
+
 app.get("/api/achievements", auth, (req, res) => {
   if (accountsWork) return accountReading(req, res, "achievement-list");
   const db = readDb();
@@ -5292,7 +5295,7 @@ app.post("/api/admin/shop", auth, requireBackOffice, (req, res) => {
   let pack;
   try { pack = normalizeShopPack(req.body.packName); } catch (error) { return res.status(400).json({ error: error.message }); }
   const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, iconFramed: req.body.iconFramed !== false, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack, createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
-  updateDb((currentDb) => { currentDb.settings ??= {}; currentDb.settings.customShopItems ??= []; currentDb.settings.customShopItems.push(item); });
+  updateDb((currentDb) => { currentDb.settings ??= {}; currentDb.settings.customShopItems ??= []; currentDb.settings.customShopItems.push(item); syncMascotPackOwners(currentDb, configuredShop(currentDb), normalizeCosmetics); });
   res.json(item);
 });
 
@@ -5314,6 +5317,7 @@ app.patch("/api/admin/shop/:id", auth, requireBackOffice, (req, res) => {
     const design = req.body.design === undefined ? current?.design ?? null : normalizeCosmeticDesign(req.body.design, type);
     const motion = req.body.motion === undefined ? current?.motion ?? null : normalizeCosmeticMotion(req.body.motion);
     db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, iconFramed: (req.body.iconFramed ?? current.iconFramed) !== false, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack };
+    syncMascotPackOwners(db, configuredShop(db), normalizeCosmetics);
     return "updated";
   });
   if (result === "missing") return res.status(404).json({ error: "Objet introuvable." });
