@@ -1,0 +1,62 @@
+.playing-card.card-solid-piece {
+  position: relative;
+  isolation: auto;
+  transform-style: preserve-3d;
+  rotate: var(--card-solid-rest);
+  transition: rotate 180ms ease, translate 180ms ease;
+}
+
+.card-row, .battle-zone { perspective: 1000px; }
+
+.card-solid-piece > .card-solid-depth,
+.card-solid-piece > .card-solid-edge {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  background: #cecec7;
+}
+
+.card-solid-piece > .card-solid-depth {
+  inset: 0;
+  background: transparent;
+  border-radius: inherit;
+  transform: translateZ(-2px);
+  box-shadow: 0 3px 3px #0004;
+}
+
+.card-solid-piece > .card-solid-edge[data-card-edge="right"],
+.card-solid-piece > .card-solid-edge[data-card-edge="left"] {
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  transform-origin: left center;
+  transform: rotateY(90deg);
+}
+.card-solid-piece > .card-solid-edge[data-card-edge="right"] { left: 100%; }
+.card-solid-piece > .card-solid-edge[data-card-edge="left"] { left: 0; }
+
+.card-solid-piece > .card-solid-edge[data-card-edge="top"],
+.card-solid-piece > .card-solid-edge[data-card-edge="bottom"] {
+  left: 5px;
+  right: 5px;
+  height: 2px;
+  transform-origin: center top;
+  transform: rotateX(-90deg);
+  background: #ededdf;
+}
+.card-solid-piece > .card-solid-edge[data-card-edge="top"] { top: 0; }
+.card-solid-piece > .card-solid-edge[data-card-edge="bottom"] { top: 100%; }
+
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover > .card-solid-piece,
+  button:not(:disabled):focus-visible > .card-solid-piece {
+    rotate: var(--card-solid-focus);
+    translate: 0 -3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playing-card.card-solid-piece { transition: none; }
+  button:not(:disabled):hover > .card-solid-piece,
+  button:not(:disabled):focus-visible > .card-solid-piece { translate: none; }
+}

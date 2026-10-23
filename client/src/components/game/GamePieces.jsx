@@ -3,18 +3,24 @@ import React, { createContext, useContext } from "react";
 import { suits } from "../../features/games/config.js";
 import { DieSolid } from "./DieSolid.jsx";
 import { diePips } from "../../features/games/dice-faces.js";
+import { cardSolidStyle } from "../../features/games/card-solid.js";
+import "./card-solid.css";
 
 const DiceTrayContext = createContext(false);
 
 export function PlayingCard({ card, hidden = false, skin = "default", style, animate = true, inline = false, playerId, motionKey }) {
   const { t: localeText } = useLocale();
   const CardElement = inline ? "span" : "div";
-  if (!card || hidden) return <CardElement data-card-piece="" data-card-covered="" data-card-player={playerId} data-card-track={motionKey} className={`playing-card card-back ${animate ? "deal-card" : ""} card-skin-${skin}`} style={style}><span>?</span></CardElement>;
+  const solidClass = inline ? "" : "card-solid-piece";
+  const surfaceStyle = inline ? style : { ...cardSolidStyle, ...style };
+  const depth = !inline && <><i className="card-solid-depth" aria-hidden="true" />{["top", "right", "bottom", "left"].map((edge) => <i className="card-solid-edge" data-card-edge={edge} key={edge} aria-hidden="true" />)}</>;
+  if (!card || hidden) return <CardElement data-card-piece="" data-card-covered="" data-card-player={playerId} data-card-track={motionKey} className={`playing-card ${solidClass} card-back ${animate ? "deal-card" : ""} card-skin-${skin}`} style={surfaceStyle}><span>?</span>{depth}</CardElement>;
   const suit = suits[card.suit] ?? suits.S;
   return (
-    <CardElement data-card-piece="" data-card-face={`${card.deckId ?? 0}:${card.rank}:${card.suit}`} data-card-track={motionKey} data-card-player={playerId} className={`playing-card ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={style} title={localeText("{value0} de {value1}", { value0: card.rank, value1: suit.name })}>
+    <CardElement data-card-piece="" data-card-face={`${card.deckId ?? 0}:${card.rank}:${card.suit}`} data-card-track={motionKey} data-card-player={playerId} className={`playing-card ${solidClass} ${animate ? "deal-card flip-card" : ""} card-skin-${skin} ${suit.red ? "red-suit" : ""}`} style={surfaceStyle} title={localeText("{value0} de {value1}", { value0: card.rank, value1: suit.name })}>
       <strong>{card.rank}</strong>
       <span>{suit.symbol}</span>
+      {depth}
     </CardElement>
   );
 }
