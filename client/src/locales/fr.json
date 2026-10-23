@@ -5234,5 +5234,11 @@
   "On te garde une place.": "On te garde une place.",
   "La prochaine manche n’attend que toi.": "La prochaine manche n’attend que toi.",
   "Gratuit, pour le plaisir de jouer": "Gratuit, pour le plaisir de jouer",
-  "Jetons virtuels · Aucun achat ni retrait d’argent": "Jetons virtuels · Aucun achat ni retrait d’argent"
+  "Jetons virtuels · Aucun achat ni retrait d’argent": "Jetons virtuels · Aucun achat ni retrait d’argent",
+  "Dé : {value0}": "Dé : {value0}",
+  "Dé non lancé": "Dé non lancé",
+  "Scores des joueurs": "Scores des joueurs",
+  "Objectif : {value0} pts": "Objectif : {value0} pts",
+  "Points cumulés": "Points cumulés",
+  "Points non encore validés": "Points non encore validés"
 }

@@ -1,6 +1,10 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
-import React from "react";
+import React, { createContext, useContext } from "react";
 import { suits } from "../../features/games/config.js";
+import { DieSolid } from "./DieSolid.jsx";
+import { diePips } from "../../features/games/dice-faces.js";
+
+const DiceTrayContext = createContext(false);
 
 export function PlayingCard({ card, hidden = false, skin = "default", style, animate = true, inline = false, playerId, motionKey }) {
   const { t: localeText } = useLocale();
@@ -15,16 +19,16 @@ export function PlayingCard({ card, hidden = false, skin = "default", style, ani
   );
 }
 
-export function Die({ value, kept, onClick, skin = "default", animate = true, selectionLabel = "Gardé", style, inline = false }) {
+export function Die({ value, kept, onClick, skin = "default", animate = true, selectionLabel = "Gardé", style, inline = false, rollKey }) {
   const { t: localeText } = useLocale();
-  const faces = {
-    1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9]
-  };
-  const pips = faces[value] ?? [];
+  const inTray = useContext(DiceTrayContext);
+  const pips = diePips[value] ?? [];
+  const solid = !inline && pips.length > 0 && (inTray || animate);
   const DieElement = onClick ? "button" : inline ? "span" : "div";
   return (
-    <DieElement className={`die die-skin-${skin} ${value && animate ? "roll-in" : ""} ${kept ? "kept" : ""} ${kept && selectionLabel === "À relancer" ? "selected-reroll" : ""}`} style={style} onClick={onClick} disabled={onClick ? !value : undefined} title={onClick ? (kept ? selectionLabel : localeText("Cliquer pour marquer comme « {value0} »", { value0: selectionLabel.toLowerCase() })) : undefined}>
-      {pips.map((dot) => <span key={dot} className="pip" data-pip={dot} />)}
+    <DieElement type={onClick ? "button" : undefined} role={onClick ? undefined : "img"} aria-label={value ? localeText("Dé : {value0}", { value0: value }) : localeText("Dé non lancé")} aria-pressed={onClick ? Boolean(kept) : undefined} className={`die die-skin-${skin} ${solid ? "dice-solid-control" : value && animate ? "roll-in" : ""} ${kept ? "kept" : ""} ${kept && selectionLabel === localeText("À relancer") ? "selected-reroll" : ""}`} style={style} onClick={onClick} disabled={onClick ? !value : undefined} title={onClick ? (kept ? selectionLabel : localeText("Cliquer pour marquer comme « {value0} »", { value0: selectionLabel.toLowerCase() })) : undefined}>
+      {pips.map((dot) => <span aria-hidden="true" key={dot} className="pip" data-pip={dot} />)}
+      {solid && <DieSolid value={Number(value)} animate={animate} skin={skin} faceStyle={style} rollKey={rollKey} />}
       {kept && <span className="kept-label">{selectionLabel}</span>}
     </DieElement>
   );
@@ -47,13 +51,16 @@ export function DiceThrowTray({ children, label = "Piste de lancer", caption = "
     <section className={`dice-throw-tray ${compact ? "compact" : ""} ${className}`.trim()}>
       <header className="dice-throw-tray-label"><span aria-hidden="true" /><strong>{localeText(label)}</strong><small>{caption}</small></header>
       <div className="dice-throw-surface">
-        <div className="dice-row">
-          {React.Children.map(children, (child, index) => {
+        <DiceTrayContext.Provider value={true}><div className="dice-row">
+          {React.Children.toArray(children).map((child, index) => {
             const position = diceRestingPositions[index % diceRestingPositions.length];
             const rolling = Boolean(child?.props?.value) && child?.props?.animate !== false;
-            return <span className={`dice-throw-slot ${rolling ? "is-rolling" : ""}`} key={child?.key ?? index} style={{ "--die-x": `${position.x}px`, "--die-y": `${position.y}px`, "--die-rotation": `${position.rotation}deg`, "--die-throw-x": `${position.throwX}px`, "--die-throw-y": `${position.throwY}px`, "--die-throw-rotation": `${position.throwRotation}deg`, "--die-delay": `${index * 34}ms` }}>{child}</span>;
+            const piece = React.isValidElement(child) && child.type === Die
+              ? React.cloneElement(child, { key: index, rollKey: child.props.rollKey ?? child.key })
+              : child;
+            return <span className={`dice-throw-slot ${rolling ? "is-rolling" : ""}`} key={index} style={{ "--die-x": `${position.x}px`, "--die-y": `${position.y}px`, "--die-rotation": `${position.rotation}deg`, "--die-throw-x": `${position.throwX}px`, "--die-throw-y": `${position.throwY}px`, "--die-throw-rotation": `${position.throwRotation}deg`, "--die-delay": `${index * 34}ms` }}>{piece}</span>;
           })}
-        </div>
+        </div></DiceTrayContext.Provider>
       </div>
     </section>
   );

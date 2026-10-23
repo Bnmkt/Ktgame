@@ -1,0 +1,21 @@
+.die.dice-solid-control[data-dice-solid="ready"],
+.die.dice-solid-control[data-dice-solid="ready"]:hover {
+  background: transparent !important; border-color: transparent !important;
+  box-shadow: none !important; clip-path: none !important;
+  animation: none !important; transform: none !important;
+}
+.dice-solid-scene { position: absolute; inset: -6%; pointer-events: none; }
+.dice-solid-scene > canvas { display: block; visibility: hidden; width: 100%; height: 100%; filter: drop-shadow(0 3px 2px #0005); }
+.die[data-dice-solid="ready"] > .dice-solid-scene > canvas { visibility: visible; }
+.die.dice-solid-palette { position: absolute; visibility: hidden; pointer-events: none; width: 76px !important; height: 76px !important; padding: 10px !important; animation: none !important; }
+.die[data-dice-solid="ready"] > .pip { visibility: hidden; }
+.die.dice-solid-control.kept::after {
+  position: absolute; inset: -3px; content: ""; pointer-events: none;
+  border: 2px solid #f0c24d; border-radius: 8px; box-shadow: 0 0 0 2px #171b18;
+}
+.die.dice-solid-control.selected-reroll::after { border-color: #e45b68; }
+.die.dice-solid-control .kept-label { z-index: 2; }
+.die.dice-solid-control:focus-visible { outline: 3px solid #ffe28a; outline-offset: 5px; }
+.dice-throw-tray .dice-throw-slot:has(> .die.dice-solid-control),
+.room-app-shell.room-render-budget .dice-throw-tray .dice-throw-slot:has(> .die.dice-solid-control) { transform: none !important; animation: none !important; }
+.dice-solid-control { touch-action: manipulation; }

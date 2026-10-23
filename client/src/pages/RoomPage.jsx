@@ -16,6 +16,7 @@ import { appPath } from "../navigation/routes.js";
 import { AlertTriangle, BadgeCheck, Bot, CheckCircle2, Clock3, Coins, Copy, DoorOpen, Eye, FastForward, HelpCircle, LogOut, Maximize2, Minimize2, Play, Save, Settings, ShieldCheck, Swords, Trophy, Users, X } from "lucide-react";
 import { SOCKET_PATH, SOCKET_URL, api, getToken } from "../api.js";
 import { DiceSelectionMode, DiceThrowTray, Die, PlayingCard } from "../components/game/GamePieces.jsx";
+import { DiceScoreStrip } from "../components/game/DiceScoreStrip.jsx";
 import { DisplayName } from "../components/cosmetics/Cosmetics.jsx";
 import { AnimatedDealerHand, RulesModal, StepperBet, accordionPlayable, blackjackDealerDisplay, blackjackTotal, canPlayPresidentSet, cardIdentity, golfPlayable, groupedHand, yahtzeePotentialScore } from "../components/game/GameSupport.jsx";
 import { BattleBoard, FarkleBoard, LiarsDiceBoard, MidnightDiceBoard, ShutTheBoxBoard, VelvetRuseBoard } from "../components/game/GameBoards.jsx";
@@ -504,6 +505,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
                 <div><Trophy size={22} /><span>{localeText("Vainqueur")}</span><strong>{winnerNames}</strong></div>
                 <div className="actions final-actions">{isOwner && room.gameId === "blackjack" && <button className="instant-replay-button" onClick={() => roomPost("replay-now")}><Play size={18} />{" " + localeText("Rejouer maintenant")}</button>}{isOwner && room.gameId !== "texas-holdem" && <button className="secondary" onClick={() => roomPost("replay")}>{room.gameId === "blackjack" ? localeText("Retour à la salle d'attente") : <><Play size={18} />{" " + localeText("Rejouer")}</>}</button>}<button className="secondary" onClick={leaveTable}><DoorOpen size={18} />{" " + localeText("Quitter")}</button></div>
               </div>}
+              <DiceScoreStrip state={state} userId={user.id} />
               {state.lastDiceByPlayer && <OtherPlayerRolls state={state} userId={user.id} />}
               {room.gameId === "belote" && <BeloteBoard state={state} user={user} onAction={action} />}
 

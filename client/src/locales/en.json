@@ -5161,5 +5161,11 @@
   "Découvrir le casino": "Discover the casino",
   "Informations pour les parents": "Information for parents",
   "Patchnotes et mises à jour": "Patch notes and updates",
-  "Retrouve les nouveautés, les corrections et les ajustements du casino. Choisis une version pour consulter le détail de sa mise à jour.": "Browse the casino's new features, fixes and adjustments. Choose a version to read its full update notes."
+  "Retrouve les nouveautés, les corrections et les ajustements du casino. Choisis une version pour consulter le détail de sa mise à jour.": "Browse the casino's new features, fixes and adjustments. Choose a version to read its full update notes.",
+  "Dé : {value0}": "Die: {value0}",
+  "Dé non lancé": "Die not rolled",
+  "Scores des joueurs": "Player scores",
+  "Objectif : {value0} pts": "Target: {value0} pts",
+  "Points cumulés": "Total points",
+  "Points non encore validés": "Points not yet banked"
 }

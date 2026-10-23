@@ -1,5 +1,6 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { DiceThrowTray, Die } from "./GamePieces.jsx";
+import { DiceScoreStrip } from "./DiceScoreStrip.jsx";
 import { yahtzeePotentialScore } from "./GameSupport.jsx";
 import { OtherPlayerRolls, ScorePanel } from "../room/RoomPanels.jsx";
 import { gameTitle, scoreCategories } from "../../features/games/config.js";
@@ -20,6 +21,7 @@ export function PublicDiceBoard({ state }) {
     : state.gameId === "shut-the-box" ? shutTileCombinations(state.boxes[current?.id], state.lastTotal).map((values) => ({ label: values.join(" + "), value: String(state.lastTotal) })) : [];
   const combination = state.gameId === "421" ? state.currentCombination : state.gameId === "cul-de-chouette" && state.lastRoll?.playerId === current?.id && state.lastRoll.pending ? state.lastRoll : null;
   return <div className="public-dice-board">
+    <DiceScoreStrip state={state} />
     {!state.finished && <>
       <DiceThrowTray label={localeText("Piste de {value0}", { value0: gameTitle(state.gameId) })} caption={current?.pseudo ?? localeText("Lancer en cours")}>
         {(dice.length ? dice : Array(count).fill(null)).map((value, index) => <Die key={`${index}-${value}-${state.rollsLeft}`} value={value} kept={state.kept?.includes(index)} animate={!state.kept?.includes(index)} skin={current?.cosmetics?.equipped?.diceSkin} />)}
