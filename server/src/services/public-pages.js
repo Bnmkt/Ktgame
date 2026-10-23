@@ -35,7 +35,7 @@ export function createPublicPageService({ template, render, styles = [], setting
     if (meta.view === "page") data.page = customPage(meta.id);
     if (["faq", "guide"].includes(meta.view)) data.help = help();
     if (meta.view === "patchnotes") {
-      const published = note(meta.id || data.catalog.notes[0]?.version);
+      const published = meta.id ? note(meta.id) : null;
       data.note = published?.status === "published" ? { ...publicNotes([published])[0], blocks: published.blocks } : null;
     }
     const canonical = canonicalOrigin + meta.canonicalPath;

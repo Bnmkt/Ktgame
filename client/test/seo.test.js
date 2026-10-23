@@ -20,3 +20,14 @@ test("private routes and verification links stay out of search results", () => {
   assert.equal(pageMetadata({ pathname: "/", search: "?verify-email=sensitive" }).indexable, false);
   assert.equal(pageMetadata({ pathname: "/parents", search: "?parental-access=sensitive" }).indexable, false);
 });
+
+test("release archive and version pages keep separate canonical identities", () => {
+  const notes = [{ version: "0.2.1", title: "Nouveautes", status: "published" }];
+  const archive = pageMetadata({ pathname: "/patchnotes", notes });
+  const release = pageMetadata({ pathname: "/patchnotes", search: "?version=0.2.1", notes });
+  assert.equal(archive.canonicalPath, "/patchnotes");
+  assert.equal(archive.id, "");
+  assert.equal(release.canonicalPath, "/patchnotes?version=0.2.1");
+  assert.equal(release.id, "0.2.1");
+  assert.equal(pageMetadata({ pathname: "/patchnotes", search: "?version=0.2.1&token=private", notes }).indexable, false);
+});

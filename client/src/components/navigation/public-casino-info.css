@@ -1,0 +1,10 @@
+.public-casino-info { padding-block: 26px 32px; color: var(--site-text, #f8ecd2); border-top: 1px solid var(--site-border, #514b38); background: var(--site-surface, #101718); }
+.public-casino-info h2 { margin: 0 0 12px; color: var(--site-primary, #e8c777); font-size: 23px; }
+.public-casino-info h3 { margin: 0 0 10px; font-size: 17px; }
+.public-casino-info p { line-height: 1.8; color: var(--site-muted, #b8ae99); font-size: 14px; max-width: 95ch; margin: 0 0 14px; }
+.public-casino-categories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; margin-block: 24px; }
+.public-casino-categories ul { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 0; margin: 12px 0 0; list-style: none; }
+.public-casino-info a { color: var(--site-link, #7dc9ed); font-size: 14px; text-underline-offset: 3px; }
+.public-casino-principles { border-top: 1px solid var(--site-border, #514b38); padding-top: 22px; }
+.public-casino-info > nav { display: flex; flex-wrap: wrap; gap: 14px 24px; margin-top: 20px; }
+@media (max-width: 650px) { .public-casino-categories { grid-template-columns: minmax(0, 1fr); gap: 24px; } .public-casino-info h2 { font-size: 21px; } }

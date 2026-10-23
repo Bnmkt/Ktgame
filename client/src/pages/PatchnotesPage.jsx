@@ -50,7 +50,7 @@ export function PatchnotesPage({ siteName, user, onBack, initialCatalog = null, 
     api(preview ? "/api/admin/patchnotes" : "/api/patchnotes").then((result) => {
       if (cancelled) return;
       setCatalogState({ scope, data: result });
-      setSelectedVersion((current) => current && result.notes.some((entry) => entry.version === current) ? current : result.notes[0]?.version ?? "");
+      setSelectedVersion((current) => current && result.notes.some((entry) => entry.version === current) ? current : "");
     }).catch((failure) => { if (!cancelled) setError(failure.message); }).finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
   }, [scope]);
@@ -67,11 +67,21 @@ export function PatchnotesPage({ siteName, user, onBack, initialCatalog = null, 
     const query = new URLSearchParams(location.search);
     query.set("version", selectedVersion);
     history.replaceState(null, "", appPath("patchnotes") + "?" + query);
-    const meta = pageMetadata({ pathname: "/patchnotes", search: `?version=${encodeURIComponent(selectedVersion)}`, siteName, notes: catalog?.notes ?? [] });
+    const meta = pageMetadata({ pathname: appPath("patchnotes"), basePath: (import.meta.env.BASE_URL || "/").replace(/\/$/, ""), search: query.toString(), siteName, notes: catalog?.notes ?? [] });
     if (preview) { meta.indexable = false; meta.robots = "noindex, follow"; }
     applyPageMetadata(meta);
     return () => { cancelled = true; };
   }, [scope, selectedVersion, selectedEntry?.id]);
+
+  useEffect(() => {
+    if (selectedVersion) return;
+    const query = new URLSearchParams(location.search);
+    query.delete("version");
+    history.replaceState(null, "", appPath("patchnotes") + (query.size ? `?${query}` : ""));
+    const meta = pageMetadata({ pathname: appPath("patchnotes"), basePath: (import.meta.env.BASE_URL || "/").replace(/\/$/, ""), search: query.toString(), siteName, notes: catalog?.notes ?? [] });
+    if (preview) { meta.indexable = false; meta.robots = "noindex, follow"; }
+    applyPageMetadata(meta);
+  }, [scope, selectedVersion, siteName]);
 
   useEffect(() => {
     setReaction(0);
@@ -90,13 +100,13 @@ export function PatchnotesPage({ siteName, user, onBack, initialCatalog = null, 
   }
 
   return <main className="app-shell patchnotes-page">
-    <header className="patchnotes-site-header"><button type="button" className="secondary" onClick={onBack}><ArrowLeft size={17} />{localeText("Retour au casino")}</button><div><span>{siteName}</span><strong>{localeText("Patchnotes")}</strong></div><span className="patchnotes-current">{localeText("Version courante ·") + " "}{catalog?.currentVersion ?? "…"}</span></header>
+    <header className="patchnotes-site-header"><a className="secondary" href={appPath("lobby")} onClick={onBack ? (event) => { event.preventDefault(); onBack(); } : undefined}><ArrowLeft size={17} />{localeText("Retour au casino")}</a><div><span>{siteName}</span><a className="patchnotes-home-link" href={appPath("patchnotes")}><strong>{localeText("Patchnotes")}</strong></a></div><span className="patchnotes-current">{localeText("Version courante ·") + " "}{catalog?.currentVersion ?? "…"}</span></header>
     {error && <div className="error patchnotes-feedback" role="alert">{localeText(error)}<button className="secondary" type="button" onClick={() => location.reload()}><RefreshCw size={15} />{localeText("Réessayer")}</button></div>}
     <section className="patchnotes-page-panel">
       {canPreview && <div className="patchnotes-reader-controls"><Eye size={18} /><label><span>{localeText("Mode admin / éditeur")}</span><input type="checkbox" role="switch" checked={preview} onChange={(event) => setPreviewEnabled(event.target.checked)} /></label>{preview && <span className="patchnotes-reader-label">{localeText("Prévisualisation privée")}</span>}</div>}
       {!catalog?.notes.length && !loading ? <div className="patchnotes-empty"><CheckCircle2 size={30} /><h1>{preview ? localeText("Aucune patchnote") : localeText("Aucune patchnote publiée")}</h1><p>{preview ? localeText("Les brouillons apparaîtront ici après leur création.") : localeText("Les prochaines évolutions du casino apparaîtront ici.")}</p></div> : <div className="patchnotes-layout">
-        <aside className="patchnotes-version-nav"><span className="eyebrow">{localeText("Historique")}</span><h1>{localeText("Versions")}</h1>{groups.map(([group, notes]) => <section key={group}><h2>{group}</h2>{notes.map((entry) => <a key={entry.id} href={`${appPath("patchnotes")}?version=${encodeURIComponent(entry.version)}`} className={selectedVersion === entry.version ? "active" : ""} onClick={(event) => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); setSelectedVersion(entry.version); } }}><span>{entry.version}</span>{preview && <span className={"patchnotes-state state-" + entry.status}>{statusLabels[entry.status]}</span>}<small>{formatDate(entry.publishedAt)}</small></a>)}</section>)}</aside>
-        <article className="patchnotes-release">{loading && !note ? <div className="patchnotes-loading"><RefreshCw className="spinning" />{localeText("Chargement de la version…")}</div> : note && <>
+        <aside className="patchnotes-version-nav"><span className="eyebrow">{localeText("Historique")}</span><h2>{localeText("Versions")}</h2>{groups.map(([group, notes]) => <section key={group}><h3>{group}</h3>{notes.map((entry) => <a key={entry.id} href={`${appPath("patchnotes")}?version=${encodeURIComponent(entry.version)}`} className={selectedVersion === entry.version ? "active" : ""} onClick={(event) => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); setSelectedVersion(entry.version); } }}><span>{entry.version}</span>{preview && <span className={"patchnotes-state state-" + entry.status}>{statusLabels[entry.status]}</span>}<small>{formatDate(entry.publishedAt)}</small></a>)}</section>)}</aside>
+        <article className="patchnotes-release">{!selectedVersion && catalog ? <div className="patchnotes-archive"><header><h1>{localeText("Patchnotes et mises à jour")}</h1><p>{localeText("Retrouve les nouveautés, les corrections et les ajustements du casino. Choisis une version pour consulter le détail de sa mise à jour.")}</p></header>{catalog.notes.map((entry) => <section key={entry.id}><h2><a href={`${appPath("patchnotes")}?version=${encodeURIComponent(entry.version)}`} onClick={(event) => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); setSelectedVersion(entry.version); } }}>{entry.version} · {entry.title}</a></h2><small><CalendarDays size={14}/> {formatDate(entry.publishedAt, true)}{preview && <> · {localeText(statusLabels[entry.status])}</>}</small><MarkdownContent>{entry.summary}</MarkdownContent></section>)}</div> : loading && !note ? <div className="patchnotes-loading"><RefreshCw className="spinning" />{localeText("Chargement de la version…")}</div> : note && <>
           {note.status !== "published" && <div className="patchnotes-private-notice" role="status"><Eye size={18} /><strong>{statusLabels[note.status]}{" " + localeText("· visible uniquement par les admins et éditeurs")}</strong></div>}
           <header><span className="patchnotes-version">{localeText("Version") + " "}{note.version}</span><h1>{note.title}</h1><MarkdownContent className="patchnotes-summary">{note.summary}</MarkdownContent><small><CalendarDays size={14} />{note.status === "draft" ? localeText("Date prévue") : localeText("Publiée le")} {formatDate(note.publishedAt, true)}</small></header>
           <PatchnoteContent note={note} />

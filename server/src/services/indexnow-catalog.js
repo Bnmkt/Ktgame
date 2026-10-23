@@ -10,11 +10,12 @@ export function indexNowCatalog({ settings, games, notes, pages, page, help, web
     if (row.view === "page") { const full = page(row.id); if (full) { const { title, description, format, content: text, html, style, script, presentation } = full; content.page = { title, description, format, text, html, style, script, presentation }; } }
     else if (row.view === "games") content.games = row.id ? publicGames.find(game => game.id === row.id) : publicGames;
     else if (row.view === "patchnotes") {
+      content.presentation = row.id ? "release-reader-v2" : "release-archive-v1";
       const full = row.id ? notes(row.id) : null;
       content.notes = row.id ? { version: full?.version, title: full?.title, summary: full?.summary, blocks: full?.blocks?.map(({ type, category, title, content, metadata }) => ({ type, category, title, content, metadata })) } : publicNotes;
     }
     else if (["faq", "guide"].includes(row.view)) content.help = help().entries.filter(entry => entry.kind === row.view);
-    else if (row.view === "lobby") content.games = publicGames;
+    else if (row.view === "lobby") { content.games = publicGames; content.presentation = "public-casino-info-v1"; }
     if (row.systemRoute === "/jeux") content.games = publicGames;
     return { ...row, content };
   });

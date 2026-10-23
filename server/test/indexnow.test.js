@@ -64,6 +64,9 @@ test("catalog ignores drafts and timestamp-only edits but includes live template
   assert.deepEqual(indexNowCatalog(options).map(row => row.content), first.map(row => row.content));
   assert.ok(first.some(row => row.content.page?.html === "Template content"));
   assert.ok(!first.some(row => row.url.includes("version=9")));
+  assert.equal(first.find(row => row.view === "lobby").content.presentation, "public-casino-info-v1");
+  assert.equal(first.find(row => row.view === "patchnotes" && !row.id).content.presentation, "release-archive-v1");
+  assert.equal(first.find(row => row.view === "patchnotes" && row.id).content.presentation, "release-reader-v2");
 });
 
 test("key verification is public while IndexNow controls follow back-office permissions", async () => {

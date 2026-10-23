@@ -5150,5 +5150,16 @@
   "{count} partie(s) classée(s) annulée(s) sur cette période.": "{count} ranked game(s) cancelled during this period.",
   "{new} nouveau(x) compte(s) · {enabled}/{total} comptes activés": "{new} new account(s) · {enabled}/{total} accounts enabled",
   "Stable": "Stable",
-  "{count} jours": "{count} days"
+  "{count} jours": "{count} days",
+  "Des jeux de cartes et de dés, à partager": "Card and dice games to share",
+  "{site} est un espace de mini-jeux gratuits sur navigateur. Retrouve les jeux de cartes et de dés, joue entre amis ou rencontre d’autres joueurs autour d’une table. Aucun logiciel de jeu n’est nécessaire pour participer.": "{site} is a collection of free browser mini-games. Enjoy card and dice games with friends or meet other players around a table. No game software installation is required to take part.",
+  "Relancer, garder ses dés ou tenter sa chance : chaque jeu a ses combinaisons et sa façon de marquer des points.": "Roll again, keep your dice or try your luck: each game has its own combinations and scoring rules.",
+  "Stratégie, mémoire, bluff ou patience : choisis une partie multijoueur ou un solitaire, selon les règles du jeu.": "Strategy, memory, bluffing or patience: choose a multiplayer game or a solitaire, depending on the rules.",
+  "Des jetons de jeu, pas d’argent réel": "Game tokens, not real money",
+  "Les jetons sont une monnaie exclusivement virtuelle. Ils ne peuvent être ni achetés avec de l’argent réel, ni retirés ou convertis en argent. Les parties classiques permettent de jouer à son rythme ; les parties classées proposent un classement sur une sélection de jeux.": "Tokens are a purely virtual currency. They cannot be bought with real money, withdrawn or converted into cash. Classic games let you play at your own pace; ranked play offers rankings for selected games.",
+  "Les règles sont consultables librement avant de jouer. Le guide et la FAQ présentent les tables, les niveaux, les maîtrises et les protections des comptes. Un parcours parental est prévu pour les moins de 13 ans.": "The rules are freely available before you play. The guide and FAQ cover tables, levels, mastery and account protections. A parental approval process is provided for children under 13.",
+  "Découvrir le casino": "Discover the casino",
+  "Informations pour les parents": "Information for parents",
+  "Patchnotes et mises à jour": "Patch notes and updates",
+  "Retrouve les nouveautés, les corrections et les ajustements du casino. Choisis une version pour consulter le détail de sa mise à jour.": "Browse the casino's new features, fixes and adjustments. Choose a version to read its full update notes."
 }

@@ -3,6 +3,15 @@
 .patchnotes-site-header > div { display: grid; justify-items: center; }
 .patchnotes-site-header > div span { color: #d9b94e; font-size: 11px; font-weight: 950; text-transform: uppercase; }
 .patchnotes-site-header > div strong { font-size: 24px; }
+.patchnotes-home-link { color: inherit; text-decoration: none; }
+.patchnotes-site-header > a.secondary { display: inline-flex; align-items: center; gap: 8px; justify-self: start; text-decoration: none; }
+.patchnotes-archive > header h1 { color: var(--site-primary, #e8c777); font-size: 30px; margin: 0 0 14px; overflow-wrap: anywhere; }
+.patchnotes-archive > header p { color: var(--site-muted, #b8ae99); line-height: 1.7; margin: 0 0 24px; }
+.patchnotes-archive > section { padding-block: 22px; border-top: 1px solid var(--site-border, #514b38); }
+.patchnotes-archive h2 { font-size: 20px; margin: 0 0 12px; overflow-wrap: anywhere; }
+.patchnotes-archive h2 a { color: var(--site-primary, #e8c777); text-decoration: none; }
+.patchnotes-archive h2 a:hover { text-decoration: underline; }
+.patchnotes-archive > section > small { display: flex; align-items: center; gap: 6px; color: var(--site-muted, #b8ae99); margin-bottom: 12px; }
 .patchnotes-current { color: #aaa28f; font-size: 12px; justify-self: end; }
 .patchnotes-feedback { align-items: center; display: flex; gap: 12px; justify-content: space-between; margin-top: 18px; }
 .patchnotes-page-panel { background: var(--site-surface, #101718); border: var(--site-border-width, 1px) solid var(--site-border, #5b533b); border-radius: var(--site-radius, 8px); margin-top: 24px; min-height: 360px; padding: 22px; }
@@ -17,9 +26,9 @@
 .patchnotes-version-nav .state-published { color: #7ccaaa; }
 .patchnotes-layout { display: grid; gap: 28px; grid-template-columns: 240px minmax(0, 1fr); }
 .patchnotes-version-nav { align-self: start; border-right: var(--site-border-width, 1px) solid #363b37; display: grid; gap: 8px; padding-right: 20px; position: sticky; top: 18px; }
-.patchnotes-version-nav > h1 { font-size: 24px; margin: 0 0 12px; }
+.patchnotes-version-nav > h2 { font-size: 24px; margin: 0 0 12px; }
 .patchnotes-version-nav section { display: grid; gap: 5px; margin-bottom: 13px; }
-.patchnotes-version-nav h2 { color: #e2c56d; font-size: 12px; margin: 0 0 2px; text-transform: uppercase; }
+.patchnotes-version-nav section h3 { color: #e2c56d; font-size: 12px; margin: 0 0 2px; text-transform: uppercase; }
 .patchnotes-version-nav a { background: transparent; border: var(--site-border-width, 1px) solid transparent; border-radius: 6px; color: #d7cfbc; display: grid; gap: 2px; justify-items: start; padding: 9px 10px; text-align: left; width: 100%; text-decoration: none; }
 .patchnotes-version-nav a:hover { background: #181d1c; border-color: #3d433f; }
 .patchnotes-version-nav a.active { background: #27291f; border-color: #8d7331; color: #f7d97e; }
@@ -89,7 +98,7 @@
 @media (max-width: 900px) {
   .patchnotes-layout { grid-template-columns: 1fr; }
   .patchnotes-version-nav { border-bottom: var(--site-border-width, 1px) solid #363b37; border-right: 0; display: flex; overflow-x: auto; padding: 0 0 14px; position: static; }
-  .patchnotes-version-nav > .eyebrow, .patchnotes-version-nav > h1 { display: none; }
+  .patchnotes-version-nav > .eyebrow, .patchnotes-version-nav > h2 { display: none; }
   .patchnotes-version-nav section { flex: 0 0 auto; margin: 0; min-width: 150px; }
   .patchnote-document { grid-template-columns: 1fr; }
   .patchnote-toc { background: rgba(10, 17, 18, .96); border: var(--site-border-width, 1px) solid #3e412e; border-radius: 6px; grid-column: 1; grid-row: auto; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 8px; position: sticky; top: 0; z-index: 5; }
@@ -104,7 +113,7 @@
   .patchnotes-page { padding: 16px 14px 40px; }
   .patchnotes-page-panel { padding: 12px; }
   .patchnotes-site-header { grid-template-columns: auto minmax(0, 1fr); }
-  .patchnotes-site-header > button { font-size: 0; padding: 8px; }
+  .patchnotes-site-header > .secondary { font-size: 0; padding: 8px; }
   .patchnotes-site-header > div { justify-items: start; }
   .patchnotes-current { display: none; }
   .patchnotes-release > header h1 { font-size: 32px; }

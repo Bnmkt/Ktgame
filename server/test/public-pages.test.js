@@ -6,7 +6,7 @@ import { createPublicPageService, registerPublicPages } from "../src/services/pu
 import { pageMetadata } from "../../client/src/seo/metadata.js";
 
 const game = { id: "yahtzee", name: "Yahtzee", type: "dice", minPlayers: 1, maxPlayers: 6, enabled: true, privateRule: "do-not-expose" };
-const release = { id: "published", version: "0.2.0", versionGroup: "0.2", status: "published", title: "Nouveautés", summary: "Des nouveautés", updatedAt: "2026-10-01T15:00:00Z", authorId: "private-author", blocks: [{ id: "text", type: "text", content: "Les nouveaux jeux", metadata: {} }] };
+const release = { id: "published", version: "0.2.0", versionGroup: "0.2", status: "published", title: "Nouveautés", summary: "Des nouveautés", updatedAt: "2026-10-01T15:00:00Z", authorId: "private-author", blocks: [{ id: "text", type: "paragraph", content: "Les nouveaux jeux", metadata: {} }] };
 const sources = {
   settings: () => ({ siteName: "KTGA.ME", siteSubtitle: "Jeux gratuits", siteIcon: "landmark", supportEmail: "contact@example.com", smtpPassword: "do-not-expose" }),
   games: () => [game, { ...game, id: "hidden-game", enabled: false }],
@@ -34,6 +34,18 @@ test("public metadata is specific, canonical, and does not index private or sens
   assert.equal(fixture().metadata("/faq?irrelevant=1").canonicalPath, "/faq");
   assert.equal(fixture().metadata("/patchnotes/0.2.0").canonicalPath, "/patchnotes?version=0.2.0");
   assert.equal(pageMetadata({ pathname: "/ktga/faq", basePath: "/ktga" }).canonicalPath, "/ktga/faq");
+});
+
+test("patchnote archive does not duplicate the latest release or change its canonical", () => {
+  let bootstrap;
+  const archive = fixture({ note: () => { throw new Error("Archive must not load a release"); }, render: (data) => { bootstrap = data; return "<main>Archive</main>"; } }).document("/patchnotes");
+  assert.equal(archive.meta.canonicalPath, "/patchnotes");
+  assert.equal(bootstrap.note, null);
+  assert.equal(bootstrap.meta.id, "");
+  assert.equal(bootstrap.catalog.notes.length, 1);
+  fixture({ render: (data) => { bootstrap = data; return "<main>Release</main>"; } }).document("/patchnotes?version=0.2.0");
+  assert.equal(bootstrap.note.version, "0.2.0");
+  assert.equal(bootstrap.meta.id, "0.2.0");
 });
 test("unknown routes, disabled games and unpublished releases are real 404 pages", () => {
   for (const route of ["/unknown", "/jeux/hidden-game", "/patchnotes?version=0.3.0", "/faq/extra", "/table"]) {
@@ -111,6 +123,14 @@ test("built renderer sends real content without JavaScript and preserves HTTP se
       if (route === "/jeux/yahtzee") assert.match(html, /Combinaisons inférieures/);
     }
     assert.equal((await fetch(origin + "/does-not-exist")).status, 404);
+    const archive = await (await fetch(origin + "/patchnotes")).text();
+    assert.match(archive, /patchnotes-archive/);
+    assert.equal((archive.match(/<h1\b/g) ?? []).length, 1);
+    assert.ok(!archive.includes("Les nouveaux jeux"));
+    const home = await (await fetch(origin + "/")).text();
+    assert.match(home, /public-casino-info/);
+    assert.match(home, /href="\/jeux\/yahtzee"/);
+    assert.ok(!home.includes("hidden-game"));
     const customResponse = await fetch(origin + "/pages/le-club");
     assert.equal(customResponse.status, 200);
     assert.match(await customResponse.text(), /<h2>Notre club<\/h2>/);

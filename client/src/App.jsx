@@ -20,6 +20,7 @@ import { AchievementToasts, NotificationCenter } from "./components/feedback/Fee
 import { Auth } from "./pages/AuthPage.jsx";
 import { PublicGamesOverview, PublicGamesPage } from "./pages/PublicGamesPage.jsx";
 import { applyPageMetadata, pageMetadata, readPublicPageData } from "./seo/metadata.js";
+import { PublicCasinoInfo } from "./components/navigation/PublicCasinoInfo.jsx";
 import { Lobby } from "./pages/LobbyPage.jsx";
 import { PublicProfileModal } from "./components/profile/PublicProfileModal.jsx";
 import { ReportPlayerDialog } from "./components/profile/ReportPlayerDialog.jsx";
@@ -386,7 +387,7 @@ export default function App() {
   if (parentAccess) return <Suspense fallback={<main className="legal-page" role="status">{localeText("Chargement de l’espace parent…")}</main>}><ParentalPortalPage siteName={publicSettings.siteName} /></Suspense>;
   if (Object.hasOwn(legalLinks, view)) return <Suspense fallback={<main className="legal-page" role="status">{localeText("Chargement…")}</main>}><CustomPage key={view} systemRoute={appPath(view).slice(appPath("lobby").length - 1)} user={user} accountReady={accountReady} siteName={publicSettings.siteName} initialPage={publicPageData?.page} fallback={<LegalPage view={view} siteName={publicSettings.siteName} supportEmail={publicSettings.supportEmail} onBack={() => goTo("lobby")}/>}/></Suspense>;
   if (view === "status") return <Suspense fallback={<main className="status-page" role="status">{localeText("Chargement de l’état des services…")}</main>}><StatusPage siteName={publicSettings.siteName} onBack={() => goTo("lobby")} /></Suspense>;
-  if (view === "patchnotes") return <Suspense fallback={<main className="patchnotes-page" role="status">{localeText("Chargement des patchnotes…")}</main>}><PatchnotesPage siteName={publicSettings.siteName} user={user} onBack={() => goTo("lobby")} initialCatalog={publicPageData?.catalog} initialNote={publicPageData?.note} initialVersion={route.id || publicPageData?.note?.version} /></Suspense>;
+  if (view === "patchnotes") return <Suspense fallback={<main className="patchnotes-page" role="status">{localeText("Chargement des patchnotes…")}</main>}><PatchnotesPage siteName={publicSettings.siteName} user={user} onBack={() => goTo("lobby")} initialCatalog={publicPageData?.catalog} initialNote={publicPageData?.note} initialVersion={route.id || ""} /></Suspense>;
   if (isDiscordActivityLocation() && !accountReady && !accountRecovery) return <main className="activity-connecting" role="status"><img src="/pwa/icon-180.png" width="64" height="64" alt=""/><h1>KTGA.ME</h1><p>{localeText("Connexion à Discord…")}</p></main>;
   if (accountRecovery || !user || user.requiresEmailUpgrade || user.requiresEmailVerification) return <><Auth
     onAuth={(account) => { setUser(account); setDiscordResult(null); }}
@@ -396,7 +397,7 @@ export default function App() {
     pendingRoomCode={pendingRoomCode}
     settings={publicSettings}
     discordResult={discordResult}
-  />{view === "lobby" && !accountRecovery && <PublicGamesOverview games={publicGames} siteName={publicSettings.siteName} featuredGameId={publicSettings.featuredGameId} compact />}</>;
+  />{view === "lobby" && !accountRecovery && <><PublicGamesOverview games={publicGames} siteName={publicSettings.siteName} featuredGameId={publicSettings.featuredGameId} compact /><PublicCasinoInfo games={publicGames} siteName={publicSettings.siteName}/></>}</>;
   const accountRestrictions = user.minor?.restrictions ?? [];
   const blockedView = view === "shop" && accountRestrictions.includes("shop") || view === "event" && (accountRestrictions.includes("community-events") || softBanLimited(user, "community-events"));
   return (
