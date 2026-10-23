@@ -9,6 +9,7 @@ import { registerRoomEntry } from "./services/room-entry.js";
 import { registerGameImageRoutes } from "./services/game-images.js";
 import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
 import { registerResourceManifest } from "./services/resource-manifest.js";
+import { createDiskCapacity } from "./services/disk-capacity.js";
 import { registerMascotGiftRoutes, syncMascotPackOwners } from "./services/mascot-gift.js";
 import { normalizeBranding, validateBranding, registerBrandingRoutes } from "./services/site-branding.js";
 import { registerSourceEditorRoutes } from "./services/source-editor.js";
@@ -1026,6 +1027,8 @@ let lastDatabaseHealthAt = 0;
 let cachedDatabaseHealth = null;
 let latestServerHealth = null;
 const serverHealthHistory = [];
+const diskCapacity = createDiskCapacity(path.dirname(databaseFilename));
+await diskCapacity.refresh();
 
 function systemCpuTimes() {
   return os.cpus().reduce((total, cpu) => {
@@ -1200,6 +1203,7 @@ function serverHealthPayload(requestedPoints = 360) {
       uptimeSeconds: os.uptime(),
       totalMemory: os.totalmem(),
       freeMemory: os.freemem(),
+      disk: diskCapacity.snapshot(),
       loadAverage: os.loadavg()
     },
     eventLoop: { meanMs: sample.eventLoopMean, p95Ms: sample.eventLoopP95, maxMs: sample.eventLoopMax },

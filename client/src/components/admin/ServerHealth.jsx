@@ -66,6 +66,19 @@ function DetailList({ rows }) {
   return <dl className="health-detail-list">{rows.map(([label, value, title]) => <div key={label}><dt>{localeText(label)}</dt><dd title={title ?? String(value)}>{value}</dd></div>)}</dl>;
 }
 
+export function SystemHealth({ system }) {
+  const { t } = useLocale();
+  const disk = system.disk;
+  const rows = [["Hôte",system.hostname],["Plateforme",`${system.platform} ${system.release}`],["Architecture",system.architecture],["Processeur",system.cpuModel],["Cœurs logiques",system.cpuCount],["RAM utilisée",formatBytes(system.totalMemory-system.freeMemory)],["RAM totale",formatBytes(system.totalMemory)],["RAM disponible",formatBytes(system.freeMemory)]];
+  if (disk) {
+    rows.push(["Disque utilisé",formatBytes(disk.usedBytes)],["Capacité du disque",formatBytes(disk.totalBytes)],["Espace disponible",formatBytes(disk.availableBytes)]);
+    if (disk.reservedBytes) rows.push(["Espace réservé système",formatBytes(disk.reservedBytes)]);
+    if (disk.unavailable) rows.push(["Mesure disque",t("Dernier relevé conservé")]);
+  } else rows.push(["Mesure disque",t("Indisponible")]);
+  rows.push(["Uptime",formatDuration(system.uptimeSeconds)]);
+  return <section className="metrics-section"><div className="metrics-section-heading"><div><span className="eyebrow">{t("Machine")}</span><h3><Cpu size={19}/>{" " + t("Système")}</h3></div></div><DetailList rows={rows}/></section>;
+}
+
 function milliseconds(value) {
   return value == null ? "\u2014" : `${Number(value).toLocaleString("fr-BE", { maximumFractionDigits: 1 })} ms`;
 }
@@ -211,7 +224,7 @@ function ServerHealthOverview({ reportError, view }) {
 
     <div className="metrics-three-columns health-details-grid">
       <section className="metrics-section"><div className="metrics-section-heading"><div><span className="eyebrow">{localeText("Processus")}</span><h3><Server size={19} />{" " + localeText("Node.js")}</h3></div></div><DetailList rows={[["PID", data.process.pid], ["Environnement", data.process.environment], ["Version", data.process.nodeVersion], ["Démarré", new Date(data.process.startedAt).toLocaleString("fr-BE")], ["Uptime", formatDuration(data.process.uptimeSeconds)], ["Mémoire externe", formatBytes(memory.external)], ["Array buffers", formatBytes(memory.arrayBuffers)]]} /></section>
-      <section className="metrics-section"><div className="metrics-section-heading"><div><span className="eyebrow">{localeText("Machine")}</span><h3><Cpu size={19} />{" " + localeText("Système")}</h3></div></div><DetailList rows={[["Hôte", data.system.hostname], ["Plateforme", `${data.system.platform} ${data.system.release}`], ["Architecture", data.system.architecture], ["Processeur", data.system.cpuModel], ["Cœurs logiques", data.system.cpuCount], ["RAM utilisée", formatBytes(data.system.totalMemory - data.system.freeMemory)], ["RAM totale", formatBytes(data.system.totalMemory)], ["Uptime", formatDuration(data.system.uptimeSeconds)]]} /></section>
+      <SystemHealth system={data.system}/>
       <section className="metrics-section"><div className="metrics-section-heading"><div><span className="eyebrow">{localeText("Jeux")}</span><h3><Activity size={19} />{" " + localeText("Runtime")}</h3></div></div><DetailList rows={[["Joueurs assis", data.realtime.seatedHumans], ["IA assises", data.realtime.seatedBots], ["Sessions invitées", data.realtime.guestSessions], ["Timers IA en attente", data.realtime.pendingBotTimers], ["Tables en jeu", data.realtime.playingRooms], ["Tables en attente", data.realtime.waitingRooms], ["Sockets ouvertes", data.realtime.sockets]]} /></section>
     </div>
 
