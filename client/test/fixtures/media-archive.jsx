@@ -1,0 +1,11 @@
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { LocaleProvider } from "../../src/locales/LocaleProvider.jsx";
+import { AssetsAdmin } from "../../src/components/admin/AssetsAdmin.jsx";
+import { SystemHealth } from "../../src/components/admin/ServerHealth.jsx";
+import "../../src/styles.css";
+import "../../src/features/theme/theme.css";
+import "../../src/navigation/casino.css";
+const gb=1024**3;
+const system={hostname:"ktga-vps",platform:"linux",release:"Debian 13",architecture:"x64",cpuModel:"2 vCPU",cpuCount:2,totalMemory:4*gb,freeMemory:3*gb,uptimeSeconds:3600,disk:{totalBytes:40*gb,usedBytes:6*gb,availableBytes:32*gb,reservedBytes:2*gb}};
+createRoot(document.getElementById("root")).render(<LocaleProvider><main className="app-shell"><AssetsAdmin admin/><div style={{maxWidth:500,marginTop:30}}><SystemHealth system={system}/></div></main></LocaleProvider>);
