@@ -636,7 +636,7 @@ export function MotionDesigner({ motion, onChange }) {
   </section>;
 }
 
-export function VisualDesigner({ type, design, onChange, onActivate, onDisable }) {
+export function VisualDesigner({ type, design, onChange, onActivate, onDisable, oneFaceArtwork }) {
   const { t: localeText } = useLocale();
   const [panel, setPanel] = useState("surface");
   if (!visualDesignerTypes.has(type)) return null;
@@ -673,7 +673,7 @@ export function VisualDesigner({ type, design, onChange, onActivate, onDisable }
       </div></div>
       <div className="designer-section"><h4>{localeText("Face 1 personnalisée")}</h4>
         <label className="motion-reduced-toggle"><span>{localeText("Personnaliser la face 1")}</span><input type="checkbox" checked={Boolean(activeDesign.oneEnabled)} onChange={(event) => set("oneEnabled", event.target.checked)}/></label>
-        {activeDesign.oneEnabled && <><div className="designer-control-grid">
+        {activeDesign.oneEnabled && <>{oneFaceArtwork}<div className="designer-control-grid">
           <DesignerSelect label={localeText("Fond de la face 1")} value={activeDesign.oneBackgroundMode} onChange={(value) => set("oneBackgroundMode", value)} options={[["solid", "Uni"], ["linear", "Dégradé linéaire"], ["radial", "Dégradé radial"]]}/>
           <DesignerColor label={localeText("Couleur principale de la face 1")} value={activeDesign.onePrimaryColor} onChange={(value) => set("onePrimaryColor", value)}/>
           <DesignerColor label={localeText("Couleur secondaire de la face 1")} value={activeDesign.oneSecondaryColor} onChange={(value) => set("oneSecondaryColor", value)}/>

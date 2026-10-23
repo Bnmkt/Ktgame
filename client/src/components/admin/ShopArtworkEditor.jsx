@@ -8,18 +8,19 @@ import { GameImageEditor } from "./GameImageEditor.jsx";
 import { MediaPicker } from "./MediaLibrary.jsx";
 import "./shop-artwork-editor.css";
 
-export function ShopArtworkEditor({ item, onUpdate, disabled }) {
+export function ShopArtworkEditor({ item, onUpdate, disabled, fields }) {
   const { t } = useLocale();
   const [editing, setEditing] = useState(null), [picking, setPicking] = useState(null);
   const supported = item.type === "icons" || visualDesignerTypes.has(item.type);
   if (!supported) return null;
   const icon = item.type === "icons";
   const design = { ...defaultVisualDesign(item.type), ...item.design };
-  const slots = icon ? [["icon", "Image de l’icône"]] : item.type === "cardSkins" ? [["faceImage", "Face des cartes"], ["backImage", "Dos des cartes"]] : [["surfaceImage", "Image de fond"], ...(item.type === "diceSkins" && design.oneEnabled ? [["oneImage", "Image de la face 1"]] : [])];
+  const availableSlots = icon ? [["icon", "Image de l’icône"]] : item.type === "cardSkins" ? [["faceImage", "Face des cartes"], ["backImage", "Dos des cartes"]] : [["surfaceImage", "Image de fond"], ...(item.type === "diceSkins" && design.oneEnabled ? [["oneImage", "Image de la face 1"]] : [])];
+  const slots = fields ? availableSlots.filter(([field]) => fields.includes(field)) : availableSlots;
   function setImage(field, image) {
     if (icon) onUpdate("icon", image);
     else {
-      if (image && item.css) {
+      if (image && item.css && field !== "oneImage") {
         const style = document.createElement("span").style;
         style.cssText = item.css;
         for (const property of ["background-image", "background-size", "background-position", "background-repeat"]) style.removeProperty(property);

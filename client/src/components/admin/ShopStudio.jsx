@@ -87,9 +87,9 @@ export function ShopStudio({
 
         {section === "appearance" && <>
           {item.type === "icons" && <label className="branding-logo-frame"><input type="checkbox" checked={item.iconFramed !== false} onChange={event => onUpdate("iconFramed", event.target.checked)} disabled={saving}/>{localeText("Afficher un cercle autour de l’icône")}</label>}
-          <ShopArtworkEditor key={item.type} item={item} onUpdate={onUpdate} disabled={saving}/>
+          <ShopArtworkEditor key={item.type} item={item} onUpdate={onUpdate} disabled={saving} fields={item.type === "diceSkins" ? ["surfaceImage"] : undefined}/>
           {item.type === "icons" && <section className="admin-form-section admin-icon-editor shop-studio-section"><div className="admin-form-section-title"><Palette /><div><h3>{localeText("Icône")}</h3><p>{localeText("Sélectionne une icône Lucide ou colle un SVG personnalisé.")}</p></div></div><label>{localeText("Nom Lucide ou code SVG")}<CodeEditor language="svg" label={localeText("Nom Lucide ou code SVG")} maxLength={6000} height={220} value={item.icon ?? ""} onChange={value => onUpdate("icon", value)}/></label><LucideIconPicker value={item.icon} onChange={(name) => onUpdate("icon", name)} /></section>}
-          <VisualDesigner type={item.type} design={item.design} onChange={(design) => onUpdate("design", design)} onActivate={onActivateVisualDesigner} onDisable={onDisableVisualDesigner} />
+          <VisualDesigner type={item.type} design={item.design} onChange={(design) => onUpdate("design", design)} onActivate={onActivateVisualDesigner} onDisable={onDisableVisualDesigner} oneFaceArtwork={item.type === "diceSkins" ? <ShopArtworkEditor item={item} onUpdate={onUpdate} disabled={saving} fields={["oneImage"]}/> : undefined}/>
         </>}
 
         {section === "motion" && <MotionDesigner motion={item.motion} onChange={(motion) => onUpdate("motion", motion)} />}
