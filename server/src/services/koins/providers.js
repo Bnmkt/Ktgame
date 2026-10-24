@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { normalizeDocumentTemplate } from "../../../../client/src/features/koins/document-template.js";
 export function createKoinProviders({
   environment = process.env,
   fetcher = fetch,
@@ -57,6 +58,9 @@ export function createKoinProviders({
       if (!stripe) throw Error("Stripe non configuré.");
       if (order.test !== environment.STRIPE_SECRET_KEY.startsWith("sk_test_"))
         throw Error("Le mode Stripe ne correspond pas au mode configuré.");
+      const documentTemplate = normalizeDocumentTemplate(
+        order.documentTemplate,
+      );
       return stripe.checkout.sessions.create(
         {
           mode: "payment",
@@ -67,7 +71,22 @@ export function createKoinProviders({
           automatic_tax: { enabled: true },
           invoice_creation: {
             enabled: true,
-            invoice_data: { metadata: { ktga_order: order.id } },
+            invoice_data: {
+              metadata: { ktga_order: order.id },
+              footer: [
+                documentTemplate.footer,
+                ...documentTemplate.links.map(
+                  (link) => `${link.label} : ${link.url}`,
+                ),
+              ]
+                .filter(Boolean)
+                .join("\n"),
+              description: documentTemplate.note.slice(0, 500),
+              custom_fields: [
+                { name: "Commande KTGA", value: order.id },
+                { name: "Contenu", value: `${order.koins} Koins` },
+              ],
+            },
           },
           metadata: { ktga_order: order.id },
           payment_intent_data: { metadata: { ktga_order: order.id } },

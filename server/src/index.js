@@ -14,6 +14,7 @@ import { useDatabase } from "./db.js";
 import { createKoinStore } from "./services/koins/store.js";
 import { createKoinProviders } from "./services/koins/providers.js";
 import { registerKoinRoutes } from "./services/koins/routes.js";
+import { createDocumentLogoLoader } from "./services/koins/document-assets.js";
 import { premiumShopFields } from "./services/koins/prices.js";
 import { cosmeticPrice, cosmeticPackPrice } from "../../client/src/features/koins/pricing.js";
 import { registerMascotGiftRoutes, syncMascotPackOwners } from "./services/mascot-gift.js";
@@ -849,6 +850,7 @@ app.use(helmet({
       baseUri: ["'self'"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
+      frameSrc: ["'self'", "blob:"],
       formAction: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
@@ -5224,7 +5226,7 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
 const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, settings: platformSettings, directory: path.join(path.dirname(databaseFilename), "media-library") });
 const koinStore = useDatabase(createKoinStore);
-const koinDelivery = registerKoinRoutes({app,auth,requireAdmin,store:koinStore,providers:createKoinProviders(),getUser,shopAccess:user=>userFeatureAccess(user,"shop").allowed,website:publicWebsiteUrl,imageAllowed:image=>{const asset=typeof image==="string"&&mediaLibrary.get(image.split("/").at(-1));return asset&&!asset.archived;}});
+const koinDelivery = registerKoinRoutes({app,auth,requireAdmin,store:koinStore,providers:createKoinProviders(),getUser,shopAccess:user=>userFeatureAccess(user,"shop").allowed,website:publicWebsiteUrl,imageAllowed:image=>{const asset=typeof image==="string"&&mediaLibrary.get(image.split("/").at(-1));return asset&&!asset.archived;},getLogo:createDocumentLogoLoader({mediaLibrary,settings:platformSettings,publicDirectory:CLIENT_DIST || path.resolve(__dirname,"../../client/public")})});
 process.on("exit", () => koinDelivery.close());
 registerResourceManifest({ app, sources: () => [platformSettings(), configuredGames().filter(game => game.enabled !== false), configuredShop(), rankedConfig(), customPages.list(true), playerHelp.read(true)], media: () => mediaLibrary.list() });
 registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });

@@ -1,4 +1,5 @@
-import PDFDocument from "pdfkit";
+import { renderKoinDocument } from "./document-layout.js";
+import { validProviderInvoiceLink } from "../../../../client/src/features/koins/document-template.js";
 import { sendTransactionalEmail } from "../email-verification.js";
 const escape = (value) =>
   String(value ?? "").replace(
@@ -8,70 +9,13 @@ const escape = (value) =>
         c
       ],
   );
-export async function koinReceiptPdf({ number, order, refund = false }) {
-  const pdf = new PDFDocument({
-      size: "A4",
-      margin: 48,
-      info: {
-        Title: refund
-          ? "Justificatif de remboursement KTGA"
-          : "Justificatif Koins KTGA",
-      },
-    }),
-    chunks = [];
-  const completed = new Promise((resolve, reject) => {
-    pdf.on("data", (chunk) => chunks.push(chunk));
-    pdf.on("end", () => resolve(Buffer.concat(chunks)));
-    pdf.on("error", reject);
-  });
-  pdf.fontSize(25).fillColor("#6e3bb0").text("KTGA.ME · Koins");
-  pdf
-    .moveDown()
-    .fontSize(17)
-    .fillColor("#171d1a")
-    .text(
-      refund
-        ? "Justificatif de remboursement"
-        : order.provider === "code"
-          ? "Justificatif d’attribution gratuite"
-          : "Justificatif d’attribution Discord",
-    );
-  const lines = [
-    `Référence : ${number}`,
-    `Date : ${order.createdAt}`,
-    `Bénéficiaire : ${order.customer?.name ?? order.userId}`,
-    `Compte : ${order.customer?.email ?? order.userId}`,
-    `Koins : ${order.koins}`,
-    `Fournisseur : ${order.provider}`,
-    `Référence fournisseur : ${order.providerRef ?? order.codeReference ?? order.id}`,
-  ];
-  if (order.provider === "code")
-    lines.push(
-      `Campagne : ${order.campaign ?? ""}`,
-      "Montant payé : 0,00 EUR",
-      "Attribution gratuite, sans vente. Ce document n’est pas une facture.",
-    );
-  else
-    lines.push(
-      "Le montant payé et les taxes figurent sur le document du fournisseur.",
-      "Ce justificatif ne remplace ni une facture ni un avoir du fournisseur.",
-    );
-  if (order.issuer?.legalName)
-    lines.push(
-      `Émetteur KTGA : ${order.issuer.legalName}`,
-      order.issuer.address ?? "",
-      order.issuer.contactEmail ?? "",
-    );
-  pdf.moveDown().fontSize(11);
-  for (const line of lines) pdf.text(line, { lineGap: 7 });
-  pdf.end();
-  return completed;
-}
+export const koinReceiptPdf = renderKoinDocument;
 export function createKoinDelivery({
   store,
   providers,
   send = sendTransactionalEmail,
   getUser,
+  getLogo = async () => null,
 }) {
   let busy = false;
   async function run() {
@@ -146,6 +90,7 @@ export function createKoinDelivery({
                   ? "free_receipt"
                   : "allocation_receipt",
               providerNumber = null,
+              providerUrl = null,
               providerAmounts = null,
               documentKoins = task.data.refund
                 ? (task.data.revokedKoins ?? order.revokedKoins)
@@ -161,6 +106,9 @@ export function createKoinDelivery({
               body = await providers.invoicePdf(invoice);
               kind = "provider_invoice";
               providerNumber = invoice.number;
+              providerUrl = validProviderInvoiceLink(invoice.hosted_invoice_url)
+                ? invoice.hosted_invoice_url
+                : null;
               providerAmounts = {
                 subtotal: invoice.subtotal_excluding_tax,
                 total: invoice.total,
@@ -172,6 +120,9 @@ export function createKoinDelivery({
               body = await providers.invoicePdf({ invoice_pdf: note.pdf });
               kind = "provider_credit_note";
               providerNumber = note.number;
+              providerUrl = validProviderInvoiceLink(note.pdf)
+                ? note.pdf
+                : null;
               documentKoins = order.amountCents
                 ? Math.ceil((order.koins * note.total) / order.amountCents)
                 : order.revokedKoins;
@@ -184,11 +135,14 @@ export function createKoinDelivery({
             } else {
               body = await koinReceiptPdf({
                 number,
+                logo: await getLogo(order.documentTemplate?.logoImage),
                 order: task.data.refund
                   ? {
                       ...order,
                       koins: task.data.revokedKoins ?? order.revokedKoins,
                       createdAt: task.data.createdAt,
+                      refundedCents:
+                        task.data.refundedCents ?? order.refundedCents,
                     }
                   : order,
                 refund: task.data.refund,
@@ -202,6 +156,7 @@ export function createKoinDelivery({
                 kind,
                 orderId: order.id,
                 providerNumber,
+                providerUrl,
                 providerAmounts,
                 koins: documentKoins,
                 amountCents:

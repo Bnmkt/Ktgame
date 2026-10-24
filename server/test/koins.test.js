@@ -695,3 +695,27 @@ test("a Checkout response cannot overwrite a payment confirmed during the provid
   assert.equal(store.order(row.orderId).credited, true);
   assert.equal(store.wallet("one").balance, 25);
 });
+
+test("document previews are administrator-only and never issue a document, number or credit", async (t) => {
+  const { request, store } = await httpFixture(t);
+  assert.equal(
+    (await request("/api/admin/monetization/documents/preview", {})).status,
+    403,
+  );
+  const response = await request(
+    "/api/admin/monetization/documents/preview",
+    {},
+    "admin",
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "application/pdf");
+  assert.ok(
+    Buffer.from(await response.arrayBuffer())
+      .subarray(0, 5)
+      .equals(Buffer.from("%PDF-")),
+  );
+  assert.equal(store.documents().length, 0);
+  assert.equal(store.orders().length, 0);
+  assert.equal(store.wallet("admin").balance, 0);
+  assert.match(store.reserveDocumentNumber("after-preview"), /-0000001$/);
+});

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api, API_URL } from "../../api.js";
 import { GameImageEditor } from "./GameImageEditor.jsx";
+import { KoinDocumentEditor } from "./KoinDocumentEditor.jsx";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { DateTimeInput } from "../common/DateTimeInput.jsx";
 import {
@@ -224,6 +225,7 @@ export function MonetizationAdmin() {
           ["settings", "Activation et facturation"],
           ["offers", "Offres"],
           ["appearance", "Personnalisation"],
+          ["documents", "Modèle des factures"],
           ["codes", "Codes"],
           ["orders", "Achats et documents"],
           ["delivery", "Livraisons et emails"],
@@ -873,6 +875,7 @@ export function MonetizationAdmin() {
         </>
       )}
       {tab === "delivery" && moreHistory("mailLog")}
+      {tab === "documents" && <KoinDocumentEditor value={draft.documents} issuer={draft.billing} onChange={documents=>setDraft({...draft,documents})}/>}
       {tab === "appearance" && (
         <>
           <h3>{t("Icône des Koins")}</h3>

@@ -1,6 +1,6 @@
 import rateLimit from "express-rate-limit";
-import { koinAccountAllowed } from "./config.js";
-import { createKoinDelivery } from "./documents.js";
+import { koinAccountAllowed, validateKoinConfig } from "./config.js";
+import { createKoinDelivery, koinReceiptPdf } from "./documents.js";
 import { exchangeDiscordCode } from "../discord-oauth.js";
 
 export function registerKoinRoutes({
@@ -15,11 +15,13 @@ export function registerKoinRoutes({
   environment = process.env,
   sendEmail,
   imageAllowed,
+  getLogo = async () => null,
 }) {
   const delivery = createKoinDelivery({
     store,
     providers,
     getUser,
+    getLogo,
     ...(sendEmail ? { send: sendEmail } : {}),
   });
   const userFor = (req, purchase = false) => {
@@ -39,6 +41,7 @@ export function registerKoinRoutes({
     },
     issuer: structuredClone(store.config().billing),
     test: store.config().testMode,
+    documentTemplate: structuredClone(store.config().documents),
   });
   const run = (handler) => async (req, res) => {
     res.set("Cache-Control", "private, no-store");
@@ -514,15 +517,60 @@ export function registerKoinRoutes({
     "/api/admin/monetization",
     auth,
     requireAdmin,
-    run((req, res) => {
+    run(async (req, res) => {
       if (imageAllowed)
         for (const image of [
           req.body.iconImage,
+          req.body.documents?.logoImage,
           ...(req.body.offers ?? []).map((offer) => offer.image),
         ])
           if (image && !imageAllowed(image))
             throw Error("Image introuvable ou archivée dans la médiathèque.");
+      if (req.body.documents?.logoImage)
+        await getLogo(req.body.documents.logoImage);
       res.json(store.saveConfig(req.body));
+    }),
+  );
+  app.post(
+    "/api/admin/monetization/documents/preview",
+    auth,
+    requireAdmin,
+    run(async (req, res) => {
+      const previewConfig = validateKoinConfig({
+        ...store.config(),
+        documents: req.body.documents,
+        billing: req.body.billing ?? store.config().billing,
+        purchasesEnabled: false,
+        codesEnabled: false,
+      });
+      const documentTemplate = previewConfig.documents;
+      if (
+        documentTemplate.logoImage &&
+        imageAllowed &&
+        !imageAllowed(documentTemplate.logoImage)
+      )
+        throw Error("Logo PDF introuvable.");
+      const order = {
+        id: "EXEMPLE-NON-EMIS",
+        provider: "code",
+        koins: 25,
+        amountCents: 0,
+        currency: "eur",
+        createdAt: new Date().toISOString(),
+        customer: { name: "Joueur exemple", email: "joueur@example.invalid" },
+        issuer: previewConfig.billing,
+        documentTemplate,
+      };
+      const body = await koinReceiptPdf({
+        number: "APERÇU-NON-ÉMIS",
+        order,
+        logo: await getLogo(documentTemplate.logoImage),
+        specimen: true,
+      });
+      res
+        .type("application/pdf")
+        .attachment("KTGA-modele-document.pdf")
+        .send(body);
     }),
   );
   app.get(

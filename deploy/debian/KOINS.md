@@ -133,6 +133,22 @@ un montant inconnu pour ces achats, et non une vente gratuite.
 
 ## Documents, emails et confidentialite
 
+Le modele des nouveaux justificatifs se regle dans **Monetisation > Modele des
+factures** : logo PNG/JPEG (2 Mo maximum), nom affiche, couleur, textes et quatre
+liens utiles. L'apercu PDF est prive, reserve aux administrateurs et n'emet ni
+numero comptable ni transaction. Les champs de facturation restent ceux de
+l'onglet Activation et facturation. Les documents deja emis ne sont pas modifies.
+
+Pour les factures Stripe, configurer aussi le logo et les informations de
+l'entreprise dans le compte Stripe. KTGA transmet les textes de pied de page,
+les liens et la reference de commande aux nouvelles factures de Checkout, sans
+recomposer les PDF officiels. Un lien vers le document fournisseur est disponible
+dans l'historique lorsqu'il est fourni par Stripe.
+
+L'apercu PDF utilise un iframe local `blob:`. La configuration Nginx HTTPS doit
+inclure `frame-src 'self' blob:` en conservant les autres sources existantes.
+Le modele fourni dans ce depot est a jour ; valider avec `nginx -t` avant reload.
+
 Les factures et avoirs Stripe sont recuperes sans regeneration ni modification
 de leur numero officiel. KTGA conserve une reference d'archivage distincte et le
 PDF original. Les attributions gratuites emettent un justificatif a 0 EUR, non

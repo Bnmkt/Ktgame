@@ -1,4 +1,8 @@
 import { casinoDateKey } from "../time.js";
+import {
+  defaultDocumentTemplate,
+  normalizeDocumentTemplate,
+} from "../../../../client/src/features/koins/document-template.js";
 
 const number = (value, min, max, label) => {
   if (!Number.isSafeInteger(value) || value < min || value > max)
@@ -45,6 +49,7 @@ export const defaultKoinConfig = {
   testMode: true,
   legalReviewed: false,
   iconImage: "",
+  documents: defaultDocumentTemplate,
   billing: {
     status: "individual",
     legalName: "",
@@ -81,6 +86,7 @@ export function validateKoinConfig(input) {
     offers: [],
   };
   result.iconImage = image(input.iconImage);
+  result.documents = normalizeDocumentTemplate(input.documents);
   if (!["individual", "professional"].includes(result.billing.status))
     throw Error("Statut de facturation invalide.");
   for (const key of ["administrativeEmail", "contactEmail"])

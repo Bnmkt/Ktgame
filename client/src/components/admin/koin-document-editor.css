@@ -1,0 +1,179 @@
+.billing-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 24px;
+  align-items: start;
+}
+.billing-editor-fields {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.billing-editor-fields h3,
+.billing-editor-fields h4,
+.billing-editor-fields .koin-admin-controls {
+  margin: 0;
+}
+.billing-editor-fields > label {
+  display: grid;
+  gap: 7px;
+}
+.billing-editor-fields textarea {
+  width: 100%;
+}
+.billing-editor-fields > a,
+.billing-download {
+  color: var(--site-link, #9bd6ef);
+}
+.billing-link-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.7fr) minmax(0, 1.3fr) 40px;
+  gap: 8px;
+  align-items: end;
+}
+.billing-link-row label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.billing-link-row input {
+  width: 100%;
+  min-width: 0;
+}
+.billing-preview {
+  position: sticky;
+  top: 110px;
+  min-width: 0;
+}
+.billing-paper {
+  min-width: 0;
+  padding: 28px;
+  color: #24313a;
+  background: #fff;
+  border: 1px solid #d5dbe0;
+  border-radius: 2px;
+  font:
+    12px/1.6 Arial,
+    sans-serif;
+  box-shadow: 0 6px 18px #0003;
+  overflow-wrap: anywhere;
+}
+.billing-paper header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 3px solid var(--document-accent);
+}
+.billing-paper header img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.billing-paper header strong {
+  font-size: 18px;
+}
+.billing-paper header small {
+  margin-left: auto;
+  color: #59636a;
+}
+.billing-paper h3 {
+  font-size: 17px;
+  margin: 18px 0 10px;
+  color: #17212b;
+}
+.billing-paper p {
+  color: inherit;
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 12px 0;
+}
+.billing-parties {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.billing-paper table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.billing-paper th,
+.billing-paper td {
+  padding: 8px 5px;
+  text-align: left;
+  border-bottom: 1px solid #dce1e4;
+  color: #24313a;
+}
+.billing-paper th {
+  background: #e9edf0;
+  font-size: 10px;
+}
+.billing-paper td:last-child,
+.billing-paper th:last-child {
+  text-align: right;
+}
+.billing-paper .billing-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid #dce1e4;
+}
+.billing-paper .billing-disclaimer {
+  font-size: 10px;
+}
+.billing-paper footer {
+  margin-top: 24px;
+  border-top: 1px solid #dce1e4;
+  padding-top: 10px;
+}
+.billing-paper footer p {
+  font-size: 10px;
+}
+.billing-paper footer span {
+  display: inline-block;
+  margin-right: 10px;
+  color: #3d5065;
+  text-decoration: underline;
+}
+.billing-pdf-dialog.casino-dialog {
+  width: min(1050px, calc(100vw - 24px));
+}
+.billing-pdf-frame {
+  display: block;
+  width: 100%;
+  height: 70dvh;
+  border: 0;
+  margin-top: 14px;
+  background: #f1f3f4;
+}
+.billing-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 1050px) {
+  .billing-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .billing-preview {
+    position: static;
+    max-width: 620px;
+    width: 100%;
+    margin: 0 auto;
+  }
+}
+@media (max-width: 480px) {
+  .billing-paper {
+    padding: 16px;
+  }
+  .billing-link-row {
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+  .billing-link-row label:first-child {
+    grid-column: 1 / -1;
+  }
+}
