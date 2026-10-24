@@ -39,6 +39,7 @@ if (!fs.existsSync(path.dirname(sqlitePath))) fs.mkdirSync(path.dirname(sqlitePa
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const sqlite = new DatabaseSync(sqlitePath);
+export function useDatabase(factory) { return factory(sqlite); }
 const entityRevisions = new Map();
 let entityRevisionEpoch = 0;
 export function databaseEntityRevision(collection, id) { return `${entityRevisionEpoch}:${entityRevisions.get(`${collection}:${id}`) ?? 0}`; }
@@ -480,9 +481,10 @@ function persistDatabase(db, selection) {
     }
   }
 
-  if (operations.length || nextSettings !== persistedSettings) {
+  if (operations.length || nextSettings !== persistedSettings || selection.atomic) {
     sqlite.exec("BEGIN IMMEDIATE");
     try {
+      selection.atomic?.(sqlite);
       for (const operation of operations) if (operation.definition.key === "rooms") roomMutationGuard?.(operation.id ?? operation.row.id);
       for (const operation of operations) {
         if (operation.type === "replaceArchive") replaceAll(operation.definition.table, operation.rows, operation.definition.insert);

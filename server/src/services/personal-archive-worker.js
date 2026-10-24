@@ -36,6 +36,13 @@ try {
   account.mfa = security;
   if (paths.passkeys && fs.existsSync(paths.passkeys)) rows("passkeys", open("passkeys"), "SELECT name,created_at,last_used_at,backed_up FROM passkeys WHERE user_id=? ORDER BY created_at");
   json("compte.json", account);
+  if (main.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='koin_wallets'").get()) {
+    rows("koins-portefeuille", main, "SELECT balance,blocked FROM koin_wallets WHERE user_id=?");
+    rows("koins-transactions", main, "SELECT delta,balance,reason,created_at,data FROM koin_ledger WHERE user_id=? ORDER BY created_at", [userId], row => ({ ...row, data: JSON.parse(row.data) }));
+    rows("koins-achats", main, "SELECT data FROM koin_orders WHERE user_id=? ORDER BY created_at", [userId], row => { const { issuer, ...order } = JSON.parse(row.data); return order; });
+    rows("koins-documents", main, "SELECT number,created_at,data FROM koin_documents WHERE user_id=? ORDER BY created_at", [userId], row => { const { issuer, ...data } = JSON.parse(row.data); return { ...row, data }; });
+    for (const document of main.prepare("SELECT number,body FROM koin_documents WHERE user_id=?").iterate(userId)) zip.addBuffer(Buffer.from(document.body), `koins/${document.number}.pdf`);
+  }
   rows("inventaire", main, "SELECT i.type,i.item_id,c.data AS definition FROM user_inventory i LEFT JOIN item_catalog c ON c.type=i.type AND c.id=i.item_id WHERE i.user_id=? ORDER BY i.type,i.position", [userId], (row) => ({ ...row, definition: row.definition ? JSON.parse(row.definition) : null }));
   rows("succes", main, "SELECT a.achievement_id,a.unlocked,a.suppressed,a.unlocked_at,c.data AS definition FROM user_achievements a LEFT JOIN achievement_catalog c ON c.id=a.achievement_id WHERE a.user_id=?", [userId], (row) => ({ ...row, definition: row.definition ? JSON.parse(row.definition) : null }));
   rows("progression-succes", main, "SELECT achievement_id,value,data,updated_at FROM achievement_progress WHERE user_id=?", [userId], (row) => ({ ...row, data: row.data ? JSON.parse(row.data) : null }));

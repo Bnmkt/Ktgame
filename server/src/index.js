@@ -10,6 +10,12 @@ import { registerGameImageRoutes } from "./services/game-images.js";
 import { registerMediaRoutes, mediaUploadLimit, validateMediaUploadLimit } from "./services/media-library.js";
 import { registerResourceManifest } from "./services/resource-manifest.js";
 import { createDiskCapacity } from "./services/disk-capacity.js";
+import { useDatabase } from "./db.js";
+import { createKoinStore } from "./services/koins/store.js";
+import { createKoinProviders } from "./services/koins/providers.js";
+import { registerKoinRoutes } from "./services/koins/routes.js";
+import { premiumShopFields } from "./services/koins/prices.js";
+import { cosmeticPrice, cosmeticPackPrice } from "../../client/src/features/koins/pricing.js";
 import { registerMascotGiftRoutes, syncMascotPackOwners } from "./services/mascot-gift.js";
 import { normalizeBranding, validateBranding, registerBrandingRoutes } from "./services/site-branding.js";
 import { registerSourceEditorRoutes } from "./services/source-editor.js";
@@ -917,6 +923,7 @@ app.use("/api/admin/pages", express.json({ limit: "1mb" }));
 app.use("/api/admin/page-templates", express.json({ limit: "1mb" }));
 app.use("/api/admin/locales", express.json({ limit: "2mb" }));
 app.use("/api/admin/source", express.json({ limit: "1mb" }));
+app.use("/api/koins/stripe/webhook", express.raw({type:"application/json",limit:"1mb"}));
 app.use(express.json());
 app.use("/api/admin", (req, res, next) => {
   const changed = !["GET", "HEAD", "OPTIONS"].includes(req.method) && /^\/api\/admin\/(?:games|pages|page-templates|patchnotes|help|settings|themes)(?:\/|$)/.test(req.originalUrl.split("?")[0]);
@@ -5183,6 +5190,7 @@ app.post("/api/admin/users/:id/reset-account", auth, requireAdmin, (req, res) =>
 
 app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
   if (req.params.id === req.auth.id) return res.status(400).json({ error: "Tu ne peux pas supprimer ton propre compte administrateur." });
+  if (koinStore.hasUnsettledPayment(req.params.id)) return res.status(409).json({ error: "Un paiement Koins est encore en attente ou en litige. Règle cette opération avant de supprimer le compte." });
   const result = updateDb((db) => {
     const target = db.users.find((entry) => entry.id === req.params.id && !entry.guest);
     if (!target) return "missing";
@@ -5215,6 +5223,9 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
 
 registerGameImageRoutes({ app, auth, requireAdmin, games, directory: path.join(path.dirname(databaseFilename), "game-images") });
 const mediaLibrary = await registerMediaRoutes({ app, auth, requireAdmin, requireBackOffice, settings: platformSettings, directory: path.join(path.dirname(databaseFilename), "media-library") });
+const koinStore = useDatabase(createKoinStore);
+const koinDelivery = registerKoinRoutes({app,auth,requireAdmin,store:koinStore,providers:createKoinProviders(),getUser,shopAccess:user=>userFeatureAccess(user,"shop").allowed,website:publicWebsiteUrl,imageAllowed:image=>{const asset=typeof image==="string"&&mediaLibrary.get(image.split("/").at(-1));return asset&&!asset.archived;}});
+process.on("exit", () => koinDelivery.close());
 registerResourceManifest({ app, sources: () => [platformSettings(), configuredGames().filter(game => game.enabled !== false), configuredShop(), rankedConfig(), customPages.list(true), playerHelp.read(true)], media: () => mediaLibrary.list() });
 registerBrandingRoutes({ app, settings: platformSettings, websiteUrl: publicWebsiteUrl, publicDirectory: CLIENT_DIST || path.resolve(__dirname, "../../client/public") });
 registerThemeRoutes({ app, auth, requireAdmin, readDb, updateDb, settings: platformSettings, mediaLibrary });
@@ -5299,8 +5310,10 @@ app.post("/api/admin/shop", auth, requireBackOffice, (req, res) => {
     return res.status(400).json({ error: `Le prix doit être compris entre ${guidance.allowedMin} et ${guidance.allowedMax} jetons pour cette catégorie.`, pricing: guidance });
   }
   let pack;
-  try { pack = normalizeShopPack(req.body.packName); } catch (error) { return res.status(400).json({ error: error.message }); }
+  let premiumFields;
+  try { pack = normalizeShopPack(req.body.packName); premiumFields=premiumShopFields(req.body,{},req.backOfficeUser.admin); } catch (error) { return res.status(400).json({ error: error.message }); }
   const item = { id, type, category, name: String(req.body.name ?? "Nouvel élément").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, value: id, iconFramed: req.body.iconFramed !== false, icon: String(req.body.icon ?? "").trim().slice(0, 6000), design: normalizeCosmeticDesign(req.body.design, type), motion: normalizeCosmeticMotion(req.body.motion), css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack, createdById: req.backOfficeUser.id, createdByName: displayNameFor(req.backOfficeUser), createdAt: new Date().toISOString() };
+  Object.assign(item,premiumFields);
   updateDb((currentDb) => { currentDb.settings ??= {}; currentDb.settings.customShopItems ??= []; currentDb.settings.customShopItems.push(item); syncMascotPackOwners(currentDb, configuredShop(currentDb), normalizeCosmetics); });
   res.json(item);
 });
@@ -5323,6 +5336,7 @@ app.patch("/api/admin/shop/:id", auth, requireBackOffice, (req, res) => {
     const design = req.body.design === undefined ? current?.design ?? null : normalizeCosmeticDesign(req.body.design, type);
     const motion = req.body.motion === undefined ? current?.motion ?? null : normalizeCosmeticMotion(req.body.motion);
     db.settings.shopOverrides[req.params.id] = { name: String(req.body.name ?? "").slice(0, 80), description: String(req.body.description ?? "").slice(0, 240), price, type, category, value: current?.value ?? req.params.id, iconFramed: (req.body.iconFramed ?? current.iconFramed) !== false, icon: String(req.body.icon ?? current?.icon ?? "").trim().slice(0, 6000), design, motion, css: normalizeCosmeticCss(req.body.css, { allowUrls: true }), ...pack };
+    Object.assign(db.settings.shopOverrides[req.params.id],premiumShopFields(req.body,current,req.backOfficeUser.admin));
     syncMascotPackOwners(db, configuredShop(db), normalizeCosmetics);
     return "updated";
   });
@@ -5503,19 +5517,25 @@ app.patch("/api/me/cosmetics", auth, (req, res) => {
 });
 
 app.post("/api/shop/purchase", auth, (req, res) => {
+  const currency=req.body.currency??"tokens";
+  if(!["tokens","koins"].includes(currency)||currency==="koins"&&!koinStore.config().shopEnabled)return res.status(400).json({error:"Monnaie indisponible."});
   if (req.auth.guest) return res.status(400).json({ error: "La boutique est réservée aux comptes enregistrés." });
   const access = userFeatureAccess(getUser(req.auth.id), "shop");
   if (!access.allowed) return rejectFeature(res, access);
   const item = configuredShop().find((entry) => entry.id === req.body.itemId);
   if (!item) return res.status(404).json({ error: "Article introuvable." });
   if (item.rewardOnly) return res.status(400).json({ error: "Cet objet se débloque avec un succès." });
+  const purchasePrice=cosmeticPrice(item,currency);
+  if(purchasePrice===null)return res.status(400).json({error:"Cette monnaie n’est pas acceptée pour cet objet."});
+  let koinDebit=null;
   const user = updateDb((db) => {
     const found = db.users.find((u) => u.id === req.auth.id);
     if (!found) return null;
     let cosmetics = ensureUserCosmetics(found);
     if (cosmetics[item.type].includes(item.value)) return { user: found, achievementUnlocks: [] };
-    if (found.tokens < item.price) return "tokens";
-    addTokens(db, found.id, -item.price, { reason: "shop-purchase" });
+    if (currency==="tokens"&&found.tokens < purchasePrice) return "tokens";
+    if(currency==="tokens")addTokens(db, found.id, -purchasePrice, { reason: "shop-purchase" });
+    else koinDebit={id:found.id,amount:purchasePrice,source:`cosmetic:${randomUUID()}`,items:[{id:item.id,type:item.type,value:item.value}]};
     // Transaction achievements may normalize and replace the inventory object.
     cosmetics = ensureUserCosmetics(found);
     cosmetics[item.type].push(item.value);
@@ -5527,16 +5547,19 @@ app.post("/api/shop/purchase", auth, (req, res) => {
       const statePlayer = room.state?.players?.find((p) => p.id === found.id);
       if (statePlayer) statePlayer.cosmetics = cosmetics;
     }
-    const eventUnlocks = processAchievementEvent(db, found.id, { type: "shop.purchase", payload: { itemId: item.id, itemType: item.type, itemCategory: item.category, price: item.price, quantity: 1 } });
-    const achievementUnlocks = [...new Set([...eventUnlocks, ...unlockEligibleAchievements(found, db), ...triggerRandomAchievement(db, found.id)])];
+    const eventUnlocks = currency==="koins"?[]:processAchievementEvent(db, found.id, { type: "shop.purchase", payload: { itemId: item.id, itemType: item.type, itemCategory: item.category, price: item.price, quantity: 1 } });
+    const achievementUnlocks = currency==="koins"?[]:[...new Set([...eventUnlocks, ...unlockEligibleAchievements(found, db), ...triggerRandomAchievement(db, found.id)])];
     return { user: found, achievementUnlocks };
-  });
+  },()=>({atomic:koinDebit?()=>koinStore.spend(koinDebit.id,koinDebit.amount,koinDebit.source,koinDebit.items):undefined}));
   if (user === "tokens") return res.status(400).json({ error: "Jetons insuffisants." });
   if (!user?.user) return res.status(404).json({ error: "Utilisateur introuvable." });
   res.json({ user: sanitizeUser(user.user), achievementUnlocks: user.achievementUnlocks });
 });
 
 app.post("/api/shop/purchase-pack", auth, (req, res) => {
+  const currency=req.body.currency??"tokens";
+  if(!["tokens","koins"].includes(currency)||currency==="koins"&&!koinStore.config().shopEnabled)return res.status(400).json({error:"Monnaie indisponible."});
+  let koinDebit=null;
   if (req.auth.guest) return res.status(400).json({ error: "La boutique est réservée aux comptes enregistrés." });
   const access = userFeatureAccess(getUser(req.auth.id), "shop");
   if (!access.allowed) return rejectFeature(res, access);
@@ -5553,11 +5576,14 @@ app.post("/api/shop/purchase-pack", auth, (req, res) => {
     let cosmetics = ensureUserCosmetics(found);
     const purchasable = selected.filter((item) => !cosmetics[item.type].includes(item.value));
     if (!purchasable.length) return "owned";
-    const subtotal = purchasable.reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.price) || 0)), 0);
-    const discountPercent = shopPackDiscountPercent(purchasable.length);
-    const total = Math.ceil(subtotal * (100 - discountPercent) / 100);
-    if (found.tokens < total) return { status: "tokens", subtotal, total, discountPercent };
-    addTokens(db, found.id, -total, { reason: "shop-pack-purchase" });
+    const quote=cosmeticPackPrice(purchasable,currency);
+    if(!quote)return "invalid";
+    const subtotal = quote.subtotal;
+    const discountPercent = quote.discount;
+    const total = quote.total;
+    if (currency==="tokens"&&found.tokens < total) return { status: "tokens", subtotal, total, discountPercent };
+    if(currency==="tokens")addTokens(db, found.id, -total, { reason: "shop-pack-purchase" });
+    else koinDebit={id:found.id,amount:total,source:`cosmetic-pack:${randomUUID()}`,items:purchasable.map(item=>({id:item.id,type:item.type,value:item.value}))};
     cosmetics = ensureUserCosmetics(found);
     for (const item of purchasable) {
       cosmetics[item.type].push(item.value);
@@ -5569,10 +5595,10 @@ app.post("/api/shop/purchase-pack", auth, (req, res) => {
       const statePlayer = room.state?.players?.find((entry) => entry.id === found.id);
       if (statePlayer) statePlayer.cosmetics = cosmetics;
     }
-    const eventUnlocks = purchasable.flatMap((item) => processAchievementEvent(db, found.id, { type: "shop.purchase", payload: { itemId: item.id, itemType: item.type, itemCategory: item.category, price: item.price, quantity: purchasable.length } }));
-    const achievementUnlocks = [...new Set([...eventUnlocks, ...unlockEligibleAchievements(found, db), ...triggerRandomAchievement(db, found.id)])];
+    const eventUnlocks = currency==="koins"?[]:purchasable.flatMap((item) => processAchievementEvent(db, found.id, { type: "shop.purchase", payload: { itemId: item.id, itemType: item.type, itemCategory: item.category, price: item.price, quantity: purchasable.length } }));
+    const achievementUnlocks = currency==="koins"?[]:[...new Set([...eventUnlocks, ...unlockEligibleAchievements(found, db), ...triggerRandomAchievement(db, found.id)])];
     return { status: "ok", user: found, achievementUnlocks, pricing: { itemCount: purchasable.length, subtotal, total, discountPercent } };
-  });
+  },()=>({atomic:koinDebit?()=>koinStore.spend(koinDebit.id,koinDebit.amount,koinDebit.source,koinDebit.items):undefined}));
   if (result === "missing") return res.status(404).json({ error: "Utilisateur introuvable." });
   if (result === "invalid" || result === "duplicate-type") return res.status(400).json({ error: "Cette sélection ne correspond pas au pack." });
   if (result === "owned") return res.status(400).json({ error: "Tous les éléments sélectionnés sont déjà débloqués." });
@@ -6099,6 +6125,7 @@ if (CLIENT_DIST) {
 }
 
 app.use((error, _req, res, next) => {
+  if (String(error.code).startsWith("KOINS_")) return res.status(error.status ?? 400).json({ error: error.message });
   if (String(error.code).startsWith("GAME_")) {
     const status = error.code === "GAME_AUTH_REVOKED" ? 403 : error.code === "GAME_CONFLICT" ? 409 : 503;
     return res.set("Retry-After", "2").status(status).json({ error: status === 403 ? "Session invalide." : "Table temporairement indisponible. Reessaie dans quelques instants." });
@@ -6125,6 +6152,7 @@ let shuttingDown = false;
 async function shutdown(restart = false) {
   if (shuttingDown) return;
   shuttingDown = true;
+  koinDelivery.close();
   setTimeout(() => process.exit(1), 10000).unref();
   try { executionHistory.sample(serviceExecution.health(readingWork.health(), gameGateway?.health()), true); } catch {}
   await gameGateway?.close();

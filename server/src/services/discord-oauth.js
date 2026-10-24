@@ -23,7 +23,7 @@ export function discordConfiguration(env = process.env) {
 }
 
 // Only transient authorization data lives here. Discord access tokens are never persisted.
-export async function exchangeDiscordCode(code, { configuration = discordConfiguration, fetcher = fetch, embedded = false } = {}) {
+export async function exchangeDiscordCode(code, { configuration = discordConfiguration, fetcher = fetch, embedded = false, returnAccessToken = false } = {}) {
   if (typeof code !== "string" || !code || code.length > 2048) throw new Error("DISCORD_INVALID_CODE");
   const config = configuration();
   if (!config.available) throw new Error("DISCORD_UNAVAILABLE");
@@ -41,7 +41,7 @@ export async function exchangeDiscordCode(code, { configuration = discordConfigu
   if (!profileResponse.ok) throw new Error("DISCORD_PROFILE_FAILED");
   const profile = await profileResponse.json();
   if (!/^\d{16,22}$/.test(profile.id) || profile.bot) throw new Error("DISCORD_PROFILE_FAILED");
-  return { id: profile.id, username: String(profile.username ?? "").slice(0, 80) };
+  return { id: profile.id, username: String(profile.username ?? "").slice(0, 80), ...(returnAccessToken ? { accessToken:token.access_token } : {}) };
 }
 
 export function createDiscordOAuth({ configuration = () => discordConfiguration(), fetcher = fetch, now = Date.now, limit = 1000 } = {}) {

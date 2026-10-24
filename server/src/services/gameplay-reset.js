@@ -108,6 +108,15 @@ export function applyPendingGameplayReset({ filename, chatFilename, isRunning = 
             user.cosmetics[type] = [];
             values.forEach((id, position) => { item.run(type, id); inventory.run(user.id, type, id, position); });
           }
+          // A gameplay reset must never destroy cosmetics purchased with premium currency.
+          if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='koin_cosmetic_grants'").get()) {
+            const restore = db.prepare("INSERT OR IGNORE INTO user_inventory(user_id,type,item_id,position) VALUES(?,?,?,?)");
+            for (const grant of db.prepare("SELECT item_type,item_value FROM koin_cosmetic_grants WHERE user_id=?").all(user.id)) {
+              item.run(grant.item_type, grant.item_value);
+              const position = db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS n FROM user_inventory WHERE user_id=? AND type=?").get(user.id, grant.item_type).n;
+              restore.run(user.id, grant.item_type, grant.item_value, position);
+            }
+          }
           update.run(JSON.stringify(user), user.id);
           const initial = { id: randomUUID(), userId: user.id, amount: current.signupTokens, balance: current.signupTokens, reason: "signup-bonus", note: "Réinitialisation globale du casino", createdAt: new Date(now).toISOString() };
           const record = { id: initial.id, user_id: user.id, game_id: null, event_id: null, request_id: null, created_at: initial.createdAt, data: JSON.stringify(initial), amount: initial.amount, balance: initial.balance, reason: initial.reason, day: casinoDateKey(now) };
