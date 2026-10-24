@@ -1,0 +1,229 @@
+.casino-header .casino-header-inner {
+  display: grid;
+  grid-template-columns: auto minmax(40px, 1fr) auto auto;
+  max-width: none;
+  width: 100%;
+  padding: 10px 20px;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+.casino-header .casino-navigation {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  order: initial;
+  padding: 0;
+  gap: 4px;
+}
+.casino-header .casino-navigation > a {
+  flex: 0 0 auto;
+}
+.casino-header .casino-nav-more {
+  flex: 0 0 40px;
+  width: 40px;
+  min-width: 40px;
+  padding: 8px;
+  justify-content: center;
+}
+.casino-nav-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.casino-nav-measure > * {
+  flex: 0 0 auto;
+}
+.casino-header .locale-header {
+  position: static;
+  flex: 0 0 auto;
+}
+.casino-header .casino-accountbar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin: 0;
+}
+.casino-header .identity-pill {
+  max-width: 190px;
+  flex-shrink: 1;
+}
+.casino-header .identity-pill .display-name {
+  min-width: 0;
+  overflow: hidden;
+}
+.casino-header .identity-pill .display-name-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.casino-header .identity-pill .player-name-lines {
+  align-items: stretch;
+  max-width: 100%;
+  overflow: hidden;
+}
+.casino-header .identity-pill .display-name-text {
+  display: block;
+}
+.casino-balance-group {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid var(--site-border, #35413b);
+  border-radius: 6px;
+  background: var(--site-raised, #19231e);
+  font-variant-numeric: tabular-nums;
+}
+.casino-currency-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--site-primary, #edd17f);
+}
+.casino-currency-row > svg,
+.casino-currency-row > img {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+.casino-currency-row small {
+  margin-left: auto;
+  padding-left: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.casino-header button.casino-currency-row {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+  line-height: 1.25;
+}
+.casino-header button.casino-currency-koins {
+  color: #ddbcff;
+}
+.casino-header button.casino-currency-row:hover {
+  background: #ffffff0b;
+  transform: none;
+}
+.casino-header button.casino-currency-row:focus-visible {
+  outline: 2px solid #c499f4;
+  outline-offset: 2px;
+}
+@media (min-width: 761px) and (max-width: 1350px) {
+  .casino-header .casino-header-inner {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .casino-header .casino-accountbar {
+    gap: 6px;
+  }
+  .casino-header .identity-pill {
+    max-width: 165px;
+  }
+  .casino-header .identity-pill .player-game-title {
+    display: none;
+  }
+  .casino-header .daily-bonus-button {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
+    padding: 7px;
+    justify-content: center;
+  }
+  .casino-header .daily-bonus-button > span {
+    display: none;
+  }
+  .casino-header .casino-brand {
+    font-size: 19px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .casino-header .casino-brand-label {
+    display: none;
+  }
+  .casino-header .identity-pill {
+    max-width: 140px;
+  }
+  .casino-header .casino-accountbar .conversation-toggle,
+  .casino-header .notification-center > button,
+  .casino-header .casino-logout {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    flex-basis: 36px;
+    padding: 6px;
+  }
+  .casino-header .casino-management-link {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+  }
+}
+@media (max-width: 760px) {
+  .casino-header .casino-header-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .casino-header .casino-brand {
+    grid-column: 1;
+    grid-row: 1;
+    max-width: none;
+  }
+  .casino-header .locale-header {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .casino-header .casino-navigation {
+    display: none;
+  }
+  .casino-header .casino-accountbar {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: 36px 36px minmax(0, 1fr) auto;
+    grid-template-rows: auto 36px;
+    gap: 6px;
+  }
+  .casino-header .casino-accountbar .identity-pill {
+    grid-column: 1 / 4;
+    grid-row: 1;
+    max-width: none;
+  }
+  .casino-header .casino-balance-group {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: end;
+    padding: 3px 6px;
+  }
+  .casino-header .casino-currency-row {
+    font-size: 12px;
+    gap: 4px;
+    min-height: 19px;
+  }
+  .casino-header .casino-currency-row small {
+    font-size: 9px;
+  }
+  .casino-header .identity-pill .display-name-text {
+    max-width: none;
+  }
+}

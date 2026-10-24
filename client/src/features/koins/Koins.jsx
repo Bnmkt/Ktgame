@@ -12,6 +12,9 @@ import { Dialog } from "../../components/common/Dialog.jsx";
 import { isDiscordActivityLocation } from "../discord/context.js";
 import { connectActivity } from "../discord/runtime.js";
 import "./koins.css";
+import { CompactNumber } from "../../utils/presentation.jsx";
+import { koinsVisible } from "../../navigation/header-layout.js";
+import { validProviderInvoiceLink } from "./document-template.js";
 import {
   koinStatusLabel,
   koinDocumentLabel,
@@ -114,33 +117,37 @@ export async function downloadKoinDocument(id, admin = false) {
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-export function KoinAccess({ user }) {
+export function CurrencyBalances({ user, allowKoins = true }) {
   const state = useKoins(user),
     [open, setOpen] = useState(false);
   const { t } = useLocale();
-  if (
-    user.guest ||
-    user.minor?.restricted ||
-    (!state.balance &&
-      !state.config.shopEnabled &&
-      !state.config.codesEnabled &&
-      !state.config.purchasesEnabled)
-  )
-    return null;
+  const enabled =
+    allowKoins &&
+    !user.guest &&
+    !user.minor?.restricted &&
+    koinsVisible(state.config);
   return (
     <>
-      <button
-        type="button"
-        className="secondary koin-access"
-        onClick={() => setOpen(true)}
-        title={t("Mon portefeuille Koins")}
-      >
-        <KoinIcon />
-        <span>
-          {state.balance.toLocaleString()} <small>Koins</small>
+      <div className="casino-balance-group" aria-label={t("Portefeuilles")}>
+        <span className="casino-currency-row">
+          <Coins size={16} />
+          <CompactNumber value={user.tokens} label={t("Solde exact")} />
+          <small>{t("Jetons")}</small>
         </span>
-      </button>
-      {open && (
+        {enabled && (
+          <button
+            type="button"
+            className="casino-currency-row casino-currency-koins"
+            onClick={() => setOpen(true)}
+            title={t("Mon portefeuille Koins")}
+          >
+            <KoinIcon />
+            <CompactNumber value={state.balance} label={t("Solde exact")} />
+            <small>Koins</small>
+          </button>
+        )}
+      </div>
+      {open && enabled && (
         <Dialog
           title={t("Mes Koins")}
           className="koin-wallet-dialog"
@@ -586,6 +593,11 @@ export function KoinWallet({ user }) {
               <article key={row.id}>
                 <span>{row.providerNumber || row.number}</span>
                 <span>{t(koinDocumentLabel(row.kind))}</span>
+                {validProviderInvoiceLink(row.providerUrl) && (
+                  <a href={row.providerUrl} target="_blank" rel="noreferrer">
+                    {t("Document officiel du fournisseur")}
+                  </a>
+                )}
                 <button
                   type="button"
                   className="secondary"

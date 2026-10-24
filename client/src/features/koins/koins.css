@@ -31,12 +31,6 @@
   width: 18px;
   height: 18px;
 }
-.koin-access {
-  color: #ddbcff;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
 .koin-wallet-dialog.casino-dialog {
   width: min(1050px, calc(100vw - 24px));
   max-height: 92dvh;
