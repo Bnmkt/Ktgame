@@ -6,6 +6,7 @@ import { CosmeticIcon } from "../cosmetics/Cosmetics.jsx";
 import { LanguagePicker , useLocale } from "../../locales/LocaleProvider.jsx";
 import { softBanLimited } from "../../features/accounts/softban.js";
 import { SoundControl } from "../feedback/InterfaceSounds.jsx";
+import { KoinAccess } from "../../features/koins/Koins.jsx";
 
 export function CasinoHeader({ user, siteName, siteIcon, siteIconFramed = true, view, roomCode, eventSlug, tribunalAvailable = false, onNavigate, onLogout, children }) {
   const { t: localeText } = useLocale();
@@ -37,6 +38,7 @@ export function CasinoHeader({ user, siteName, siteIcon, siteIconFramed = true, 
         {destinations.map(link)}
       </nav>
       <div className="casino-accountbar">
+        {!limited("shop") && <KoinAccess user={user}/>}
         {children}
         <button type="button" className="secondary icon-toggle casino-logout" onClick={onLogout} title={localeText("Déconnexion")} aria-label={localeText("Déconnexion")}><LogOut size={18} /></button>
       </div>

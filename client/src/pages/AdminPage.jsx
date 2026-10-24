@@ -15,6 +15,7 @@ import { ServerHealth } from "../components/admin/ServerHealth.jsx";
 import { CapacityTests } from "../components/admin/CapacityTests.jsx";
 import { CommunityEventsAdmin } from "../components/admin/CommunityEventsAdmin.jsx";
 import { CasinoSettings } from "../components/admin/CasinoSettings.jsx";
+import { MonetizationAdmin } from "../components/admin/MonetizationAdmin.jsx";
 import { AchievementsAdmin } from "../components/admin/AchievementsAdmin.jsx";
 import { ParentalApprovals } from "../components/admin/ParentalApprovals.jsx";
 import { Pagination } from "../components/feedback/Feedback.jsx";
@@ -244,6 +245,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
       { value: "locales", label: "Langues et traductions", icon: Languages }
     ] },
     { label: "Administration", items: [
+      { value: "monetization", label: "Monétisation", icon: ShoppingBag },
       { value: "source", label: "Code source", icon: Settings },
       { value: "users", label: "Comptes joueurs", icon: Users, count: data.users.length },
       { value: "tribunal", label: "Tribunal", icon: Scale },
@@ -326,6 +328,7 @@ export function Admin({ user, onBack, onSettingsChange }) {
           <Pagination {...pages} label={localeText("Pages {value0}", { value0: tab === "users" ? "des joueurs" : tab === "games" ? "des jeux" : "de la boutique admin" })} />
         </section>}
 
+        {isAdministrator && tab === "monetization" && <MonetizationAdmin/>}
         {isAdministrator && tab === "parental" && <ParentalApprovals onSettingsChange={(settings) => { setSettingsDraft(settings); setData((current) => ({ ...current, settings })); onSettingsChange?.(settings); }} />}
         {isAdministrator && tab === "tribunal" && <TribunalAdmin reportError={setError} notifySuccess={notifySuccess} />}
         {isAdministrator && tab === "ranked" && <RankedAdmin/>}

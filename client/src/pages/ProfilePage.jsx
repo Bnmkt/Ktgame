@@ -13,6 +13,7 @@ import { memberCardOptions, publicProfileStatOptions } from "../config/site.js";
 import { gameTitle } from "../features/games/config.js";
 import { CompactNumber, achievementTypeLabel, formatDate, formatExactNumber, memberCardStats, transactionLabel } from "../utils/presentation.jsx";
 import { ShopCatalog } from "../components/shop/ShopCatalog.jsx";
+import { KoinWallet, KoinIcon, useKoins, notifyKoins } from "../features/koins/Koins.jsx";
 
 function useLedgerPage(kind, filters, count, step, revision, enabled, onError) {
   const [page, setPage] = useState({ rows: [], total: 0, hasMore: false });
@@ -51,7 +52,8 @@ function ProfileParticipantList({ players = [], winners = [] }) {
 export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchievements }) {
   const { t: localeText } = useLocale();
   const isShop = mode === "shop";
-  const [tab, setTab] = useState(isShop ? "shop" : "account");
+  const [tab, setTab] = useState(isShop ? "shop" : typeof window !== "undefined" && new URLSearchParams(window.location.search).has("koins") ? "koins" : "account");
+  const koins = useKoins(user);
   const [accountSaving, setAccountSaving] = useState("");
   const [form, setForm] = useState({ login: user.login ?? user.pseudo, displayName: user.profile?.displayName ?? user.pseudo, birthDate: user.profile?.birthDate ?? "", gender: user.profile?.gender ?? "", bio: user.profile?.bio ?? "", titleGameId: user.profile?.titleGameId ?? "", titleLevel: user.profile?.titleLevel ?? 0, titleHidden: user.profile?.titleHidden ?? false, rankedBadgeGameId: user.profile?.rankedBadgeGameId ?? "", password: "" });
   const [statForm, setStatForm] = useState({ memberCardStats: user.profileStats?.memberCardStats ?? [user.profileStats?.memberCardStat ?? "winRate", "achievementsUnlocked"], customAchievementIds: user.profileStats?.customAchievementIds ?? [user.profileStats?.customAchievementId ?? "", ""], visibleProfileStats: user.profileStats?.visibleProfileStats ?? publicProfileStatOptions.map(([key]) => key) });
@@ -73,6 +75,9 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
   const [message, setMessage] = useState("");
   const [purchaseConfirmation, setPurchaseConfirmation] = useState(null);
   const [purchasePending, setPurchasePending] = useState(false);
+  const confirmationCurrency = purchaseConfirmation?.[purchaseConfirmation.kind]?.currency ?? "tokens";
+  const confirmationBalance = confirmationCurrency === "koins" ? koins.balance : user.tokens;
+  const currencyLabel = confirmationCurrency === "koins" ? "Koins" : localeText("jetons");
   const [smallRockOpen, setSmallRockOpen] = useState(false);
   const [smallRockStartedAt, setSmallRockStartedAt] = useState(0);
   const [smallRockNow, setSmallRockNow] = useState(Date.now());
@@ -194,11 +199,12 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     });
   }
 
-  async function purchase(itemId) {
+  async function purchase(itemId, currency = "tokens") {
     setError("");
     setMessage("");
     try {
-      const result = await api("/api/shop/purchase", { method: "POST", body: JSON.stringify({ itemId }) });
+      const result = await api("/api/shop/purchase", { method: "POST", body: JSON.stringify({ itemId, currency }) });
+      notifyKoins();
       const updated = result.user ?? result;
       setUser(updated);
       onAchievements?.(result.achievementUnlocks ?? []);
@@ -215,7 +221,8 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     setError("");
     setMessage("");
     try {
-      const result = await api("/api/shop/purchase-pack", { method: "POST", body: JSON.stringify({ packId: pack.packId, itemIds: pack.itemIds }) });
+      const result = await api("/api/shop/purchase-pack", { method: "POST", body: JSON.stringify({ packId: pack.packId, itemIds: pack.itemIds, currency: pack.currency ?? "tokens" }) });
+      notifyKoins();
       setUser(result.user);
       onAchievements?.(result.achievementUnlocks ?? []);
       await reloadLedger();
@@ -231,7 +238,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
     if (!purchaseConfirmation || purchasePending) return;
     setPurchasePending(true);
     const completed = purchaseConfirmation.kind === "item"
-      ? await purchase(purchaseConfirmation.item.id)
+      ? await purchase(purchaseConfirmation.item.id, purchaseConfirmation.item.currency)
       : await purchasePack(purchaseConfirmation.pack);
     setPurchasePending(false);
     if (completed) setPurchaseConfirmation(null);
@@ -338,6 +345,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
             <button className={tab === "achievements" ? "active" : ""} onClick={() => setTab("achievements")}><BadgeCheck size={18} />{" " + localeText("Succès")}</button>
             <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}><Trophy size={18} />{" " + localeText("Historique")}</button>
             <button className={tab === "transactions" ? "active" : ""} onClick={() => setTab("transactions")}><ReceiptText size={18} />{" " + localeText("Transactions")}</button>
+            {!user.guest && !user.minor?.restricted && <button className={tab === "koins" ? "active" : ""} onClick={() => setTab("koins")}><KoinIcon/> Koins</button>}
           </nav>}
           <div className={isShop ? "shop-page-content" : "profile-content"}>
           {tab === "account" && <AccountWorkspace user={user} form={form} setForm={setForm} favorites={favorites} games={games} toggleFavorite={toggleFavorite} statForm={statForm} setStatForm={setStatForm} milestones={milestoneAchievements} onPreview={() => openPublicProfile(user.id)} onSave={savePublicInfo} onSaveEmail={saveEmail} onSavePassword={savePassword} saving={accountSaving} onUser={setUser} onError={setError} onMessage={setMessage} />}
@@ -381,6 +389,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
             {!historyPage.loading && !filteredHistory.length && <div className="empty-state">{localeText("Aucune partie ne correspond aux filtres.")}</div>}
             {historyPage.hasMore && <button type="button" disabled={historyPage.loading} className="secondary admin-load-more" onClick={() => setHistoryLimit((value) => value + 40)}>{localeText("Afficher 40 parties supplémentaires")}</button>}
           </>}
+          {tab === "koins" && !user.guest && !user.minor?.restricted && <KoinWallet user={user}/>}
           {tab === "transactions" && <>
             <div className="profile-ledger-heading"><div><span className="eyebrow">{localeText("Portefeuille")}</span><h2>{localeText("Transactions de jetons")}</h2><p>{localeText("Achats, mises, gains et bonus sont regroupés dans un journal filtrable.")}</p></div><strong>{transactionPage.total}{" " + localeText("résultat")}{transactionPage.total > 1 ? localeText("s") : ""}</strong></div>
             <div className="admin-transaction-summary profile-transaction-summary"><button type="button" className={transactionFilters.event === "all" ? "active" : ""} onClick={() => { setTransactionFilters({ ...transactionFilters, event: "all" }); setTransactionLimit(60); }}><span>{localeText("Toutes")}</span><strong><CompactNumber value={statistics?.transactions ?? 0} /></strong></button><button type="button" className={transactionFilters.event === "daily-claim" ? "active bonus" : "bonus"} onClick={() => { setTransactionFilters({ ...transactionFilters, event: "daily-claim" }); setTransactionLimit(60); }}><span>{localeText("Bonus quotidiens")}</span><strong><CompactNumber value={dailyClaims} /></strong></button><div><span>{localeText("Crédits affichés")}</span><strong className="positive"><CompactNumber prefix="+" value={filteredTransactions.filter((row) => row.amount > 0).reduce((sum, row) => sum + row.amount, 0)} label={localeText("Crédits exacts")} /></strong></div><div><span>{localeText("Débits affichés")}</span><strong className="negative"><CompactNumber prefix="−" value={Math.abs(filteredTransactions.filter((row) => row.amount < 0).reduce((sum, row) => sum + row.amount, 0))} label={localeText("Débits exacts")} /></strong></div></div>
@@ -397,9 +406,9 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
         <div className="shop-confirmation-icon"><ShoppingBag size={28} /></div>
         <span className="eyebrow">{localeText("Confirmation d’achat")}</span>
         <h2>{purchaseConfirmation.kind === "item" ? purchaseConfirmation.item.name : purchaseConfirmation.pack.name}</h2>
-        <p>{purchaseConfirmation.kind === "item" ? <>{localeText("Débloquer et équiper cet élément pour") + " "}<strong><CompactNumber value={purchaseConfirmation.item.price} label={localeText("Prix exact")} />{" " + localeText("jetons")}</strong> ?</> : <>{localeText("Acheter les") + " "}<strong>{purchaseConfirmation.pack.count}{" " + localeText("éléments")}</strong>{" " + localeText("sélectionnés pour") + " "}<strong><CompactNumber value={purchaseConfirmation.pack.total} label={localeText("Prix exact")} />{" " + localeText("jetons")}</strong>{purchaseConfirmation.pack.discount ? localeText(" avec {value0}% de réduction", { value0: purchaseConfirmation.pack.discount }) : ""} ?</>}</p>
-        <div className="shop-confirmation-balance"><span>{localeText("Solde actuel")}<strong><CompactNumber value={user.tokens} label={localeText("Solde exact")} /></strong></span><span>{localeText("Après achat")}<strong><CompactNumber value={Math.max(0, Number(user.tokens) - (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) : purchaseConfirmation.pack.total))} label={localeText("Solde prévisionnel exact")} /></strong></span></div>
-        <div className="actions"><button type="button" disabled={purchasePending || (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) > Number(user.tokens) : purchaseConfirmation.pack.total > Number(user.tokens))} onClick={confirmPurchase}><Coins size={18} /> {purchasePending ? localeText("Achat en cours…") : localeText("Confirmer l’achat")}</button><button type="button" className="secondary" disabled={purchasePending} onClick={() => setPurchaseConfirmation(null)}>{localeText("Annuler")}</button></div>
+        <p>{purchaseConfirmation.kind === "item" ? <>{localeText("Débloquer et équiper cet élément pour")} <strong>{purchaseConfirmation.item.price} {currencyLabel}</strong> ?</> : <>{localeText("Acheter les")} <strong>{purchaseConfirmation.pack.count} {localeText("éléments")}</strong> {localeText("sélectionnés pour")} <strong>{purchaseConfirmation.pack.total} {currencyLabel}</strong>{purchaseConfirmation.pack.discount ? localeText(" avec {value0}% de réduction", { value0: purchaseConfirmation.pack.discount }) : ""} ?</>}</p>
+        <div className="shop-confirmation-balance"><span>{localeText("Solde actuel")}<strong>{confirmationBalance} {currencyLabel}</strong></span><span>{localeText("Après achat")}<strong>{Math.max(0, Number(confirmationBalance) - (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) : purchaseConfirmation.pack.total))} {currencyLabel}</strong></span></div>
+        <div className="actions"><button type="button" disabled={purchasePending || (purchaseConfirmation.kind === "item" ? Number(purchaseConfirmation.item.price) > Number(confirmationBalance) : purchaseConfirmation.pack.total > Number(confirmationBalance))} onClick={confirmPurchase}>{confirmationCurrency === "koins" ? <KoinIcon/> : <Coins size={18}/>} {purchasePending ? localeText("Achat en cours…") : localeText("Confirmer l’achat")}</button><button type="button" className="secondary" disabled={purchasePending} onClick={() => setPurchaseConfirmation(null)}>{localeText("Annuler")}</button></div>
       </div></ModalBackdrop>}
       {smallRockOpen && <ModalBackdrop className="modal-backdrop secret-rock-backdrop" onClick={() => setSmallRockOpen(false)}><div className="modal secret-rock-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-title-row"><div><small>{localeText("Anomalie temporelle")}</small><h2>{localeText("Une petite pierre")}</h2></div><button className="secondary icon-toggle" onClick={() => setSmallRockOpen(false)} aria-label={localeText("Fermer")}><X size={18} /></button></div>

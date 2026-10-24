@@ -8,6 +8,8 @@ import { usePagination } from "../common/usePagination.js";
 import { CompactNumber, shopCategoryLabel } from "../../utils/presentation.jsx";
 import { shopPackDefinitions } from "../../utils/shop-packs.js";
 import { defaultCatalogFilters, filterShopItems, ownsShopItem, pricePack } from "../../features/shop/catalog.js";
+import { KoinIcon, useKoins } from "../../features/koins/Koins.jsx";
+import { cosmeticPrice } from "../../features/koins/pricing.js";
 import { Mascot } from "../mascots/Mascot.jsx";
 import "./catalog.css";
 
@@ -33,14 +35,20 @@ export function ShopCatalog({ user, items, stats, onPurchaseItem, onPurchasePack
   const [theme, setTheme] = useState("");
   const [selection, setSelection] = useState([]);
   const [previewId, setPreviewId] = useState("");
+  const koins = useKoins(user);
+  const [chosenCurrency, setCurrency] = useState("tokens");
+  const currency = koins.config.shopEnabled ? chosenCurrency : "tokens";
+  const balance = currency === "koins" ? (koins.blocked ? 0 : koins.balance) : user.tokens;
+  const CurrencyIcon = currency === "koins" ? KoinIcon : Coins;
+  const purchasableItems = items.filter(item => item.rewardOnly || cosmeticPrice(item, currency) !== null).map(item => ({ ...item, price: cosmeticPrice(item, currency) ?? item.price, currency }));
   const change = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   const definitions = shopPackDefinitions(items);
-  const filtered = filterShopItems(items, user, filters, definitions);
+  const filtered = filterShopItems(purchasableItems, { ...user, tokens: balance }, filters, definitions);
   const themes = Object.keys(definitions).filter((id) => filtered.some((item) => item.packs?.includes(id)));
   const effectiveTheme = themes.includes(theme) ? theme : themes[0];
   const matching = mode === "items" ? filtered : filtered.filter((item) => item.packs?.includes(effectiveTheme));
   const pages = usePagination(matching, JSON.stringify([mode, filters, effectiveTheme]), 12);
-  const selected = items.filter((item) => item.packs?.includes(effectiveTheme) && selection.includes(item.id) && !item.rewardOnly && !ownsShopItem(user, item));
+  const selected = purchasableItems.filter((item) => item.packs?.includes(effectiveTheme) && selection.includes(item.id) && !item.rewardOnly && !ownsShopItem(user, item));
   const pricing = pricePack(selected);
   const preview = matching.find((item) => item.id === previewId) ?? matching[0];
   const chooseTheme = (id) => { setTheme(id); setSelection([]); setPreviewId(""); };
@@ -52,6 +60,7 @@ export function ShopCatalog({ user, items, stats, onPurchaseItem, onPurchasePack
     setSelection((previous) => previous.includes(item.id) ? previous.filter((id) => id !== item.id) : [...previous, item.id]);
   };
   return <div className="catalog-workspace">
+    {koins.config.shopEnabled && <div className="koin-currency-picker segmented-tabs" aria-label={localeText("Monnaie")}><button type="button" className={currency === "tokens" ? "active" : ""} onClick={() => { setCurrency("tokens"); setSelection([]); }}><Coins size={18}/>{localeText("Jetons")} · {Number(user.tokens).toLocaleString()}</button><button type="button" className={currency === "koins" ? "active" : ""} onClick={() => { setCurrency("koins"); setSelection([]); }}><KoinIcon/>Koins · {koins.balance.toLocaleString()}</button></div>}
     <nav className="catalog-mode" aria-label={localeText("Catalogue")}><button className={mode === "items" ? "active" : ""} type="button" onClick={() => setMode("items")} aria-pressed={mode === "items"}><ShoppingBag size={18} />{localeText("Objets")}</button><button className={mode === "packs" ? "active" : ""} type="button" onClick={() => setMode("packs")} aria-pressed={mode === "packs"}><Boxes size={18} />{localeText("Packs")}</button><Mascot cycle="collection" className="catalog-host" docked/></nav>
     <div className="catalog-filters">
       <label className="catalog-search"><span>{localeText("Recherche")}</span><div><Search size={17} /><input type="search" value={filters.search} onChange={(event) => change("search", event.target.value)} placeholder={localeText("Nom, collection…")} /></div></label>
@@ -73,12 +82,12 @@ export function ShopCatalog({ user, items, stats, onPurchaseItem, onPurchasePack
           return <article className={`catalog-item ${preview?.id === item.id ? "is-previewed" : ""} ${checked ? "is-selected" : ""}`} key={item.id}>
             <button type="button" className="catalog-preview-action" title={localeText("Aperçu : {value0}", { value0: item.name })} aria-label={localeText("Aperçu : {value0}", { value0: item.name })} onClick={() => setPreviewId(item.id)}><ItemVisual item={item} user={user} /><span><Eye size={14} />{localeText("Aperçu")}</span></button>
             <div className="catalog-item-description"><small>{localeText(shopTypeLabel(item.type))} · {localeText(shopCategoryLabel(item.category))}</small><h3>{localeText(item.name)}</h3><p>{localeText(item.description)}</p></div>
-            <div className="catalog-item-purchase"><span>{item.rewardOnly ? <><Trophy size={16} />{localeText("Succès requis")}</> : <><CompactNumber value={item.price} label={localeText("Prix exact")} /><Coins size={16} /></>}</span>{mode === "packs" ? <label className="catalog-item-check"><input type="checkbox" checked={checked} disabled={owned || item.rewardOnly} onChange={() => toggle(item)} /><span>{owned ? localeText("Acquis") : item.rewardOnly ? localeText("Récompense") : localeText("Choisir")}</span></label> : <button type="button" disabled={owned || item.rewardOnly || Number(item.price) > Number(user.tokens)} className={owned || item.rewardOnly ? "secondary" : ""} onClick={() => onPurchaseItem(item)}>{owned ? <Check size={16} /> : <ShoppingBag size={16} />}{owned ? localeText("Acquis") : item.rewardOnly ? localeText("Récompense") : localeText("Acheter")}</button>}</div>
+            <div className="catalog-item-purchase"><span>{item.rewardOnly ? <><Trophy size={16} />{localeText("Succès requis")}</> : <><CompactNumber value={item.price} label={localeText("Prix exact")} /><CurrencyIcon size={16} /></>}</span>{mode === "packs" ? <label className="catalog-item-check"><input type="checkbox" checked={checked} disabled={owned || item.rewardOnly} onChange={() => toggle(item)} /><span>{owned ? localeText("Acquis") : item.rewardOnly ? localeText("Récompense") : localeText("Choisir")}</span></label> : <button type="button" disabled={owned || item.rewardOnly || Number(item.price) > Number(balance)} className={owned || item.rewardOnly ? "secondary" : ""} onClick={() => onPurchaseItem(item)}>{owned ? <Check size={16} /> : <ShoppingBag size={16} />}{owned ? localeText("Acquis") : item.rewardOnly ? localeText("Récompense") : localeText("Acheter")}</button>}</div>
           </article>;
         })}</div>
         {!matching.length && <div className="catalog-empty"><ShoppingBag size={24} /><h3>{localeText("Aucun objet dans cette sélection")}</h3><button type="button" className="secondary" onClick={() => setFilters({ ...defaultCatalogFilters, ownership: "all" })}>{localeText("Afficher tout le catalogue")}</button></div>}
         {matching.length > 0 && <Pagination {...pages} pageSizes={[12, 24, 48]} label={localeText("Pages du catalogue")} />}
-        {mode === "packs" && <section className="catalog-checkout"><div><span>{selected.length}{" " + localeText("objet")}{selected.length > 1 ? localeText("s") : ""}{" " + localeText("sélectionné")}{selected.length > 1 ? localeText("s") : ""}</span>{pricing.discount > 0 && <del><CompactNumber value={pricing.subtotal} /></del>}<strong><CompactNumber value={pricing.total} label={localeText("Total exact")} /><Coins size={18} /></strong></div><button type="button" disabled={!selected.length || pricing.total > Number(user.tokens)} onClick={() => onPurchasePack({ ...pricing, packId: effectiveTheme, name: definitions[effectiveTheme]?.name, itemIds: selected.map((item) => item.id), count: selected.length })}><ShoppingBag size={17} />{localeText("Acheter la sélection")}</button></section>}
+        {mode === "packs" && <section className="catalog-checkout"><div><span>{selected.length}{" " + localeText("objet")}{selected.length > 1 ? localeText("s") : ""}{" " + localeText("sélectionné")}{selected.length > 1 ? localeText("s") : ""}</span>{pricing.discount > 0 && <del><CompactNumber value={pricing.subtotal} /></del>}<strong><CompactNumber value={pricing.total} label={localeText("Total exact")} /><CurrencyIcon size={18} /></strong></div><button type="button" disabled={!selected.length || pricing.total > Number(balance)} onClick={() => onPurchasePack({ ...pricing, currency, packId: effectiveTheme, name: definitions[effectiveTheme]?.name, itemIds: selected.map((item) => item.id), count: selected.length })}><ShoppingBag size={17} />{localeText("Acheter la sélection")}</button></section>}
       </div>
       <aside className="catalog-preview">{preview ? <><div className="catalog-preview-heading"><Eye size={17}/><span>{localeText("Aperçu")}</span></div><button type="button" className="catalog-profile-surface" onClick={() => onPreviewProfile?.(preview)} disabled={!onPreviewProfile} aria-label={`${localeText("Profil public")} · ${localeText(preview.name)}`}><CosmeticPreview user={user} item={preview} stats={stats} /><span><Eye size={17}/>{localeText("Profil public")}</span></button><h3>{localeText(preview.name)}</h3><span>{localeText(shopTypeLabel(preview.type))} · {localeText(shopCategoryLabel(preview.category))}</span></> : <span>{localeText("Aucun aperçu")}</span>}</aside>
     </div>

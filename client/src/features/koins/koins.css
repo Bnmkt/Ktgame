@@ -1,0 +1,189 @@
+.koin-symbol {
+  color: #c499f4;
+  flex-shrink: 0;
+}
+.koin-custom-symbol {
+  object-fit: contain;
+}
+.koin-offer-artwork {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: 160px;
+  object-fit: contain;
+}
+.koin-offer-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  line-height: 1.5;
+}
+.koin-records small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.koin-admin-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.koin-admin-controls input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+.koin-access {
+  color: #ddbcff;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.koin-wallet-dialog.casino-dialog {
+  width: min(1050px, calc(100vw - 24px));
+  max-height: 92dvh;
+  overflow: auto;
+}
+.koin-wallet-heading,
+.koin-wallet-heading > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.koin-wallet-heading {
+  justify-content: space-between;
+}
+.koin-wallet-heading strong {
+  color: #ddbcff;
+  font-size: 24px;
+}
+.koin-workspace {
+  min-width: 0;
+}
+.koin-workspace > p {
+  line-height: 1.6;
+}
+.koin-test-mode {
+  color: #e8c777;
+  border-left: 3px solid #e8c777;
+  padding: 8px 12px;
+}
+.koin-offers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+  margin-block: 20px;
+}
+.koin-offers > article {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #78608c;
+  border-radius: 6px;
+  background: var(--site-card, #1b2826);
+}
+.koin-offers .koin-offer-description {
+  flex: 1;
+}
+.koin-offers article > span:last-of-type {
+  margin-top: auto;
+}
+.koin-offers h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.koin-offers strong {
+  font-size: 24px;
+  color: #ddbcff;
+}
+.koin-terms {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.koin-terms input {
+  width: 18px;
+  height: 18px;
+}
+.koin-code-form {
+  display: grid;
+  gap: 16px;
+  max-width: 620px;
+  margin-block: 22px;
+}
+.koin-code-form label {
+  display: grid;
+  gap: 8px;
+}
+.koin-records {
+  display: grid;
+  gap: 0;
+  margin-block: 16px;
+}
+.koin-records > article {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--site-border, #4b584f);
+}
+.koin-records > article > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.koin-price-fields {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 20px;
+}
+.koin-price-fields label {
+  display: grid;
+  gap: 7px;
+}
+.koin-price-fields input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+.koin-price-fields > label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+.koin-admin-tabs {
+  margin-block: 20px;
+}
+.koin-admin-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+}
+.koin-admin-fields label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.koin-admin-fields input,
+.koin-admin-fields textarea {
+  width: 100%;
+  min-width: 0;
+}
+.koin-admin-offer {
+  padding-block: 20px;
+  border-bottom: 1px solid var(--site-border, #4b584f);
+}
+.koin-admin-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+.koin-generated-codes {
+  width: 100%;
+  min-height: 260px;
+  font-family: monospace;
+}
