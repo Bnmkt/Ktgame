@@ -61,6 +61,18 @@
 .catalog-item-purchase { padding: 12px 14px; border-top: 1px solid #36483a; display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
 .catalog-item-purchase > span { display: flex; gap: 6px; align-items: center; color: #e2cc82; font-size: 12px; font-weight: 700; }
 .catalog-item-purchase button { padding: 7px 9px; font-size: 11px; }
+.catalog-purchase-options { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.catalog-purchase-options > button { display: flex; flex: 1 1 110px; align-items: center; justify-content: center; gap: 6px; min-height: 42px; min-width: 0; }
+.catalog-purchase-options small { font-size: 10px; }
+.catalog-purchase-options .catalog-buy-koins { background: #67418b; color: #fff2ff; border-color: #b899d8; }
+.catalog-buy-koins .koin-symbol { color: #f2dfff; }
+.catalog-price-options { display: flex; flex-wrap: wrap; gap: 10px; color: #e2cc82; font-size: 12px; }
+.catalog-price-options > span { display: inline-flex; align-items: center; gap: 5px; }
+.catalog-item-purchase .catalog-owned { color: #a7dec2; }
+.catalog-currency-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; margin: 0; padding: 10px 12px; border: 1px solid #566455; border-radius: 5px; }
+.catalog-currency-filters legend { color: #c6c9b1; font-size: 12px; padding-inline: 4px; }
+.catalog-filters .catalog-currency-filters label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; }
+.catalog-currency-filters input { width: 17px; height: 17px; min-height: 17px; margin: 0; accent-color: #d9b454; }
 .catalog-item-check { display: flex; flex-direction: row; align-items: center; gap: 7px; font-size: 12px; color: #e7ead7; }
 .catalog-collection-picker { display: block; max-width: 420px; }
 .catalog-collection-heading { display: flex; gap: 18px; justify-content: space-between; align-items: center; margin-top: 22px; padding-bottom: 14px; border-bottom: 1px solid #444f3d; }
@@ -76,6 +88,11 @@
 .catalog-checkout del { font-size: 12px; color: #aab89d; }
 .catalog-checkout strong { display: flex; gap: 6px; align-items: center; font-size: 18px; color: #edda89; }
 .catalog-checkout button { font-size: 12px; flex-shrink: 0; }
+.catalog-checkout { flex-wrap: wrap; }
+.catalog-checkout .catalog-purchase-options { flex: 1 1 260px; width: auto; }
+.catalog-checkout .catalog-purchase-options > button > span { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; color: inherit; }
+.catalog-checkout .catalog-purchase-options del { font-size: 10px; color: inherit; opacity: .75; }
+.catalog-checkout-hint { flex-basis: 100%; margin: 0; color: #e2cc82; font-size: 12px; line-height: 1.5; }
 .catalog-preview { position: sticky; top: 20px; min-width: 0; }
 .shop-shell .catalog-preview { top: 84px; padding: 16px; border: 2px solid var(--site-border, #514b38); border-top: 4px solid var(--site-primary, #e8c777); border-radius: 6px; background: #101a18; box-shadow: 0 6px 0 #06100d; }
 .catalog-preview-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--site-primary, #e8c777); font-size: 12px; font-weight: 800; text-transform: uppercase; }
@@ -102,4 +119,5 @@
 @media (max-width: 420px) { .catalog-items { grid-template-columns: minmax(0, 1fr); } .catalog-visual { height: 128px; } }
 @media (max-width: 620px) { .shop-shell .catalog-items { grid-template-columns: minmax(0, 1fr); } .shop-shell .page-heading h1 { font-size: 27px; } .shop-shell .shop-page-panel { padding: 14px; } }
 @media (max-width: 620px) { .catalog-mode .catalog-host { width: 70px; height: 76px; flex-basis: 70px; } .catalog-mode button { padding-inline: 12px; } }
+@media (max-width: 480px) { .catalog-mode .catalog-host { display: none; } .catalog-mode { padding-top: 12px; gap: 6px; flex-wrap: wrap; } .catalog-mode button { padding-inline: 10px; font-size: 12px; } .catalog-currency-filters { grid-column: 1 / -1; } }
 @media (prefers-reduced-motion: reduce) { .shop-shell .catalog-item { transition: none; } .shop-shell .catalog-item:hover, .shop-shell .catalog-item:focus-within { transform: none; } }
