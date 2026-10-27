@@ -5173,5 +5173,11 @@
   "Scores des joueurs": "Player scores",
   "Objectif : {value0} pts": "Target: {value0} pts",
   "Points cumulés": "Total points",
-  "Points non encore validés": "Points not yet banked"
+  "Points non encore validés": "Points not yet banked",
+  "Lance les dés, puis choisis une case dans la feuille de score.": "Roll the dice, then choose a category on the score sheet.",
+  "Les dés sélectionnés suivent ton mode de sélection. Valide ta figure pour terminer le tour.": "Selected dice follow your selection mode. Confirm your combination to end the turn.",
+  "Figures et combinaisons": "Patterns and combinations",
+  "Dés gardés": "Kept dice",
+  "Possible": "Possible",
+  "Lancer les dés": "Roll the dice"
 }

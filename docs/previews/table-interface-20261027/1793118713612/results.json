@@ -1,0 +1,41 @@
+{
+  "blocker": "Ghostery (EasyList + EasyPrivacy)",
+  "checks": [
+    "farkle: layouts, blocker, selection, 3D, fullscreen",
+    "yahtzee: layouts, blocker, selection, 3D, fullscreen",
+    "cul-de-chouette: layouts, blocker, selection, 3D, fullscreen",
+    "texas-holdem: layouts, blocker, selection, 3D, fullscreen"
+  ],
+  "requests": [
+    {
+      "type": "roll",
+      "keepIndexes": [
+        0
+      ]
+    },
+    {
+      "type": "score",
+      "category": "chance"
+    },
+    {
+      "type": "bank"
+    },
+    {
+      "type": "select",
+      "indexes": [
+        0
+      ]
+    },
+    {
+      "type": "bank"
+    },
+    {
+      "type": "call"
+    },
+    {
+      "type": "raise",
+      "amount": 300
+    }
+  ],
+  "errors": []
+}

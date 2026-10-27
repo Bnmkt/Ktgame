@@ -5240,5 +5240,11 @@
   "Scores des joueurs": "Scores des joueurs",
   "Objectif : {value0} pts": "Objectif : {value0} pts",
   "Points cumulés": "Points cumulés",
-  "Points non encore validés": "Points non encore validés"
+  "Points non encore validés": "Points non encore validés",
+  "Lance les dés, puis choisis une case dans la feuille de score.": "Lance les dés, puis choisis une case dans la feuille de score.",
+  "Les dés sélectionnés suivent ton mode de sélection. Valide ta figure pour terminer le tour.": "Les dés sélectionnés suivent ton mode de sélection. Valide ta figure pour terminer le tour.",
+  "Figures et combinaisons": "Figures et combinaisons",
+  "Dés gardés": "Dés gardés",
+  "Possible": "Possible",
+  "Lancer les dés": "Lancer les dés"
 }

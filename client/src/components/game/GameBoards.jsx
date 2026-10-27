@@ -11,45 +11,50 @@ import { farkleCombos, farkleSelectionScore, farkleSuggestions, shutTileCombinat
 import { CompactNumber, formatExactNumber } from "../../utils/presentation.jsx";
 import { Dialog } from "../common/Dialog.jsx";
 import { useCompactLayout } from "../common/useCompactLayout.js";
+import { TableActionBar } from "../room/TableInterface.jsx";
 
-export function FarkleBoard({ state, user, onAction, rollLocked = false }) {
+export function FarkleBoard({ state, user, onAction, rollLocked = false, showGuide = true }) {
   const { t: localeText } = useLocale();
-  const compact = useCompactLayout();
   const [selected, setSelected] = useState([]);
   const current = state.players[state.currentPlayerIndex];
   const isMyTurn = current?.id === user.id;
   const selectedDice = selected.map((index) => state.dice[index]).filter(Boolean);
   const preview = farkleSelectionScore(selectedDice);
-  const banked = state.scores?.[user.id] ?? 0;
+  const banked = state.scores?.[current?.id] ?? 0;
   const entryScore = state.modifiers?.entryScore ?? 0;
   const entryMissing = banked === 0 && state.turnScore < entryScore;
-  const progress = Math.min(100, Math.round((banked / (state.target || 10000)) * 100));
   const suggestions = farkleSuggestions(state.dice);
 
   useEffect(() => { setSelected([]); }, [state.currentPlayerIndex, state.dice.join("-"), state.turnScore]);
 
   return <section className={`farkle-table ${isMyTurn ? "active" : "spectating"}`}>
-    <header className="farkle-heading"><div><span className="eyebrow">{localeText("Tour à risque")}</span><h2>{isMyTurn ? localeText("Construis ton coup") : localeText("{value0} construit son coup", { value0: current?.pseudo ?? "Un joueur" })}</h2><p>{localeText("Sélectionne uniquement les dés qui forment une combinaison, puis encaisse ou relance les autres.")}</p></div><div className="farkle-target"><span>{localeText("Objectif")}</span><strong><CompactNumber value={state.target} suffix={localeText(" pts")} label={localeText("Objectif exact")} /></strong><div><i style={{ width: `${progress}%` }} /></div><small><CompactNumber value={banked} suffix={localeText(" sécurisés")} label={localeText("Score sécurisé exact")} /></small></div></header>
+
     <div className="farkle-dashboard">
       <section className="farkle-play-zone">
-        <div className="farkle-score-strip"><span><small>{localeText("Score sécurisé")}</small><strong><CompactNumber value={banked} label={localeText("Score exact")} /></strong></span><span className="turn-bank"><small>{localeText("En jeu ce tour")}</small><strong><CompactNumber value={state.turnScore} prefix="+" label={localeText("Score exact du tour")} /></strong></span><span><small>{localeText("Dés à relancer")}</small><strong>{state.remainingDice || 6}</strong></span></div>
+        <div className="farkle-score-strip"><span><small>{localeText("Score sécurisé")}</small><strong><CompactNumber value={banked} label={localeText("Score exact")} /></strong></span><span className="turn-bank"><small>{localeText("En jeu ce tour")}</small><strong><CompactNumber value={state.turnScore} prefix="+" label={localeText("Score exact du tour")} /></strong></span><span><small>{localeText("Dés à relancer")}</small><strong>{state.remainingDice || 6}</strong></span><span><small>{localeText("Objectif")}</small><strong><CompactNumber value={state.target} suffix={localeText(" pts")}/></strong></span></div>
         <div className={`farkle-dice-stage ${state.bust ? "bust" : ""}`}>
           <DiceThrowTray label={localeText("Piste de risque")} caption={localeText("{value0} dé{value1} disponibles", { value0: state.remainingDice || 6, value1: (state.remainingDice || 6) > 1 ? "s" : "" })}>{(state.dice.length ? state.dice : Array(state.remainingDice || 6).fill(null)).map((die, index) => <Die key={`${index}-${die ?? "empty"}-${state.turnScore}`} value={die} kept={selected.includes(index)} selectionLabel={localeText("À marquer")} skin={current?.cosmetics?.equipped?.diceSkin ?? user.cosmetics?.equipped?.diceSkin ?? "default"} onClick={isMyTurn && !state.bust ? () => setSelected((values) => values.includes(index) ? values.filter((value) => value !== index) : [...values, index]) : undefined} />)}</DiceThrowTray>
           {state.bust ? <div className="farkle-bust"><AlertTriangle /><div><strong>{localeText("Aucune combinaison possible")}</strong><span>{localeText("Les points accumulés ce tour sont perdus. Confirme le score nul pour passer la main.")}</span></div></div> : state.dice.length ? <div className={`farkle-selection-readout ${selected.length && !preview.valid ? "invalid" : preview.valid ? "valid" : ""}`}><CircleDot /><span><small>{localeText("Sélection actuelle")}</small><strong>{localeText(preview.label)}</strong></span><b>{preview.valid ? `+${preview.points}` : "—"}</b></div> : <div className="farkle-decision-tip"><ShieldCheck /><span><strong>{state.turnScore ? localeText("Encaisser ou prendre le risque ?") : localeText("Lance les six dés")}</strong><small>{state.turnScore ? localeText("Encaisser sécurise le tour. Relancer peut tout faire perdre.") : localeText("Premier encaissement requis : {value0} points.", { value0: entryScore })}</small></span></div>}
         </div>
-        <div className="farkle-actions">
+        <TableActionBar className="farkle-actions">
           {state.bust ? <button className="danger-button" disabled={!isMyTurn} onClick={() => onAction({ type: "forfeit" })}><AlertTriangle size={18} />{" " + localeText("Terminer le tour · 0 point")}</button> : <>
             <button data-request-feedback="state" aria-busy={rollLocked} className={rollLocked ? "roll-cooldown" : ""} disabled={!isMyTurn || state.dice.length > 0 || rollLocked} onClick={() => onAction({ type: "roll" })}><Dices size={18} />{" " + localeText("Lancer") + " "}{state.remainingDice || 6}{" " + localeText("dé")}{(state.remainingDice || 6) > 1 ? localeText("s") : ""}</button>
             <button className="secondary" disabled={!isMyTurn || !state.dice.length || !preview.valid} onClick={() => onAction({ type: "select", indexes: selected })}>{localeText("Marquer la sélection") + " "}{preview.valid ? `· +${preview.points}` : ""}</button>
             <button disabled={!isMyTurn || !state.turnScore || state.dice.length > 0 || entryMissing} title={entryMissing ? localeText("Atteins {value0} points pour entrer dans la partie", { value0: formatExactNumber(entryScore) }) : localeText("Sécuriser exactement {value0} points", { value0: formatExactNumber(state.turnScore) })} onClick={() => onAction({ type: "bank" })}><Banknote size={18} />{" " + localeText("Encaisser") + " "}<CompactNumber value={state.turnScore} /></button>
           </>}
-        </div>
+        </TableActionBar>
         {!state.bust && state.dice.length > 0 && suggestions.length > 0 && <div className="farkle-suggestions"><span>{localeText("Combinaisons détectées")}</span>{suggestions.map((suggestion) => <button type="button" className={suggestion.indexes.every((index) => selected.includes(index)) && selected.length === suggestion.indexes.length ? "active" : "secondary"} disabled={!isMyTurn} onClick={() => setSelected(suggestion.indexes)} key={`${suggestion.values.join("-")}-${suggestion.points}`}><strong>{localeText(suggestion.label)}</strong><small>{suggestion.values.join(" · ")} · +{suggestion.points}</small></button>)}</div>}
         {entryMissing && state.turnScore > 0 && <p className="farkle-entry-warning"><AlertTriangle size={16} />{" " + localeText("Encore") + " "}{Math.max(0, entryScore - state.turnScore)}{" " + localeText("points avant de pouvoir entrer au score.")}</p>}
       </section>
-      <details className="farkle-combo-guide" open={!compact}><summary>{localeText("Combinaisons possibles")}</summary><small>{localeText("Les combinaisons à six dés déclenchent les « dés chauds » : tu relances les six.")}</small><div className="farkle-combo-grid">{farkleCombos.map((combo) => <article key={combo.id}><div className="farkle-mini-dice">{combo.dice.map((die, index) => <Die value={die} kept={false} animate={false} skin="default" key={`${combo.id}-${index}`} />)}</div><span><strong>{localeText(combo.label)}</strong><small>{combo.points}</small></span></article>)}</div></details>
+      {showGuide && <FarkleGuide/>}
     </div>
   </section>;
+}
+
+export function FarkleGuide({ expanded = false }) {
+  const { t: localeText } = useLocale();
+  const compact = useCompactLayout();
+  return <details className="farkle-combo-guide" open={expanded || !compact}><summary>{localeText("Combinaisons possibles")}</summary><small>{localeText("Les combinaisons à six dés déclenchent les « dés chauds » : tu relances les six.")}</small><div className="farkle-combo-grid">{farkleCombos.map((combo) => <article key={combo.id}><div className="farkle-mini-dice">{combo.dice.map((die, index) => <Die value={die} kept={false} animate={false} skin="default" key={`${combo.id}-${index}`} />)}</div><span><strong>{localeText(combo.label)}</strong><small>{combo.points}</small></span></article>)}</div></details>;
 }
 
 export function LiarsDiceBoard({ state, user, onAction }) {

@@ -1,6 +1,6 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Coins, Dice5, Landmark, Spade, Swords, Trophy, X } from "lucide-react";
 import { Die, PlayingCard } from "./GamePieces.jsx";
 import { gameRules, ruleDiceExamples } from "../../config/site.js";
@@ -129,7 +129,7 @@ export function yahtzeePotentialScore(dice = [], category) {
   return sum;
 }
 
-export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, label = "Mise" }) {
+export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INTEGER, label = "Mise", compact = false }) {
   const { t: localeText } = useLocale();
   const finiteMax = Number.isFinite(max) && max < Number.MAX_SAFE_INTEGER;
   const clamp = (next) => Math.min(max, Math.max(min, Math.floor(Number(next) || 0)));
@@ -137,8 +137,9 @@ export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INT
   function adjust(delta) {
     onChange(clamp(numeric + delta));
   }
-  const minusSteps = [-100, -10, -1];
-  const plusSteps = [1, 10, 100];
+  const minusSteps = compact ? [-1] : [-100, -10, -1];
+  const plusSteps = compact ? [1] : [1, 10, 100];
+  const ExtraControls = compact ? "details" : Fragment;
   return (
     <div className="bet-stepper">
       <div className="bet-stepper-head">
@@ -167,6 +168,8 @@ export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INT
           ))}
         </div>
       </div>
+      <ExtraControls {...(compact ? { className: "table-bet-options" } : {})}>
+      {compact && <><summary>{localeText("Réglage rapide de la mise")}</summary><div className="bet-mouse-controls">{[-100, -10, 10, 100].map((step) => <button type="button" className="secondary" key={step} onClick={() => adjust(step)}>{step > 0 ? "+" : ""}{step}</button>)}</div></>}
       <div className="bet-mouse-controls" aria-label={localeText("Réglage rapide de la mise")}>
         <button type="button" className="secondary" onClick={() => onChange(min)}>{localeText("Minimum")}</button>
         <button type="button" className="secondary" onClick={() => onChange(clamp(Math.max(min, Math.floor(numeric / 2))))}>÷ 2</button>
@@ -174,6 +177,7 @@ export function StepperBet({ value, onChange, min = 0, max = Number.MAX_SAFE_INT
         {finiteMax && <button type="button" className="secondary" onClick={() => onChange(max)}>{localeText("Maximum")}</button>}
       </div>
       {finiteMax && max > min && <label className="bet-range-input"><span className="sr-only">{localeText(label)}{" " + localeText("à la souris")}</span><input type="range" min={min} max={max} step={Math.max(1, Math.floor((max - min) / 100))} value={numeric} onChange={(event) => onChange(clamp(event.target.value))} /></label>}
+      </ExtraControls>
     </div>
   );
 }

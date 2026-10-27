@@ -7,12 +7,18 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createServer } from "node:net";
 import { DatabaseSync } from "node:sqlite";
+import jwt from "../../server/node_modules/jsonwebtoken/index.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const folder = mkdtempSync(path.join(tmpdir(), "ktga-rooms-events-"));
 const database = path.join(folder, "test.sqlite");
 const db = new DatabaseSync(database);
 db.exec("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL); INSERT INTO meta VALUES ('legacy-json-migrated','true');");
+db.exec("CREATE TABLE users(id TEXT PRIMARY KEY, data TEXT NOT NULL, pseudo TEXT NOT NULL, email TEXT, guest INTEGER)");
+for (const [id, pseudo] of [["owner", "bnmkt"], ["player", "Camille"], ["offline", "Alex"]]) {
+  const account = { id, pseudo, email: `${id}@tests.invalid`, active: true, guest: false, admin: id === "owner", tokens: 10000, passwordHash: "unused-fixture-hash", passwordPolicyVersion: 1, emailVerifiedAt: new Date().toISOString(), profile: { birthDate: "1990-01-01" }, createdAt: new Date().toISOString() };
+  db.prepare("INSERT INTO users VALUES(?,?,?,?,0)").run(id, JSON.stringify(account), pseudo, account.email);
+}
 db.close();
 async function freePort() { const socket = createServer(); socket.listen(0, "127.0.0.1"); await once(socket, "listening"); const port = socket.address().port; await new Promise((resolve) => socket.close(resolve)); return port; }
 const apiPort = await freePort();
@@ -39,9 +45,11 @@ try {
   await waitFor(`${apiRoot}/api/health`);
   start([path.join(root, "client/node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(clientPort), "--strictPort"], path.join(root, "client"), { VITE_BASE_PATH: "/ktga/", VITE_API_URL: apiRoot, VITE_SOCKET_URL: `http://127.0.0.1:${apiPort}`, VITE_SOCKET_PATH: "/ktga/socket.io" });
   await waitFor(`${base}/`);
-  const owner = await api("/auth/register", null, { email: "bnmkt@tests.invalid", pseudo: "bnmkt", password: "test-password", birthDate: "1990-01-01", termsVersion: "2026-09-27" });
-  const player = await api("/auth/register", null, { email: "camille@tests.invalid", pseudo: "Camille", password: "test-password", birthDate: "1990-01-01", termsVersion: "2026-09-27" });
-  const offline = await api("/auth/register", null, { email: "alex@tests.invalid", pseudo: "Alex", password: "test-password", birthDate: "1990-01-01", termsVersion: "2026-09-27" });
+  const fixtureAccount = async (id) => {
+    const token = jwt.sign({ id, guest: false, sessionVersion: 0 }, "isolated-test-only-secret", { expiresIn: "1h" });
+    return { token, user: await api("/me", token) };
+  };
+  const owner = await fixtureAccount("owner"), player = await fixtureAccount("player"), offline = await fixtureAccount("offline");
   const initialAdmin = await api("/admin", owner.token);
   const updatedSettings = await api("/admin/settings", owner.token, { siteIcon: "crown" }, "PATCH");
   assert.equal(updatedSettings.siteIcon, "crown");
@@ -76,7 +84,7 @@ try {
   await guest.locator(".room-table-tools").waitFor();
   await guest.getByRole("button", { name: "Je suis prêt", exact: true }).click();
   await host.getByRole("button", { name: "Démarrer la partie", exact: true }).click();
-  await host.getByRole("heading", { name: "Manche en cours" }).waitFor();
+  await host.locator(".table-hud").waitFor();
   const rollButton = host.locator('button[data-request-feedback="state"]').filter({ hasText: "Lancer" }).first();
   await rollButton.waitFor();
   await host.route("**/api/rooms/*/action", async (route) => { await new Promise((resolve) => setTimeout(resolve, 350)); await route.continue(); }, { times: 1 });
@@ -88,9 +96,12 @@ try {
   await firstRollResponse;
   await host.waitForFunction((button) => !button.disabled, await rollButton.elementHandle());
   assert.equal(await rollButton.evaluate((button) => button.classList.contains("roll-cooldown")), false);
+  await host.waitForFunction(() => [...document.querySelectorAll(".dice-solid-scene")].every((node) => node.dataset.diceMotion === "settled"));
+  await host.waitForTimeout(300);
   const rerollResponse = host.waitForResponse((response) => response.url().includes(`/api/rooms/${room.code}/action`) && response.request().method() === "POST");
   await rollButton.click();
-  await rerollResponse;
+  const reroll = await (await rerollResponse).json();
+  assert.ok(reroll.state, JSON.stringify(reroll));
   await host.waitForFunction((button) => !button.disabled, await rollButton.elementHandle());
   await host.waitForTimeout(750);
   const continuousAnimations = await host.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running" && animation.effect?.getTiming().iterations === Infinity).map((animation) => animation.animationName));
@@ -100,6 +111,23 @@ try {
   assert.deepEqual(await host.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running" && animation.effect?.getTiming().iterations === Infinity).map((animation) => animation.animationName)), []);
   await host.screenshot({ path: path.join(folder, "room-performance-fullscreen.png") });
   await host.getByRole("button", { name: "Réduire", exact: true }).click();
+  if (process.argv.includes("--tables-only")) {
+    await guest.locator(".table-hud").waitFor();
+    assert.equal(reroll.state.rollsLeft, 1);
+    await guest.waitForFunction(() => [...document.querySelectorAll(".table-stats > div")].find((node) => node.querySelector("dt")?.textContent === "Lancers restants")?.querySelector("dd")?.textContent === "1");
+    await host.locator(".table-panel > summary").filter({ hasText: "Informations de la table" }).click();
+    await host.getByTitle("Exclure ce joueur", { exact: true }).click();
+    let confirmation = host.getByRole("dialog", { name: "Exclure ce joueur ?" });
+    await confirmation.getByRole("button", { name: "Annuler", exact: true }).click();
+    assert.equal((await api(`/rooms/${room.code}`, owner.token)).players.length, 2);
+    await host.getByTitle("Exclure ce joueur", { exact: true }).click();
+    confirmation = host.getByRole("dialog", { name: "Exclure ce joueur ?" });
+    await confirmation.getByRole("button", { name: "Exclure", exact: true }).click();
+    await guest.getByRole("dialog", { name: "Vous avez été exclu", exact: true }).waitFor();
+    assert.equal((await api(`/rooms/${room.code}`, owner.token)).players.length, 1);
+    assert.deepEqual(errors, []);
+    console.log(JSON.stringify({ ok: true, screenshots: folder, checks: ["protected-room", "two-browser-join", "ready-and-start", "live-rolls", "request-lock", "idle-performance", "fullscreen", "in-game-exclusion", "recipient-socket-event"] }));
+  } else {
   await host.getByRole("navigation", { name: "Navigation du casino" }).getByRole("button", { name: "Amis", exact: true }).click();
   const friends = host.getByRole("dialog", { name: "Amis", exact: true });
   await friends.getByRole("button", { name: "Rejoindre Camille", exact: true }).waitFor();
@@ -114,6 +142,7 @@ try {
   assert.equal((await api("/friends", owner.token)).friends.length, 2);
   await host.screenshot({ path: path.join(folder, "friends.png") });
   await friends.getByRole("button", { name: "Fermer", exact: true }).click();
+  await host.locator(".table-panel > summary").filter({ hasText: "Informations de la table" }).click();
   await host.getByTitle("Exclure ce joueur", { exact: true }).click();
   let confirm = host.getByRole("dialog", { name: "Exclure ce joueur ?" });
   assert.match(await confirm.innerText(), /manche est en cours/);
@@ -238,6 +267,7 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, screenshots: folder, checks: ["protected-room", "live-friend-presence", "friend-delete-confirmation", "in-game-exclusion", "recipient-only-notification", "casino-settings", "admin-metrics-tab", "event-rules", "dice-card-stages", "dice-card-combination-editor", "combination-persistence", "mobile"] }));
+  }
 } catch (error) {
   for (const [index, context] of (browser?.contexts() ?? []).entries()) {
     const page = context.pages()[0];
