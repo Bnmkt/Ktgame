@@ -8,27 +8,30 @@ import { diceScoreRows } from "../../features/games/dice-scoreboard.js";
 import { yahtzeePotentialScore, yahtzeeTotal, yahtzeeUpperTotal } from "../game/GameSupport.jsx";
 import { tableRoundInfo } from "../../features/games/table-interface.js";
 import "./table-interface.css";
+import "./table-stage.css";
 
 // Presentation only. Actions and room synchronization remain owned by Room.
 export function TableHud({ room, state, userId }) {
   const { t } = useLocale();
   const current = state.players[state.currentPlayerIndex];
   const poker = state.gameId === "texas-holdem";
+  const blackjack = state.gameId === "blackjack";
+  const round = tableRoundInfo(state);
   const scores = diceScoreRows(state, userId, state.gameId === "yahtzee" ? yahtzeeTotal : undefined);
   return <section className="table-hud" aria-label={t("Informations de la table")}>
-    <dl className="table-hud-facts">
-      <div><dt>{t("Jeu")}</dt><dd>{t(gameTitle(room.gameId))}</dd></div>
-      <div><dt>{t("Joueur actif")}</dt><dd>{state.finished ? t("Partie terminée") : room.pacing ? t("Tour en cours") : current?.pseudo ?? "—"}</dd></div>
+    <div className="table-hud-top"><header className="table-board-heading"><h2>{poker || blackjack ? <Spade size={25}/> : <Dices size={25}/>} {t(gameTitle(room.gameId))}</h2></header><dl className="table-hud-facts">
+      <div><dt>{t(round.label)}</dt><dd>{t(round.value)}</dd></div>
+      <div><dt>{t(blackjack ? "Actions simultanées" : "Joueur actif")}</dt><dd>{state.finished ? t("Partie terminée") : blackjack ? t("Contre le croupier") : current?.pseudo ?? "—"}</dd></div>
       <div><dt>{t("Joueurs")}</dt><dd>{state.players.length}{poker && room.maxPlayers ? ` / ${room.maxPlayers}` : ""}</dd></div>
-      <div><dt>{t(poker ? "Blindes" : room.ranked ? "Partie classée" : "Mise par joueur")}</dt><dd>{poker ? `${state.smallBlind} / ${state.bigBlind}` : room.ranked ? <><Trophy size={15}/>{t("Classé")}</> : <CompactNumber value={room.stake} suffix={t(" jetons")}/>}</dd></div>
-    </dl>
+      <div><dt>{t(poker ? "Blindes" : blackjack ? "Limites de mise" : room.ranked ? "Partie classée" : "Mise par joueur")}</dt><dd>{poker ? `${state.smallBlind} / ${state.bigBlind}` : blackjack ? `${state.modifiers?.minimumBet ?? 50} – ${state.modifiers?.maximumBet ?? 100}` : room.ranked ? <><Trophy size={15}/>{t("Classé")}</> : <CompactNumber value={room.stake} suffix={t(" jetons")}/>}</dd></div>
+    </dl></div>
     {!poker && <div className="table-hud-players">{state.players.map((player, index) => {
-      const active = !state.finished && index === state.currentPlayerIndex;
+      const active = !state.finished && (blackjack ? !player.isBot && !state.completedPlayerIds?.includes(player.id) : index === state.currentPlayerIndex);
       const score = scores.find((row) => row.player.id === player.id);
       return <article className={`table-hud-player ${active ? "table-player-current" : ""}`} key={player.id} aria-current={active ? "true" : undefined}>
         {player.id === room.ownerId && <Crown className="table-player-crown" size={18} aria-label={t("Maître")}/>}
         <DisplayName user={player}/>{player.isBot && <small className="table-player-kind">{t("IA")}</small>}
-        {score && <strong className="table-player-points"><CompactNumber value={score.score}/><small>{t("pts")}</small></strong>}
+        {(score || blackjack) && <strong className="table-player-points"><CompactNumber value={blackjack ? player.tokens ?? 0 : score.score}/><small>{t(blackjack ? "jetons" : "pts")}</small></strong>}
         {active && <span className="table-player-turn"><Play size={10} fill="currentColor"/>{t(player.id === userId && !room.pacing ? "À toi de jouer" : "Tour en cours")}</span>}
       </article>;
     })}</div>}
@@ -50,8 +53,7 @@ export function TableTurnFocus({ state, userId, pacing }) {
     : state.gameId === "farkle" ? "Sélectionne uniquement les dés qui forment une combinaison, puis encaisse ou relance les autres."
     : "Les dés sélectionnés suivent ton mode de sélection. Valide ta figure pour terminer le tour.";
   return <section className={`table-turn-focus ${mine ? "table-turn-self" : ""}`} role="status" aria-live="polite">
-    {current && <DisplayName user={current}/>}
-    <div><strong>{t(state.finished ? "Partie terminée" : pacing ? "Tour en cours" : mine ? "À toi de jouer" : "En attente du joueur actif")}</strong>{!state.finished && <small>{t(hint)}</small>}</div>
+    <Play size={16} fill={mine ? "currentColor" : "none"}/><div><strong>{t(state.finished ? "Partie terminée" : pacing ? "Tour en cours" : mine ? "À toi de jouer" : "En attente du joueur actif")}</strong>{!state.finished && <small>{t(hint)}</small>}</div>
   </section>;
 }
 
@@ -88,7 +90,7 @@ export function TableYahtzeeSheet({ state, canAct, onChoose }) {
   return <section className="table-score-sheet" aria-label={t("Feuille de score")}>
     <header><h2>{t("Feuille de score")}</h2><small>{current?.pseudo}</small></header>
     <div className="table-sheet-columns"><span>{t("Catégorie")}</span><span>{t("Score")}</span><span>{t("Possible")}</span></div>
-    {scoreCategories.map(([key, label], index) => {
+    <div className="table-sheet-rows">{scoreCategories.map(([key, label], index) => {
       const used = scores[key] !== undefined;
       const potential = yahtzeePotentialScore(state.dice ?? [], key);
       return <div key={key}>
@@ -97,7 +99,7 @@ export function TableYahtzeeSheet({ state, canAct, onChoose }) {
           <span>{used && <span className="table-sheet-check" aria-hidden="true">✓</span>}{t(label)}</span><strong>{scores[key] ?? "—"}</strong><span>{used ? "✓" : potential === null ? "—" : `+${potential}`}</span>
         </button>
       </div>;
-    })}
+    })}</div>
     <footer><span>{t("Score total")}</span><strong>{yahtzeeTotal(scores)}</strong></footer>
   </section>;
 }

@@ -1,0 +1,278 @@
+/* Second pass: a single HUD, a large playfield and a compact command dock. */
+.room-app-shell.table-interface { max-width: 1920px; padding: 8px 20px 12px; }
+.table-interface .room-heading h1 { font-size: 14px; color: #ccdbd3; }
+.table-interface .room-table-tools { margin: 5px 0 10px; }
+.table-hud { padding: 11px 14px; border-color: #cbd9c133; background: linear-gradient(115deg, #102326fa, #09151bfa); }
+.table-hud-top { display: flex; align-items: center; gap: 20px; }
+.table-hud-top > .table-board-heading { flex: 1 0 auto; }
+.table-hud .table-board-heading h2 { font-size: clamp(21px, 1.8vw, 30px); }
+.table-hud .table-hud-facts { display: flex; align-items: center; gap: 20px; }
+.table-hud .table-hud-facts > div { padding: 0 0 0 16px; border: 0; border-left: 1px solid #bcd9c22b; border-radius: 0; background: none; }
+.table-hud .table-hud-facts dt { font-size: 11px; text-transform: none; margin-bottom: 3px; color: #a9c0b4; }
+.table-hud .table-hud-facts dd, .table-hud .table-hud-facts > div:first-child dd { font-size: 14px; letter-spacing: 0; }
+.table-hud .table-hud-players { display: flex; gap: 18px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #a6c9b51c; overflow-x: auto; }
+.table-hud .table-hud-player { flex: 0 1 260px; min-width: 170px; padding: 3px 0 3px 10px; border: 0; border-left: 3px solid transparent; border-radius: 0; background: none; box-shadow: none; gap: 7px; }
+.table-hud .table-player-current { border-left-color: var(--table-mint); }
+.table-hud .table-hud-player .cosmetic-icon { width: 30px; height: 30px; flex-basis: 30px; }
+.table-hud .table-player-points { display: flex; align-items: baseline; gap: 4px; min-width: 0; font-size: 21px; }
+.table-hud .table-player-points > small { font-size: 11px; }
+.table-hud .table-player-turn { position: static; transform: none; background: none; color: var(--table-mint); padding: 0; font-size: 0; }
+.table-hud .table-player-turn svg { width: 12px; height: 12px; }
+.table-interface .board > .board-felt { background: radial-gradient(ellipse at 50% 30%, #126b4d, #06382d 85%); }
+.room-app-shell.table-interface[data-table-game="texas-holdem"] .board > .board-felt { background: radial-gradient(ellipse at 50% 40%, #0a3b32, #041b1af5 80%); }
+.table-interface .table-turn-focus { display: flex; grid-template-columns: none; gap: 10px; padding: 0 0 10px; border: 0; border-bottom: 1px solid #bddbb929; border-radius: 0; background: none; }
+.table-interface .table-turn-focus > svg { color: var(--table-mint); flex-shrink: 0; }
+.table-interface .table-turn-focus > div { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.table-interface .table-turn-focus > div > strong { font-size: 22px; }
+.table-interface .table-turn-focus small { font-size: 13px; max-width: 700px; }
+.table-interface .table-stats, .table-interface .farkle-score-strip { display: flex; gap: 18px; margin: 0; padding-block: 2px 8px; border-bottom: 1px solid #bddbb929; }
+.table-interface .table-stats > div, .table-interface .farkle-score-strip > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 0; border: 0; border-radius: 0; background: none; }
+.table-interface .table-stats dt, .table-interface .farkle-score-strip small { font-size: 12px; color: #bdd5c8; }
+.table-interface .table-stats dd, .table-interface .farkle-score-strip strong { font-size: 24px; }
+.table-interface .table-stats > div:last-child { margin-left: auto; }
+.table-interface .dice-mode-toggle { justify-self: end; border: 0; background: none; padding: 0; min-height: 30px; }
+.table-interface .dice-mode-toggle > span:first-child { display: none; }
+.table-interface .dice-mode-choice > small { font-size: 11px; }
+.room-app-shell.table-interface .dice-throw-tray { min-height: 0; padding: 7px; border-radius: 22px; display: flex; flex-direction: column; background: linear-gradient(145deg, #75451d, #25190e 48%, #91642d); box-shadow: inset 0 0 0 2px #edc46e42, 0 12px 24px #0005; }
+.table-interface .dice-throw-tray-label { padding: 3px 10px 9px; min-height: 28px; }
+.table-interface .dice-throw-tray-label strong { font-size: 12px; letter-spacing: .04em; }
+.table-interface .dice-throw-tray-label small { font-size: 12px; }
+.room-app-shell.table-interface .dice-throw-surface { flex: 1; min-height: 180px; padding: 22px; background: radial-gradient(ellipse at center, #14634a, #032b24 80%); }
+.room-app-shell.table-interface .dice-throw-tray .dice-throw-surface > .dice-row { max-width: 900px; gap: clamp(14px, 2vw, 30px); }
+.room-app-shell.table-interface .dice-throw-tray .dice-row .die.dice-solid-control { width: min(var(--table-die-size, 120px), 100%); min-width: 0; min-height: 0; height: auto; aspect-ratio: 1; }
+.table-interface[data-table-game="cul-de-chouette"] { --table-die-size: 156px; }
+.table-interface[data-table-game="cul-de-chouette"] .dice-throw-surface > .dice-row { max-width: 650px; }
+.table-interface .dice-throw-tray .die.kept { outline-color: #78fac1; outline-offset: 7px; }
+.table-interface .dice-throw-tray .die.selected-reroll { outline: 2px dashed #f5d983; }
+.table-interface .dice-throw-tray .die.dice-solid-control.kept::after { border-color: #68f4ac; box-shadow: 0 0 16px #3fffa05c; }
+.table-interface .dice-throw-tray .die.dice-solid-control.selected-reroll::after { border-color: #e6c772; box-shadow: none; }
+.table-interface .dice-throw-tray .kept-label { font-size: 11px; }
+.table-interface .table-action-bar { padding: 10px 0 0; gap: 10px; }
+.table-interface .table-action-bar > button { min-height: 58px; font-size: 17px; padding: 10px 18px; }
+.table-interface .table-action-bar small { font-size: 12px; }
+.room-app-shell.table-interface button.table-command-main { background: linear-gradient(#09a76c, #045a3d); border-color: #63e9ac; color: #f0fff4; box-shadow: inset 0 1px #ffffff38, 0 3px 12px #001e1655; }
+.room-app-shell.table-interface button.table-command-gold { background: linear-gradient(#f9d976, #b48125); border-color: #f9d976; color: #201a0b; }
+.room-app-shell.table-interface button.table-command-hold { background: linear-gradient(#963843, #50232c); border-color: #c35a64; color: #fff0ef; }
+.table-interface .table-action-bar > button:disabled { background: #234139; color: #9eaea2; border-color: #77978844; box-shadow: none; opacity: .5; }
+.table-interface .table-action-bar > button:not(:disabled):active { transform: translateY(1px); }
+.table-interface .table-panel > summary { min-height: 42px; padding: 12px 14px; font-size: 14px; }
+.table-interface .table-panel-content { font-size: 13px; line-height: 1.5; }
+.table-interface .table-panel-content .score-table { font-size: 13px; }
+.table-interface .table-sheet-columns { font-size: 12px; }
+.table-interface .table-sheet-choice { min-height: 34px; padding: 8px; font-size: 13px; }
+.table-interface .table-sheet-choice:not(:disabled) { background: linear-gradient(90deg, #25503940, transparent); border-left: 2px solid #69d5aa50; }
+.table-interface .table-sheet-choice:not(:disabled):hover, .table-interface .table-sheet-choice:focus-visible { background: #1e6046; box-shadow: inset 3px 0 #7bffc2; }
+.table-interface .table-sheet-choice.table-sheet-used { opacity: .65; border-left: 2px solid transparent; }
+.table-interface .table-sheet-choice > span:last-child { font-size: 15px; }
+.table-interface .table-sheet-subtotal { padding: 8px; margin-block: 4px; }
+.table-interface .table-score-sheet > footer { padding: 10px; font-size: 14px; }
+.table-interface .farkle-suggestions { display: flex; flex-wrap: nowrap; overflow-x: auto; margin-top: 8px; gap: 7px; padding-bottom: 2px; }
+.table-interface .farkle-suggestions > span { display: none; }
+.table-interface .farkle-suggestions button { flex: 0 0 auto; min-height: 44px; padding: 6px 10px; font-size: 13px; }
+.table-interface .farkle-suggestions button small { font-size: 11px; }
+.table-interface .farkle-selection-readout, .table-interface .farkle-decision-tip { background: none; border: 0; border-bottom: 1px solid #b2cfb323; border-radius: 0; padding: 8px 2px; }
+.table-interface .farkle-selection-readout small, .table-interface .farkle-decision-tip small { font-size: 12px; }
+.table-interface .farkle-mini-dice { display: none; }
+.table-interface .farkle-combo-grid article { grid-template-columns: 1fr; min-height: 38px; padding: 8px 6px; background: none; border: 0; border-bottom: 1px solid #ffffff15; border-radius: 0; }
+.table-interface .farkle-combo-grid article > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.table-interface .farkle-combo-guide > small { font-size: 12px; }
+.table-interface .cul-controls .result-line { border: 1px solid #79ebb471; border-radius: 9px; padding: 10px 14px; margin: 0; color: #a0ffd1; font-size: 17px; background: #023c2d; }
+.table-interface .dice-selection-help { font-size: 12px; }
+.table-interface .table-roll-history > summary { font-size: 12px; }
+.table-interface .table-completion { flex: 0 0 auto; font-size: 13px; }
+.table-interface .table-completion > summary { padding: 8px; cursor: pointer; color: var(--table-gold); }
+.table-interface .table-completion[open] { max-height: 240px; overflow: auto; }
+.blackjack-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.blackjack-history li { display: grid; gap: 3px; padding-bottom: 9px; border-bottom: 1px solid #ffffff13; }
+.blackjack-history strong { color: var(--table-gold); }
+
+/* A broad felt table with real occupied seats and room capacity indicators. */
+.blackjack-stage { display: flex; flex-direction: column; min-height: 0; gap: 12px; }
+.blackjack-playfield { position: relative; display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 360px; padding: 10px 18px 12px; }
+.blackjack-playfield::before { content: ""; position: absolute; inset: 45px 4px 0; border: 5px solid #ae8743; border-radius: 48% 48% 22% 22% / 28% 28% 18% 18%; background: radial-gradient(ellipse at 50% 20%, #14674b, #05392d 85%); box-shadow: inset 0 0 0 2px #dfc27833, inset 0 0 80px #001b14b3, 0 0 0 6px #332620, 0 10px 24px #0005; pointer-events: none; }
+.blackjack-dealer { position: relative; z-index: 1; display: grid; gap: 8px; justify-items: center; padding: 10px 16px; min-width: 180px; border: 1px solid #d8b35c73; border-radius: 10px; background: #061e1deb; }
+.blackjack-dealer > header { display: flex; align-items: center; gap: 9px; font-size: 14px; }
+.blackjack-dealer > header > svg { color: var(--table-gold); }
+.blackjack-stage .card-row { overflow: visible; margin: 0; padding: 0; gap: 7px; }
+.room-app-shell.table-interface .blackjack-dealer .playing-card { width: 76px; min-width: 76px; height: 108px; padding: 6px; }
+.blackjack-hand-total { display: inline-flex; justify-content: center; align-items: center; min-width: 34px; min-height: 30px; padding: 3px 8px; border: 1px solid var(--table-line); border-radius: 20px; background: #061c1c; color: #fff1cc; font-size: 18px; font-weight: 850; }
+.blackjack-table-print { position: relative; display: grid; gap: 4px; justify-items: center; color: #cae4b8a8; padding: 12px 0; }
+.blackjack-table-print > strong { font-family: Georgia, serif; font-size: clamp(22px, 3vw, 40px); letter-spacing: .13em; }
+.blackjack-table-print > span { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+.blackjack-table-print > small { font-size: 12px; color: #aed0b0; }
+.blackjack-places { position: relative; width: 100%; display: flex; justify-content: center; align-items: end; gap: clamp(8px, 1.5vw, 25px); z-index: 1; }
+.blackjack-place { position: relative; display: grid; justify-items: center; align-content: end; gap: 6px; min-width: 0; flex: 0 1 220px; padding: 10px; border: 1px solid #a2c3a935; border-radius: 44% 44% 10px 10px; background: radial-gradient(ellipse at center, #004c2c3d, #001e1b7d); }
+.blackjack-place-self { flex-basis: 250px; }
+.blackjack-place-current { border-color: #9af8ae; box-shadow: inset 0 0 24px #40e98518, 0 0 20px #6dff9b27; }
+.blackjack-place .blackjack-hand-total { position: absolute; right: 8px; top: 8px; z-index: 2; }
+.blackjack-player-cards { container-type: inline-size; width: 100%; justify-content: center; min-height: 110px; align-items: end; }
+.room-app-shell.table-interface .blackjack-player-cards .playing-card { --blackjack-piece-width: min(var(--blackjack-card-size), calc((100cqw + (var(--blackjack-hand-count) - 1) * 14px) / var(--blackjack-hand-count))); width: var(--blackjack-piece-width); min-width: 0; height: calc(var(--blackjack-piece-width) * 1.42); flex-shrink: 0; padding: 6px; }
+.blackjack-player-cards .playing-card + .playing-card { margin-left: -14px; }
+.blackjack-player-cards .playing-card > strong { font-size: clamp(14px, calc(100cqw / var(--blackjack-hand-count) * .32), 28px); }
+.blackjack-player-cards .playing-card > span { font-size: clamp(18px, calc(100cqw / var(--blackjack-hand-count) * .42), 36px); }
+.blackjack-place-identity { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 8px; border-radius: 8px; background: #04181af0; }
+.blackjack-place-identity .display-name { min-width: 0; font-size: 14px; }
+.blackjack-place-identity .cosmetic-icon { width: 28px; height: 28px; flex: 0 0 28px; }
+.blackjack-place-identity > strong { display: inline-flex; align-items: center; gap: 4px; color: var(--table-gold); font-size: 15px; }
+.blackjack-player-state, .blackjack-result { font-size: 12px; color: #bcd8c5; }
+.blackjack-result { color: #b9ffb8; font-weight: 800; }
+.blackjack-result-loss { color: #ffb3af; }
+.blackjack-result-tie { color: #f5d58c; }
+.room-app-shell.table-interface .blackjack-result { animation: blackjack-result-in 260ms ease-out both !important; }
+@keyframes blackjack-result-in { from { opacity: .2; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.blackjack-empty-place { position: relative; display: grid; justify-items: center; align-content: center; gap: 9px; color: #9dc8ad7d; border: 1px solid #b7dcc329; border-radius: 50%; flex: 0 1 170px; min-height: 120px; padding: 14px; font-size: 12px; }
+.blackjack-empty-hand { display: grid; place-items: center; min-height: 70px; color: #a8c6b8; font-size: 13px; }
+.blackjack-command-dock { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 12px; background: #06181cf5; border: 1px solid var(--table-line); border-radius: 10px; }
+.blackjack-command-dock > .table-action-bar { flex: 1; min-width: 0; padding-top: 0; }
+.blackjack-command-dock .table-action-bar > button { flex-basis: 110px; min-height: 62px; }
+.blackjack-bet-choice { display: flex; align-items: center; flex: 1 1 360px; gap: 12px; }
+.blackjack-bet-choice .bet-stepper { flex: 1; min-width: 190px; padding: 8px; }
+.blackjack-bet-presets { display: flex; flex-wrap: wrap; gap: 5px; }
+.blackjack-bet-presets > button { min-height: 36px; font-size: 12px; }
+.blackjack-bet-readout { display: flex; align-items: center; gap: 9px; color: var(--table-gold); }
+.blackjack-bet-readout > span { display: grid; gap: 3px; font-size: 12px; }
+.blackjack-bet-readout strong { font-size: 25px; }
+.blackjack-extra-actions { flex: 0 0 auto; font-size: 12px; }
+.blackjack-extra-actions > summary { cursor: pointer; padding: 10px; }
+.blackjack-extra-actions[open] { display: flex; }
+.blackjack-waiting { font-size: 14px; color: #c0d3c7; margin: 0; }
+
+@media (min-width: 1100px) and (min-height: 560px) {
+  .room-app-shell.table-interface.room-playing { height: var(--table-view-height, calc(100dvh - 72px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr); }
+  .room-app-shell.table-interface.room-playing:has(> .error) { grid-template-rows: auto auto auto minmax(0, 1fr); }
+  .room-app-shell.table-interface .layout { height: 100%; min-height: 0; grid-template-columns: minmax(0, 1fr) clamp(280px, 22vw, 350px); gap: 14px; }
+  .room-app-shell.table-interface .layout > section { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .table-interface .table-hud { flex: 0 0 auto; }
+  .room-app-shell.table-interface .board { flex: 1 1 auto; margin: 0; min-height: 0; }
+  .room-app-shell.table-interface .board > .board-felt { height: 100%; padding: 13px; gap: 10px; grid-template-rows: auto minmax(0, 1fr); border-width: 2px; }
+  .room-app-shell.table-interface .board-felt:has(> .table-roll-history) { grid-template-rows: auto auto minmax(0, 1fr); }
+  .table-interface .yahtzee-controls { min-height: 0; gap: 7px; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .table-interface .cul-controls { min-height: 0; gap: 6px; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+  .table-interface .cul-controls:not(:has(.result-line)) { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .room-app-shell.table-interface .yahtzee-roll-row { min-height: 0; }
+  .room-app-shell.table-interface .dice-throw-surface { min-height: 0; }
+  .table-interface .farkle-table, .table-interface .farkle-dashboard { height: 100%; min-height: 0; }
+  .table-interface .farkle-play-zone { display: flex; height: 100%; min-height: 0; flex-direction: column; }
+  .table-interface .farkle-dice-stage { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-top: 10px; gap: 3px; }
+  .table-interface .farkle-dice-stage > .dice-throw-tray { flex: 1; width: 100%; }
+  .table-interface .farkle-selection-readout, .table-interface .farkle-decision-tip { flex-shrink: 0; }
+  .table-interface .farkle-actions { flex: 0 0 auto; padding-top: 0; margin-top: 7px; }
+  .table-interface .farkle-entry-warning { margin: 5px 0 0; font-size: 12px; }
+  .room-app-shell.table-interface .room-side-panels { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: thin; }
+  .table-interface .table-panel { flex: 0 0 auto; }
+  .table-interface .table-panel-content { max-height: min(430px, 52dvh); overflow: auto; }
+  .table-interface .table-score-sheet { flex: 1 1 auto; min-height: 200px; display: flex; flex-direction: column; }
+  .table-interface .table-sheet-rows { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+  .table-interface[data-table-game="texas-holdem"] .board > .board-felt, .table-interface[data-table-game="blackjack"] .board > .board-felt { display: flex; flex-direction: column; padding: 10px; }
+  .table-interface[data-table-game="texas-holdem"] .poker-table { min-height: 0; height: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .table-interface[data-table-game="texas-holdem"] .poker-play-area { min-height: 230px; flex: 1; padding: 65px 110px; }
+  .table-interface .poker-play-area::before { inset: 35px 24px; }
+  .room-app-shell.table-interface[data-table-game="texas-holdem"] .community-cards .playing-card { width: clamp(64px, 5.4vw, 94px); height: clamp(92px, 7.7vw, 134px); padding: 7px; }
+  .table-interface[data-table-game="texas-holdem"] .poker-control-dock { flex: 0 0 auto; display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 2fr); padding: 8px; gap: 6px 12px; align-items: start; }
+  .table-interface .poker-local-hand { grid-column: 1; grid-row: 1; gap: 7px; }
+  .table-interface .poker-local-hand > .display-name { flex-basis: auto; min-width: 80px; font-size: 12px; }
+  .table-interface .poker-local-hand .playing-card { width: 60px; min-width: 60px; height: 85px; }
+  .table-interface .poker-auto-action { grid-row: 2; padding: 5px; min-height: 28px; font-size: 10px; }
+  .table-interface .poker-auto-action small { display: none; }
+  .table-interface .poker-actions { grid-column: 2; grid-row: 1 / 3; display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .table-interface .poker-actions > .actions > button { min-height: 44px; font-size: 15px; }
+  .table-interface .poker-raise { display: flex; align-items: center; flex-wrap: nowrap; gap: 7px; }
+  .table-interface .poker-raise .bet-stepper { position: relative; flex-basis: 160px; padding: 5px; gap: 3px; }
+  .table-interface .poker-raise .bet-stepper-head { display: none; }
+  .table-interface .poker-raise > button { min-height: 45px; font-size: 15px; }
+  .table-interface .table-bet-options summary { padding: 2px; font-size: 11px; }
+  .table-interface .table-bet-options[open] { position: absolute; z-index: 12; background: #092b25; border: 1px solid var(--table-line); padding: 8px; border-radius: 8px; width: 280px; right: 0; bottom: calc(100% + 64px); }
+  .table-interface[data-table-game="texas-holdem"] .poker-seats > .poker-seat { width: 150px; padding: 7px; top: clamp(62px, var(--table-seat-y), calc(100% - 34px)); }
+  .room-app-shell.table-interface[data-table-game="texas-holdem"] .poker-seats .playing-card { width: 43px; min-width: 43px; height: 60px; }
+  .table-interface[data-table-game="texas-holdem"] .poker-seats .card-row { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
+  .table-interface .poker-seat-details { grid-column: 1 / -1; grid-row: 3; display: flex; justify-content: space-between; gap: 5px; font-size: 12px; }
+  .table-interface .poker-seat-self .card-row { display: none; }
+  .table-interface .poker-seat-self .poker-seat-details { grid-row: 2; }
+  .table-interface .poker-seat-header h3 { font-size: 13px; }
+  .table-interface .poker-seat-details > strong { display: none; }
+  .table-interface .poker-seat-status { font-size: 11px; }
+  .table-interface[data-table-game="texas-holdem"] .poker-table-many .poker-seats { container-type: inline-size; }
+  .table-interface[data-table-game="texas-holdem"] .poker-table-many .poker-seat { width: min(150px, 15cqw); grid-template-columns: minmax(0, 1fr) auto; top: clamp(56px, var(--table-seat-y), calc(100% - 56px)); }
+  .table-interface .poker-table-many .cosmetic-icon { display: none; }
+  .table-interface .poker-table-many .display-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .table-interface .poker-table-many .poker-seat-header { grid-column: 1; }
+  .table-interface[data-table-game="texas-holdem"] .poker-table-many .card-row { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+  .room-app-shell.table-interface[data-table-game="texas-holdem"] .poker-table-many .poker-seats .playing-card { width: 35px; min-width: 35px; height: 50px; }
+  .table-interface .poker-table-many .poker-seat-details { grid-column: 1; grid-row: 2; display: grid; gap: 2px; }
+  .table-interface .poker-hand-potential { font-size: 12px; padding: 4px 8px; }
+  .blackjack-stage { flex: 1; min-height: 0; }
+  .blackjack-playfield { flex: 1; min-height: 0; padding-top: 0; }
+  .blackjack-player-cards { min-height: 90px; }
+  .blackjack-table-print { padding-block: 3px; }
+  .blackjack-stage .blackjack-command-dock { flex: 0 0 auto; }
+  .blackjack-command-dock .table-action-bar > button { min-height: 54px; }
+  .room-app-shell.table-interface.table-fullscreen { display: grid; height: var(--table-view-height, 100dvh); }
+  .room-app-shell.table-interface.table-fullscreen .layout > section { display: flex; }
+}
+@media (min-width: 1100px) and (max-height: 850px) {
+  .table-hud { padding: 8px 12px; }
+  .table-hud .table-hud-player .cosmetic-icon { width: 25px; height: 25px; flex-basis: 25px; }
+  .table-hud .table-hud-facts { gap: 12px; }
+  .table-hud .table-hud-facts dt { font-size: 10px; }
+  .table-interface .table-turn-focus > div > strong { font-size: 20px; }
+  .table-interface .table-turn-focus small { font-size: 12px; }
+  .table-interface { --table-die-size: 106px; }
+  .table-interface[data-table-game="cul-de-chouette"] { --table-die-size: 136px; }
+  .table-interface .poker-seat .cosmetic-icon { display: none; }
+  .table-interface .poker-seats .playing-card { width: 37px; min-width: 37px; height: 52px; }
+  .room-app-shell.table-interface .blackjack-dealer .playing-card { width: 68px; min-width: 68px; height: 96px; }
+  .blackjack-playfield { --blackjack-card-size: 90px !important; }
+  .blackjack-playfield:has(.blackjack-place:nth-of-type(4)) { --blackjack-card-size: 68px !important; }
+  .blackjack-place { padding: 6px; gap: 4px; }
+  .blackjack-place-identity { padding: 5px; }
+  .blackjack-table-print { position: absolute; left: 50%; top: 42%; transform: translateX(-50%); pointer-events: none; white-space: nowrap; }
+  .blackjack-table-print > strong { font-size: 24px; }
+  .blackjack-table-print > small { display: none; }
+  .blackjack-dealer { padding: 6px 12px; }
+  .blackjack-command-dock { padding: 7px; }
+}
+@media (max-width: 1099px) {
+  .table-hud-top { flex-wrap: wrap; gap: 10px; }
+  .table-hud .table-hud-facts { flex-wrap: wrap; gap: 10px; }
+  .table-hud .table-hud-facts > div { padding-left: 10px; }
+  .table-interface .table-stats, .table-interface .farkle-score-strip { flex-wrap: wrap; gap: 8px 16px; }
+  .table-interface .table-stats > div:last-child { margin-left: 0; }
+  .blackjack-places { flex-wrap: wrap; }
+  .blackjack-place { flex-basis: 180px; }
+  .blackjack-empty-place { flex-basis: 110px; min-height: 85px; }
+  .blackjack-command-dock { align-items: stretch; }
+  .blackjack-command-dock > .table-action-bar { flex-basis: 100%; }
+}
+@media (max-width: 760px) {
+  .table-hud .table-hud-facts { gap: 8px 14px; }
+  .table-hud .table-hud-facts dt { font-size: 10px; }
+  .table-hud .table-hud-facts dd, .table-hud .table-hud-facts > div:first-child dd { font-size: 12px; }
+  .table-hud .table-hud-players { padding-bottom: 3px; gap: 8px; }
+  .table-hud .table-hud-player { flex: 0 0 170px; }
+  .room-app-shell.table-interface .dice-throw-surface { padding: 20px 10px; min-height: 175px; }
+  .room-app-shell.table-interface .dice-throw-tray .dice-throw-surface > .dice-row { gap: 12px; }
+  .room-app-shell.table-interface .dice-throw-tray .dice-row .die.dice-solid-control { width: min(80px, 100%); }
+  .table-interface .table-action-bar > button { padding: 9px; min-height: 52px; font-size: 14px; }
+  .table-interface .table-turn-focus > div { gap: 5px; }
+  .table-interface .table-turn-focus small { font-size: 12px; }
+  .table-interface .table-stats dd { font-size: 21px; }
+  .table-interface .table-sheet-choice { min-height: 42px; font-size: 14px; }
+  .table-interface .dice-throw-tray-label strong { font-size: 10px; }
+  .table-interface .dice-throw-tray-label small { font-size: 10px; }
+  .blackjack-playfield { padding-inline: 4px; }
+  .blackjack-places { gap: 8px; }
+  .blackjack-place { flex: 1 1 125px; padding: 8px 4px; }
+  .blackjack-place-self { flex-basis: 100%; }
+  .blackjack-player-cards { min-height: 90px; }
+  .blackjack-place { --blackjack-card-size: 68px; }
+  .blackjack-place-self { --blackjack-card-size: 90px; }
+  .blackjack-empty-place { display: none; }
+  .blackjack-table-print > small { font-size: 10px; text-align: center; }
+  .blackjack-bet-choice { flex-direction: column; align-items: stretch; flex-basis: 100%; }
+  .blackjack-command-dock > .table-action-bar { flex-basis: 100%; }
+  .blackjack-command-dock .table-action-bar > button { min-height: 52px; flex-basis: 90px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blackjack-place, .blackjack-result { transition: none; }
+  .room-app-shell.table-interface .blackjack-result { animation: none !important; }
+}

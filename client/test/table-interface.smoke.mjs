@@ -19,7 +19,7 @@ const port = socket.address().port;
 await new Promise((resolve) => socket.close(resolve));
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const origin = `http://127.0.0.1:${port}`;
-const output = new URL(`../../docs/previews/table-interface-20261027/${Date.now()}/`, import.meta.url);
+const output = new URL(`../../docs/previews/table-stage-20261028/${Date.now()}/`, import.meta.url);
 await fs.mkdir(output, { recursive: true });
 const vite = spawn(process.execPath, [path.join(root, "client/node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: path.join(root, "client"), env: { ...process.env, VITE_BASE_PATH: "/", VITE_API_URL: origin, VITE_SOCKET_URL: origin, VITE_SOCKET_PATH: "/table-test-socket" }, windowsHide: true, stdio: "pipe" });
 let viteLog = "";
@@ -32,10 +32,19 @@ const players = Array.from({ length: 9 }, (_, index) => ({ id: index ? `p${index
 function prepare(game, count = game === "texas-holdem" ? 6 : 2) {
   const state = createGameState(game, players.slice(0, count), { buyIn: 1500, bigBlind: 100, maximumBet: 1500 });
   state.currentPlayerIndex = 0;
+  if (game === "blackjack") {
+    state.modifiers.dealerMode = "classic-17";
+    state.players.forEach((player) => { player.isBot = false; });
+    for (const player of state.players) applyAction(state, player.id, { type: "bet", amount: 50 });
+    state.hands.me = [{ rank: "10", suit: "S" }, { rank: "6", suit: "H" }];
+    state.hands.p1 = [{ rank: "9", suit: "S" }, { rank: "8", suit: "H" }];
+    state.dealer = [{ rank: "7", suit: "C" }, { rank: "K", suit: "D" }];
+    state.deck.push({ rank: "2", suit: "C" });
+  }
   if (game === "yahtzee") { state.dice = [1, 3, 5, 2, 6]; state.rollsLeft = 2; }
   if (game === "cul-de-chouette") { state.dice = [2, 2, 4]; state.rollsLeft = 2; state.lastRoll = { ...scoreCulDeChouette(state.dice), playerId: "me", pending: true }; }
   if (game === "farkle") state.dice = [1, 3, 5, 2, 6, 4];
-  room = { code: game, gameId: game, name: "La table de Bnmkt", ownerId: "me", stake: game === "texas-holdem" ? 1500 : 100, players: state.players, maxPlayers: 9, state };
+  room = { code: game, gameId: game, name: "La table de Bnmkt", ownerId: "me", stake: game === "texas-holdem" ? 1500 : 100, players: state.players, maxPlayers: game === "blackjack" ? 5 : 9, state };
   return room;
 }
 function payload() {
@@ -68,7 +77,7 @@ try {
     prepare(game, count);
     await page.goto(`${origin}/test/fixtures/table-interface.html?game=${game}`);
     await page.locator(".table-hud").waitFor();
-    if (game !== "texas-holdem") {
+    if (["farkle", "yahtzee", "cul-de-chouette"].includes(game)) {
       await page.locator(".dice-throw-tray").scrollIntoViewIfNeeded();
       await page.waitForFunction(() => [...document.querySelectorAll('.dice-throw-tray .die')].every((node) => node.dataset.diceSolid === "ready"));
       await page.waitForTimeout(950);
@@ -78,11 +87,11 @@ try {
     const layout = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: innerWidth, shell: document.querySelector(".table-interface").scrollWidth }));
     assert.ok(layout.page <= layout.viewport, `${label}: horizontal overflow ${JSON.stringify(layout)}`);
   }
-  for (const game of ["farkle", "yahtzee", "cul-de-chouette", "texas-holdem"]) {
+  for (const game of (process.env.TABLE_GAMES?.split(",") ?? ["farkle", "yahtzee", "cul-de-chouette", "texas-holdem", "blackjack"])) {
     await page.setViewportSize({ width: 1672, height: 941 });
     await open(game);
     assert.ok(await page.locator(".table-hud").isVisible(), "HUD survives content blocking");
-    if (game !== "texas-holdem") {
+    if (["farkle", "yahtzee", "cul-de-chouette"].includes(game)) {
       const dice = page.locator(".dice-throw-tray .die");
       assert.equal(await dice.count(), game === "farkle" ? 6 : game === "yahtzee" ? 5 : 3);
       assert.equal(await dice.first().getAttribute("class").then((value) => value.includes("die-skin-table-inlay")), true);
@@ -96,21 +105,35 @@ try {
       await dice.first().click();
       assert.equal(await dice.first().getAttribute("aria-pressed"), "true");
       assert.equal(await dice.first().locator(".dice-solid-scene").getAttribute("data-dice-pose"), pose, "selection must preserve 3D pose");
-    } else {
+    } else if (game === "texas-holdem") {
       assert.equal(await page.locator(".poker-seat").count(), 6);
       assert.equal(await page.locator(".poker-seat .card-back").count(), 10);
       assert.equal(await page.locator(".poker-local-hand .card-solid-edge").count(), 8);
       assert.equal(await page.locator(".poker-local-hand .playing-card").first().evaluate((node) => getComputedStyle(node).transformStyle), "preserve-3d");
     }
-    for (const [name, viewport] of [["desktop", { width: 1672, height: 941 }], ["laptop", { width: 1280, height: 720 }], ["tablet", { width: 820, height: 1180 }], ["mobile", { width: 390, height: 844 }], ["small", { width: 320, height: 740 }]]) {
+    if (game === "blackjack") {
+      assert.equal(await page.locator(".blackjack-place").count(), 2);
+      assert.equal(await page.locator(".blackjack-place:not(.blackjack-place-self) .card-back").count(), 2);
+      assert.equal(await page.locator(".blackjack-dealer .card-back").count(), 1);
+      assert.equal(await page.locator(".blackjack-place:not(.blackjack-place-self) [data-card-face]").count(), 0);
+      assert.equal(await page.getByRole("button", { name: /Assurance|Séparer/ }).count(), 0);
+      assert.equal(await page.locator(".blackjack-place-self .playing-card").first().evaluate((node) => getComputedStyle(node).transformStyle), "preserve-3d");
+    }
+    for (const [name, viewport] of [["wide", { width: 2560, height: 1440 }], ["desktop", { width: 1920, height: 1080 }], ["laptop", { width: 1366, height: 768 }], ["tablet", { width: 820, height: 1180 }], ["mobile", { width: 390, height: 844 }], ["small", { width: 320, height: 740 }]]) {
       await page.setViewportSize(viewport);
-      if (game !== "texas-holdem") await page.locator(".dice-throw-tray").scrollIntoViewIfNeeded();
-      else await page.locator(".poker-local-hand").scrollIntoViewIfNeeded();
+      if (["farkle", "yahtzee", "cul-de-chouette"].includes(game)) await page.locator(".dice-throw-tray").scrollIntoViewIfNeeded();
+      else if (game === "texas-holdem") await page.locator(".poker-local-hand").scrollIntoViewIfNeeded();
+      else await page.locator(".blackjack-place-self").scrollIntoViewIfNeeded();
       await page.waitForTimeout(180);
-      if (game !== "texas-holdem") {
+      if (["farkle", "yahtzee", "cul-de-chouette"].includes(game)) {
         await page.waitForFunction(() => [...document.querySelectorAll('.dice-throw-tray canvas')].every((node) => node.getContext('2d').getImageData(0, 0, node.width, node.height).data.some((value, i) => i % 4 === 3 && value > 100)));
       }
       await noOverflow(`${game}/${name}`);
+      if (viewport.width >= 1100) {
+        const geometry = await page.locator(".board").evaluate((node) => ({ bottom: node.getBoundingClientRect().bottom, viewport: innerHeight, page: document.documentElement.scrollHeight, rootHeight: document.querySelector(".table-interface").getBoundingClientRect().height, rootTop: document.querySelector(".table-interface").getBoundingClientRect().top, remaining: document.querySelector(".table-interface").style.getPropertyValue("--table-view-height") }));
+        if (["farkle", "yahtzee", "cul-de-chouette"].includes(game)) assert.ok((await page.locator(".dice-throw-tray .die").first().boundingBox()).width >= 90, "3D dice must be the main visual elements");
+        assert.ok(geometry.bottom <= geometry.viewport + 2 && geometry.page <= geometry.viewport + 2, `${game}/${name}: essential playfield must fit vertically: ${JSON.stringify(geometry)}`);
+      }
       if (game === "yahtzee") assert.ok(await page.locator(".table-score-sheet").isVisible(), "the playable score sheet must stay available on mobile");
       await page.screenshot({ path: fileURLToPath(new URL(`${game}-${name}.png`, output)), fullPage: true });
     }
@@ -167,9 +190,63 @@ try {
   await open("texas-holdem", 9);
   await noOverflow("poker/nine-seats");
   await page.screenshot({ path: fileURLToPath(new URL("texas-holdem-nine-seats.png", output)), fullPage: true });
+  for (const viewport of [{width:1366,height:768},{width:1920,height:1080}]) {
+    await page.setViewportSize(viewport);
+    await page.waitForTimeout(100);
+    const collision = await page.locator(".poker-seat").evaluateAll((nodes) => {
+      const boxes=nodes.map((node)=>node.getBoundingClientRect());
+      return boxes.flatMap((a,i)=>boxes.map((b,j)=>j>i && Math.min(a.right,b.right)-Math.max(a.left,b.left)>3 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>3 ? {i,j,a:{x:a.x,y:a.y,w:a.width,h:a.height},b:{x:b.x,y:b.y,w:b.width,h:b.height}} : null).filter(Boolean));
+    });
+    assert.deepEqual(collision,[],`nine poker seats must not overlap at ${viewport.width}: ${JSON.stringify(collision)}`);
+  }
   await page.setViewportSize({ width: 320, height: 740 });
   await noOverflow("poker/nine-seats-small");
   await page.screenshot({ path: fileURLToPath(new URL("texas-holdem-nine-seats-small.png", output)), fullPage: true });
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await open("blackjack");
+  await page.getByRole("button", { name: /^Tirer/ }).click();
+  await page.waitForTimeout(200);
+  assert.equal(room.state.hands.me.length, 3);
+  assert.equal(await page.locator(".blackjack-place-self .playing-card").count(), 3);
+  assert.equal(await page.getByRole("button", { name: /^Doubler/ }).count(), 0);
+  await page.getByRole("button", { name: /^Rester/ }).click();
+  await page.waitForTimeout(150);
+  assert.ok(room.state.completedPlayerIds.includes("me"));
+  await open("blackjack");
+  await page.getByRole("button", { name: /^Doubler/ }).click();
+  await page.waitForTimeout(150);
+  assert.equal(room.state.bets.me, 100);
+  assert.equal(room.state.hands.me.length, 3);
+  await open("blackjack");
+  room.state.hands = {}; room.state.bets = {}; room.state.dealer = [];
+  await page.reload();
+  await page.getByRole("button", { name: /^Miser/ }).waitFor();
+  await page.getByRole("spinbutton", { name: "Mise Blackjack", exact: true }).fill("75");
+  await page.getByRole("button", { name: /^Miser/ }).click();
+  await page.waitForTimeout(150);
+  assert.equal(room.state.bets.me, 75);
+  assert.ok((await page.locator(".blackjack-waiting").textContent()).includes("autres mises"));
+  await open("blackjack");
+  room.state.hands.me = [{ rank: "A", suit: "S" }, { rank: "K", suit: "H" }];
+  room.state.dealer = [{ rank: "10", suit: "C" }, { rank: "9", suit: "D" }];
+  applyAction(room.state, "me", { type: "stand" });
+  applyAction(room.state, "p1", { type: "stand" });
+  await page.reload();
+  await page.locator(".blackjack-result").first().waitFor();
+  assert.ok((await page.locator(".blackjack-place-self .blackjack-result").textContent()).includes("Blackjack"));
+  assert.equal(await page.locator(".blackjack-dealer .card-back").count(), 0);
+  await page.screenshot({ path: fileURLToPath(new URL("blackjack-result.png", output)), fullPage: true });
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await open("blackjack", 5);
+  assert.equal(await page.locator(".blackjack-place").count(),5);
+  await noOverflow("blackjack/five-players");
+  room.state.hands.me = [{rank:"A",suit:"S"},{rank:"A",suit:"H"},{rank:"2",suit:"S"},{rank:"3",suit:"S"},{rank:"4",suit:"S"}];
+  await page.reload();
+  await page.locator(".blackjack-place-self").waitFor();
+  await page.waitForTimeout(750);
+  const handFits=await page.locator(".blackjack-place-self").evaluate((node)=>{const r=node.getBoundingClientRect();return [...node.querySelectorAll('.playing-card')].every((card)=>{const c=card.getBoundingClientRect();return c.left>=r.left-3 && c.right<=r.right+3;});});
+  assert.ok(handFits,"long hands stay inside their seat");
+  await page.screenshot({path:fileURLToPath(new URL("blackjack-five-players.png",output)),fullPage:true});
   await page.emulateMedia({ reducedMotion: "reduce" });
   assert.ok(await page.locator(".table-panel summary > svg").first().evaluate((node) => parseFloat(getComputedStyle(node).transitionDuration) <= .001));
   assert.deepEqual(errors, []);
