@@ -39,4 +39,6 @@ Les tests ciblés des moteurs et de l’état public passent : 72 contrôles ser
 
 `deploy/debian/update-table-interface.sh` construit une version isolée à partir des sources en production et applique uniquement les fichiers des tables et leurs nouvelles traductions. Le manifeste de livraison vérifie les empreintes de départ et le script refuse de publier si les sources ont changé pendant la compilation. Les cosmétiques, réglages d’apparence, données et autres personnalisations du site sont conservés.
 
+Le déploiement progressif inclut désormais [Président](../previews/president-table-20261028/README.md). Le manifeste peut restreindre la livraison à une liste explicite de fichiers autorisés. L’ajustement du moteur Président est préparé séparément du serveur actif, sauvegardé et installé uniquement pendant la publication.
+
 La publication prend le verrou de déploiement existant, vérifie l’absence de tables ouvertes, sauvegarde les sources et le build précédent, conserve les anciens assets pour les onglets ouverts, publie les documents d’entrée en dernier et relance le service à vide pour actualiser son HTML en mémoire. Une erreur provoque le retour au build précédent ; les URL publiques et le nouvel asset d’entrée sont contrôlés avant de confirmer la livraison.

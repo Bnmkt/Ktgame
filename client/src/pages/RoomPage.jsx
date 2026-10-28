@@ -18,17 +18,18 @@ import { SOCKET_PATH, SOCKET_URL, api, getToken } from "../api.js";
 import { DiceSelectionMode, DiceThrowTray, Die, PlayingCard } from "../components/game/GamePieces.jsx";
 import { DiceScoreStrip } from "../components/game/DiceScoreStrip.jsx";
 import { DisplayName } from "../components/cosmetics/Cosmetics.jsx";
-import { RulesModal, StepperBet, accordionPlayable, blackjackTotal, canPlayPresidentSet, cardIdentity, golfPlayable, groupedHand, yahtzeeTotal } from "../components/game/GameSupport.jsx";
+import { RulesModal, StepperBet, accordionPlayable, blackjackTotal, cardIdentity, golfPlayable, yahtzeeTotal } from "../components/game/GameSupport.jsx";
 import { BattleBoard, FarkleBoard, FarkleGuide, LiarsDiceBoard, MidnightDiceBoard, ShutTheBoxBoard, VelvetRuseBoard } from "../components/game/GameBoards.jsx";
 import { TableActionBar, TableFigureGuide, TableHud, TablePanel, TableStats, TableTurnFocus, TableYahtzeeSheet } from "../components/room/TableInterface.jsx";
 import { pokerSeatPosition, tableInterfaceGames } from "../features/games/table-interface.js";
+import { PresidentTable, PresidentPanels } from "../components/game/PresidentTable.jsx";
 import { BlackjackTable } from "../components/game/BlackjackTable.jsx";
 import { BeloteBoard } from "../components/game/BeloteBoard.jsx";
 import { BeloteTeams } from "../components/room/BeloteTeams.jsx";
 import { BattleModifiersPanel, FinishedLeaderboard, GameModifiersPanel, OtherPlayerRolls, RoomStatusPanel, ScorePanel, WagerPanel } from "../components/room/RoomPanels.jsx";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
 import { useBugGameContext } from "../features/bugs/BugReportProvider.jsx";
-import { defaultBattleModifiers, defaultGameModifiers, gameTitle, playerName, suits } from "../features/games/config.js";
+import { defaultBattleModifiers, defaultGameModifiers, gameTitle, playerName } from "../features/games/config.js";
 import { CompactNumber, copyText } from "../utils/presentation.jsx";
 import { hasPlayablePresidentSet } from "../features/games/president.js";
 import { usePresidentAutoPass } from "../components/game/usePresidentAutoPass.js";
@@ -158,6 +159,8 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
   const [scoreConfirmation, setScoreConfirmation] = useState(null);
   const [accordionFrom, setAccordionFrom] = useState(null);
   const [selectedPresidentCards, setSelectedPresidentCards] = useState([]);
+  const [presidentDealKey, setPresidentDealKey] = useState(null);
+  const previousPresidentRoom = useRef(null);
   const [presidentActionBusy, setPresidentActionBusy] = useState(false);
   const presidentActionPending = useRef(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -176,12 +179,18 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
   const isOwner = room?.ownerId === user.id;
   useEffect(() => { setMobilePanel(""); }, [compact, room?.activityMatchId]);
 
-  const commitRoom = useCallback((nextRoom) => {
+  const commitRoom = useCallback((nextRoom, { animateStart = true } = {}) => {
     if (!nextRoom) return;
     const { achievementUnlocks: _achievementUnlocks, ...payload } = nextRoom;
     const snapshot = JSON.stringify(payload);
     if (snapshot === roomSnapshotRef.current) return;
     roomSnapshotRef.current = snapshot;
+    const previous = previousPresidentRoom.current;
+    if (animateStart && payload.gameId === "president" && payload.state && !payload.state.finished && previous?.code === payload.code &&
+      (!previous.state || previous.activityMatchId && payload.activityMatchId !== previous.activityMatchId)) {
+      setPresidentDealKey(payload.code + ":" + (payload.activityMatchId ?? Date.now()));
+    }
+    previousPresidentRoom.current = payload;
     setRoom(payload);
   }, []);
 
@@ -227,11 +236,16 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
     if (!room?.id) return undefined;
     const socket = io(SOCKET_URL, { path: SOCKET_PATH, withCredentials: true, auth: { stream: "table" } });
     const disposeDiagnostics = bugDiagnostics.registerSocket(socket);
-    const watch = () => socket.emit("watch-room", { roomId: room.id, token: getToken() });
+    let connected = false, restoring = false;
+    const watch = () => {
+      restoring = connected; connected = true;
+      socket.emit("watch-room", { roomId: room.id, token: getToken() });
+    };
     socket.on("connect", watch);
     socket.on("room", (nextRoom) => {
       if (nextRoom.code !== code) return;
-      commitRoom(nextRoom);
+      commitRoom(nextRoom, { animateStart: !restoring });
+      restoring = false;
       if (!nextRoom.players?.some((p) => p.id === user.id)) onBack();
     });
     socket.on("room-closed", (payload) => {
@@ -391,10 +405,6 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
   const diceSkin = user.cosmetics?.equipped?.diceSkin ?? "default";
   const activeDiceSkin = current?.cosmetics?.equipped?.diceSkin ?? diceSkin;
   const cardSkin = user.cosmetics?.equipped?.cardSkin ?? "default";
-  const presidentHand = groupedHand(myHand).flatMap(([, cards]) => cards);
-  const selectedPresidentHand = presidentHand.filter((card) => selectedPresidentCards.includes(cardIdentity(card)));
-  const presidentRequiredCount = state?.gameId === "president" ? state.currentSet?.count ?? null : null;
-  const presidentSelectionPlayable = state?.gameId === "president" && selectedPresidentHand.length > 0 && (!presidentRequiredCount || selectedPresidentHand.length === presidentRequiredCount) && canPlayPresidentSet(state, selectedPresidentHand[0].rank, selectedPresidentHand.length);
   const presidentAutoPass = usePresidentAutoPass({
     enabled: state?.gameId === "president" && isPlayerActionExpected && Boolean(state.currentSet) && myHand.length > 0 && !hasPlayablePresidentSet(state, myHand),
     turnKey: `${code}:${current?.id}:${state?.currentSet?.playerId}:${state?.currentSet?.rank}:${state?.currentSet?.count}:${state?.revolution}:${myHand.map(cardIdentity).join(",")}`,
@@ -508,10 +518,10 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
           {showFinishedResult && state?.finished && !room.ranked && <CompletionContainer {...(tableInterface ? { className: "table-completion" } : {})}>{tableInterface && <summary>{localeText("Bilan de la partie")}</summary>}<ClassicCompletion key={room.activityMatchId ?? room.id} room={room} userId={user.id} isOwner={isOwner} pacing={pacing} canSkip={isSeatedPlayer} onSkip={skipPacing} onReplay={() => roomPost("replay")} onInstantReplay={() => roomPost("replay-now")} onLeave={leaveTable}/></CompletionContainer>}
           {(!state?.finished || room.ranked) && <TurnPacingBanner pacing={pacing} players={room.players} canSkip={isSeatedPlayer} onSkip={skipPacing} />}
 
-          {state && (!state.finished || room.ranked || ["blackjack", "texas-holdem", "belote"].includes(room.gameId)) && <section className={`board board-${room.gameId} ${state.finished ? "finished-board" : ""} ${isPlayerActionExpected ? "your-active-turn" : ""} ${pacingActive ? "pacing-locked" : ""}`}><CardMotionSurface attachToChild version={state} actorId={current?.id}>
+          {state && (!state.finished || room.ranked || ["blackjack", "texas-holdem", "belote"].includes(room.gameId)) && <section className={`board board-${room.gameId} ${state.finished ? "finished-board" : ""} ${isPlayerActionExpected ? "your-active-turn" : ""} ${pacingActive ? "pacing-locked" : ""}`}><CardMotionSurface opaqueFlights={room.gameId === "president"} attachToChild version={state} actorId={current?.id}>
             <div className="board-felt">
               {!tableInterface && <div className="board-heading"><h2>{localeText(gameTitle(room.gameId))}</h2>{room.gameId === "yahtzee" && <div className="round-counter"><span>{localeText("Manche")}</span><strong>{yahtzeeRound} / 13</strong><small>{Math.max(0, 13 - yahtzeeRound)}{" " + localeText("restante")}{13 - yahtzeeRound > 1 ? localeText("s") : ""}</small></div>}{["421", "cul-de-chouette"].includes(room.gameId) && <div className="round-counter"><span>{localeText("Manche")}</span><strong>{state.round} / {state.maxRounds}</strong><small>{Math.max(0, state.maxRounds - state.round)}{" " + localeText("restante")}{state.maxRounds - state.round > 1 ? localeText("s") : ""}</small></div>}</div>}
-              {tableInterface ? (!["texas-holdem", "blackjack"].includes(room.gameId) && <TableTurnFocus state={state} userId={user.id} pacing={pacing}/>) : <div className={`turn-line ${room.gameId === "yahtzee" && !state.finished ? `yahtzee-turn-focus ${isMyTurn ? "your-turn" : "opponent-turn"}` : ""} ${room.gameId === "bataille" && !state.finished ? "battle-simultaneous-turn" : ""}`}>{state.finished ? (showFinishedResult ? localeText("Partie terminée") : localeText("Le dealer termine sa main…")) : room.gameId === "blackjack" && allBlackjackBetsPlaced ? localeText("{value0} main(s) encore en jeu avant le dealer", { value0: state.players.filter((player) => !player.isBot).length - (state.completedPlayerIds?.length ?? 0) }) : room.gameId === "bataille" ? <><span className="turn-status-icon"><Swords size={22} /></span><span className="turn-copy"><small>{state.resolutionEndsAt ? localeText("Confrontation") : localeText("Actions simultanées")}{" " + localeText("· manche") + " "}{state.round}</small><strong>{state.resolutionEndsAt ? <>{localeText("Résultat affiché encore") + " "}<BattleCountdown endsAt={state.resolutionEndsAt} />{" " + localeText("seconde(s)")}</> : state.submittedPlayerIds?.includes(user.id) ? localeText("Placement enregistré — l’adversaire joue") : state.drawnCards?.[user.id] ? localeText("Ta carte est prête — choisis {value0}", { value0: state.battleLanes?.length === 1 ? "la pile centrale" : "la pile A ou B" }) : localeText("À toi de piocher ta carte")}</strong></span></> : room.gameId === "yahtzee" ? <><span className="turn-status-icon"><Play size={22} /></span><span className="turn-copy"><small>{isMyTurn ? localeText("Ton tour") : localeText("Tour en cours")}</small><strong>{isMyTurn ? localeText("À toi de jouer") : <><DisplayName user={current} />{" " + localeText("joue maintenant")}</>}</strong></span></> : <>{localeText("À") + " "}<DisplayName user={current} />{" " + localeText("de jouer")}</>}</div>}
+              {tableInterface ? (!["texas-holdem", "blackjack", "president"].includes(room.gameId) && <TableTurnFocus state={state} userId={user.id} pacing={pacing}/>) : <div className={`turn-line ${room.gameId === "yahtzee" && !state.finished ? `yahtzee-turn-focus ${isMyTurn ? "your-turn" : "opponent-turn"}` : ""} ${room.gameId === "bataille" && !state.finished ? "battle-simultaneous-turn" : ""}`}>{state.finished ? (showFinishedResult ? localeText("Partie terminée") : localeText("Le dealer termine sa main…")) : room.gameId === "blackjack" && allBlackjackBetsPlaced ? localeText("{value0} main(s) encore en jeu avant le dealer", { value0: state.players.filter((player) => !player.isBot).length - (state.completedPlayerIds?.length ?? 0) }) : room.gameId === "bataille" ? <><span className="turn-status-icon"><Swords size={22} /></span><span className="turn-copy"><small>{state.resolutionEndsAt ? localeText("Confrontation") : localeText("Actions simultanées")}{" " + localeText("· manche") + " "}{state.round}</small><strong>{state.resolutionEndsAt ? <>{localeText("Résultat affiché encore") + " "}<BattleCountdown endsAt={state.resolutionEndsAt} />{" " + localeText("seconde(s)")}</> : state.submittedPlayerIds?.includes(user.id) ? localeText("Placement enregistré — l’adversaire joue") : state.drawnCards?.[user.id] ? localeText("Ta carte est prête — choisis {value0}", { value0: state.battleLanes?.length === 1 ? "la pile centrale" : "la pile A ou B" }) : localeText("À toi de piocher ta carte")}</strong></span></> : room.gameId === "yahtzee" ? <><span className="turn-status-icon"><Play size={22} /></span><span className="turn-copy"><small>{isMyTurn ? localeText("Ton tour") : localeText("Tour en cours")}</small><strong>{isMyTurn ? localeText("À toi de jouer") : <><DisplayName user={current} />{" " + localeText("joue maintenant")}</>}</strong></span></> : <>{localeText("À") + " "}<DisplayName user={current} />{" " + localeText("de jouer")}</>}</div>}
               {state.finished && showFinishedResult && room.ranked && <div className="board-result">
                 <div><Trophy size={22} /><span>{localeText("Vainqueur")}</span><strong>{winnerNames}</strong></div>
                 <div className="actions final-actions">{isOwner && room.gameId === "blackjack" && <button className="instant-replay-button" onClick={() => roomPost("replay-now")}><Play size={18} />{" " + localeText("Rejouer maintenant")}</button>}{isOwner && room.gameId !== "texas-holdem" && <button className="secondary" onClick={() => roomPost("replay")}>{room.gameId === "blackjack" ? localeText("Retour à la salle d'attente") : <><Play size={18} />{" " + localeText("Rejouer")}</>}</button>}<button className="secondary" onClick={leaveTable}><DoorOpen size={18} />{" " + localeText("Quitter")}</button></div>
@@ -584,11 +594,8 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
 
               {!state.finished && room.gameId === "bataille" && <BattleBoard state={state} user={user} onDraw={() => action({ type: "draw" })} onPlace={(laneId) => action({ type: "place", laneId })} />}
 
-              {!state.finished && room.gameId === "president" && <section className="card-game-arena president-table">
-                <div className="president-opponents">{state.players.filter((player) => player.id !== user.id && !state.finishedOrder?.includes(player.id)).map((player) => { const count = state.hands[player.id]?.length ?? 0; return <article className={current?.id === player.id ? "active" : ""} key={player.id} data-card-owner={player.id}><div><DisplayName user={player} /><small>{count}{" " + localeText("carte")}{count > 1 ? localeText("s") : ""}</small></div><div className="opponent-card-fan">{Array.from({ length: Math.min(3, count) }, (_, index) => <PlayingCard key={index} hidden skin={player.cosmetics?.equipped?.cardSkin ?? cardSkin} />)}</div></article>; })}</div>
-                <div className="president-center-line"><div className="president-deck-stack"><PlayingCard hidden skin={cardSkin} /><span>{myHand.length + state.players.filter((player) => player.id !== user.id).reduce((sum, player) => sum + (state.hands[player.id]?.length ?? 0), 0)}{" " + localeText("en jeu")}</span></div><div className={`president-pile ${state.revolution ? "revolution" : ""}`} data-card-arrival="played"><span className="eyebrow">{state.revolution ? localeText("Révolution active") : state.currentSet ? localeText("Pli en cours") : localeText("Nouvelle ouverture")}</span><div className="card-row">{state.currentSet ? (state.pile.at(-1)?.cards ?? []).map((card, index) => <PlayingCard key={`${cardIdentity(card)}-${index}`} card={card} skin={cardSkin} />) : <div className="empty-card-slot">{localeText("Pose libre")}</div>}</div><strong>{state.currentSet ? `${state.currentSet.count} × ${state.currentSet.rank}` : localeText("Toute combinaison autorisée")}</strong></div><div className="president-direction"><span>{state.revolution ? localeText("Valeur décroissante") : localeText("Valeur croissante")}</span><b>{state.revolution ? "2 → 3" : "3 → 2"}</b></div></div>
-                <div className={`president-self-zone ${isMyTurn ? "active" : ""}`} data-card-owner={user.id}><header><div><span className="eyebrow">{localeText("Ta main")}</span><h3>{isMyTurn ? localeText("Choisis précisément les cartes à poser") : localeText("Au tour de {value0}", { value0: current?.pseudo ?? "l'adversaire" })}</h3></div><div className="president-requirement"><small>{localeText("Combinaison requise")}</small><strong>{state.currentSet ? localeText("{value0} carte{value1} · {value2} {value3}", { value0: state.currentSet.count, value1: state.currentSet.count > 1 ? "s" : "", value2: state.revolution ? "en dessous de" : "au-dessus de", value3: state.currentSet.rank }) : localeText("Libre")}</strong></div></header><div className="president-card-hand">{presidentHand.map((card, index) => { const key = cardIdentity(card); const selected = selectedPresidentCards.includes(key); const rankAllowed = canPlayPresidentSet(state, card.rank, state.currentSet?.count ?? 1); const blockedBySelection = selectedPresidentHand.length > 0 && selectedPresidentHand[0].rank !== card.rank; const selectionFull = Boolean(presidentRequiredCount && selectedPresidentHand.length >= presidentRequiredCount && !selected); return <button type="button" key={key} className={`${selected ? "selected" : ""} ${!rankAllowed ? "unplayable" : ""}`} style={{ "--hand-index": index }} disabled={!isMyTurn || presidentActionBusy || !rankAllowed || blockedBySelection || selectionFull} aria-pressed={selected} onClick={() => setSelectedPresidentCards((cards) => cards.includes(key) ? cards.filter((entry) => entry !== key) : [...cards, key])}><PlayingCard card={card} skin={cardSkin} /><span>{selected ? localeText("Sélectionnée") : suits[card.suit]?.name}</span></button>; })}</div><footer><div className="president-selection-summary"><strong>{selectedPresidentHand.length ? `${selectedPresidentHand.length} × ${selectedPresidentHand[0].rank}` : localeText("Aucune carte sélectionnée")}</strong><small>{selectedPresidentHand.length ? selectedPresidentHand.map((card) => `${card.rank}${suits[card.suit]?.symbol}`).join(" · ") : localeText("Clique directement les cartes et leur couleur.")}</small></div><div className="actions"><button disabled={!isMyTurn || presidentActionBusy || !presidentSelectionPlayable} onClick={() => action({ type: "play", cards: selectedPresidentHand.map(({ rank, suit }) => ({ rank, suit })) })}>{localeText("Jouer la sélection")}</button><button className="secondary" disabled={!isMyTurn || presidentActionBusy || !state.currentSet} onClick={() => action({ type: "pass" })}>{localeText("Passer")}{presidentAutoPass.deadline && <> · <PacingCountdown endsAt={presidentAutoPass.deadline} />{" " + localeText("s")}</>}</button></div></footer></div>
-              </section>}
+              {room.gameId === "president" && <PresidentTable room={room} state={state} user={user} onAction={action} canAct={isMyTurn} busy={presidentActionBusy} selected={selectedPresidentCards} onSelectionChange={setSelectedPresidentCards} autoPassDeadline={presidentAutoPass.deadline} countdown={<PacingCountdown endsAt={presidentAutoPass.deadline}/>} dealKey={presidentDealKey}/>}
+
 
               {!state.finished && room.gameId === "golf-solitaire" && <section className="solo-card-table golf-card-table">
                 <header className="solo-card-heading"><div><span className="eyebrow">{localeText("Solitaire Golf")}</span><h3>{localeText("Sept fairways à dégager")}</h3></div><div className="solo-card-stats"><span><strong>{state.tableau.reduce((sum, column) => sum + column.length, 0)}</strong>{" " + localeText("au tableau")}</span><span><strong>{state.stock.length}</strong>{" " + localeText("en pioche")}</span></div></header>
@@ -615,6 +622,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
         <aside className="room-side-panels">
           {!state && <section className="card invite-card"><div className="invite-card-heading"><div><span className="eyebrow">{localeText("Invitation")}</span><h2>{localeText("Inviter des joueurs")}</h2></div><div className="room-invite-code"><small>{localeText("Code de la table")}</small><strong>{room.code}</strong></div></div><button className="secondary room-invite-copy" onClick={copyInviteLink}>{inviteCopied ? <BadgeCheck size={17} /> : <Copy size={17} />} {inviteCopied ? localeText("Invitation copiée !") : localeText("Copier le lien d'invitation")}</button>{inviteMessage && <div className="success compact-message">{inviteMessage}</div>}{!user.guest ? <div className="player-network-list compact">{invitableFriends.map((friend) => <article key={friend.id} className="player-network-row"><DisplayName user={friend} /><button onClick={() => inviteFriend(friend.id)}>{localeText("Inviter")}</button></article>)}{!invitableFriends.length && <div className="empty-state">{localeText("Aucun ami disponible à inviter.")}</div>}</div> : <p className="muted-line">{localeText("Partage le lien ou le code pour inviter d'autres joueurs.")}</p>}</section>}
           {tableInterface ? <>
+            {state.gameId === "president" && <PresidentPanels state={state}/>}
             {state.gameId === "blackjack" && <>
               <TablePanel title={localeText("Historique de la main")}><ol className="blackjack-history">{(state.logs ?? []).slice(-20).reverse().map((entry) => <li key={entry.id}><strong>{entry.actor}</strong><span>{entry.text}</span></li>)}</ol></TablePanel>
               <TablePanel title={localeText("Règles principales")}><p>{localeText("Obtenir 21 sans dépasser. Le Blackjack se joue contre le croupier.")}</p><p>{localeText(state.modifiers?.dealerMode === "classic-17" ? "Le croupier tire jusqu’à 17" : "Le croupier vise au moins 17 et la meilleure main")}</p><p>{localeText("Victoire payée 1:1. En cas d’égalité, la mise est rendue.")}</p></TablePanel>

@@ -5264,5 +5264,22 @@
   "Victoire payée 1:1. En cas d’égalité, la mise est rendue.": "Victoire payée 1:1. En cas d’égalité, la mise est rendue.",
   "Main terminée": "Main terminée",
   "Tirer": "Tirer",
-  "Autres actions": "Autres actions"
+  "Autres actions": "Autres actions",
+  "Glisser pour déplacer · Alt + flèche pour réordonner": "Glisser pour déplacer · Alt + flèche pour réordonner",
+  "Plateau de Président": "Plateau de Président",
+  "A passé": "A passé",
+  "Distribution": "Distribution",
+  "Accélérer": "Accélérer",
+  "Passer l’animation": "Passer l’animation",
+  "Ordre classique": "Ordre classique",
+  "{value0} carte(s) sélectionnée(s)": "{value0} carte(s) sélectionnée(s)",
+  "Ordre et rangs": "Ordre et rangs",
+  "Derniers tours": "Derniers tours",
+  "Les cartes d’une combinaison doivent avoir la même valeur.": "Les cartes d’une combinaison doivent avoir la même valeur.",
+  "Répondre avec le même nombre de cartes et une valeur supérieure.": "Répondre avec le même nombre de cartes et une valeur supérieure.",
+  "Un carré inverse l’ordre des cartes et libère le pli.": "Un carré inverse l’ordre des cartes et libère le pli.",
+  "Vice-Président": "Vice-Président",
+  "Vice-Ass": "Vice-Ass",
+  "Ass": "Ass",
+  "Neutre": "Neutre"
 }

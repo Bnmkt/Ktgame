@@ -66,7 +66,7 @@ export class CardMotionSurface extends Component {
     const visibility = target.node.style.visibility;
     target.node.style.visibility = "hidden";
     const animation = clone.animate([
-      { transform: `translate(${source.rect.x - destination.x}px, ${source.rect.y - destination.y}px) scale(${source.rect.width / destination.width}, ${source.rect.height / destination.height}) rotate(-8deg)`, opacity: .85 },
+      { transform: `translate(${source.rect.x - destination.x}px, ${source.rect.y - destination.y}px) scale(${source.rect.width / destination.width}, ${source.rect.height / destination.height}) rotate(-8deg)`, opacity: this.props.opaqueFlights ? 1 : .85 },
       { transform: `translate(${(source.rect.x - destination.x) * .45}px, ${(source.rect.y - destination.y) * .45 - 20}px) scale(1.08) rotate(3deg)`, opacity: 1, offset: .5 },
       { transform: "translate(0,0) scale(1) rotate(0deg)", opacity: 1 }
     ], { duration: 520, easing: "cubic-bezier(.2,.7,.25,1)", fill: "forwards" });

@@ -51,10 +51,11 @@ const service = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   const reply = (data, status = 200) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(data)); };
   if (url.pathname === "/api/me") return reply(user);
+  if (url.pathname === "/api/me/mascot-gift") return reply({ packs: [], claim: {} });
   if (url.pathname === "/api/config") return reply({ siteName: "KTGA.ME", minRoomStake: 10 });
   if (url.pathname === "/api/games") return reply(games);
   if (url.pathname === "/api/rooms") return reply([...fixtures.values()]);
-  if (["/api/shop", "/api/notifications"].includes(url.pathname)) return reply([]);
+  if (["/api/shop", "/api/notifications", "/api/pages"].includes(url.pathname)) return reply([]);
   if (url.pathname === "/api/friends") return reply({ friends: [], incoming: [], outgoing: [], roomInvites: [] });
   if (url.pathname === "/api/tribunal/availability") return reply({ available: false });
   if (url.pathname === "/api/community-events/carousel") return reply({ events: [] });
@@ -111,11 +112,11 @@ try {
   await context.addInitScript(initializeAudio);
   const page = await context.newPage();
   const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (error) => { errors.push(error.message); console.error(error.stack); });
   async function begin(code) {
     await page.goto(`${webOrigin}/table/${code}`);
     await page.locator(`.board-${fixtures.get(code).gameId}`).waitFor();
-    await page.locator(".board-heading h2").click();
+    await page.locator(".board-heading h2, .table-board-heading h2").click();
     assert.equal(await page.evaluate(() => window.turnTones), 0, "no cue during the previous turn's pause");
     const room = fixtures.get(code);
     room.pacing = null;
@@ -125,11 +126,11 @@ try {
     return readyAt;
   }
   const readyAt = await begin("NORMAL");
-  const pass = () => page.locator(".president-self-zone").getByRole("button", { name: /^Passer/ });
+  const pass = () => page.locator(".president-command-dock").getByRole("button", { name: /^Passer/ });
   assert.equal(await pass().isDisabled(), false, "manual pass immediately available when the turn starts");
   await page.waitForTimeout(1900);
   assert.equal(actions.filter((entry) => entry.code === "NORMAL").length, 0, "no automatic pass before three seconds");
-  const output = path.join(root, "docs", "previews");
+  const output = path.join(root, "docs", "previews", "president-table-20261028", "regressions", String(Date.now()));
   mkdirSync(output, { recursive: true });
   await page.screenshot({ path: path.join(output, "president-auto-pass.png"), fullPage: true });
   await waitFor(() => actions.some((entry) => entry.code === "NORMAL"), "automatic pass");
@@ -204,19 +205,23 @@ try {
   const firstVisit = await freshContext.newPage();
   firstVisit.on("pageerror", (error) => errors.push(error.message));
   await firstVisit.goto(`${webOrigin}/table/READY`);
-  await firstVisit.locator(".president-table").waitFor();
+  await firstVisit.locator(".president-stage").waitFor();
   assert.equal(await firstVisit.evaluate(() => window.turnTones), 0, "browser blocks initial cue before an interaction");
-  await firstVisit.locator(".board-heading h2").click();
+  await firstVisit.locator(".board-heading h2, .table-board-heading h2").click();
   await waitFor(async () => await firstVisit.evaluate(() => window.turnTones) === 2, "initial cue retried on first interaction");
   await freshContext.close();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${webOrigin}/table/MANUAL`);
-  await page.locator(".president-table").waitFor();
-  assert.ok(await page.locator(".president-table").isVisible());
+  await page.locator(".president-stage").waitFor();
+  assert.ok(await page.locator(".president-stage").isVisible());
   await page.screenshot({ path: path.join(output, "president-mobile.png"), fullPage: true });
   assert.deepEqual(errors, []);
   console.log("PASS: President automatic/manual passes, three-second delay after pacing, normal/revolution ranks, combination size, turn audio without duplicates, desktop/mobile.");
   console.log("PASS: poker all-in decision, Yahtzee reroll/turn cues, real transport reconnect and resubscription, desktop/mobile.");
+} catch(error) {
+  const page=browser?.contexts()[0]?.pages()[0];
+  if(page) { console.error((await page.locator('body').innerText()).slice(0,3000)); await page.screenshot({path:path.join(root,'artifacts/president-regression-failure.png')}); }
+  throw error;
 } finally {
   await browser?.close();
   if (vite.exitCode === null) await new Promise((resolve) => { vite.once("exit", resolve); vite.kill(); });

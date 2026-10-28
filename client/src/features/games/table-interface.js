@@ -1,7 +1,8 @@
 // Opt in one game at a time; common presentation has no server dependencies.
-export const tableInterfaceGames = new Set(["farkle", "yahtzee", "cul-de-chouette", "texas-holdem", "blackjack"]);
+export const tableInterfaceGames = new Set(["farkle", "yahtzee", "cul-de-chouette", "texas-holdem", "blackjack", "president"]);
 
 export function tableRoundInfo(state) {
+  if (state.gameId === "president") return { label: "Phase", value: state.finished ? "Résultat" : state.revolution ? "Révolution active" : state.currentSet ? "Pli en cours" : "Nouvelle ouverture" };
   if (state.gameId === "yahtzee") {
     const completed = Object.values(state.scores ?? {}).reduce((sum, scores) => sum + Object.keys(scores).length, 0);
     return { label: "Manche", value: `${Math.min(13, Math.floor(completed / Math.max(1, state.players.length)) + 1)} / 13` };

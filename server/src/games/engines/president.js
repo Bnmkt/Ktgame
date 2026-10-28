@@ -1,4 +1,4 @@
-import { cardValue, createDeck, currentPlayer, shuffle } from "../shared.js";
+import { createDeck, currentPlayer, shuffle } from "../shared.js";
 import { normalizeGameModifiers } from "../modifiers.js";
 import { appendLog, cardsText, publicPlayers } from "../engine-context.js";
 
@@ -42,7 +42,6 @@ export function createPresidentState(players, options = {}) {
   const deck = shuffle(createDeck());
   const hands = Object.fromEntries(players.map((player) => [player.id, []]));
   deck.forEach((card, index) => hands[players[index % players.length].id].push(card));
-  Object.values(hands).forEach((hand) => hand.sort((left, right) => cardValue(left.rank) - cardValue(right.rank)));
   return { gameId: "president", players: publicPlayers(players), modifiers: normalizeGameModifiers("president", options.gameModifiers), hands, pile: [], currentSet: null, passes: [], finishedOrder: [], revolution: false, logs: [], currentPlayerIndex: 0, finished: false, winners: [] };
 }
 
@@ -66,7 +65,10 @@ export function applyPresidentAction(state, actorId, action) {
     if (indexes.some((index) => index < 0)) throw new Error("Une des cartes sélectionnées n'est plus dans ta main.");
     if (state.currentSet && count !== state.currentSet.count) throw new Error(`Il faut jouer ${state.currentSet.count} carte(s).`);
     if (state.currentSet && presidentValue(rank, state.revolution) <= presidentValue(state.currentSet.rank, state.revolution)) throw new Error(state.revolution ? "Il faut jouer une combinaison supérieure dans l'ordre inversé de la révolution." : "Il faut jouer une combinaison supérieure.");
-    const cards = indexes.reverse().map((index) => hand.splice(index, 1)[0]).reverse();
+    const cards = indexes.map((index) => hand[index]);
+    // Manual hand order can submit identities in any order. Remove backwards
+    // by server index so selecting an earlier card cannot remove its neighbour.
+    [...indexes].sort((left, right) => right - left).forEach((index) => hand.splice(index, 1));
     state.pile.push({ playerId: actorId, cards });
     state.currentSet = { playerId: actorId, rank, count };
     state.passes = [];

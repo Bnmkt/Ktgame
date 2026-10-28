@@ -8,13 +8,27 @@ stage=$(realpath -- "$1")
 [[ -f $stage/source-manifest.json && -d $stage/incoming/client/src ]] || { echo 'Incomplete release.' >&2; exit 1; }
 exec 9>/run/ktga-deployment.lock
 flock -w 120 9 || { echo 'Another deployment is still active.' >&2; exit 1; }
-files=(
-  client/src/components/game/GameBoards.jsx client/src/components/game/GameSupport.jsx
-  client/src/components/game/BlackjackTable.jsx client/src/components/room/TableInterface.jsx
-  client/src/components/room/table-interface.css client/src/components/room/table-stage.css
-  client/src/features/games/table-interface.js client/src/pages/RoomPage.jsx
-  client/src/locales/fr.json client/src/locales/en.json
-)
+node - "$stage" <<'JS'
+const fs=require('node:fs'),path=require('node:path'),stage=process.argv[2];
+const defaults=[
+ 'client/src/components/game/GameBoards.jsx','client/src/components/game/GameSupport.jsx',
+ 'client/src/components/game/BlackjackTable.jsx','client/src/components/room/TableInterface.jsx',
+ 'client/src/components/room/table-interface.css','client/src/components/room/table-stage.css',
+ 'client/src/features/games/table-interface.js','client/src/pages/RoomPage.jsx',
+ 'client/src/locales/fr.json','client/src/locales/en.json'
+];
+const allowed=new Set([...defaults,
+ 'client/src/components/game/PresidentTable.jsx','client/src/components/game/president-table.css',
+ 'client/src/components/game/usePresidentHand.js','client/src/components/game/usePresidentDeal.js',
+ 'client/src/components/game/CardMotionSurface.jsx','client/src/features/games/president.js',
+ 'server/src/games/engines/president.js'
+]);
+const manifest=JSON.parse(fs.readFileSync(path.join(stage,'source-manifest.json')));
+const files=manifest.files ?? defaults;
+if(!Array.isArray(files)||!files.length||files.some(file=>!allowed.has(file))||new Set(files).size!==files.length) throw Error('Invalid scoped release files');
+fs.writeFileSync(path.join(stage,'release-files.txt'),files.join('\n')+'\n');
+JS
+mapfile -t files < "$stage/release-files.txt"
 for file in "${files[@]}"; do
   [[ -f $stage/incoming/$file && ! -L $stage/incoming/$file ]] || { echo "Missing release source: $file" >&2; exit 1; }
 done
@@ -58,11 +72,16 @@ function snapshot(directory) {
     if (entry.isSymbolicLink()) throw Error('Unexpected source symlink');
     if (entry.isDirectory()) walk(filename); else result[path.relative(directory,filename)] = hash(filename);
   }}
-  walk(directory); return result;
+  walk(directory);
+  result['/server/president.js']=hash('/opt/ktga/server/src/games/engines/president.js');
+  return result;
 }
 fs.writeFileSync(path.join(stage,'live-source-state.json'),JSON.stringify(snapshot('/opt/ktga/client/src')));
 for (const relative of files) {
-  const live=path.join('/opt/ktga',relative), incoming=path.join(stage,'incoming',relative), destination=path.join(stage,'workspace',relative);
+  const live=path.join('/opt/ktga',relative), incoming=path.join(stage,'incoming',relative);
+  // workspace/server points to production for read-only build dependencies.
+  // Stage server updates separately so preparing a release cannot alter live code.
+  const destination=path.join(stage,relative.startsWith('server/')?'server-source':'workspace',relative);
   if (relative.startsWith('client/src/locales/')) {
     const language=path.basename(relative,'.json');
     const current=JSON.parse(fs.readFileSync(live));
@@ -92,11 +111,12 @@ function walk(folder) { for(const entry of fs.readdirSync(folder,{withFileTypes:
  if(entry.isDirectory()) walk(filename); else current[path.relative('/opt/ktga/client/src',filename)]=crypto.createHash('sha256').update(fs.readFileSync(filename,'utf8').replace(/\r\n/g,'\n')).digest('hex');
 }}
 walk('/opt/ktga/client/src');
+current['/server/president.js']=crypto.createHash('sha256').update(fs.readFileSync('/opt/ktga/server/src/games/engines/president.js','utf8').replace(/\r\n/g,'\n')).digest('hex');
 if(JSON.stringify(previous)!==JSON.stringify(current)) throw Error('Live source changed during the build; rebuild the release.');
 JS
 backup=/var/backups/ktga/tables-$(date -u +%Y%m%dT%H%M%SZ)-$$
 install -d -m 0700 "$backup"
-tar -czf "$backup/code.tar.gz" -C /opt/ktga client/src client/dist-ssr
+tar -czf "$backup/code.tar.gz" -C /opt/ktga client/src client/dist-ssr server/src/games/engines/president.js
 tar -czf "$backup/frontend.tar.gz" -C /var/www/ktga .
 stopped=false
 changed=false
@@ -120,7 +140,11 @@ systemctl stop ktga.service
 stopped=true
 checkTables
 changed=true
-for file in "${files[@]}"; do install -D -m 0644 -o deploy -g deploy "$stage/workspace/$file" "/opt/ktga/$file"; done
+for file in "${files[@]}"; do
+  source="$stage/workspace/$file"
+  if [[ $file == server/* ]]; then source="$stage/server-source/$file"; fi
+  install -D -m 0644 -o deploy -g deploy "$source" "/opt/ktga/$file"
+done
 # Retain old hashed assets for existing tabs; publish entry documents last.
 rsync -a --chown=root:root --chmod=D755,F644 --exclude=/index.html --exclude=/discord-activity/index.html "$stage/workspace/client/dist/" /var/www/ktga/
 rsync -a --delete --chown=deploy:deploy --chmod=D755,F644 "$stage/workspace/client/dist-ssr/" /opt/ktga/client/dist-ssr/

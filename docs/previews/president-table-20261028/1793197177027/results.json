@@ -1,0 +1,44 @@
+{
+  "ok": true,
+  "checks": [
+    "52-round-robin-flights",
+    "hidden-opponents",
+    "opaque-3d-cosmetics",
+    "hover-front",
+    "toggle-and-multi-selection",
+    "pointer-reorder-without-click",
+    "order-survives-updates-and-reload",
+    "3-to-6-players",
+    "1366-1920-wide-mobile-fullscreen",
+    "socket-multiplayer-and-reconnect",
+    "accelerate-and-skip",
+    "immediate-server-update",
+    "reduced-motion",
+    "content-blocker"
+  ],
+  "actions": [
+    {
+      "viewer": "me",
+      "action": {
+        "type": "play",
+        "cards": [
+          {
+            "rank": "8",
+            "suit": "S"
+          },
+          {
+            "rank": "8",
+            "suit": "H"
+          }
+        ]
+      }
+    },
+    {
+      "viewer": "p1",
+      "action": {
+        "type": "pass"
+      }
+    }
+  ],
+  "errors": []
+}

@@ -5197,5 +5197,22 @@
   "Victoire payée 1:1. En cas d’égalité, la mise est rendue.": "A win pays 1:1. A tie returns the bet.",
   "Main terminée": "Hand completed",
   "Tirer": "Hit",
-  "Autres actions": "More actions"
+  "Autres actions": "More actions",
+  "Glisser pour déplacer · Alt + flèche pour réordonner": "Drag to move · Alt + arrow to reorder",
+  "Plateau de Président": "President table",
+  "A passé": "Passed",
+  "Distribution": "Dealing",
+  "Accélérer": "Speed up",
+  "Passer l’animation": "Skip animation",
+  "Ordre classique": "Standard order",
+  "{value0} carte(s) sélectionnée(s)": "{value0} card(s) selected",
+  "Ordre et rangs": "Order and ranks",
+  "Derniers tours": "Recent turns",
+  "Les cartes d’une combinaison doivent avoir la même valeur.": "Cards in a set must have the same rank.",
+  "Répondre avec le même nombre de cartes et une valeur supérieure.": "Respond with the same number of cards and a higher rank.",
+  "Un carré inverse l’ordre des cartes et libère le pli.": "Four of a kind reverses the rank order and clears the trick.",
+  "Vice-Président": "Vice-President",
+  "Vice-Ass": "Vice-Ass",
+  "Ass": "Ass",
+  "Neutre": "Neutral"
 }
