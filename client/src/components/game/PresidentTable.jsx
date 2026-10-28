@@ -38,7 +38,7 @@ function PresidentHand({ cards, selected, onSelect, onMove, canSelect, state }) 
     gesture.current = null; setDrag(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
-  return <div className="president-card-hand" ref={handRef} style={{ "--president-card-width": `${cardWidth}px`, "--president-card-height": `${cardWidth * 118 / 82}px`, "--president-corner-font": `${Math.max(9, Math.min(27, (cards.length > 1 ? step : cardWidth) * .68))}px` }} aria-label={t("Ta main")}>
+  return <div className="president-card-hand" ref={handRef} style={{ "--president-card-width": `${cardWidth}px`, "--president-card-height": `${cardWidth * 118 / 82}px` }} aria-label={t("Ta main")}>
     {cards.map((card) => {
       const key = presidentCardKey(card), index = preview.indexOf(key), originalIndex = keys.indexOf(key);
       const chosen = selected.includes(key), allowed = canPlayPresidentSet(state, card.rank, state.currentSet?.count ?? 1);

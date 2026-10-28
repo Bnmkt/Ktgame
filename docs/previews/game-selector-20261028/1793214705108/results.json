@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "checks": [
+    "existing-15-artworks",
+    "ellipse-depth-and-motion",
+    "arrows-and-infinite-keyboard",
+    "direct-click",
+    "wheel-without-scroll",
+    "filtered-random-without-requests",
+    "search-and-empty",
+    "classic-preserved-and-persisted",
+    "immersive-persisted",
+    "existing-create-and-browse",
+    "ranked-dialog",
+    "desktop-and-mobile",
+    "touch",
+    "reduced-motion",
+    "Ghostery"
+  ],
+  "requests": [
+    {
+      "path": "/api/rooms",
+      "body": {
+        "gameId": "blackjack",
+        "stake": 20,
+        "isPublic": true,
+        "name": "",
+        "password": "",
+        "minLevel": 1,
+        "maxLevel": null
+      }
+    }
+  ],
+  "errors": []
+}

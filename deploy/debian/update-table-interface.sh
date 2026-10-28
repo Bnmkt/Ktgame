@@ -21,7 +21,9 @@ const allowed=new Set([...defaults,
  'client/src/components/game/PresidentTable.jsx','client/src/components/game/president-table.css',
  'client/src/components/game/usePresidentHand.js','client/src/components/game/usePresidentDeal.js',
  'client/src/components/game/CardMotionSurface.jsx','client/src/features/games/president.js',
- 'server/src/games/engines/president.js'
+ 'server/src/games/engines/president.js',
+ 'client/src/components/game/ImmersiveGameSelector.jsx','client/src/components/game/immersive-game-selector.css',
+ 'client/src/components/game/useOrbitMotion.js','client/src/features/games/selector.js','client/src/pages/LobbyPage.jsx'
 ]);
 const manifest=JSON.parse(fs.readFileSync(path.join(stage,'source-manifest.json')));
 const files=manifest.files ?? defaults;

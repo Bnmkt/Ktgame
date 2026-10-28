@@ -5,6 +5,8 @@ import { softBanLimited } from "../features/accounts/softban.js";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { bugDiagnostics } from "../features/bugs/diagnostics.js";
+import { ImmersiveGameSelector } from "../components/game/ImmersiveGameSelector.jsx";
+import { gameViewStorageKey, preferredGameView } from "../features/games/selector.js";
 import { GameArtwork } from "../components/game/GameArtwork.jsx";
 import { LobbyNotice } from "../components/navigation/LobbyNotice.jsx";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coins, Dice5, DoorOpen, Eye, Filter, Gamepad2, HelpCircle, Play, Plus, Search, ShieldCheck, Spade, Sparkles, Star, Swords, Trophy, Users, X } from "lucide-react";
@@ -41,6 +43,9 @@ function formatEventDate(value) {
 export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onAchievements, settings = defaultPublicSettings }) {
   const { t: localeText } = useLocale();
   const [games, setGames] = useState([]);
+  const [gameView, setGameView] = useState(() => { try { return preferredGameView(window.localStorage); } catch { return "immersive"; } });
+  const [activeGameId, setActiveGameId] = useState(settings.featuredGameId);
+  useEffect(() => { try { localStorage.setItem(gameViewStorageKey, gameView); } catch { /* Private browsing can disable storage. */ } }, [gameView]);
   const [rooms, setRooms] = useState([]);
   const [friends, setFriends] = useState([]);
   const liveFriendTables = friendTables(rooms, friends);
@@ -159,8 +164,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
   }
 
   return (
-    <main className="app-shell game-lounge">
-      <div className="page-heading lobby-heading lounge-heading"><div><span className="eyebrow"><Gamepad2 size={18}/>{localeText("Le casino")}</span><h1>{localeText("À quelle table joues-tu ?")}</h1><div className="lounge-mode-label"><span>{localeText(playMode === "ranked" ? "Classé" : "Classique")}</span><span><Users size={14}/>{localeText("Multijoueur")}</span></div></div></div>
+    <main className={`app-shell game-lounge ${gameView === "immersive" ? "game-lounge-immersive" : ""}`}>
+      <div className="page-heading lobby-heading lounge-heading"><div><span className="eyebrow"><Gamepad2 size={18}/>{localeText("Le casino")}</span><h1>{localeText(gameView === "immersive" ? "Choisis ton jeu" : "À quelle table joues-tu ?")}</h1><div className="lounge-mode-label"><span>{localeText(playMode === "ranked" ? "Classé" : "Classique")}</span><span><Users size={14}/>{localeText("Multijoueur")}</span></div></div><div className="game-view-switch" role="group" aria-label={localeText("Affichage des jeux")}>{[["immersive", "Vue immersive"], ["classic", "Vue classique"]].map(([value, label]) => <button type="button" key={value} className="secondary" aria-pressed={gameView === value} onClick={() => setGameView(value)}>{localeText(label)}</button>)}</div></div>
       {error && !selectedGame && <div className="error">{localeText(error)}</div>}
       {(user.minor?.restricted || user.moderation?.type === "soft") && <div className="account-limitation-notice"><ShieldCheck size={18} /><span><strong>{localeText("Accès adapté")}</strong>{localeText("Certaines fonctions et certains jeux ne sont pas disponibles pour ce compte.")}</span></div>}
       <div id="lobby-collection-entry"/>
@@ -185,7 +190,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
       {!entryRestricted && <div className="lobby-join-action"><button type="button" className="secondary" onClick={() => setJoinOpen(true)}><DoorOpen size={18} />{" " + localeText("Rejoindre avec un code")}</button></div>}
       {!observingRestricted && liveFriendTables.length > 0 && <section className="live-room-section"><h2>{localeText("Parties en cours")}</h2><div className="live-room-list">{liveFriendTables.map((room) => <button className="secondary" key={room.code} onClick={() => onEnterRoom(room.code)}><Eye size={18} /><span>{room.name}</span></button>)}</div></section>}
       <div className="single-layout">
-        <section>
+        <section className="game-selection-area">
+          <div className="game-selection-tools">
           <div className="section-title"><h2>{localeText("Jeux disponibles")}</h2><span className="muted">{visibleGames.length}{" " + localeText("jeu")}{visibleGames.length !== 1 ? localeText("x") : ""}</span></div>
           <div className="lounge-categories" role="group" aria-label={localeText("Type de jeu")}>{[{ value: "all", label: "Tous les jeux", icon: Gamepad2 }, { value: "dice", label: "Jeux de dés", icon: Dice5 }, { value: "cards", label: "Jeux de cartes", icon: Spade }].map(({ value, label, icon: Icon }) => <button key={value} type="button" className={gameTypeFilter === value ? "active" : "secondary"} aria-pressed={gameTypeFilter === value} onClick={() => setGameTypeFilter(value)}><Icon size={18}/><span>{localeText(label)}</span></button>)}</div>
           <div className="game-filter-panel">
@@ -204,7 +210,8 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
             </div>}
             {(activeFilterCount > 0 || normalizedGameSearch) && <div className="active-filter-summary" aria-live="polite"><span>{visibleGames.length}{" " + localeText("résultat")}{visibleGames.length > 1 ? localeText("s") : ""}</span>{gameTypeFilter !== "all" && <b>{gameTypeFilter === "dice" ? localeText("Dés") : localeText("Cartes")}</b>}{gameCategoryFilter !== "all" && <b>{localeText(gameCategoryLabel(gameCategoryFilter))}</b>}{gameAudienceFilter !== "all" && <b>{localeText(gameAudienceLabel(gameAudienceFilter))}</b>}{gameComplexityFilter !== "all" && <b>{localeText(gameComplexityLabel(gameComplexityFilter))}</b>}</div>}
           </div>
-          <div className="game-grid">
+          </div>
+          {gameView === "immersive" ? <ImmersiveGameSelector games={visibleGames} rooms={rooms} activeId={activeGameId} onSelect={setActiveGameId} mode={playMode} rankedStatus={rankedStatus} canCreate={!creatingRestricted} canEnter={!entryRestricted} canRanked={!joiningRestricted && !rankedRestricted} onTables={chooseTables} onRules={setRulesGame}/> : <div className="game-grid">
             {visibleGames.map((game) => (
               <article key={game.id} className={`game-card premium-card ${game.type} ${playMode==="ranked"?"ranked-game-card":""}`}>
                 <GameArtwork source={game.descriptiveImage} backdrop />
@@ -216,7 +223,7 @@ export function Lobby({ user, setUser, onOpenRoom, onEnterRoom, onOpenEvent, onA
                 <div className="game-table-actions">{playMode==="ranked"?<button type="button" disabled={joiningRestricted || rankedRestricted || rankedStatus?.games.find((row)=>row.id===game.id)?.enabled===false} onClick={()=>chooseTables(game,"browse")}><Swords size={18}/>{localeText("Rejoindre le classé")}</button>:<><button type="button" disabled={creatingRestricted} onClick={() => chooseTables(game, "create")}><Plus size={18} />{localeText("Créer une table")}</button>{!entryRestricted && <button type="button" className="secondary" onClick={() => chooseTables(game, "browse")}><DoorOpen size={17} />{localeText("Rejoindre (")}{rooms.filter((room) => room.gameId === game.id && !room.ranked).length})</button>}</>}<button type="button" className="secondary game-table-rules" title={localeText("Règles de {value0}", { value0: game.name })} aria-label={localeText("Règles de {value0}", { value0: game.name })} onClick={() => setRulesGame(game.id)}><HelpCircle size={18} /></button></div>
               </article>
             ))}
-          </div>
+          </div>}
           {!visibleGames.length && <div className="empty-state game-filter-empty mascot-empty-state"><Mascot character="lucky" pose="think"/><strong>{localeText("Aucun jeu ne correspond à ces critères.")}</strong><button className="secondary" onClick={resetGameFilters}>{localeText("Effacer la recherche et les filtres")}</button></div>}
         </section>
       </div>

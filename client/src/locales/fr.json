@@ -5281,5 +5281,21 @@
   "Vice-Président": "Vice-Président",
   "Vice-Ass": "Vice-Ass",
   "Ass": "Ass",
-  "Neutre": "Neutre"
+  "Neutre": "Neutre",
+  "Choisis ton jeu": "Choisis ton jeu",
+  "Affichage des jeux": "Affichage des jeux",
+  "Vue immersive": "Vue immersive",
+  "Vue classique": "Vue classique",
+  "carrousel": "carrousel",
+  "Sélecteur circulaire des jeux": "Sélecteur circulaire des jeux",
+  "Utilise les flèches du clavier, la molette ou un glissement horizontal pour choisir un jeu.": "Utilise les flèches du clavier, la molette ou un glissement horizontal pour choisir un jeu.",
+  "Choisir {value0}": "Choisir {value0}",
+  "{value0} jeux, un seul casino.": "{value0} jeux, un seul casino.",
+  "Classé disponible": "Classé disponible",
+  "{value0} tables publiques": "{value0} tables publiques",
+  "Jeu précédent": "Jeu précédent",
+  "Jeu suivant": "Jeu suivant",
+  "Jeu aléatoire": "Jeu aléatoire",
+  "Molette · flèches · glisser": "Molette · flèches · glisser",
+  "{value0} table publique": "{value0} table publique"
 }

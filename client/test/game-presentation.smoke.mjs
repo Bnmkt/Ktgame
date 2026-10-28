@@ -31,6 +31,7 @@ async function setup(viewport, { logged = false, admin = false, editor = false, 
   await context.addInitScript((version) => {
     localStorage.setItem("ktga-privacy-choice", JSON.stringify({ version, chosenAt: Date.now(), enabled: false }));
     localStorage.setItem("ktga-install-choice", "ignored");
+    localStorage.setItem("ktga-game-selection-view", "classic");
   }, PRIVACY_VERSION);
   await context.addInitScript((language) => { if (!localStorage.getItem("ktga-locale")) localStorage.setItem("ktga-locale", language); }, browserLocale);
   const page = await context.newPage();

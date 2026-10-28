@@ -129,6 +129,19 @@ try {
     }
   }
   await page.setViewportSize({ width: 1366, height: 768 });
+  prepare(3, true); broadcast(); await page.waitForTimeout(150);
+  await until(async () => await page.locator('[data-president-dealing]').count() === 0, 'theme deal complete');
+  for (const skin of ['premium-frame', 'premium-obsidian', 'premium-royal']) {
+    await page.goto(url('me') + `&skin=${skin}`); await page.locator('.president-stage').waitFor(); await page.mouse.move(0,0);
+    await page.waitForTimeout(200);
+    assert.ok(await page.locator('.president-hand-card > .playing-card').evaluateAll(nodes => nodes.every(node => getComputedStyle(node).justifyItems === 'center' && getComputedStyle(node).alignContent === 'center')), 'themed rank and suit stay in the centre');
+    const ranksVisible=await page.locator('.president-hand-card').evaluateAll(nodes => nodes.every(node => {
+      const rank=node.querySelector('strong').getBoundingClientRect();
+      return document.elementFromPoint(rank.x + rank.width/2, rank.y + rank.height/2)?.closest('[data-president-card]') === node;
+    }));
+    assert.ok(ranksVisible, `${skin}: centred ranks remain exposed in an 18-card hand`);
+    await page.screenshot({ path: path.join(output, `centred-${skin}.png`), fullPage:true });
+  }
   await page.getByRole('button', { name: 'Plein écran', exact: true }).click();
   await page.locator('.table-fullscreen').waitFor();
   assert.ok(await page.evaluate(() => Boolean(document.fullscreenElement)));

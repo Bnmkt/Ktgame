@@ -35,7 +35,8 @@ export function movePresidentCard(order, key, destination) {
 
 export function presidentHandGeometry(width, count, maximum = 100) {
   const available = Math.max(1, width - 12);
-  const cardWidth = Math.min(maximum, available / (1 + Math.max(0, count - 1) * .31));
+  // Keep the central rank and suit exposed, including decorated card skins.
+  const cardWidth = Math.min(maximum, available / (1 + Math.max(0, count - 1) * .74));
   const step = count > 1 ? Math.min(cardWidth * .88, (available - cardWidth) / (count - 1)) : 0;
   return { cardWidth, step, start: (width - cardWidth - step * Math.max(0, count - 1)) / 2 };
 }
