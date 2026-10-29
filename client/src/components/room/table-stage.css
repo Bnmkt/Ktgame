@@ -81,7 +81,7 @@
 .table-interface .table-roll-history > summary { font-size: 12px; }
 .table-interface .table-completion { flex: 0 0 auto; font-size: 13px; }
 .table-interface .table-completion > summary { padding: 8px; cursor: pointer; color: var(--table-gold); }
-.table-interface .table-completion[open] { max-height: 240px; overflow: auto; }
+.table-interface .table-completion[open] { max-height: none; }
 .blackjack-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
 .blackjack-history li { display: grid; gap: 3px; padding-bottom: 9px; border-bottom: 1px solid #ffffff13; }
 .blackjack-history strong { color: var(--table-gold); }

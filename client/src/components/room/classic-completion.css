@@ -45,9 +45,9 @@
 .classic-completion-actions button { min-height: 42px; }
 .classic-completion-review { margin-top: 12px; font-size: 12px; }
 .classic-completion-layer { z-index: 1400; }
-.classic-completion-modal { width: min(620px, calc(100vw - 28px)); max-width: 620px; max-height: calc(100dvh - 28px); overflow: hidden; padding: 28px; background: #101b1a; }
-.classic-completion-modal .classic-completion-content { display: flex; flex-direction: column; max-height: calc(100dvh - 86px); min-height: 0; }
-.classic-completion-modal .classic-completion-body { min-height: 0; overflow-y: auto; padding-right: 6px; }
+.classic-completion-modal { overflow: hidden; padding: 28px; background: #101b1a; }
+.classic-completion-modal .classic-completion-content { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.classic-completion-modal .classic-completion-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; }
 .classic-completion-modal .classic-completion-heading { padding-right: 24px; }
 .classic-completion-modal .classic-completion-actions { flex-shrink: 0; }
 @keyframes completion-emblem-enter { from { transform: scale(.85); opacity: .4; } to { transform: scale(1); opacity: 1; } }
@@ -58,7 +58,6 @@
   .classic-completion-headline { gap: 12px; }
   .classic-completion-headline h2 { font-size: 22px; overflow-wrap: anywhere; }
   .classic-completion-emblem { flex-basis: 52px; width: 52px; height: 52px; }
-  .classic-completion-modal .classic-completion-content { max-height: calc(100dvh - 66px); }
   .classic-completion-metrics { gap: 16px; }
   .classic-completion-metrics strong { font-size: 25px; }
   .classic-completion-ranking li { padding: 8px; gap: 8px; }

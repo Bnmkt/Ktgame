@@ -23,7 +23,10 @@ const allowed=new Set([...defaults,
  'client/src/components/game/CardMotionSurface.jsx','client/src/features/games/president.js',
  'server/src/games/engines/president.js',
  'client/src/components/game/ImmersiveGameSelector.jsx','client/src/components/game/immersive-game-selector.css',
- 'client/src/components/game/useOrbitMotion.js','client/src/features/games/selector.js','client/src/pages/LobbyPage.jsx'
+ 'client/src/components/game/useOrbitMotion.js','client/src/features/games/selector.js','client/src/pages/LobbyPage.jsx',
+ 'client/src/components/room/ClassicCompletion.jsx','client/src/components/room/classic-completion.css',
+ 'client/src/components/room/completion-dialog.css','client/src/features/games/RankedCompletion.jsx',
+ 'client/src/features/games/ranked-completion.css'
 ]);
 const manifest=JSON.parse(fs.readFileSync(path.join(stage,'source-manifest.json')));
 const files=manifest.files ?? defaults;

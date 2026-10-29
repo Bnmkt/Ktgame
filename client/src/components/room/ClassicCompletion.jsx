@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowRight, Coins, DoorOpen, Eye, Play, Sparkles, Trophy } from "lucide-react";
 import { Dialog } from "../common/Dialog.jsx";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
@@ -8,20 +8,14 @@ import { gameTitle } from "../../features/games/config.js";
 import { classicResults } from "../../features/games/classic-completion.js";
 import { isFundedPlayer } from "../../features/games/token-economy.js";
 import "./classic-completion.css";
+import "./completion-dialog.css";
 import { Mascot, gameMascot } from "../mascots/Mascot.jsx";
 
 function signed(value, t) {
   return <>{value > 0 ? "+" : value < 0 ? "-" : ""}<CompactNumber value={Math.abs(value)} label={t("Bilan net de jetons")} /></>;
 }
 
-function RecapExpiry({ endsAt }) {
-  const { t } = useLocale();
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
-  return <small className="classic-completion-expiry">{t("Retour à la table dans {seconds} s", { seconds: Math.max(0, Math.ceil((endsAt - now) / 1000)) })}</small>;
-}
-
-function CompletionContent({ room, userId, actions, endsAt, dialog = false }) {
+function CompletionContent({ room, userId, actions, dialog = false }) {
   const { t } = useLocale();
   const rows = classicResults(room), own = rows.find((row) => row.id === userId);
   const winners = rows.filter((row) => row.winner);
@@ -40,7 +34,7 @@ function CompletionContent({ room, userId, actions, endsAt, dialog = false }) {
     <section className="classic-completion-ranking" aria-label={t("Classement final")}><div className="classic-completion-ranking-heading"><h3>{t(room.gameId === "blackjack" ? "Résultats des joueurs" : "Classement final")}</h3><small>{t(rows[0]?.unit ?? "Score")}</small></div><ol>{rows.map((row) => <li key={row.id} className={`${row.winner ? "is-winner" : ""} ${row.id === userId ? "is-current" : ""}`}><span className="classic-completion-position">{row.winner ? <Trophy size={17}/> : room.gameId === "blackjack" ? "—" : row.rank}</span><div className="classic-completion-player"><DisplayName user={row}/><small>{row.id === userId ? t("Toi") : row.isBot ? t("IA") : ""}{room.gameId === "blackjack" ? ` · ${t(row.push ? "Égalité" : row.winner ? "Gagnant" : "Perdu")}` : ""}</small></div><strong>{row.unit === "Place" ? `#${row.score}` : <CompactNumber value={row.score}/>}</strong></li>)}</ol></section>
     {isFundedPlayer(own) && hasMoney && <details className="classic-completion-accounting"><summary>{t("Détail des jetons")}</summary><dl><div><dt>{t(own.net === null ? "Mise initiale" : "Jetons engagés")}</dt><dd><CompactNumber value={own.spent}/></dd></div><div><dt>{t("Jetons récupérés")}</dt><dd><CompactNumber value={own.recovered}/></dd></div>{own.net !== null && <div><dt>{t("Bilan net de jetons")}</dt><dd>{signed(own.net, t)}</dd></div>}</dl></details>}
     </div>
-    <footer className="classic-completion-actions">{endsAt && <RecapExpiry endsAt={endsAt}/>}{actions}{!dialog && !actions && <small>{t("En attente du maître de table")}</small>}</footer>
+    <footer className="classic-completion-actions">{actions}{!dialog && !actions && <small>{t("En attente du maître de table")}</small>}</footer>
   </div>;
 }
 
@@ -48,12 +42,13 @@ export function ClassicCompletion({ room, userId, isOwner, pacing, canSkip, onSk
   const { t } = useLocale();
   const [dismissed, setDismissed] = useState(false);
   const [review, setReview] = useState(false);
-  const automatic = pacing?.kind === "round-results" && pacing.final && !dismissed;
+  const finalPacing = pacing?.kind === "round-results" && pacing.final;
+  const automatic = room.state?.finished && !dismissed;
   const close = () => { setDismissed(true); setReview(false); };
   const actions = <>{isOwner && room.gameId === "blackjack" && <button type="button" onClick={onInstantReplay}><Play size={17}/>{t("Rejouer maintenant")}</button>}{isOwner && room.gameId !== "texas-holdem" && <button type="button" className={room.gameId === "blackjack" ? "secondary" : ""} onClick={onReplay}><Play size={17}/>{t("Retour à la salle d'attente")}</button>}{!isOwner && room.gameId !== "texas-holdem" && <small>{t("Le maître de table peut relancer une partie.")}</small>}<button type="button" className="secondary" onClick={onLeave}><DoorOpen size={17}/>{t("Quitter la table")}</button></>;
   return <section className="classic-completion" aria-label={t("Bilan de la partie")}>
     <CompletionContent room={room} userId={userId} actions={actions}/>
     <button type="button" className="secondary classic-completion-review" onClick={() => setReview(true)}><Eye size={16}/>{t("Revoir les résultats")}</button>
-    {(automatic || review) && <Dialog title={t("Bilan de la partie")} hideTitle className="classic-completion-modal" layerClassName="classic-completion-layer" onClose={close}><CompletionContent room={room} userId={userId} dialog endsAt={automatic ? pacing.endsAt : null} actions={<button type="button" onClick={() => { close(); if (automatic && canSkip) onSkip(); }}>{t("Voir la table")}<ArrowRight size={17}/></button>}/></Dialog>}
+    {(automatic || review) && <Dialog title={t("Bilan de la partie")} hideTitle className="classic-completion-modal completion-dialog" layerClassName="classic-completion-layer completion-dialog-layer" onClose={close}><CompletionContent room={room} userId={userId} dialog actions={<button type="button" onClick={() => { close(); if (finalPacing && canSkip) onSkip(); }}>{t("Voir la table")}<ArrowRight size={17}/></button>}/></Dialog>}
   </section>;
 }

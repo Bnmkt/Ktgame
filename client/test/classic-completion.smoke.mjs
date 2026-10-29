@@ -8,10 +8,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { Server } from "../../server/node_modules/socket.io/dist/index.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const dependencies = path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
+const dependencies = process.env.KTGA_BROWSER_TOOLS || path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
 const { chromium } = await import(pathToFileURL(path.join(dependencies, "playwright/index.mjs")));
 const { PlaywrightBlocker } = await import(pathToFileURL(path.join(dependencies, "@ghostery/adblocker-playwright/dist/esm/index.js")));
-const directory = path.join(root, "docs/previews/classic-completion-20261013", String(Date.now()));
+const directory = path.join(root, "docs/previews/completion-fullheight-20261029", String(Date.now()));
 fs.mkdirSync(directory, { recursive: true });
 const listener = net.createServer();
 await new Promise(resolve => listener.listen(0, "127.0.0.1", resolve));
@@ -38,10 +38,12 @@ import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook
 import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
 import '/src/styles.css';import '/src/navigation/casino.css';
 const {LocaleProvider}=await import('/src/locales/LocaleProvider.jsx'),{ClassicCompletion}=await import('/src/components/room/ClassicCompletion.jsx'),{Room}=await import('/src/pages/RoomPage.jsx');
+const {RankedCompletion}=await import('/src/features/games/RankedCompletion.jsx');
 const {SpectatorPage}=await import('/src/pages/SpectatorPage.jsx');
 const h=React.createElement,root=ReactDOM.createRoot(document.getElementById('root'));
 window.skips=0;window.replays=0;window.leaves=0;
 window.recap=(room)=>root.render(h(LocaleProvider,null,h('main',{style:{maxWidth:800,margin:'24px auto',padding:12}},h(ClassicCompletion,{key:room.activityMatchId,room,userId:'self',isOwner:true,pacing:room.pacing,canSkip:true,onSkip:()=>window.skips++,onReplay:()=>window.replays++,onInstantReplay:()=>window.replays++,onLeave:()=>window.leaves++}))));
+window.rankedRecap=(matchId,gameId,result)=>root.render(h(LocaleProvider,null,h(RankedCompletion,{key:matchId,matchId,gameId,result,userId:'self'})));
 window.table=(room)=>root.render(h(LocaleProvider,null,h(Room,{key:room.activityMatchId,code:room.code,user:room.players[0],setUser:()=>{},onBack:()=>{},onExcluded:()=>{}})));
 window.joins=0;window.spectate=(room)=>root.render(h(LocaleProvider,null,h(SpectatorPage,{key:room.activityMatchId,code:room.code,user:{id:'observer',pseudo:'Spectateur',cosmetics:{equipped:{}}},onBack:()=>{},onJoin:()=>window.joins++})));
 window.ready=true;
@@ -54,6 +56,14 @@ const fixture = (id, gameId = "yahtzee") => ({ id: "room", activityMatchId: id, 
   completion: { xp: { amount: 350, level: 10, previousLevel: 9, mastery: 1, previousMastery: 1, masteryLabel: "I", title: "Brelan I", levelXp: 140, nextXp: 1280 } },
   pacing: { id, kind: "round-results", final: true, endsAt: Date.now() + 30000, startedAt: Date.now() }
 });
+async function assertFullHeight(modal, page) {
+  const viewportHeight = await page.evaluate(() => innerHeight);
+  const bounds = await modal.boundingBox();
+  assert.ok(bounds && Math.abs(bounds.y) <= 1 && Math.abs(bounds.height - viewportHeight) <= 1, "Recap occupies the full viewport height");
+  const footer = await modal.locator("footer").boundingBox();
+  assert.ok(footer && footer.y >= 0 && footer.y + footer.height <= viewportHeight + 1, "Recap actions remain inside the viewport");
+  assert.equal(await modal.evaluate(node => node.scrollWidth > node.clientWidth + 1), false);
+}
 try {
   for (let attempt = 0; attempt < 200; attempt++) {
     try { if ((await fetch(origin)).ok) break; } catch {}
@@ -62,7 +72,7 @@ try {
   }
   browser = await chromium.launch({ channel: "msedge", headless: true });
   const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
-  for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }], ["compact", { width: 1366, height: 768 }]]) {
+  for (const [name, viewport] of [["desktop", { width: 1920, height: 1080 }], ["mobile", { width: 390, height: 844 }], ["compact", { width: 1366, height: 768 }]]) {
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
     await blocker.enableBlockingInPage(page);
@@ -85,12 +95,17 @@ try {
     await page.evaluate(value => window.recap(value), room);
     const modal = page.getByRole("dialog", { name: "Bilan de la partie" });
     await modal.waitFor();
+    await assertFullHeight(modal, page);
     assert.equal(await modal.getByRole("heading", { name: "Victoire !" }).count(), 1);
     assert.equal(await modal.locator("progress").getAttribute("value"), "140");
     assert.equal(await modal.getByText("+350 XP", { exact: true }).count(), 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     assert.equal(await modal.evaluate(node => node.scrollWidth > node.clientWidth + 1), false);
     await modal.screenshot({ path: path.join(directory, `${name}-victory.png`) });
+    room = { ...room, pacing: null };
+    await page.evaluate(value => window.recap(value), room);
+    await modal.waitFor();
+    assert.equal(await modal.isVisible(), true, "Final recap stays open after server pacing ends");
     await modal.getByRole("button", { name: "Fermer", exact: true }).click();
     assert.equal(await page.evaluate(() => window.skips), 0, "Closing cannot change server pacing");
     await page.evaluate(value => window.recap(value), { ...room });
@@ -105,6 +120,28 @@ try {
     await modal.waitFor();
     assert.equal(await modal.locator(".completion-finished").count(), 1);
     await modal.screenshot({ path: path.join(directory, `${name}-loss.png`) });
+    for (const gameId of ["yahtzee", "421", "cul-de-chouette", "farkle", "liars-dice", "shut-the-box", "midnight-dice", "velvet-ruse", "blackjack", "texas-holdem", "president", "bataille", "belote", "golf-solitaire", "accordion"]) {
+      const finished = { ...fixture(`${name}-${gameId}`, gameId), pacing: null };
+      await page.evaluate(value => window.recap(value), finished);
+      await modal.waitFor();
+      await assertFullHeight(modal, page);
+      await modal.getByRole("button", { name: "Fermer", exact: true }).click();
+    }
+    const rankedResult = { userId: "self", before: 1090, after: 1110, delta: 20, beforeRank: { id: "bronze", name: "Bronze", order: 11 }, afterRank: { id: "silver", name: "Argent", order: 12 }, beforeProgression: { progress: 90 }, progression: { progress: 10 } };
+    for (const gameId of ["yahtzee", "belote", "texas-holdem", "president", "liars-dice", "velvet-ruse", "midnight-dice"]) {
+      const matchId = `${name}-${gameId}-ranked`;
+      await page.evaluate(({ matchId, gameId, result }) => {
+        sessionStorage.setItem(`ktga-ranked-recap:self:${matchId}`, "closed");
+        window.rankedRecap(matchId, gameId, result);
+      }, { matchId, gameId, result: rankedResult });
+      const ranked = page.getByRole("dialog", { name: "Ta progression classée", exact: true });
+      await ranked.waitFor();
+      await assertFullHeight(ranked, page);
+      await ranked.getByRole("button", { name: "Afficher le résultat", exact: true }).click();
+      if (gameId === "president") await ranked.screenshot({ path: path.join(directory, `${name}-ranked.png`) });
+      await ranked.getByRole("button", { name: "Continuer", exact: true }).click();
+      assert.equal(await ranked.count(), 0);
+    }
     // Render the real table to check that the legacy final views no longer stack.
     room = fixture(`${name}-real-table`); wireRoom = room;
     await page.evaluate(value => window.table(value), room);
@@ -112,6 +149,7 @@ try {
     assert.equal(await page.locator(".round-results-modal, .board-result, .leaderboard").count(), 0);
     await modal.getByRole("button", { name: "Fermer", exact: true }).click();
     assert.equal(await page.locator(".classic-completion").count(), 1);
+    assert.equal(await page.locator(".table-completion").evaluate(node => node.open), true, "Inline results start expanded");
     if (viewport.width <= 760) {
       await page.getByRole("toolbar").getByRole("button", { name: "Scores", exact: true }).click();
       const scores = page.getByRole("dialog", { name: "Scores", exact: true });
@@ -124,6 +162,7 @@ try {
       await page.getByRole("button", { name: "Plein écran", exact: true }).click();
       await page.getByRole("button", { name: "Revoir les résultats" }).click();
       assert.equal(await modal.evaluate(node => !!node.closest(":fullscreen")), true);
+      await assertFullHeight(modal, page);
       assert.equal(await modal.evaluate(node => node.scrollWidth > node.clientWidth + 1), false);
       await page.screenshot({ path: path.join(directory, `${name}-fullscreen.png`) });
       await page.evaluate(() => document.exitFullscreen());

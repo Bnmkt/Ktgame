@@ -1,5 +1,7 @@
 .ranked-recap-layer { z-index: 24; }
 .ranked-recap-modal { --recap-accent: #e9c35e; --recap-glow: #caa44c66; max-width: 560px; width: min(560px, 94vw); max-height: 92dvh; overflow-y: auto; background: #111c18; border: 1px solid var(--recap-accent); padding: 32px; text-align: center; position: relative; }
+.ranked-recap-modal.completion-dialog { overflow: hidden; }
+.ranked-recap-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .ranked-recap-heading span { font-size: 13px; color: #b8c7bd; }
 .ranked-recap-heading h2 { font-size: 30px; margin: 10px 32px 0; color: var(--recap-accent); }
 .ranked-recap-stage { height: 230px; position: relative; display: grid; place-items: center; overflow: hidden; }
@@ -25,7 +27,7 @@
 .ranked-recap-rating strong { font-size: 24px; color: #f4edd8; }
 .ranked-recap-rating b { font-size: 20px; }
 .ranked-recap-placement { display: flex; align-items: center; justify-content: center; gap: 8px; color: #c2d5ce; }
-.ranked-recap-modal footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.ranked-recap-modal footer { display: flex; flex-shrink: 0; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
 .ranked-recap-modal button { min-height: 42px; }
 .recap-demotion, .recap-loss { --recap-accent: #ed8793; --recap-glow: #cf687555; }
 .recap-demotion.recap-travel .ranked-recap-emblem { transform: translateY(14px) scale(.9); opacity: .4; transition: transform 1s, opacity 1s; }
