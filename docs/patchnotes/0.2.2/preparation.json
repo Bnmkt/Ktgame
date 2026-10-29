@@ -1,0 +1,25 @@
+{
+  "preparedOn": "2026-10-29",
+  "sourceRevision": "17ced4ddf44cff83e2af1d2d6e0f761c5df76554",
+  "version": "0.2.2",
+  "draftId": "00514312-c65c-44dd-b6a6-2e6112aecc82",
+  "status": "draft",
+  "publishedAt": null,
+  "publicVersionAtPreparation": "0.2.1",
+  "readerUrl": "https://www.ktga.me/patchnotes?version=0.2.2",
+  "readerRequiresEditorMode": true,
+  "announcementActivated": false,
+  "summaryCharacters": 466,
+  "blocks": 29,
+  "illustrations": 4,
+  "verifiedLinks": 15,
+  "validation": {
+    "desktop": "1440x1000",
+    "mobile": "390x844",
+    "blocker": "Ghostery",
+    "javascriptErrors": 0,
+    "horizontalOverflow": false,
+    "publicDraftApiStatus": 404,
+    "anonymousEditorApiStatus": 401
+  }
+}
