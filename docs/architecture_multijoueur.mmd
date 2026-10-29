@@ -1,0 +1,85 @@
+flowchart TB
+  %% KTGA : architecture observee dans le depot au 2026-10-28.
+  %% Les branches conditionnelles sont des modes existants, pas des services tous actifs.
+  subgraph CLIENT["Navigateur - memoire locale"]
+    UI["React : LobbyPage / RoomPage / SpectatorPage<br/>rendu cartes et des 3D cote client"]
+    CONV["useConversationInbox<br/>connexion de conversation distincte"]
+  end
+
+  subgraph EDGE["Deploiement Debian fourni - processus independants"]
+    NGINX["Nginx : terminaison TLS, fichiers statiques<br/>un upstream 127.0.0.1:4000 dans le modele"]
+    SYSTEMD["systemd : ktga.service<br/>supervise un Node principal et ses enfants"]
+    STATIC[("/var/www/ktga<br/>assets construits")]
+  end
+
+  subgraph MAIN["Node principal - index.js - un PID, une boucle principale"]
+    HTTP["Express + serveur HTTP ou HTTPS<br/>auth, API salons, API comptes, chat"]
+    RT["Socket.IO<br/>watch-room, chat-subscribe, presence<br/>emission de vues room privees"]
+    MODE{"GAME_WORKERS_ENABLED = 1 ?"}
+    LOCAL["Mode historique : room-commands + room-runtime<br/>createGameState / applyAction<br/>15 moteurs dans ce meme processus"]
+    COORD["Mode processus : game-gateway + game-workers<br/>FIFO par salon, proprietaire unique local<br/>prepare / validation / persistance / commit"]
+    VIEW["sanitizeRoom / serializeRoom / spectatorState<br/>masquage par destinataire<br/>lobby regroupe et incremental"]
+    RAM[("Memoire principale privee<br/>cachedDb : comptes et salons complets<br/>snapshots JSON, index room-directory<br/>invites, presence, acces spectateurs<br/>files ranked et propositions")]
+    STORE["db.js : DatabaseSync<br/>updateDb / persistDatabase<br/>resultats, jetons, XP, checkpoint de salon"]
+    AUX["Stores SQLite annexes<br/>chat, journaux, statut, controles parentaux...<br/>appeles depuis le processus principal"]
+    TASKMODE{"ACCOUNTS_PROCESS_ENABLED = 1 ?"}
+    subgraph THREADS["Alternative comptes desactivee - meme PID, isolates et heaps distincts"]
+      READ["reading-worker : worker_threads<br/>historique, transactions, statistiques<br/>1 par defaut, pool borne"]
+      PASS["password-worker : worker_threads<br/>bcrypt, pool paresseux borne"]
+    end
+  end
+
+  subgraph GAME["Mode jeux active : 1 a 4 processus enfants Node - game-worker-process.js"]
+    KERNEL["Un kernel prive par processus<br/>Map des salons attribues, version et epoch<br/>etat valide + brouillon + recus bornes"]
+    ENGINE["room-commands + room-runtime + ranked-room-runtime<br/>registre des 15 moteurs : createGameState / applyAction<br/>bots, pacing, regles ; aucun acces SQLite"]
+    DUE["Scan due chaque seconde<br/>telemetrie chaque 5 secondes<br/>le gateway doit commander le tick"]
+  end
+
+  subgraph ACCOUNT["Option comptes activee - un processus enfant independant"]
+    AP["accounts-process<br/>bcrypt + lectures et projections de comptes<br/>connexions SQLite en lecture seule"]
+  end
+
+  subgraph DISK["Stockage local persistant - partage par acces SQL, pas par objets JS"]
+    DB[("SQLite principal - SQLITE_PATH<br/>WAL, comptes, salons JSON, ledger<br/>historique, XP, resultats classes")]
+    DBS[("Fichiers SQLite annexes<br/>persistance des services transverses")]
+  end
+
+  UI -->|"HTTPS : GET et POST, dont les actions de jeu"| NGINX
+  UI ==>|"WSS Socket.IO ; HTTP polling possible"| NGINX
+  CONV ==>|"WSS Socket.IO conversation ; polling possible"| NGINX
+  NGINX -->|"HTTP proxy : /api et pages dynamiques"| HTTP
+  NGINX ==>|"WebSocket upgrade ou polling : /socket.io"| RT
+  NGINX -->|"Fichiers : assets statiques"| STATIC
+  SYSTEMD -.->|"OS : demarrage et redemarrage"| HTTP
+  HTTP -->|"Appel dans le meme processus"| MODE
+  MODE -->|"Non"| LOCAL
+  MODE -->|"Oui"| COORD
+  LOCAL -->|"Memoire : lecture et mutation"| RAM
+  COORD -->|"Memoire : contexte, revisions et miroir valide"| RAM
+  RT -->|"Memoire : abonnements et autorisations"| RAM
+  HTTP -->|"Appel : acces aux comptes et aux stores"| STORE
+  LOCAL -->|"Appel : ecriture de salon"| STORE
+  COORD -->|"Appel : effets et checkpoint atomiques"| STORE
+  STORE -->|"Memoire : modele charge et snapshots"| RAM
+  STORE -->|"SQL synchrone : lectures et ecritures"| DB
+  HTTP -->|"Appel direct"| AUX
+  AUX -->|"SQL synchrone"| DBS
+  COORD -.->|"IPC fork : configure, register, prepare, commit, abort"| KERNEL
+  KERNEL -.->|"IPC : etat complet, effets et reponses"| COORD
+  KERNEL -->|"Memoire privee du worker : executer une transition"| ENGINE
+  DUE -->|"Memoire privee : kernel.due et health"| KERNEL
+  DUE -.->|"IPC : due et telemetrie"| COORD
+  LOCAL -->|"Appel : publication"| VIEW
+  COORD -->|"Appel : publication apres commit"| VIEW
+  RAM -->|"Memoire : etat valide et profils"| VIEW
+  VIEW -->|"Appel : emission par destinataire"| RT
+  RT ==>|"WebSocket ou polling : room, rooms, patch, evenements"| NGINX
+  HTTP -->|"Appel : bcrypt et lectures deleguees"| TASKMODE
+  TASKMODE -.->|"Non : messages worker_threads"| READ
+  TASKMODE -.->|"Non : messages worker_threads"| PASS
+  READ -->|"SQL : lecture seule, snapshot de lecture"| DB
+  TASKMODE -.->|"Oui : IPC fork, taches et configuration"| AP
+  AP -->|"SQL : lecture seule"| DB
+
+  classDef disk fill:#15342d,stroke:#cda648,color:#fff;
+  class DB,DBS,STATIC disk;
