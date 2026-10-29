@@ -5,6 +5,7 @@ import { DieSolid } from "./DieSolid.jsx";
 import { diePips } from "../../features/games/dice-faces.js";
 import { cardSolidStyle } from "../../features/games/card-solid.js";
 import "./card-solid.css";
+import "./game-pieces.css";
 
 const DiceTrayContext = createContext(false);
 

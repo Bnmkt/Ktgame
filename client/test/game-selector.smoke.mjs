@@ -7,10 +7,10 @@ import { createServer } from "node:http";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Server } from "../../server/node_modules/socket.io/dist/index.js";
 
-const root=fileURLToPath(new URL('../../',import.meta.url)), dependencies=path.join(tmpdir(),'ktga-chat-browser-tools/node_modules');
+const root=fileURLToPath(new URL('../../',import.meta.url)), dependencies=process.env.KTGA_BROWSER_TOOLS ?? path.join(tmpdir(),'ktga-chat-browser-tools/node_modules');
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE ?? path.join(dependencies,'playwright/index.mjs')).href);
 const {PlaywrightBlocker}=await import(pathToFileURL(path.join(dependencies,'@ghostery/adblocker-playwright/dist/esm/index.js')).href);
-const blocker=await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
+const blocker=process.env.KTGA_BLOCKER_CACHE ? PlaywrightBlocker.deserialize(await fs.readFile(process.env.KTGA_BLOCKER_CACHE)) : await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
 const cache=path.join(root,'artifacts/selector-artwork');await fs.mkdir(cache,{recursive:true});
 let games;
 try {games=JSON.parse(await fs.readFile(path.join(cache,'games.json'),'utf8'));}
@@ -82,7 +82,7 @@ try{
    return null;
  });
  assert.ok(exposed,'a visible overlapping seat keeps an exposed click target');
- await page.mouse.move(exposed.x,exposed.y);await president.click();assert.equal(await active(),'president');await settle();
+ await page.mouse.move(exposed.x,exposed.y);await page.mouse.click(exposed.x,exposed.y);assert.equal(await active(),'president');await settle();
  const rect=await page.locator('.game-orbit-viewport').boundingBox();await page.mouse.move(rect.x+rect.width*.3,Math.min(650,rect.y+rect.height*.45));
  const scroll=await page.evaluate(()=>scrollY),wheelBefore=await active();await page.mouse.wheel(0,140);await until(async()=>await active()!==wheelBefore,'wheel');
  assert.equal(await page.evaluate(()=>scrollY),scroll,'wheel must not scroll the page simultaneously');
@@ -133,6 +133,19 @@ try{
  for(const[name,viewport]of[['desktop',{width:1920,height:1080}],['laptop',{width:1366,height:768}],['tablet',{width:820,height:1180}],['mobile',{width:390,height:844}],['small',{width:320,height:740}]]){
   await page.setViewportSize(viewport);await settle();
   const geometry=await page.evaluate(()=>({page:document.documentElement.scrollWidth,width:innerWidth}));assert.ok(geometry.page<=geometry.width,`${name}: no horizontal overflow ${JSON.stringify(geometry)}`);
+  const focus=await page.locator('.game-orbit-box').boundingBox(),field=await page.locator('.game-orbit-viewport').boundingBox();
+  assert.ok(focus.y+focus.height<=field.y+field.height+1,`${name}: opened game box stays inside the table`);
+  await page.locator('.game-orbit-box').scrollIntoViewIfNeeded();
+  await page.locator('.game-orbit-seat').evaluateAll(seats=>seats.forEach(seat=>seat.style.zIndex='9999'));
+  const unobstructed=await page.locator('.game-orbit-box').evaluate(node=>{
+   const rect=node.getBoundingClientRect();
+   return [[.1,.1],[.9,.1],[.1,.5],[.9,.5],[.1,.9],[.9,.9],[.5,.5]].every(([x,y])=>{
+    const hit=document.elementFromPoint(rect.x+rect.width*x,rect.y+rect.height*y);
+    return hit && node.contains(hit);
+   });
+  });
+  assert.ok(unobstructed,`${name}: orbit cards cannot cover the selected game, even at extreme depth`);
+  await page.locator('.game-orbit-seat').evaluateAll(seats=>seats.forEach(seat=>seat.style.removeProperty('z-index')));
   if(viewport.width<=700)assert.ok((await page.locator('.game-orbit-seat').all()).length===15);
   const visible=await page.locator('.game-orbit-seat').evaluateAll(nodes=>nodes.filter(node=>getComputedStyle(node).visibility!=='hidden').length);
   assert.equal(visible,viewport.width<=700?6:14,`${name}: mobile hides distant seats`);

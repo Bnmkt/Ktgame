@@ -7,6 +7,7 @@ import { PiecePreview } from "./PiecePreview.jsx";
 import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
 import { memberCardOptions } from "../../config/site.js";
 import { copyText } from "../../utils/presentation.jsx";
+import { StatValue } from "../common/StatValue.jsx";
 import "../profile/game-progression.css";
 import { RankInsignia } from "../../features/games/RankInsignia.jsx";
 import { gameTitle } from "../../features/games/config.js";
@@ -747,7 +748,7 @@ export function CosmeticItemVisual({ user, item, stats = [], compact = false }) 
   return <div className={`cosmetic-item-visual cosmetic-item-${type}${compact ? " cosmetic-item-compact" : ""}`}>
     {type === "icons" && <CosmeticIcon value={item?.value} source={item?.icon} framed={item?.iconFramed}/>}
     {type === "nameEffects" && name}
-    {type === "memberCards" && <div className={`vip-card preview-card member-${item?.value ?? "default"}`}><span className="vip-label">{item?.name ?? t("Carte membre")} · KTGA.ME</span><strong className="display-name">{name}</strong><small>{user.friendCode ? t("Code ami · {value0}", { value0: user.friendCode }) : t("MEMBRE · APERÇU")}</small><div className="vip-stats">{(stats.length ? stats : [{ label: "Winrate", value: "0%", icon: <Trophy size={18}/> }, { label: "Succès", value: "0/0", icon: <BadgeCheck size={18}/> }]).map((stat, index) => <div className="vip-ratio" key={index}>{stat.icon}<span>{t(stat.label)}</span><strong>{stat.value}</strong></div>)}</div></div>}
+    {type === "memberCards" && <div className={`vip-card preview-card member-${item?.value ?? "default"}`}><span className="vip-label">{item?.name ?? t("Carte membre")} · KTGA.ME</span><strong className="display-name">{name}</strong><small>{user.friendCode ? t("Code ami · {value0}", { value0: user.friendCode }) : t("MEMBRE · APERÇU")}</small><div className="vip-stats">{(stats.length ? stats : [{ label: "Winrate", value: "0%", icon: <Trophy size={18}/> }, { label: "Succès", value: "0/0", icon: <BadgeCheck size={18}/> }]).map((stat, index) => <div className="vip-ratio" key={index}>{stat.icon}<span>{t(stat.label)}</span><strong><StatValue value={stat.value}/></strong></div>)}</div></div>}
     {["profileBanners", "profileFrames", "profileEffects"].includes(type) && <ProfileCosmeticShell user={preview} className="profile-cosmetic-preview cosmetic-item-surface">{type !== "profileBanners" && <span className="cosmetic-item-specimen">{name}</span>}</ProfileCosmeticShell>}
     {["diceSkins", "cardSkins"].includes(type) && <PiecePreview type={type} skin={item?.value}/>}
   </div>;

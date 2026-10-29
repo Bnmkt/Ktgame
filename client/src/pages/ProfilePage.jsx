@@ -1,3 +1,4 @@
+import { StatValue } from "../components/common/StatValue.jsx";
 import { useLocale } from "../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { useEffect, useState } from "react";
@@ -321,7 +322,7 @@ export function Profile({ user, setUser, mode = "profile", onOpenShop, onAchieve
             <span className="vip-label">{memberCardOptions[user.cosmetics?.equipped?.memberCard ?? "default"]} · {user.guest ? localeText("Pass invité") : localeText("Carte membre")}</span>
             <strong><DisplayName user={user} /></strong>
             <FriendCode code={user.friendCode} />
-            <div className="vip-stats">{displayedStats.map((stat, index) => <div className="vip-ratio" key={`${stat.label}-${index}`}>{stat.icon}<span>{localeText(stat.label)}</span><strong title={stat.exactValue ?? String(stat.value)}>{stat.value}</strong></div>)}</div>
+            <div className="vip-stats">{displayedStats.map((stat, index) => <div className="vip-ratio" key={`${stat.label}-${index}`}>{stat.icon}<span>{localeText(stat.label)}</span><strong title={stat.exactValue ?? String(stat.value)}><StatValue value={stat.value}/></strong></div>)}</div>
           </div></ProfileCosmeticShell>
           <details className="account-stat-summary" open={tab !== "account"}><summary>{localeText("Mes statistiques")}</summary><div className="profile-stats">
             <div><span>{localeText("Parties")}</span><strong><CompactNumber value={gamesPlayed} label={localeText("Nombre exact de parties")} /></strong></div>

@@ -1,3 +1,4 @@
+import { StatValue } from "../common/StatValue.jsx";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../common/ModalBackdrop.jsx";
 import { DailyActivityChart } from "./DailyActivityChart.jsx";
@@ -39,7 +40,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
     ["gamesPlayed", "Parties", <CompactNumber value={profile.stats?.gamesPlayed} label={localeText("Nombre exact de parties")} />],
     ["wins", "Victoires", <CompactNumber value={profile.stats?.wins} label={localeText("Nombre exact de victoires")} />],
     ["winRate", "Winrate", `${profile.stats?.winRate ?? 0}%`],
-    ["achievements", "Succès", <span title={localeText("{value0} succès sur {value1}", { value0: formatExactNumber(profile.stats?.achievementsUnlocked), value1: formatExactNumber(profile.stats?.achievementsTotal) })}><CompactNumber value={profile.stats?.achievementsUnlocked} /> / <CompactNumber value={profile.stats?.achievementsTotal} /></span>]
+    ["achievements", "Succès", <span title={localeText("{value0} succès sur {value1}", { value0: formatExactNumber(profile.stats?.achievementsUnlocked), value1: formatExactNumber(profile.stats?.achievementsTotal) })}><CompactNumber value={profile.stats?.achievementsUnlocked} /> <StatValue value="/"/> <CompactNumber value={profile.stats?.achievementsTotal} /></span>]
   ].filter((entry) => entry && visibleStatKeys.has(entry[0]));
   async function controlConnection(kind, method) {
     setConnectionBusy(kind);
@@ -77,7 +78,7 @@ export function PublicProfileModal({ profile, currentUser, onClose, onFriendRequ
               <span className="vip-label">{memberCardOptions[profile.cosmetics?.equipped?.memberCard ?? "default"]}{" " + localeText("· Profil public")}</span>
               <strong><DisplayName user={profile} interactive={!preview} /></strong>
               <FriendCode code={profile.friendCode} />
-              <div className="vip-stats">{(profile.profileStats?.publicStats ?? []).map((stat, index) => <div className="vip-ratio" key={`${stat.key}-${index}`}><BadgeCheck size={16} /><span title={localeText(stat.label)}>{shortStatLabel(stat.label)}</span><strong title={String(stat.value)}>{stat.value}</strong></div>)}</div>
+              <div className="vip-stats">{(profile.profileStats?.publicStats ?? []).map((stat, index) => <div className="vip-ratio" key={`${stat.key}-${index}`}><BadgeCheck size={16} /><span title={localeText(stat.label)}>{shortStatLabel(stat.label)}</span><strong title={String(stat.value)}><StatValue value={stat.value}/></strong></div>)}</div>
             </div>
             {publicStats.length > 0 && <div className="public-profile-grid">{publicStats.map(([key, label, value]) => <div key={key}><span>{localeText(label)}</span><strong>{value}</strong></div>)}</div>}
             <div className="profile-cosmetics-preview" aria-label={localeText("Dés et cartes équipés")}>

@@ -110,12 +110,14 @@ export function ImmersiveGameSelector({ games, rooms, activeId, onSelect, mode, 
       })}</div>
       <article className="game-orbit-focus" key={game.id} aria-label={t(game.name)}>
         <GameArtwork source={selectedGameArtwork(game)} eager fallback={<Mascot {...gameMascot(game.id, game.type)} docked size="large" priority/>}/>
+        <div className="game-orbit-box">
         <header><span>{ranked ? <Swords size={15}/> : game.type === "dice" ? <Dice5 size={15}/> : <Spade size={15}/>}</span><h2>{t(game.name)}</h2></header>
         <p>{t(game.description || gameRules[game.id]?.goal)}</p>
         <div className="game-orbit-facts"><span>{t(game.type === "dice" ? "Dés" : "Cartes")}</span><span><Users size={13}/>{ranked ? entry?.players ?? "…" : game.minPlayers === game.maxPlayers ? game.minPlayers : `${game.minPlayers}–${game.maxPlayers}`}</span><span>{t(mode === "ranked" ? "Classé" : "Classique")}</span>{!ranked && rankedGames.includes(game.id) && <span>{t("Classé disponible")}</span>}</div>
         {ranked ? <RankBadge rank={entry?.rank}/> : <small className="game-orbit-tables">{t(tables === 1 ? "{value0} table publique" : "{value0} tables publiques", { value0: tables })}</small>}
         <div className="game-orbit-actions">{ranked ? <button type="button" disabled={!canEnter || !canRanked || !eligible(game) || game.enabled === false} onClick={() => onTables(game, "browse")}><Swords size={17}/>{t("Rejoindre le classé")}</button> : <><button type="button" disabled={!canCreate || game.enabled === false} onClick={() => onTables(game, "create")}><Plus size={17}/>{t("Créer une table")}</button>{canEnter && <button className="secondary" type="button" disabled={game.enabled === false} onClick={() => onTables(game, "browse")}><DoorOpen size={16}/>{t("Rejoindre")}{` (${tables})`}</button>}</>}</div>
         <button className="secondary game-orbit-rules" type="button" onClick={() => onRules(game.id)}><HelpCircle size={14}/>{t("Règles du jeu")}</button>
+        </div>
       </article>
       <button className="secondary game-orbit-arrow game-orbit-previous" type="button" disabled={count < 2} aria-label={t("Jeu précédent")} onClick={() => navigate(-1)}><ArrowLeft/></button>
       <button className="secondary game-orbit-arrow game-orbit-next" type="button" disabled={count < 2} aria-label={t("Jeu suivant")} onClick={() => navigate(1)}><ArrowRight/></button>

@@ -26,7 +26,11 @@ const allowed=new Set([...defaults,
  'client/src/components/game/useOrbitMotion.js','client/src/features/games/selector.js','client/src/pages/LobbyPage.jsx',
  'client/src/components/room/ClassicCompletion.jsx','client/src/components/room/classic-completion.css',
  'client/src/components/room/completion-dialog.css','client/src/features/games/RankedCompletion.jsx',
- 'client/src/features/games/ranked-completion.css'
+ 'client/src/features/games/ranked-completion.css',
+ 'client/src/components/game/GamePieces.jsx','client/src/components/game/game-pieces.css',
+ 'client/src/components/common/StatValue.jsx','client/src/components/common/stat-value.css',
+ 'client/src/components/cosmetics/Cosmetics.jsx','client/src/pages/ProfilePage.jsx',
+ 'client/src/components/profile/PublicProfileModal.jsx','client/src/components/admin/AdminAccountWorkspace.jsx'
 ]);
 const manifest=JSON.parse(fs.readFileSync(path.join(stage,'source-manifest.json')));
 const files=manifest.files ?? defaults;

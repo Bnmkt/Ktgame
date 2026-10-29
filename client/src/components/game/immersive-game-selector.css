@@ -2,13 +2,13 @@
 .game-orbit { position: relative; min-width: 0; color: #f6e8c5; }
 .game-orbit:focus-visible { outline: 2px solid #f0d67f; outline-offset: 3px; border-radius: 22px; }
 .game-orbit-viewport { position: relative; height: clamp(480px, calc(100dvh - 268px), 760px); width: 100%; min-width: 0; container-type: size; isolation: isolate; touch-action: pan-y; }
-.game-orbit-table { position: absolute; inset: 25% 1% 2%; border: 7px solid #c8a04b; border-radius: 50%; background: radial-gradient(ellipse at 50% 32%, #14714e, #06412f 72%); box-shadow: inset 0 0 0 3px #f9d87963, inset 0 0 80px #001d1b99, 0 7px 0 4px #3b2116, 0 13px 32px #0007; pointer-events: none; z-index: 0; }
+.game-orbit-table { position: absolute; inset: 25% 1% 2%; border: 7px solid #c8a04b; border-radius: 50%; background: radial-gradient(ellipse at 50% 32%, #14714e, #06412f 72%); box-shadow: inset 0 0 0 3px #f9d87963, inset 0 0 80px #001d1b99, 0 7px 0 4px #3b2116, 0 13px 32px #0007; pointer-events: none; -webkit-user-select: none; user-select: none; z-index: 0; }
 .game-orbit-table::before { content: ""; position: absolute; inset: 9%; border: 1px solid #b2d09729; border-radius: inherit; }
 .game-orbit-table > span { position: absolute; left: 50%; top: 39%; translate: -50% -50%; font: 900 clamp(26px, 4vw, 54px) Georgia, serif; color: #b7d7891c; letter-spacing: .1em; }
 .game-orbit-host { position: absolute; top: 1%; left: 2%; display: flex; align-items: center; pointer-events: none; gap: 2px; max-width: 33%; z-index: 2; }
 .game-orbit-host .ktga-mascot { width: clamp(100px, 12vw, 185px); height: clamp(110px, 13vw, 195px); flex: 0 0 auto; }
 .game-orbit-host-copy { background: #111c1ce8; border: 1px solid #bd944b99; border-radius: 8px; padding: 12px; font: italic 700 18px/1.35 Georgia, serif; max-width: 160px; color: #e7cc83; }
-.game-orbit-seats { position: absolute; inset: 0; pointer-events: none; }
+.game-orbit-seats { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .game-orbit .game-orbit-seat { --orbit-angle: calc(var(--orbit-seat-angle) - var(--orbit-turn, 0deg)); position: absolute; left: 50%; top: 52%; display: flex; flex-direction: column; align-items: center; width: clamp(110px, 11.5vw, 182px); min-height: 0; padding: 5px 5px 0; background: linear-gradient(145deg, #164e3dee, #05231ef5); border: 2px solid #b99a50; border-bottom-width: 4px; border-radius: 14px 14px 6px 6px; color: #f4df9e; box-shadow: 0 7px 15px #001a1766, inset 0 0 0 1px #f2d58326; transform: translate(-50%, -50%) translate3d(calc(sin(var(--orbit-angle)) * (50cqw - 108px)), calc(cos(var(--orbit-angle)) * 24cqh), 0) scale(calc(.65 + (cos(var(--orbit-angle)) + 1) * .16)) rotate(calc(sin(var(--orbit-angle)) * -6deg)); filter: brightness(calc(.87 + cos(var(--orbit-angle)) * .13)); z-index: calc(20 + cos(var(--orbit-angle)) * 10); pointer-events: auto; will-change: transform; }
 .game-orbit .game-orbit-seat-current { visibility: hidden; pointer-events: none; }
 .game-orbit .game-orbit-seat:hover, .game-orbit .game-orbit-seat:focus-visible { border-color: #fff09d; box-shadow: 0 0 0 2px #c7ffae69, 0 8px 16px #00130dcc; background: #15573df5; }
@@ -17,16 +17,16 @@
 .game-orbit-seat .game-artwork-media img { object-fit: contain; }
 .game-orbit-seat .ktga-mascot { width: 100%; height: clamp(52px, 5.2vw, 82px); flex: 0 0 auto; }
 .game-orbit-seat > strong { width: calc(100% + 10px); padding: 6px 4px; margin-bottom: -1px; border-top: 1px solid #bca15c; background: #071f1cf7; color: #f9e6af; text-align: center; font-size: clamp(11px, 1.1vw, 16px); line-height: 1.1; border-radius: 0 0 4px 4px; white-space: normal; }
-.game-orbit-focus { position: absolute; top: 46%; left: 50%; translate: -50% -17%; width: clamp(270px, 28vw, 400px); max-width: 43%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; z-index: 32; padding: 7px 12px; border-radius: 22px; background: radial-gradient(ellipse at center, #002b20dd, #002b2000 72%); animation: game-orbit-focus-in 220ms ease-out both; }
-.game-orbit-focus { pointer-events: none; }
-.game-orbit-focus button { pointer-events: auto; }
+.game-orbit-focus { position: absolute; top: 46%; left: 50%; translate: -50% -17%; width: clamp(300px, 30vw, 430px); max-width: 44%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0; z-index: 3; padding: 0; border-radius: 14px; pointer-events: auto; animation: game-orbit-focus-in 220ms ease-out both; }
 .game-orbit-focus > .game-artwork-media { width: 82%; height: clamp(100px, 10.5vw, 170px); background: none; aspect-ratio: auto; overflow: visible; filter: drop-shadow(0 5px 7px #001c1488); }
 .game-orbit-focus > .game-artwork-media img { object-fit: contain; }
 .game-orbit-focus > .ktga-mascot { width: 200px; height: clamp(100px, 11vw, 170px); flex: 0 0 auto; }
-.game-orbit-focus > header { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 5px 12px; border: 1px solid #e1c26f; border-radius: 7px; background: linear-gradient(#092b25f5, #051c1bf5); box-shadow: 0 0 0 2px #001b1366; }
+.game-orbit-box { position: relative; display: flex; flex-direction: column; align-items: center; gap: 9px; width: 100%; box-sizing: border-box; padding: 14px; border: 1px solid #d9b867; border-bottom: 4px solid #a47b35; border-radius: 10px 10px 14px 14px; background: linear-gradient(145deg, #12392e, #071d19 75%); box-shadow: 0 12px 24px #00140f99, inset 0 0 0 3px #e7c57912; }
+.game-orbit-box::before { content: ""; position: absolute; top: -5px; left: 8px; right: 8px; height: 6px; border: 1px solid #e4c77c; border-radius: 4px 4px 0 0; background: #193c2d; transform: perspective(400px) rotateX(25deg); transform-origin: bottom; pointer-events: none; }
+.game-orbit-box > header { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding-bottom: 10px; border-bottom: 1px solid #c5a75b66; }
 .game-orbit-focus h2 { margin: 0; font: 800 clamp(22px, 2vw, 32px)/1.1 Georgia, serif; color: #f5e2aa; }
-.game-orbit-focus > header > span { color: #e9cb72; flex-shrink: 0; }
-.game-orbit-focus > p { margin: 0; color: #f0e8c9; font-size: 13px; line-height: 1.4; min-height: 2.8em; max-width: 350px; }
+.game-orbit-box > header > span { color: #e9cb72; flex-shrink: 0; }
+.game-orbit-box > p { margin: 0; color: #fff1d6; font-size: 14px; line-height: 1.5; min-height: 3em; max-width: 370px; }
 .game-orbit-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 10px; color: #c3d8bd; font-size: 11px; }
 .game-orbit-facts > span { display: inline-flex; align-items: center; gap: 4px; }
 .game-orbit-tables { color: #e4cf8c; font-size: 11px; }
@@ -41,7 +41,7 @@
 .game-orbit-controls { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; padding: 10px 0; font-size: 12px; color: #c9d5ba; }
 .game-orbit-controls > button { display: flex; gap: 7px; align-items: center; min-height: 36px; padding: 6px 12px; border-color: #bba261; background: #101e1c; color: #f4d88b; border-radius: 8px; }
 .game-orbit-controls > small { font-size: 11px; }
-@keyframes game-orbit-focus-in { from { opacity: .5; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes game-orbit-focus-in { from { transform: translateY(4px); } to { transform: none; } }
 
 /* These rules only affect the new view; the original catalog keeps its layout. */
 .game-lounge.game-lounge-immersive { max-width: 1720px; padding: 12px 24px 20px; }
@@ -75,15 +75,16 @@
 .game-lounge-immersive .lobby-join-action { margin: 0; display: flex; justify-content: flex-start; }
 .game-lounge-immersive .lobby-join-action > button { min-height: 28px; padding: 5px 9px; font-size: 11px; }
 @media (min-width: 1100px) and (max-height: 850px) {
-  .game-orbit-focus { gap: 4px; top: 44%; }
+  .game-orbit-focus { top: 38%; }
   .game-orbit-focus > .game-artwork-media, .game-orbit-focus > .ktga-mascot { height: 110px; }
   .game-orbit-focus h2 { font-size: 24px; }
-  .game-orbit-focus > p { font-size: 12px; }
+  .game-orbit-box { gap: 7px; padding: 11px; }
+  .game-orbit-box > p { font-size: 13px; line-height: 1.4; }
 }
 @media (max-width: 1000px) {
   .game-orbit-host-copy { display: none; }
   .game-orbit-host { left: 3%; }
-  .game-orbit-focus { width: 310px; max-width: 47%; }
+  .game-orbit-focus { width: 330px; max-width: 47%; }
   .game-orbit .game-orbit-seat { width: 115px; }
 }
 @media (max-width: 700px) {
@@ -103,10 +104,12 @@
   .game-orbit .game-orbit-seat[data-orbit-near="false"] { visibility: hidden; pointer-events: none; }
   .game-orbit-seat .game-artwork-media, .game-orbit-seat .ktga-mascot { height: 57px; }
   .game-orbit-seat > strong { font-size: 10px; padding-block: 5px; }
-  .game-orbit-focus { top: 38%; max-width: 78%; width: 310px; gap: 4px; translate: -50% -5%; }
+  .game-orbit-focus { top: 34%; max-width: 78%; width: 310px; translate: -50% -5%; }
   .game-orbit-focus > .game-artwork-media, .game-orbit-focus > .ktga-mascot { height: 90px; }
   .game-orbit-focus h2 { font-size: 22px; }
-  .game-orbit-focus > p { font-size: 11px; line-height: 1.35; min-height: 2.8em; }
+  .game-orbit-box { padding: 12px; gap: 7px; }
+  .game-orbit-box > header { padding-bottom: 8px; }
+  .game-orbit-box > p { font-size: 12px; line-height: 1.4; min-height: 2.8em; }
   .game-orbit-facts { font-size: 10px; gap: 4px 8px; }
   .game-orbit .game-orbit-actions { flex-wrap: wrap; }
   .game-orbit .game-orbit-actions > button { min-height: 36px; font-size: 11px; padding: 7px 9px; }

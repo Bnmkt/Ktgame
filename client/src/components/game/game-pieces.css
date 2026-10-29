@@ -1,0 +1,2 @@
+.playing-card, .playing-card *, .die, .die *, .president-felt-insignia, .poker-table-mark { -webkit-user-select: none; user-select: none; }
+.playing-card img, .die img { -webkit-user-drag: none; }
