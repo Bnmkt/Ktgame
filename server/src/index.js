@@ -180,6 +180,7 @@ import { createHelpStore } from "./services/help-content.js";
 import { createCustomPageStore, registerCustomPageRoutes } from "./services/custom-pages.js";
 import { createTribunalStore, tribunalCategories } from "./services/tribunal.js";
 import { createChatStore, directChannelId } from "./services/chat.js";
+import { registerChatModerationRoutes } from "./services/chat-moderation.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_VERSION = process.env.APP_VERSION || JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || "0.1.0";
@@ -2949,7 +2950,7 @@ app.post("/api/auth/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
-registerBugReportRoutes({ app, auth, requireBackOffice, store: bugReports, version: () => patchnotes.currentVersion,
+registerBugReportRoutes({ app, auth, requireBackOffice, store: bugReports, version: () => patchnotes.currentVersion, intakeSecret: JWT_SECRET,
   notifyContact: (key, notice) => contactNotices.enqueue(key, notice),
   identify: (req) => {
     try {
@@ -3207,6 +3208,9 @@ app.get("/api/chat/unread", auth, (req, res) => {
   res.json({ channels: channels.map((channel) => ({ ...channel, ...activity[`${channel.channelType}:${channel.channelId}`], count: counts[`${channel.channelType}:${channel.channelId}`] ?? 0 })) });
 });
 
+registerChatModerationRoutes({ app, auth, requireAdmin, store: chat,
+  publish: (event) => io.to("chat:global").emit("chat-reset", event), audit: (entry) => requestLogs.append(entry) });
+
 app.get("/api/chat/messages", auth, (req, res) => {
   if (req.auth.guest) return res.status(403).json({ error: "Le chat est réservé aux comptes enregistrés." });
   const db = readDb();
@@ -3221,7 +3225,7 @@ app.get("/api/chat/messages", auth, (req, res) => {
       senders.set(message.senderId, decorated.sender);
       return decorated;
     }));
-  res.json({ channel: { type: channel.channelType, id: channel.channelId }, messages, readAt: new Date().toISOString() });
+  res.json({ channel: { type: channel.channelType, id: channel.channelId }, messages, readAt: new Date().toISOString(), ...(channel.channelType === "global" ? { revision: chat.globalRevision() } : {}) });
 });
 
 app.post("/api/chat/messages", auth, (req, res) => {

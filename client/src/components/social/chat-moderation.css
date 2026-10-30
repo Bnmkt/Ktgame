@@ -1,0 +1,3 @@
+.conversation-global-tools { grid-row: 3; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 8px 12px; border-bottom: 1px solid #b99b4940; }
+.conversation-global-tools > button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 5px 9px; font-size: 12px; }
+.conversation-global-tools > small { color: #b6cebd; font-size: 11px; }

@@ -41,8 +41,14 @@ export function createChatStore({ filename }) {
       user_id TEXT NOT NULL, channel_id TEXT NOT NULL,
       PRIMARY KEY(user_id, channel_id)
     );
+    CREATE TABLE IF NOT EXISTS chat_control (key TEXT PRIMARY KEY,value INTEGER NOT NULL);
+    INSERT OR IGNORE INTO chat_control(key,value) VALUES('global_revision',0);
+    CREATE TABLE IF NOT EXISTS chat_purges (
+      id TEXT PRIMARY KEY,actor_id TEXT NOT NULL,removed INTEGER NOT NULL,revision INTEGER NOT NULL,created_at TEXT NOT NULL
+    );
   `);
   let writesSinceCleanup = 0;
+  const globalRevision = () => Number(db.prepare("SELECT value FROM chat_control WHERE key='global_revision'").get().value);
 
   return {
     add({ channelType, channelId, senderId, content, participantIds = [] }, now = Date.now()) {
@@ -66,13 +72,28 @@ export function createChatStore({ filename }) {
         db.prepare("DELETE FROM chat_messages WHERE channel_type=? AND channel_id=? AND id NOT IN (SELECT id FROM chat_messages WHERE channel_type=? AND channel_id=? ORDER BY created_at DESC LIMIT 2000)")
           .run(message.channelType, message.channelId, message.channelType, message.channelId);
       }
-      return message;
+      return channelType === "global" ? { ...message, revision: globalRevision() } : message;
     },
     list(channelType, channelId, limit = 100) {
       if (!channelTypes.has(channelType)) return [];
       const rows = db.prepare("SELECT id,channel_type AS channelType,channel_id AS channelId,sender_id AS senderId,content,created_at AS createdAt FROM chat_messages WHERE channel_type=? AND channel_id=? ORDER BY created_at DESC LIMIT ?")
         .all(channelType, clean(channelId, 100), Math.max(1, Math.min(100, Math.floor(Number(limit) || 50))));
-      return rows.reverse();
+      const revision = channelType === "global" ? globalRevision() : 0;
+      return rows.reverse().map(row => channelType === "global" ? { ...row, revision } : row);
+    },
+    globalRevision,
+    purgeGlobal(actorId, now = Date.now()) {
+      const actor = clean(actorId, 100);
+      if (!actor) throw new Error("INVALID_CHAT_MODERATOR");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const removed = Number(db.prepare("DELETE FROM chat_messages WHERE channel_type='global' AND channel_id='global'").run().changes);
+        db.prepare("UPDATE chat_control SET value=value+1 WHERE key='global_revision'").run();
+        const revision = globalRevision(), clearedAt = iso(now);
+        db.prepare("INSERT INTO chat_purges(id,actor_id,removed,revision,created_at) VALUES(?,?,?,?,?)").run(randomUUID(), actor, removed, revision, clearedAt);
+        db.exec("COMMIT");
+        return { channelType: "global", channelId: "global", removed, revision, clearedAt };
+      } catch (error) { db.exec("ROLLBACK"); throw error; }
     },
     markRead(userId, channelType, channelId, now = Date.now()) {
       if (!channelTypes.has(channelType)) return false;

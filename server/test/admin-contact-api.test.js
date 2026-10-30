@@ -392,6 +392,39 @@ test("in-flight account projections are not delivered after revocation", { skip:
   assert.ok(!Object.hasOwn(rejected.data, "email"));
 });
 
+test("global moderation uses real account roles and broadcasts its durable reset over Socket.IO", async () => {
+  for (const id of [null, "player", "editor"]) assert.equal((await request(id, "/api/admin/chat/global", "DELETE", { confirm: true })).status, id ? 403 : 401);
+  assert.equal((await request("admin", "/api/admin/chat/global", "DELETE", {})).status, 400);
+  const metadata = await request(null, "/api/bugs/metadata");
+  assert.equal(metadata.data.limits.intake.cooldownSeconds, 60);
+  assert.equal(metadata.data.limits.intake.reportsPerHour, 6);
+  const token = jwt.sign({ id: "editor", sessionVersion: 0 }, secret, { expiresIn: "1h" });
+  const observer = io(url, { autoConnect: false, transports: ["websocket"], auth: { token, stream: "conversation" } });
+  const connected = new Promise((resolve, reject) => { observer.once("connect", resolve); observer.once("connect_error", reject); });
+  observer.connect();
+  try {
+    await connected;
+    const announced = new Promise(resolve => observer.once("chat-message", resolve));
+    observer.emit("chat-subscribe", { token });
+    const sent = await request("admin", "/api/chat/messages", "POST", { channelType: "global", content: "Global purge integration fixture" });
+    assert.equal(sent.status, 201);
+    assert.equal((await announced).id, sent.data.id);
+    const reset = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Missing chat-reset event")), 5000);
+      observer.once("chat-reset", payload => { clearTimeout(timer); resolve(payload); });
+    });
+    const purged = await request("admin", "/api/admin/chat/global", "DELETE", { confirm: true });
+    assert.equal(purged.status, 200);
+    assert.ok(purged.data.removed >= 1);
+    assert.deepEqual(await reset, purged.data);
+    const history = await request("editor", "/api/chat/messages?channelType=global");
+    assert.deepEqual(history.data.messages, []);
+    assert.equal(history.data.revision, purged.data.revision);
+    await stop(); await start();
+    assert.equal((await request("editor", "/api/chat/messages?channelType=global")).data.revision, purged.data.revision);
+  } finally { observer.disconnect(); }
+});
+
 test("accounts separation remains opt-in and legacy reads stay available", async () => {
   await stop();
   for (const flag of [null, "0"]) {

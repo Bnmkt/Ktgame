@@ -1,5 +1,6 @@
 .issue-launcher { position: fixed; right: 20px; bottom: 20px; width: 46px; height: 46px; padding: 0; display: grid; place-items: center; z-index: 1005; border-radius: var(--site-radius, 8px); background: #172022; color: #e5bd59; border: var(--site-border-width, 1px) solid #8b7540; box-shadow: 0 3px 12px #0005; }
 .issue-launcher:hover { background: #293235; }
+.issue-form-layer { z-index: 120; }
 .modal.issue-form-dialog, .modal.issue-editor-dialog { width: min(1120px, calc(100vw - 32px)); max-width: 1120px; max-height: 90dvh; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
 .issue-form-dialog .modal-title-row, .issue-editor-dialog .modal-title-row { flex: 0 0 auto; }
 .issue-form { display: flex; flex-direction: column; min-height: 0; gap: 12px; }

@@ -1,12 +1,15 @@
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Globe2, GripHorizontal, MessageCircle, MessagesSquare, PanelRight, PictureInPicture2, Plus, ReceiptText, Send, Table2, Volume2, VolumeX, X } from "lucide-react";
+import { Globe2, GripHorizontal, MessageCircle, MessagesSquare, PanelRight, PictureInPicture2, Plus, ReceiptText, Send, Table2, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { api } from "../../api.js";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { useConversationInbox } from "./useConversationInbox.js";
 import { PresenceDot } from "../profile/FriendPresence.jsx";
 import { ChatMessageContent } from "./ChatMessageContent.jsx";
 import { softBanLimited } from "../../features/accounts/softban.js";
+import { ConfirmActionButton } from "../common/ConfirmAction.jsx";
+import { chatRevision, mergeChatSnapshot } from "./chat-state.js";
+import "./chat-moderation.css";
 
 const tabs = [
   { id: "journal", label: "Journal", icon: ReceiptText, needsRoom: true },
@@ -34,12 +37,14 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [moderationNotice, setModerationNotice] = useState("");
   const [windowRect, setWindowRect] = useState(savedWindow);
   const panelRef = useRef(null);
   const scrollRef = useRef(null);
   const dragRef = useRef(null);
   const loadedChannel = useRef(null);
   const loadRevision = useRef(0);
+  const globalRevision = useRef(0);
   const currentView = useRef(null);
   const chatFeature = activeTab === "direct" ? "chat:private" : activeTab === "room" ? "chat:table" : "chat:global";
   const canWrite = !softBanLimited(user, chatFeature) && !(user.minor?.restrictions ?? []).includes("chat");
@@ -54,13 +59,28 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
 
   const channelInput = useMemo(() => ({ channelType: activeTab, ...(activeTab === "direct" ? { friendId } : {}), ...(activeTab === "room" ? { roomCode } : {}) }), [activeTab, friendId, roomCode]);
   currentView.current = { open, channelQuery };
+  const appendMessage = (message) => {
+    if (message.channelType === "global") {
+      const revision = chatRevision(message);
+      if (revision < globalRevision.current) return false;
+      if (revision > globalRevision.current) { globalRevision.current = revision; loadRevision.current++; setLoading(false); setMessages([]); }
+    }
+    setMessages((rows) => rows.some((row) => row.id === message.id) ? rows : [...rows, message].slice(-100));
+    return true;
+  };
   const receiveMessage = (message) => {
     const loaded = loadedChannel.current;
     if (!open || loaded?.query !== channelQuery || loaded?.id !== message.channelId || loaded?.type !== message.channelType) return false;
-    setMessages((rows) => rows.some((row) => row.id === message.id) ? rows : [...rows, message].slice(-100));
-    return document.visibilityState === "visible";
+    return appendMessage(message) && document.visibilityState === "visible";
   };
-  const { channels, markRead, soundEnabled, toggleSound } = useConversationInbox({ userId: user.id, roomCode, onMessage: receiveMessage, onUnreadChange, onRoomsChange: () => {
+  const receiveReset = (payload) => {
+    if (payload?.channelType !== "global" || payload.channelId !== "global" || chatRevision(payload) <= globalRevision.current) return;
+    globalRevision.current = chatRevision(payload);
+    if (activeTab !== "global") return;
+    loadRevision.current++; setLoading(false); setMessages([]);
+    loadActive(true);
+  };
+  const { channels, markRead, soundEnabled, toggleSound } = useConversationInbox({ userId: user.id, roomCode, onMessage: receiveMessage, onChannelReset: receiveReset, onUnreadChange, onRoomsChange: () => {
     if (messages.some((message) => message.links?.some((link) => link.kind === "table"))) loadActive(true);
   } });
   const friendChannels = new Map(channels.filter((channel) => channel.channelType === "direct").map((channel) => [channel.friendId, channel]));
@@ -96,14 +116,13 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
     if (!channelQuery) return setMessages([]);
     if (!quiet) setLoading(true);
     try {
-      const payload = await api(`/api/chat/messages?${channelQuery}`, { background: quiet });
+      const payload = await api(`/api/chat/messages?${channelQuery}`, { background: quiet, deduplicate: false });
       if (!stillActive()) return;
+      const knownRevision = globalRevision.current;
+      if (payload.channel?.type === "global" && chatRevision(payload) < knownRevision) return;
+      if (payload.channel?.type === "global") globalRevision.current = chatRevision(payload);
       loadedChannel.current = { ...payload.channel, query: channelQuery };
-      setMessages((rows) => {
-        const fetched = payload.messages ?? [];
-        const ids = new Set(fetched.map((row) => row.id));
-        return [...fetched, ...rows.filter((row) => row.channelId === payload.channel?.id && row.channelType === payload.channel?.type && row.createdAt > payload.readAt && !ids.has(row.id))].slice(-100);
-      });
+      setMessages((rows) => mergeChatSnapshot(rows, payload, knownRevision) ?? rows);
       setError("");
       if (document.visibilityState === "visible") markRead(channelInput, payload.readAt);
     } catch (err) { if (stillActive()) setError(err.message); }
@@ -184,10 +203,16 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
     try {
       const body = { channelType: activeTab, content, ...(activeTab === "direct" ? { friendId } : {}), ...(activeTab === "room" ? { roomCode } : {}) };
       const message = await api("/api/chat/messages", { method: "POST", body: JSON.stringify(body) });
-      if (currentView.current.open && currentView.current.channelQuery === channelQuery) setMessages((rows) => rows.some((row) => row.id === message.id) ? rows : [...rows, message].slice(-100));
+      if (currentView.current.open && currentView.current.channelQuery === channelQuery) appendMessage(message);
       setDraft("");
     } catch (err) { setError(err.message); }
     finally { setSending(false); }
+  }
+  async function purgeGlobal() {
+    setError("");
+    const result = await api("/api/admin/chat/global", { method: "DELETE", body: JSON.stringify({ confirm: true }) });
+    receiveReset(result);
+    setModerationNotice("Le chat global a été purgé.");
   }
   if (!open) return null;
   const style = mode === "floating" ? { left: windowRect.left, top: windowRect.top, width: windowRect.width, height: windowRect.height } : undefined;
@@ -198,6 +223,7 @@ export function SocialPanel({ user, roomCode, open, onClose, onFriends, onUnread
       <div className="conversation-window-actions"><button type="button" className="secondary icon-toggle" onClick={toggleSound} aria-pressed={soundEnabled} title={soundEnabled ? localeText("Couper le son du chat") : localeText("Activer le son du chat")} aria-label={soundEnabled ? localeText("Couper le son du chat") : localeText("Activer le son du chat")}>{soundEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}</button><button type="button" className="secondary icon-toggle" onClick={toggleMode} title={mode === "docked" ? localeText("Passer en fenêtre") : localeText("Attacher à droite")} aria-label={mode === "docked" ? localeText("Passer en fenêtre") : localeText("Attacher à droite")}>{mode === "docked" ? <PictureInPicture2 size={17} /> : <PanelRight size={17} />}</button><button type="button" className="secondary icon-toggle" onClick={onClose} aria-label={localeText("Fermer Social")}><X size={18} /></button></div>
     </header>
     <nav className="conversation-tabs" aria-label={localeText("Canaux de conversation")}>{tabs.map(({ id, label, icon: Icon, needsRoom }) => { const count = id === "direct" ? unreadDirect : id === "room" ? unreadRoom : 0; return <button type="button" key={id} disabled={needsRoom && !roomCode} className={`${activeTab === id ? "active" : ""} ${count ? "conversation-channel-unread" : ""}`} onClick={() => setActiveTab(id)}><Icon size={17} /><span>{localeText(label)}{count > 0 && <span className="conversation-unread-count" aria-label={localeText("{value0} messages non lus", { value0: count })}>{count > 99 ? "99+" : count}</span>}</span></button>; })}</nav>
+    {activeTab === "global" && user.admin && <div className="conversation-global-tools"><ConfirmActionButton className="secondary" danger dialogTitle={localeText("Purger le chat global ?")} message={localeText("Tous les messages du chat global seront supprimés définitivement pour tous les joueurs. Les conversations privées et les messages des tables sont conservés.")} confirmLabel={localeText("Purger")} onConfirm={purgeGlobal}><Trash2 size={15}/>{localeText("Purger le chat global")}</ConfirmActionButton>{moderationNotice && <small role="status">{localeText(moderationNotice)}</small>}</div>}
     {activeTab === "direct" && <div className="conversation-contact-strip" role="tablist" aria-label={localeText("Conversations avec les amis")}><button type="button" className="conversation-contact-add icon-toggle" onClick={onFriends} title={localeText("Choisir un ami")} aria-label={localeText("Choisir un ami")}><Plus size={17} /></button>{conversations.map((friend) => { const count = friendChannels.get(friend.id)?.count ?? 0; return <button type="button" role="tab" aria-selected={friend.id === friendId} className={`${friend.id === friendId ? "active" : ""} ${count ? "conversation-channel-unread" : ""}`} key={friend.id} onClick={() => setFriendId(friend.id)}><PresenceDot online={friend.online} /><DisplayName user={friend} interactive={false} />{count > 0 && <span className="conversation-unread-count" aria-label={localeText("{value0} messages non lus", { value0: count })}>{count > 99 ? "99+" : count}</span>}</button>; })}{!conversations.length && <span>{localeText("Aucune conversation ouverte")}</span>}</div>}
     <div className="conversation-feed" ref={scrollRef} aria-live="polite">
       {loading && <p className="conversation-empty">{localeText("Chargement…")}</p>}

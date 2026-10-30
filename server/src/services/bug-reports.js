@@ -31,6 +31,9 @@ const contextFor = (input) => Object.fromEntries(["page", "zone", "game", "match
   return [key, redactBugPublicText(value, 240)];
 }));
 const terminal = (state) => ["fixed", "closed"].includes(state);
+export const bugIntakeLimits = { cooldownSeconds: 60, reportsPerHour: 6, uploadsPerQuarterHour: 18, duplicateHours: 24 };
+const intakeError = (retryAfter) => Object.assign(new Error(`Patiente ${retryAfter} s avant un nouvel envoi. Ton brouillon est conservé.`), { code: "BUG_INTAKE_LIMIT", retryAfter });
+const normalizedContent = (value) => String(value ?? "").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
 
 export function createBugReportStore({ filename, uploadDirectory, version = () => "", now = () => Date.now() }) {
   if (filename !== ":memory:") fs.mkdirSync(path.dirname(filename), { recursive: true });
@@ -67,6 +70,12 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     CREATE TABLE IF NOT EXISTS bug_actions(id INTEGER PRIMARY KEY AUTOINCREMENT,bug_id INTEGER NOT NULL REFERENCES bug_reports(id) ON DELETE CASCADE,
       actor_id TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS bug_actions_bug ON bug_actions(bug_id,created_at);
+    CREATE TABLE IF NOT EXISTS bug_intake_events(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,subject_key TEXT NOT NULL,kind TEXT NOT NULL,
+      content_hash TEXT NOT NULL DEFAULT '',bug_id INTEGER REFERENCES bug_reports(id) ON DELETE SET NULL,created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS bug_intake_subject_at ON bug_intake_events(subject_key,kind,created_at);
+    CREATE INDEX IF NOT EXISTS bug_intake_expiry ON bug_intake_events(created_at);
   `);
   const columns = new Set(db.prepare("PRAGMA table_info(bug_reports)").all().map((column) => column.name));
   for (const column of ["public_expected", "public_actual", "public_steps"]) {
@@ -83,6 +92,27 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     finally { transactionDepth--; }
   };
   const audit = (id, actor, kind, body) => db.prepare("INSERT INTO bug_actions(bug_id,actor_id,kind,body,created_at) VALUES(?,?,?,?,?)").run(id, String(actor ?? ""), kind, clean(body, 8000), timestamp());
+  const trimIntake = () => db.prepare("DELETE FROM bug_intake_events WHERE created_at<=?").run(now() - 86400000);
+  function checkIntake(subjectKey, kind, contentHash = "") {
+    if (!subjectKey || typeof subjectKey !== "string" || subjectKey.length > 100) throw new Error("Session de signalement invalide.");
+    trimIntake();
+    if (kind === "report" && contentHash) {
+      const duplicate = db.prepare("SELECT bug_id FROM bug_intake_events WHERE subject_key=? AND kind='report' AND content_hash=? AND bug_id IS NOT NULL ORDER BY id DESC LIMIT 1").get(subjectKey, contentHash);
+      if (duplicate) throw Object.assign(new Error(`Tu as déjà envoyé ce signalement (BUG ${duplicate.bug_id}). Ajoute une précision au dossier existant.`), { code: "BUG_INTAKE_DUPLICATE", bugId: duplicate.bug_id });
+    }
+    const window = kind === "report" ? 3600000 : 900000;
+    const maximum = kind === "report" ? bugIntakeLimits.reportsPerHour : bugIntakeLimits.uploadsPerQuarterHour;
+    const rows = db.prepare("SELECT created_at FROM bug_intake_events WHERE subject_key=? AND kind=? AND created_at>? ORDER BY created_at,id").all(subjectKey, kind, now() - window);
+    let wait = rows.length >= maximum ? rows[rows.length - maximum].created_at + window - now() : 0;
+    if (kind === "report" && rows.length) wait = Math.max(wait, rows.at(-1).created_at + bugIntakeLimits.cooldownSeconds * 1000 - now());
+    if (wait > 0) throw intakeError(Math.max(1, Math.ceil(wait / 1000)));
+  }
+  function reserveUpload(subjectKey) {
+    return transaction(() => {
+      checkIntake(subjectKey, "upload");
+      db.prepare("INSERT INTO bug_intake_events(subject_key,kind,created_at) VALUES(?,'upload',?)").run(subjectKey, now());
+    });
+  }
   const owns = (row, viewer, receipt) => Boolean(row && (viewer?.id && row.reporter_id === viewer.id || equalHash(row.receipt_hash, receipt)));
   function get(id, { viewer, receipt, admin = false } = {}) {
     const row = rowFor(id);
@@ -138,7 +168,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     catch (error) { fs.unlinkSync(target); throw error; }
     return { id, key };
   }
-  function create(input, viewer) {
+  function create(input, viewer, { subjectKey } = {}) {
     if (!/^[a-f0-9-]{36}$/i.test(input.submissionId ?? "")) throw new Error("Identifiant d'envoi invalide.");
     const receiptHash = hash(input.submissionId);
     const existing = db.prepare("SELECT id,reporter_id FROM bug_reports WHERE receipt_hash=?").get(receiptHash);
@@ -152,7 +182,9 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     const refs = input.images ?? [];
     if (!Array.isArray(refs) || refs.length > 6 || new Set(refs.map((ref) => ref?.id)).size !== refs.length) throw new Error("Ajoute au maximum 6 captures différentes.");
     const diagnostics = input.diagnosticConsent === true ? sanitizeBugDiagnostics(input.diagnostics, { userId: viewer?.id ?? "", version: version() }) : null;
+    const contentHash = hash(JSON.stringify([category, title, description, input.expected, input.actual, input.steps, input.context?.game, input.context?.page, input.context?.zone].map(normalizedContent)));
     const id = transaction(() => {
+      if (subjectKey) checkIntake(subjectKey, "report", contentHash);
       const images = refs.map((ref) => db.prepare("SELECT * FROM bug_images WHERE id=? AND bug_id IS NULL").get(clean(ref?.id, 80)));
       if (images.some((image, index) => !image || !equalHash(image.upload_hash, refs[index].key) || Date.parse(image.created_at) < now() - 3600000)) throw new Error("Une capture a expiré ou ne t'appartient pas. Ajoute-la à nouveau.");
       if (images.reduce((sum, image) => sum + image.bytes, 0) > 12 * 1024 * 1024) throw new Error("Les captures dépassent 12 Mo au total.");
@@ -160,6 +192,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
       const result = db.prepare(`INSERT INTO bug_reports(receipt_hash,reporter_id,title,category,description,expected,actual,steps,frequency,impact,context,diagnostics,consent_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(receiptHash, viewer?.id ?? null, title, category, description, clean(input.expected, 3000), clean(input.actual, 3000), clean(input.steps, 5000), frequency, impact, JSON.stringify(contextFor(input.context)), diagnostics ? JSON.stringify(diagnostics) : null, input.diagnosticConsent === true ? at : null, at, at);
       const id = Number(result.lastInsertRowid);
+      if (subjectKey) db.prepare("INSERT INTO bug_intake_events(subject_key,kind,content_hash,bug_id,created_at) VALUES(?,'report',?,?,?)").run(subjectKey, contentHash, id, now());
       for (const image of images) db.prepare("UPDATE bug_images SET bug_id=?,upload_hash='' WHERE id=?").run(id, image.id);
       audit(id, viewer?.id, "received", "Signalement reçu. Publication soumise à relecture.");
       return id;
@@ -312,6 +345,7 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     return { path: path.resolve(uploadDirectory, row.filename), mimeType: "image/png" };
   }
   function prune() {
+    trimIntake();
     const rows = db.prepare("SELECT id,filename FROM bug_images WHERE bug_id IS NULL AND created_at<?").all(new Date(now() - 3600000).toISOString());
     for (const row of rows) { fs.rmSync(path.join(uploadDirectory, row.filename), { force: true }); db.prepare("DELETE FROM bug_images WHERE id=?").run(row.id); }
     db.prepare("UPDATE bug_reports SET diagnostics=NULL WHERE diagnostics IS NOT NULL AND consent_at<?").run(new Date(now() - 90 * 86400000).toISOString());
@@ -331,5 +365,5 @@ export function createBugReportStore({ filename, uploadDirectory, version = () =
     for (const file of files) fs.rmSync(path.join(uploadDirectory, file.filename), { force: true });
   }
   prune();
-  return { get, list, create, update, publish, stageImage, addComment, moderateComment, relate, unlink, resolutionPlan, resolve, groups, createGroup, batch, suggestions, image, prune, summary, deleteForUser, close: () => db.close() };
+  return { get, list, create, update, publish, stageImage, reserveUpload, addComment, moderateComment, relate, unlink, resolutionPlan, resolve, groups, createGroup, batch, suggestions, image, prune, summary, deleteForUser, close: () => db.close() };
 }

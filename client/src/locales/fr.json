@@ -5297,5 +5297,12 @@
   "Jeu suivant": "Jeu suivant",
   "Jeu aléatoire": "Jeu aléatoire",
   "Molette · flèches · glisser": "Molette · flèches · glisser",
-  "{value0} table publique": "{value0} table publique"
+  "{value0} table publique": "{value0} table publique",
+  "Purger le chat global": "Purger le chat global",
+  "Purger le chat global ?": "Purger le chat global ?",
+  "Tous les messages du chat global seront supprimés définitivement pour tous les joueurs. Les conversations privées et les messages des tables sont conservés.": "Tous les messages du chat global seront supprimés définitivement pour tous les joueurs. Les conversations privées et les messages des tables sont conservés.",
+  "Purger": "Purger",
+  "Le chat global a été purgé.": "Le chat global a été purgé.",
+  "Réessaie dans {seconds} s": "Réessaie dans {seconds} s",
+  "Ouvrir le signalement existant": "Ouvrir le signalement existant"
 }

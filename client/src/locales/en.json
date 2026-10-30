@@ -5230,5 +5230,12 @@
   "Jeu suivant": "Next game",
   "Jeu aléatoire": "Random game",
   "Molette · flèches · glisser": "Wheel · arrows · swipe",
-  "{value0} table publique": "{value0} public table"
+  "{value0} table publique": "{value0} public table",
+  "Purger le chat global": "Clear global chat",
+  "Purger le chat global ?": "Clear global chat?",
+  "Tous les messages du chat global seront supprimés définitivement pour tous les joueurs. Les conversations privées et les messages des tables sont conservés.": "All global chat messages will be permanently deleted for every player. Private conversations and table messages will be kept.",
+  "Purger": "Clear",
+  "Le chat global a été purgé.": "Global chat has been cleared.",
+  "Réessaie dans {seconds} s": "Try again in {seconds} s",
+  "Ouvrir le signalement existant": "Open existing report"
 }

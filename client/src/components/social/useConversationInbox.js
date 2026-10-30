@@ -6,15 +6,15 @@ import { createNotificationSound } from "../../utils/notification-sound.js";
 
 export const conversationKey = (channel) => `${channel.channelType}:${channel.channelId}`;
 
-export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChange, onRoomsChange }) {
+export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChange, onRoomsChange, onChannelReset }) {
   const [channels, setChannels] = useState([]);
   const [soundEnabled, setSoundEnabled] = useState(() => {
     try { return localStorage.getItem(`ktga-conversation-sound:${userId}`) !== "off"; }
     catch { return true; }
   });
   const socketRef = useRef(null);
-  const current = useRef({ roomCode, onMessage, soundEnabled, onRoomsChange });
-  current.current = { roomCode, onMessage, soundEnabled, onRoomsChange };
+  const current = useRef({ roomCode, onMessage, soundEnabled, onRoomsChange, onChannelReset });
+  current.current = { roomCode, onMessage, soundEnabled, onRoomsChange, onChannelReset };
   const revision = useRef(0);
   const owner = useRef(userId);
   owner.current = userId;
@@ -83,6 +83,11 @@ export function useConversationInbox({ userId, roomCode, onMessage, onUnreadChan
       });
       if (displayed) markRead(message.channelType === "direct" ? { channelType: "direct", friendId: message.senderId } : { channelType: "room", roomCode: current.current.roomCode }, message.createdAt);
       else scheduleRefresh();
+    });
+    socket.on("chat-reset", (payload) => {
+      current.current.onChannelReset?.(payload);
+      revision.current += 1;
+      scheduleRefresh();
     });
     const onFocus = () => { if (document.visibilityState === "visible") refresh(); };
     const onConnections = () => subscribe();

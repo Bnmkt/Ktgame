@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A scoped client release built on the current live source, retaining site customizations.
+# A scoped interface release built on the current live source, retaining site customizations.
 set -euo pipefail
 umask 077
 [[ $EUID -eq 0 && $# -eq 1 ]] || { echo 'Run as root with one extracted tables release.' >&2; exit 1; }
@@ -30,7 +30,12 @@ const allowed=new Set([...defaults,
  'client/src/components/game/GamePieces.jsx','client/src/components/game/game-pieces.css',
  'client/src/components/common/StatValue.jsx','client/src/components/common/stat-value.css',
  'client/src/components/cosmetics/Cosmetics.jsx','client/src/pages/ProfilePage.jsx',
- 'client/src/components/profile/PublicProfileModal.jsx','client/src/components/admin/AdminAccountWorkspace.jsx'
+ 'client/src/components/profile/PublicProfileModal.jsx','client/src/components/admin/AdminAccountWorkspace.jsx',
+ 'client/src/components/social/SocialPanel.jsx','client/src/components/social/useConversationInbox.js',
+ 'client/src/components/social/chat-state.js','client/src/components/social/chat-moderation.css',
+ 'client/src/features/bugs/BugReportForm.jsx','client/src/features/bugs/bugs.css',
+ 'server/src/index.js','server/src/services/chat.js','server/src/services/chat-moderation.js',
+ 'server/src/services/bug-reports.js','server/src/services/bug-report-routes.js'
 ]);
 const manifest=JSON.parse(fs.readFileSync(path.join(stage,'source-manifest.json')));
 const files=manifest.files ?? defaults;
@@ -82,7 +87,10 @@ function snapshot(directory) {
     if (entry.isDirectory()) walk(filename); else result[path.relative(directory,filename)] = hash(filename);
   }}
   walk(directory);
-  result['/server/president.js']=hash('/opt/ktga/server/src/games/engines/president.js');
+  for (const relative of files.filter(file=>file.startsWith('server/'))) {
+    const live=path.join('/opt/ktga',relative);
+    result['/'+relative]=fs.existsSync(live)?hash(live):null;
+  }
   return result;
 }
 fs.writeFileSync(path.join(stage,'live-source-state.json'),JSON.stringify(snapshot('/opt/ktga/client/src')));
@@ -120,12 +128,16 @@ function walk(folder) { for(const entry of fs.readdirSync(folder,{withFileTypes:
  if(entry.isDirectory()) walk(filename); else current[path.relative('/opt/ktga/client/src',filename)]=crypto.createHash('sha256').update(fs.readFileSync(filename,'utf8').replace(/\r\n/g,'\n')).digest('hex');
 }}
 walk('/opt/ktga/client/src');
-current['/server/president.js']=crypto.createHash('sha256').update(fs.readFileSync('/opt/ktga/server/src/games/engines/president.js','utf8').replace(/\r\n/g,'\n')).digest('hex');
+const manifest=JSON.parse(fs.readFileSync(path.join(process.argv[2],'source-manifest.json')));
+for(const relative of (manifest.files??[]).filter(file=>file.startsWith('server/'))) {
+ const live=path.join('/opt/ktga',relative);
+ current['/'+relative]=fs.existsSync(live)?crypto.createHash('sha256').update(fs.readFileSync(live,'utf8').replace(/\r\n/g,'\n')).digest('hex'):null;
+}
 if(JSON.stringify(previous)!==JSON.stringify(current)) throw Error('Live source changed during the build; rebuild the release.');
 JS
 backup=/var/backups/ktga/tables-$(date -u +%Y%m%dT%H%M%SZ)-$$
 install -d -m 0700 "$backup"
-tar -czf "$backup/code.tar.gz" -C /opt/ktga client/src client/dist-ssr server/src/games/engines/president.js
+tar -czf "$backup/code.tar.gz" -C /opt/ktga client/src client/dist-ssr server/src
 tar -czf "$backup/frontend.tar.gz" -C /var/www/ktga .
 stopped=false
 changed=false
@@ -148,6 +160,20 @@ checkTables
 systemctl stop ktga.service
 stopped=true
 checkTables
+# Keep consistent private copies before additive chat/report schema migrations.
+if printf '%s\n' "${files[@]}" | grep -q '^server/src/services/\(chat\|bug-reports\)\.js$'; then
+  node - "$backup" <<'JS'
+const fs=require('node:fs'),path=require('node:path'),{DatabaseSync}=require('node:sqlite');
+const backup=process.argv[2],env=require('/opt/ktga/server/node_modules/dotenv').parse(fs.readFileSync('/etc/ktga/server.env'));
+const main=env.SQLITE_PATH;
+for(const [name,filename] of Object.entries({chat:env.CHAT_DB_PATH||'/opt/ktga/server/data/chat.sqlite',bugs:env.BUG_REPORT_DB_PATH||`${main}.bugs.sqlite`})) {
+ const resolved=path.resolve('/opt/ktga/server',filename);
+ if(!resolved.startsWith('/var/lib/ktga/')||!fs.existsSync(resolved)) throw Error(`Unexpected ${name} database location`);
+ const db=new DatabaseSync(resolved,{readOnly:true});
+ try { db.exec(`VACUUM INTO '${path.join(backup,`${name}.sqlite`).replace(/'/g,"''")}'`); } finally { db.close(); }
+}
+JS
+fi
 changed=true
 for file in "${files[@]}"; do
   source="$stage/workspace/$file"

@@ -1,19 +1,27 @@
 import express from "express";
-import rateLimit from "express-rate-limit";
-import { bugMetadata } from "./bug-reports.js";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { createHmac, randomBytes } from "node:crypto";
+import { bugIntakeLimits, bugMetadata } from "./bug-reports.js";
 
-export function registerBugReportRoutes({ app, auth, requireBackOffice, store, identify, staff, version, notifyContact = () => {} }) {
-  const submissions = rateLimit({ windowMs: 3600000, limit: 12, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Trop de signalements. Réessaie dans une heure." } });
-  const uploads = rateLimit({ windowMs: 900000, limit: 36, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Trop de captures. Réessaie dans 15 minutes." } });
+export function registerBugReportRoutes({ app, auth, requireBackOffice, store, identify, staff, version, intakeSecret = randomBytes(32), notifyContact = () => {} }) {
+  const rateReply = (message) => (req, res) => {
+    const retryAfter = Math.max(1, Math.ceil(((req.rateLimit.resetTime?.getTime() ?? Date.now() + 60000) - Date.now()) / 1000));
+    res.set("Retry-After", String(retryAfter)).status(429).json({ error: message, code: "BUG_INTAKE_LIMIT", retryAfter });
+  };
+  const submissions = rateLimit({ windowMs: 3600000, limit: 12, standardHeaders: "draft-7", legacyHeaders: false, handler: rateReply("Trop de signalements depuis cette connexion. Réessaie plus tard.") });
+  const uploads = rateLimit({ windowMs: 900000, limit: 36, standardHeaders: "draft-7", legacyHeaders: false, handler: rateReply("Trop de captures depuis cette connexion. Réessaie plus tard.") });
   const comments = rateLimit({ windowMs: 60000, limit: 8, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Patiente avant d'envoyer un autre commentaire." } });
   const viewer = (req) => identify(req);
+  const subjectKey = (req, user = viewer(req)) => createHmac("sha256", intakeSecret).update(`bug-intake:${user?.id && !user.guest ? `account:${user.id}` : `network:${ipKeyGenerator(req.ip || "unknown")}`}`).digest("hex");
   const access = (req) => {
     const user = viewer(req);
     return { viewer: user, receipt: req.get("X-Bug-Receipt"), admin: Boolean(user?.admin || user?.editor) };
   };
-  const wrap = (handler) => (req, res) => {
-    try { return handler(req, res); }
+  const wrap = (handler) => (req, res, next) => {
+    try { return handler(req, res, next); }
     catch (error) {
+      if (error.code === "BUG_INTAKE_LIMIT") return res.set("Retry-After", String(error.retryAfter)).status(429).json({ error: error.message, code: error.code, retryAfter: error.retryAfter });
+      if (error.code === "BUG_INTAKE_DUPLICATE") return res.status(409).json({ error: error.message, code: error.code, bugId: error.bugId });
       if (error.code && !String(error.code).startsWith("ERR_SQLITE")) return res.status(500).json({ error: "Le dossier ne peut pas être traité pour le moment." });
       if (String(error.code).startsWith("ERR_SQLITE")) return res.status(400).json({ error: "Modification invalide. Vérifie les champs et les relations." });
       return res.status(400).json({ error: error.message || "Signalement invalide." });
@@ -31,11 +39,11 @@ export function registerBugReportRoutes({ app, auth, requireBackOffice, store, i
     }
     return true;
   };
-  app.get("/api/bugs/metadata", (_req, res) => res.json({ ...bugMetadata, limits: { images: 6, imageBytes: 3145728, totalImageBytes: 12582912 } }));
+  app.get("/api/bugs/metadata", (_req, res) => res.json({ ...bugMetadata, limits: { images: 6, imageBytes: 3145728, totalImageBytes: 12582912, intake: bugIntakeLimits } }));
   app.get("/api/bugs/diagnostic-version", (_req, res) => res.json({ version: version() }));
-  app.post("/api/bugs/uploads", uploads, express.raw({ type: "image/png", limit: "3mb" }), wrap((req, res) => res.status(201).json(store.stageImage(req.body))));
+  app.post("/api/bugs/uploads", uploads, wrap((req, _res, next) => { store.reserveUpload(subjectKey(req)); next(); }), express.raw({ type: "image/png", limit: "3mb" }), wrap((req, res) => res.status(201).json(store.stageImage(req.body))));
   app.post("/api/bugs", submissions, wrap((req, res) => {
-    const user = viewer(req), result = store.create(req.body ?? {}, user);
+    const user = viewer(req), result = store.create(req.body ?? {}, user, { subjectKey: subjectKey(req, user) });
     if (result.created) notifyContact(`bug-received:${result.report.id}`, { kind: "bug-received", reference: result.report.id, at: result.report.createdAt });
     res.status(result.created ? 201 : 200).json({ ...result, anonymous: !user?.id });
   }));

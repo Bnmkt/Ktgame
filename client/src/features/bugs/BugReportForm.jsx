@@ -28,11 +28,24 @@ export function BugReportForm({ open, onClose, onFollow, detectedContext, user }
   const [draft, setDraft] = useState(initial), [context, setContext] = useState(null), [metadata, setMetadata] = useState(null);
   const [images, setImages] = useState([]), [consent, setConsent] = useState(false), [version, setVersion] = useState("");
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [success, setSuccess] = useState(null), [tab, setTab] = useState("problem");
+  const [blockedUntil, setBlockedUntil] = useState(0), [retrySeconds, setRetrySeconds] = useState(0), [duplicateId, setDuplicateId] = useState(0);
+  const sendPending = useRef(false);
   const imageRefs = useRef(images), consentRevision = useRef(0);
   imageRefs.current = images;
   useEffect(() => () => { imageRefs.current.forEach((image) => URL.revokeObjectURL(image.url)); }, []);
   useEffect(() => {
+    if (!blockedUntil) { setRetrySeconds(0); return; }
+    const update = () => {
+      const seconds = Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000));
+      setRetrySeconds(seconds);
+      if (!seconds) setBlockedUntil(0);
+    };
+    update(); const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [blockedUntil]);
+  useEffect(() => {
     consentRevision.current++; bugDiagnostics.stop(); setConsent(false); setVersion("");
+    setBlockedUntil(0); setDuplicateId(0);
     imageRefs.current.forEach((image) => URL.revokeObjectURL(image.url)); setImages([]); setDraft(initial()); setContext(null); setSuccess(null); setError("");
   }, [user?.id]);
   useEffect(() => {
@@ -59,9 +72,12 @@ export function BugReportForm({ open, onClose, onFollow, detectedContext, user }
     finally { setBusy(false); }
   }
   async function submit(event) {
-    event.preventDefault(); setError("");
+    event.preventDefault();
+    if (sendPending.current || Date.now() < blockedUntil) return;
+    setError(""); setDuplicateId(0);
     if (draft.title.trim().length < 4 || draft.description.trim().length < 20) { setTab("problem"); setError("Ajoute un titre de 4 caractères et une description de 20 caractères minimum."); return; }
     const revision = consentRevision.current;
+    sendPending.current = true;
     setBusy(true);
     try {
       const uploaded = [];
@@ -80,8 +96,13 @@ export function BugReportForm({ open, onClose, onFollow, detectedContext, user }
       if (result.anonymous || !user || user.guest) saveBugReceipt(result.report.id, result.receipt);
       changeConsent(false);
       images.forEach((image) => URL.revokeObjectURL(image.url)); setImages([]); setDraft(initial()); setSuccess({ id: result.report.id, code: result.report.code });
-    } catch (reason) { setError(reason.message); }
-    finally { setBusy(false); }
+    } catch (reason) {
+      setError(reason.message);
+      const retry = Number(reason.data?.retryAfter);
+      if (reason.status === 429 && Number.isFinite(retry) && retry > 0) setBlockedUntil(Date.now() + Math.min(86400, retry) * 1000);
+      if (reason.code === "BUG_INTAKE_DUPLICATE") setDuplicateId(Number(reason.data?.bugId) || 0);
+    }
+    finally { sendPending.current = false; setBusy(false); }
   }
   function reset() {
     changeConsent(false); images.forEach((image) => URL.revokeObjectURL(image.url)); setImages([]); setDraft(initial()); setContext({ ...detectedContext }); setSuccess(null); setError(""); setTab("problem");
@@ -89,7 +110,7 @@ export function BugReportForm({ open, onClose, onFollow, detectedContext, user }
   if (!open) return null;
   const field = (key, label, multiline = false, placeholder = "") => <label key={key}>{localeText(label)}{multiline ? <textarea aria-label={localeText(label)} value={draft[key]} maxLength={key === "description" ? 6000 : 3000} rows={key === "description" ? 5 : 3} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} placeholder={placeholder} /> : <input aria-label={localeText(label)} value={draft[key]} maxLength={160} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} placeholder={placeholder} />}</label>;
   const select = (key, label, values) => <label>{localeText(label)}<select aria-label={localeText(label)} value={draft[key]} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}>{Object.entries(values ?? {}).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label>;
-  return <Dialog title={success ? localeText("Signalement envoyé") : localeText("Signaler un bug")} className="issue-form-dialog" dismissible={!busy} onClose={onClose}>
+  return <Dialog title={success ? localeText("Signalement envoyé") : localeText("Signaler un bug")} className="issue-form-dialog" layerClassName="issue-form-layer" dismissible={!busy} onClose={onClose}>
     {success ? <div className="issue-success"><CheckCircle2 size={42} /><h3>{success.code}</h3><p>{localeText("Merci ! Ton signalement a bien été reçu. Les informations originales et les captures restent privées jusqu’à relecture.")}</p><div className="actions"><a className="button-link" href={appPath("bugs", success.id)} onClick={(event) => onFollow?.(event, success.id)}>{localeText("Consulter le suivi")}</a><button type="button" className="secondary" onClick={reset}>{localeText("Nouveau signalement")}</button></div></div> : <form onSubmit={submit} className="issue-form">
       <nav className="issue-tabs" aria-label={localeText("Signalement")}><button type="button" className={tab === "problem" ? "active" : "secondary"} onClick={() => setTab("problem")}><Bug size={17} />{localeText("Le problème")}</button><button type="button" className={tab === "context" ? "active" : "secondary"} onClick={() => setTab("context")}><ImagePlus size={17} />{localeText("Contexte et captures")}</button><button type="button" className={tab === "diagnostic" ? "active" : "secondary"} onClick={() => setTab("diagnostic")}><ShieldCheck size={17} />{localeText("Diagnostic facultatif")}</button></nav>
       <div className="issue-form-body">
@@ -98,7 +119,8 @@ export function BugReportForm({ open, onClose, onFollow, detectedContext, user }
         {tab === "diagnostic" && <section className="issue-consent"><ShieldCheck size={32} /><h3>{localeText("Un diagnostic, seulement avec ton accord")}</h3><p>{localeText("Tu peux envoyer ton signalement sans diagnostic technique.")}</p><label className="issue-check"><input type="checkbox" checked={consent} disabled={busy} onChange={(event) => changeConsent(event.target.checked)} /><span>{localeText("J’accepte de transmettre, uniquement pour diagnostiquer et résoudre ce bug, la version du site, la date, le navigateur, le système, les dimensions d’écran, mon identifiant de compte et les codes des erreurs JavaScript, API et WebSocket.")}</span></label><p className="issue-muted">{localeText("La collecte commence après cet accord, jusqu’à l’envoi ou son retrait. Les erreurs antérieures ne sont pas récupérées. Aucun cookie, token, mot de passe, contenu de requête ni historique de navigation n’est joint. Le diagnostic reste privé et est supprimé après 90 jours.")}</p>{consent && <p role="status" className="issue-privacy-note">{localeText("Diagnostic actif")}{version ? localeText(" · version {value0}", { value0: version }) : ""}{localeText(". Tu peux fermer ce formulaire pour reproduire le problème, puis revenir ici. Décocher efface les informations recueillies.")}</p>}</section>}
       </div>
       {error && <p className="error" role="alert">{localeText(error)}</p>}
-      <footer className="issue-form-footer"><small>{localeText("Privé à réception · Aucun diagnostic sans accord")}{consent ? localeText(" · Diagnostic actif") : ""}</small><button type="submit" disabled={busy || !metadata}><Send size={17} />{busy ? localeText("Envoi en cours…") : localeText("Envoyer le signalement")}</button></footer>
+      {duplicateId > 0 && <button type="button" className="secondary" onClick={(event) => onFollow?.(event, duplicateId)}>{localeText("Ouvrir le signalement existant")}</button>}
+      <footer className="issue-form-footer"><small>{localeText("Privé à réception · Aucun diagnostic sans accord")}{consent ? localeText(" · Diagnostic actif") : ""}</small><button type="submit" disabled={busy || retrySeconds > 0 || !metadata}><Send size={17} />{busy ? localeText("Envoi en cours…") : retrySeconds > 0 ? localeText("Réessaie dans {seconds} s", { seconds: retrySeconds }) : localeText("Envoyer le signalement")}</button></footer>
     </form>}
   </Dialog>;
 }
