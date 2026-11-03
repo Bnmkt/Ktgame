@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -10,10 +10,10 @@ import { createPresidentState, applyPresidentAction } from "../../server/src/gam
 import { presidentCardKey, presidentDealSequence } from "../src/features/games/president.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const dependencies = path.join(tmpdir(), "ktga-chat-browser-tools/node_modules");
+const dependencies = process.env.KTGA_BROWSER_TOOLS ? path.join(process.env.KTGA_BROWSER_TOOLS, "node_modules") : path.join(tmpdir(), "ktga-chat-browser-tools/node_modules");
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE ?? path.join(dependencies, "playwright/index.mjs")).href);
 const { PlaywrightBlocker } = await import(pathToFileURL(path.join(dependencies, "@ghostery/adblocker-playwright/dist/esm/index.js")).href);
-const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
+const blocker = process.env.KTGA_BLOCKER_CACHE ? PlaywrightBlocker.deserialize(readFileSync(process.env.KTGA_BLOCKER_CACHE)) : await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
 const players = Array.from({ length: 6 }, (_, i) => ({ id: i ? `p${i}` : "me", pseudo: i ? ["", "Camille", "Lucky", "Midnight", "Jacky", "Nixie"][i] : "Bnmkt", tokens: 10000, ready: true, cosmetics: { equipped: { icon: i ? "star" : "chip", cardSkin: i ? "classic-red" : "premium-gold" } } }));
 let room, revision = 0, webOrigin;
 const actions = [], errors = [], watches = new Map();
@@ -57,7 +57,7 @@ async function until(check, label) { for (let i = 0; i < 120; i++) { try { if (a
 let browser;
 try {
   await until(async () => (await fetch(webOrigin)).ok, "Vite");
-  browser = await chromium.launch({ channel: "msedge", headless: true });
+  browser = await chromium.launch({ channel: "msedge", headless: true, args: ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"] });
   async function newPage(viewer = "me") {
     const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
     await context.addInitScript(id => localStorage.setItem("ktgame-token", id), viewer);

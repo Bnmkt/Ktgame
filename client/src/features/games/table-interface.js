@@ -1,7 +1,15 @@
 // Opt in one game at a time; common presentation has no server dependencies.
-export const tableInterfaceGames = new Set(["farkle", "yahtzee", "cul-de-chouette", "texas-holdem", "blackjack", "president"]);
+import { familyTableGames } from "./table-families.js";
+export const tableInterfaceGames = new Set(["farkle", "yahtzee", "cul-de-chouette", "texas-holdem", "blackjack", "president", ...familyTableGames]);
 
 export function tableRoundInfo(state) {
+  if (state.gameId === "belote") return { label: "Donne", value: String(state.round) };
+  if (state.gameId === "midnight-dice") return { label: "Manche", value: `${state.round} / ${state.modifiers.rounds}` };
+  if (["liars-dice", "bataille"].includes(state.gameId)) return { label: "Manche", value: String(state.round ?? 1) };
+  if (state.gameId === "velvet-ruse") return { label: "Phase", value: state.phase === "draw" ? "Pioche" : state.phase === "decision" ? "Verdict" : "Déclaration" };
+  if (state.gameId === "golf-solitaire") return { label: "Tableau", value: `${state.tableau.reduce((sum, column) => sum + column.length, 0)} / 35` };
+  if (state.gameId === "accordion") return { label: "Piles restantes", value: String(state.piles.length) };
+  if (state.gameId === "shut-the-box") return { label: "Objectif", value: "Fermer la boîte" };
   if (state.gameId === "president") return { label: "Phase", value: state.finished ? "Résultat" : state.revolution ? "Révolution active" : state.currentSet ? "Pli en cours" : "Nouvelle ouverture" };
   if (state.gameId === "yahtzee") {
     const completed = Object.values(state.scores ?? {}).reduce((sum, scores) => sum + Object.keys(scores).length, 0);

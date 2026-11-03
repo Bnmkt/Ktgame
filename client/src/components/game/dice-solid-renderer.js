@@ -274,6 +274,10 @@ export function mountDie(host, initial) {
       schedule();
     }
     if (entry.materials) samplePalette(entry);
+    // Grid changes can resize a cleared canvas before its visibility notification arrives.
+    // Request a fresh observation so a die returning on screen is painted again.
+    intersection.unobserve(host);
+    intersection.observe(host);
   };
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(host);

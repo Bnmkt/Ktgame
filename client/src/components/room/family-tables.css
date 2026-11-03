@@ -1,0 +1,256 @@
+/* Layout only: solid card faces, depth, dice canvases and cosmetic materials are untouched. */
+.table-family-interface .board > .board-felt { position: relative; display: flex; flex-direction: column; }
+.table-family-interface .board-felt > :not(.table-turn-focus):not(.table-roll-history):not(.table-deal-origin):not(.table-deal-skip) { min-width: 0; }
+.table-family-interface .table-turn-focus { flex: 0 0 auto; }
+.table-family-interface .table-turn-focus > div > strong { font-size: 18px; }
+.table-family-interface .table-turn-focus > div { gap: 7px 15px; }
+.table-family-interface .table-inline-help { border-top: 1px solid var(--table-line); color: #c6d9cc; font-size: 12px; padding: 7px 0; }
+.table-family-interface .table-inline-help > summary { cursor: pointer; color: var(--table-gold); padding: 3px; }
+.table-family-interface .table-inline-help[open] > :not(summary) { margin-top: 8px; }
+.table-family-interface button:has(.playing-card):disabled { opacity: 1; cursor: default; }
+.table-family-interface .playing-card { opacity: 1; }
+.table-family-interface .actions { gap: 8px; }
+.table-family-interface .actions > button { min-height: 44px; }
+.table-family-interface .table-roll-history { flex: 0 0 auto; }
+
+.table-card-stock { --stock-width: 70px; display: grid; justify-items: center; gap: 7px; padding: 7px 9px; min-width: 0; border: 1px solid transparent; background: transparent; color: #e4d5ac; font-size: 11px; border-radius: 9px; box-shadow: none; }
+button.table-card-stock:enabled:hover { border-color: var(--table-gold); background: #051c1770; }
+.table-stock-layers { display: block; width: var(--stock-width); aspect-ratio: 5 / 7; position: relative; margin: 4px 4px 0 0; }
+.table-stock-layers > .playing-card { position: absolute; left: 0; top: 0; width: 100% !important; min-width: 0 !important; height: 100% !important; margin: 0 !important; }
+.table-stock-layers > .playing-card:nth-child(2) { translate: 3px -3px; }
+.table-stock-layers > .playing-card:nth-child(3) { translate: 6px -6px; }
+.table-stock-readout { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.table-stock-readout strong { color: var(--table-gold); font-size: 15px; }
+.table-stock-empty { border: 1px dashed var(--table-line); border-radius: 7px; display: grid; place-items: center; width: var(--stock-width); aspect-ratio: 5 / 7; }
+.table-deal-origin { display: none; position: absolute; top: 40%; left: 50%; translate: -50% -50%; z-index: 7; pointer-events: none; }
+[data-table-dealing] > .table-deal-origin { display: block; }
+.table-deal-skip { position: absolute; z-index: 8; right: 12px; top: 12px; min-height: 32px; padding: 6px 10px; font-size: 12px; }
+
+/* Dice tables share their throwing surface and an action dock; each retains its own choices. */
+.table-family-interface[data-table-game="421"] .dice-throw-tray { flex: 1; margin-top: 5px; }
+.table-family-interface[data-table-game="421"] .four-twenty-one-combo { padding: 8px 12px; margin: 0; }
+.table-family-interface[data-table-game="421"] .four-twenty-one-combo strong { font-size: 22px; }
+.table-family-interface[data-table-game="421"] .four-twenty-one-combo small { display: none; }
+.table-family-interface[data-table-game="421"] .four-twenty-one-actions { margin: 0; }
+.table-family-interface .liar-arena, .table-family-interface .shut-table { gap: 12px; }
+.table-family-interface .liar-heading { justify-content: end; min-height: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.table-family-interface .liar-heading > div:first-child, .table-family-interface .shut-heading > div:first-child { display: none; }
+.table-family-interface .liar-pool { display: flex; gap: 8px; align-items: baseline; padding: 0; background: none; border: 0; }
+.table-family-interface .liar-pool strong { font-size: 22px; }
+.table-family-interface .liar-opponents { gap: 8px; }
+.table-family-interface .liar-opponents article { padding: 8px; }
+.table-family-interface .liar-cup { min-height: 45px; padding: 6px; flex-direction: row; gap: 7px; }
+.table-family-interface .liar-confrontation { grid-template-columns: minmax(0, 1fr) minmax(210px, .8fr); gap: 12px; }
+.table-family-interface .liar-own-hand, .table-family-interface .liar-command, .table-family-interface .liar-bid-stage { padding: 10px; }
+.table-family-interface .liar-bid-stage { grid-column: 1; grid-row: 1; background: none; min-height: 80px; }
+.table-family-interface .liar-own-hand { grid-column: 1; grid-row: 2; }
+.table-family-interface .liar-command { grid-column: 2; grid-row: 1 / 3; align-self: stretch; display: flex; flex-direction: column; }
+.table-family-interface .liar-command .actions { margin-top: auto; padding-top: 12px; }
+.table-family-interface .liar-current-bid { gap: 10px; }
+.table-family-interface .liar-current-bid > strong { font-size: 36px; }
+.table-family-interface .liar-versus { display: none; }
+.table-family-interface .liar-face-grid .die { min-width: 0; width: 100%; height: auto; aspect-ratio: 1; }
+.table-family-interface .liar-face-grid > button { min-width: 0; min-height: 35px; }
+.table-family-interface .liar-own-hand .dice-throw-surface { min-height: 115px; padding: 15px; }
+.table-family-interface .liar-read { font-size: 11px; }
+.table-family-interface .shut-heading { display: none; }
+.table-family-interface .shut-score { display: flex; flex: 0 1 auto; gap: 10px; padding: 0; border: 0; background: none; }
+.table-family-interface .shut-score span { display: none; }
+.table-family-interface .shut-player-strip { gap: 6px; }
+.table-family-interface .shut-player-strip article { padding: 5px 9px; }
+.table-family-interface .shut-cabinet { padding: 12px; }
+.table-family-interface .shut-tiles { grid-template-columns: repeat(var(--shut-tile-count, 9), minmax(0, 1fr)); gap: 6px; }
+.table-family-interface .shut-tiles button { min-width: 0; min-height: 68px; }
+.table-family-interface .shut-console { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.table-family-interface .shut-roll, .table-family-interface .shut-choice { padding: 10px; }
+.table-family-interface .shut-roll .dice-throw-tray { width: 100%; }
+.table-family-interface .shut-roll .dice-throw-surface { min-height: 120px; padding: 12px; }
+.table-family-interface .shut-roll .dice-row .die { --table-die-size: 86px; }
+.table-family-interface .midnight-table { gap: 12px; }
+.table-family-interface .midnight-heading { padding: 0; }
+.table-family-interface .midnight-heading > div:first-child, .table-family-interface .midnight-phase { display: none; }
+.table-family-interface .midnight-heading-actions { width: 100%; justify-content: end; }
+.table-family-interface .midnight-player-trays { gap: 8px; }
+.table-family-interface .midnight-player-trays > article { padding: 9px; }
+.table-family-interface .midnight-current-contract { padding: 10px; }
+.table-family-interface .midnight-market { padding: 12px; }
+.table-family-interface .midnight-market-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.table-family-interface .midnight-market-grid .die { width: 78px; height: 78px; min-width: 0; min-height: 0; }
+.table-family-interface .midnight-market-grid > article { padding: 10px; }
+.table-family-interface .midnight-market-grid > article > div { display: flex; gap: 4px; justify-content: center; }
+.table-family-interface .midnight-market-grid button { min-height: 32px; padding: 6px 8px; font-size: 12px; }
+
+/* Card tables retain a clear centre, covered opponent hands and a local decision area. */
+.table-family-interface .strategic-battle, .table-family-interface .velvet-table { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.table-family-interface .battle-round-heading > div > strong, .table-family-interface .battle-round-heading > small { display: none; }
+.table-family-interface .battle-mode-strip { display: flex; flex-wrap: wrap; }
+.table-family-interface .battle-round-heading { padding: 0; }
+.table-family-interface .battle-table-faceoff { grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr); gap: 10px; padding: 15px; border-radius: 26px; flex: 1; overflow: visible; }
+.table-family-interface .battle-player-side { padding: 10px; gap: 10px; }
+.table-family-interface .battle-player-heading { flex-wrap: wrap; gap: 4px; }
+.table-family-interface .battle-player-heading small { display: none; }
+.table-family-interface .battle-player-heading strong { font-size: 15px; }
+.table-family-interface .battle-player-layout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.table-family-interface .battle-deck-station { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; }
+.table-family-interface .battle-deck-stack { padding: 0; background: none; width: auto; height: auto; }
+.table-family-interface .battle-deck-stack::before, .table-family-interface .battle-deck-stack::after { content: none; }
+.table-family-interface .battle-deck-stack .table-card-stock { --stock-width: 58px; }
+.table-family-interface .battle-drawn-station .playing-card, .table-family-interface .battle-placement-slot .playing-card { width: 64px; min-width: 0; height: 90px; }
+.table-family-interface .battle-empty-card { width: 64px; height: 90px; min-height: 0; }
+.table-family-interface .battle-player-field { gap: 7px; }
+.table-family-interface .battle-placement-slot { min-height: 135px; padding: 7px; }
+.table-family-interface .battle-placement-slot > button { font-size: 11px; min-height: 32px; padding: 6px; }
+.table-family-interface .battle-confrontation-axis { display: flex; flex-direction: column; justify-content: center; gap: 40px; }
+.table-family-interface .battle-confrontation-axis > div { display: grid; grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 5px; }
+.table-family-interface .battle-confrontation-axis small { font-size: 9px; }
+.table-family-interface .velvet-heading { display: none; }
+.table-family-interface .velvet-opponents { gap: 10px; }
+.table-family-interface .velvet-opponents > article { padding: 8px; }
+.table-family-interface .velvet-opponent-hand { display: flex; justify-content: center; padding-left: 25px; }
+.table-family-interface .velvet-opponent-hand > span { width: 14px; position: relative; }
+.table-family-interface .velvet-opponent-hand .playing-card { width: 38px; min-width: 38px; height: 54px; margin: 0; }
+.table-family-interface .velvet-center { gap: 12px; padding: 18px 12px; min-width: 0; }
+.table-family-interface .velvet-center .playing-card { width: 68px; min-width: 0; height: 96px; }
+.table-family-interface .velvet-center .table-card-stock { --stock-width: 68px; }
+.table-family-interface .velvet-dossier > div { gap: 4px; }
+.table-family-interface .velvet-self { margin-top: auto; padding: 12px; }
+.table-family-interface .velvet-self > header { padding: 0; margin-bottom: 8px; }
+.table-family-interface .velvet-self > header h3 { font-size: 15px; }
+.table-family-interface .velvet-hand { display: flex; justify-content: center; flex-wrap: nowrap; gap: 5px; overflow: visible; padding: 10px 3px; }
+.table-family-interface .velvet-hand > button { flex: 0 1 86px; min-width: 0; padding: 0; background: none; border: 0; opacity: 1; transition: translate 160ms ease, filter 160ms ease; }
+.table-family-interface .velvet-hand > button > span { display: none; }
+.table-family-interface .velvet-hand .playing-card { width: 100%; min-width: 0; height: auto; aspect-ratio: 5 / 7; }
+.table-family-interface .velvet-hand > button:not(:disabled):hover, .table-family-interface .velvet-hand > button.selected { translate: 0 -8px; z-index: 3; filter: drop-shadow(0 0 5px #78efae); }
+.table-family-interface .velvet-play-console { gap: 9px; }
+.table-family-interface .velvet-claim-fields { gap: 8px; }
+.table-family-interface .velvet-claim-fields select { min-height: 35px; padding: 5px; }
+.table-family-interface .velvet-pending { padding: 9px; }
+
+/* Belote keeps its teams, compass seats, trump and trick rules. */
+.table-family-interface .belote-board { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+.table-family-interface .belote-board > :not(.belote-table) { flex: 0 0 auto; }
+.table-family-interface .belote-summary { padding-bottom: 5px; font-size: 12px; }
+.table-family-interface .belote-summary > span:first-child { display: none; }
+.table-family-interface .belote-score-strip { gap: 8px; }
+.table-family-interface .belote-score-strip > div { padding: 6px 9px; gap: 5px; background: #061d1e99; border-bottom-width: 2px; }
+.table-family-interface .belote-score-strip strong { font-size: 18px; }
+.table-family-interface .belote-score-strip span { font-size: 11px; }
+.table-family-interface .belote-table { flex: 1; grid-template-columns: minmax(80px, 1fr) minmax(160px, 1.6fr) minmax(80px, 1fr); grid-template-rows: 90px minmax(120px, 1fr); gap: 5px; min-height: 215px; }
+.table-family-interface .belote-seat.seat-south { display: none; }
+.table-family-interface .belote-table-felt { inset: 20px 5px; border-width: 5px; }
+.table-family-interface .belote-seat { position: relative; padding: 6px; width: min(100%, 160px); gap: 3px; background: #061e22ed; }
+.table-family-interface .belote-seat-count { position: absolute; right: -3px; bottom: -6px; padding: 1px 5px; background: #061e22; border-radius: 5px; }
+.table-family-interface .belote-upcard { gap: 3px; }
+.table-family-interface .belote-upcard .playing-card { width: 55px; }
+.table-family-interface .belote-seat-name { font-size: 12px; }
+.table-family-interface .belote-seat .cosmetic-icon { width: 24px; height: 24px; flex-basis: 24px; }
+.table-family-interface .belote-card-fan { padding-left: 20px; height: 36px; width: auto; }
+.table-family-interface .belote-card-fan > span { width: 8px; }
+.table-family-interface .belote-card-fan .playing-card { height: 34px; width: 24px; min-width: 24px; margin: 0; transform: none; }
+.table-family-interface .belote-trick-grid { height: 150px; max-width: 190px; }
+.table-family-interface .belote-trick-label { top: -12px; font-size: 11px; }
+.table-family-interface .belote-trick-winner { bottom: -12px; }
+.table-family-interface .belote-stock { position: absolute; left: 23%; top: 7px; z-index: 2; }
+.table-family-interface .belote-stock .table-card-stock { --stock-width: 38px; font-size: 10px; gap: 3px; }
+.table-family-interface .belote-hand-zone { padding-top: 5px; }
+.table-family-interface .belote-hand-zone > h3 { font-size: 12px; margin: 0 0 5px; }
+.table-family-interface .belote-hand { flex-wrap: nowrap; gap: 5px; }
+.table-family-interface .belote-hand > button { flex: 0 1 75px; min-width: 0; padding: 2px; opacity: 1; }
+.table-family-interface .belote-hand .playing-card { width: 100%; height: auto; }
+.table-family-interface .belote-hand button:not(:disabled):hover { translate: 0 -5px; z-index: 2; }
+.table-family-interface .belote-round-score { padding: 8px; }
+.table-family-interface .belote-bid-actions button { min-height: 38px; padding: 8px 12px; }
+
+/* Solitaires use the whole centre; seven fairways and the ribbon retain their own rules. */
+.table-family-interface .solo-card-table { border: 0; background: none; padding: 6px; gap: 15px; min-height: 0; flex: 1; }
+.table-family-interface .golf-tableau { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: clamp(5px, 1vw, 18px); overflow: visible; padding: 5px; margin: 0; min-width: 0; width: 100%; }
+.table-family-interface .golf-fairway { min-width: 0; }
+.table-family-interface .golf-card-stack { min-height: 240px; }
+.table-family-interface .golf-card-stack > button { width: min(100%, 90px); min-width: 0; opacity: 1; }
+.table-family-interface .golf-card-stack .playing-card { width: 100%; min-width: 0; height: auto; aspect-ratio: 5 / 7; }
+.table-family-interface .golf-draw-zone { padding: 10px; margin-top: auto; }
+.table-family-interface .golf-draw-zone .playing-card { width: 80px; min-width: 0; height: 112px; }
+.table-family-interface .golf-draw-zone .table-card-stock { --stock-width: 80px; }
+.table-family-interface .accordion-guide { font-size: 12px; flex-wrap: wrap; }
+.table-family-interface .accordion-guide > strong { margin-left: auto; color: var(--table-gold); }
+.table-family-interface .accordion-line { display: grid; grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); gap: 9px 5px; overflow-y: auto; overflow-x: clip; min-height: 0; max-height: none; padding: 5px; align-content: start; }
+.table-family-interface .accordion-line button { min-height: 115px; padding: 17px 2px 2px; min-width: 0; animation: none; }
+.table-family-interface .accordion-line .playing-card { width: 100%; min-width: 0; height: auto; aspect-ratio: 5 / 7; }
+.table-family-interface .accordion-line button.target { box-shadow: inset 0 0 0 1px var(--table-mint), 0 0 8px #6bdfac33; }
+
+@media (min-width: 1100px) and (min-height: 560px) {
+  .room-app-shell.table-family-interface .layout > section { height: 100%; }
+  .room-app-shell.table-family-interface .board > .board-felt { display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: thin; }
+  .table-family-interface .liar-arena, .table-family-interface .shut-table { flex: 1; min-height: 0; align-content: start; }
+  .table-family-interface .shut-table { grid-template-rows: auto auto minmax(0, 1fr); }
+  .table-family-interface .shut-console { align-self: stretch; }
+  .table-family-interface .shut-roll > .dice-throw-tray { height: 100%; }
+  .table-family-interface .shut-choice { align-content: end; }
+  .table-family-interface .strategic-battle, .table-family-interface .velvet-table { flex: 1; }
+  .room-app-shell.table-interface.table-family-interface.table-fullscreen .board > .board-felt { display: flex; height: 100%; overflow: auto; }
+  .room-app-shell.table-interface.table-family-interface .midnight-table { display: grid; grid-template-columns: minmax(0, 1fr) 230px; align-content: start; min-width: 0; }
+  .room-app-shell.table-interface.table-family-interface .midnight-table > * { grid-column: 1; grid-row: auto; }
+  .room-app-shell.table-interface.table-family-interface .midnight-table > .midnight-player-trays { grid-column: 2; grid-row: 1 / 6; grid-template-columns: 1fr; align-content: start; }
+  .room-app-shell.table-interface.table-family-interface .midnight-player-trays article { display: grid; grid-template-columns: 1fr; }
+  .room-app-shell.table-interface.table-family-interface .midnight-player-trays article > * { grid-column: 1; grid-row: auto; }
+  .room-app-shell.table-interface.table-family-interface .midnight-market-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .table-family-interface .midnight-tray-dice .die { width: 42px; height: 42px; min-width: 0; min-height: 0; }
+  .table-family-interface .midnight-tray-dice .midnight-die-slot { min-height: 50px; }
+  .table-family-interface .midnight-player-trays footer { font-size: 10px; }
+  .table-family-interface .golf-card-stack { min-height: 215px; }
+  .table-family-interface .belote-hand > button { flex-basis: 65px; }
+}
+@media (max-width: 700px) {
+  .table-family-interface .table-turn-focus > div { display: grid; gap: 4px; }
+  .table-family-interface .table-turn-focus small { font-size: 11px; }
+  .table-family-interface .liar-confrontation { display: flex; flex-direction: column; }
+  .table-family-interface .shut-console { grid-template-columns: 1fr; }
+  .table-family-interface .shut-cabinet { padding: 10px 5px; border-width: 3px; }
+  .table-family-interface .shut-tiles { gap: 3px; }
+  .table-family-interface .shut-tiles button { min-height: 58px; padding: 5px 1px; }
+  .table-family-interface .shut-tiles button span { font-size: 20px; }
+  .table-family-interface .shut-tiles button small { display: none; }
+  .table-family-interface .battle-table-faceoff { display: flex; flex-direction: column; padding: 9px; }
+  .table-family-interface .battle-confrontation-axis { flex-direction: row; gap: 12px; }
+  .table-family-interface .battle-confrontation-axis > div { flex: 1; }
+  .table-family-interface .velvet-center { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 10px; gap: 10px; }
+  .table-family-interface .velvet-dossier { grid-column: 1 / -1; grid-row: 2; }
+  .table-family-interface .velvet-center .playing-card { width: 55px; height: 78px; }
+  .table-family-interface .velvet-center .table-card-stock { --stock-width: 55px; }
+  .table-family-interface .velvet-edict { min-width: 0; }
+  .table-family-interface .velvet-edict strong { font-size: 11px; }
+  .table-family-interface .velvet-play-console { display: flex; flex-direction: column; }
+  .table-family-interface .velvet-opponents { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .table-family-interface .velvet-opponent-hand .playing-card { width: 27px; min-width: 27px; height: 38px; }
+  .table-family-interface .velvet-opponent-hand > span { width: 8px; }
+  .table-family-interface .velvet-self > header { flex-wrap: wrap; }
+  .table-family-interface .belote-table { grid-template-columns: minmax(60px, .75fr) minmax(100px, 1.3fr) minmax(60px, .75fr); }
+  .table-family-interface .belote-seat .cosmetic-icon { display: none; }
+  .table-family-interface .belote-stock { left: 13%; top: 5px; }
+  .table-family-interface .belote-stock .table-card-stock { --stock-width: 26px; }
+  .table-family-interface .belote-trick-grid { max-width: 120px; height: 130px; }
+  .table-family-interface .belote-seat { max-width: 110px; padding: 4px; }
+  .table-family-interface .belote-seat-count, .table-family-interface .belote-seat small { font-size: 9px; }
+  .table-family-interface .belote-card-fan { padding-left: 14px; }
+  .table-family-interface .belote-card-fan > span { width: 5px; }
+  .table-family-interface .belote-card-fan .playing-card { width: 19px; min-width: 19px; height: 27px; }
+  .table-family-interface .belote-hand { gap: 2px; }
+  .table-family-interface .belote-hand > button { padding: 1px; }
+  .table-family-interface .belote-hand .playing-card strong { font-size: 16px; }
+  .table-family-interface .belote-hand .playing-card > span { font-size: 20px; }
+  .table-family-interface .golf-tableau { gap: 4px; padding: 2px; }
+  .table-family-interface .golf-fairway > small { font-size: 0; }
+  .table-family-interface .golf-card-stack { min-height: 175px; }
+  .table-family-interface .golf-card-stack .playing-card { padding: 2px; }
+  .table-family-interface .golf-card-stack .playing-card strong { font-size: 15px; }
+  .table-family-interface .golf-card-stack .playing-card > span { font-size: 19px; }
+  .table-family-interface .golf-draw-zone { gap: 8px; padding: 8px; }
+  .table-family-interface .golf-draw-zone .table-card-stock { --stock-width: 50px; padding: 5px; }
+  .table-family-interface .golf-draw-zone .playing-card { width: 50px; height: 70px; min-width: 0; }
+  .table-family-interface .golf-direction { font-size: 20px; min-width: 0; max-width: 70px; text-align: center; }
+  .table-family-interface .accordion-line { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); max-height: 65dvh; }
+  .table-family-interface .accordion-line button { min-height: 100px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-family-interface button { transition: none; }
+}

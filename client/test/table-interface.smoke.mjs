@@ -9,10 +9,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createGameState, applyAction } from "../../server/src/games/engines.js";
 import { scoreCulDeChouette } from "../../server/src/games/engines/cul-de-chouette.js";
 
-const dependencies = path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
+const dependencies = process.env.KTGA_BROWSER_TOOLS ? path.join(process.env.KTGA_BROWSER_TOOLS, "node_modules") : path.join(os.tmpdir(), "ktga-chat-browser-tools/node_modules");
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE ?? path.join(dependencies, "playwright/index.mjs")).href);
 const { PlaywrightBlocker } = await import(pathToFileURL(process.env.BLOCKER_MODULE ?? path.join(dependencies, "@ghostery/adblocker-playwright/dist/esm/index.js")).href);
-const blocker = await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
+const blocker = process.env.KTGA_BLOCKER_CACHE ? PlaywrightBlocker.deserialize(await fs.readFile(process.env.KTGA_BLOCKER_CACHE)) : await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch);
 const socket = createServer().listen(0, "127.0.0.1");
 await once(socket, "listening");
 const port = socket.address().port;
@@ -60,7 +60,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 150));
     if (attempt === 99) throw new Error(viteLog);
   }
-  browser = await chromium.launch({ channel: "msedge", headless: true });
+  browser = await chromium.launch({ channel: "msedge", headless: true, args: ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"] });
   const page = await browser.newPage({ viewport: { width: 1672, height: 941 } });
   page.on("pageerror", (error) => errors.push(error.message));
   await blocker.enableBlockingInPage(page);

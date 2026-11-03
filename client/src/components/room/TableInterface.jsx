@@ -7,26 +7,30 @@ import { gameRules } from "../../config/site.js";
 import { diceScoreRows } from "../../features/games/dice-scoreboard.js";
 import { yahtzeePotentialScore, yahtzeeTotal, yahtzeeUpperTotal } from "../game/GameSupport.jsx";
 import { tableRoundInfo } from "../../features/games/table-interface.js";
+import { cardTableGames, familyTableGames, familyTurnHint } from "../../features/games/table-families.js";
 import "./table-interface.css";
 import "./table-stage.css";
+import "./family-tables.css";
 
 // Presentation only. Actions and room synchronization remain owned by Room.
 export function TableHud({ room, state, userId }) {
   const { t } = useLocale();
-  const current = state.players[state.currentPlayerIndex];
+  const current = state.players[state.currentPlayerIndex ?? 0];
   const poker = state.gameId === "texas-holdem";
   const blackjack = state.gameId === "blackjack";
   const president = state.gameId === "president";
+  const simultaneous = blackjack || state.gameId === "bataille";
+  const embeddedPlayers = cardTableGames.has(state.gameId) || ["liars-dice", "midnight-dice", "shut-the-box"].includes(state.gameId);
   const round = tableRoundInfo(state);
   const scores = diceScoreRows(state, userId, state.gameId === "yahtzee" ? yahtzeeTotal : undefined);
   return <section className="table-hud" aria-label={t("Informations de la table")}>
-    <div className="table-hud-top"><header className="table-board-heading"><h2>{president ? <Crown size={25}/> : poker || blackjack ? <Spade size={25}/> : <Dices size={25}/>} {t(gameTitle(room.gameId))}</h2></header><dl className="table-hud-facts">
+    <div className="table-hud-top"><header className="table-board-heading"><h2>{president ? <Crown size={25}/> : cardTableGames.has(state.gameId) ? <Spade size={25}/> : <Dices size={25}/>} {t(gameTitle(room.gameId))}</h2></header><dl className="table-hud-facts">
       <div><dt>{t(round.label)}</dt><dd>{t(round.value)}</dd></div>
-      <div><dt>{t(blackjack ? "Actions simultanées" : "Joueur actif")}</dt><dd>{state.finished ? t("Partie terminée") : blackjack ? t("Contre le croupier") : current?.pseudo ?? "—"}</dd></div>
+      <div><dt>{t(simultaneous ? "Actions simultanées" : "Joueur actif")}</dt><dd>{state.finished ? t("Partie terminée") : blackjack ? t("Contre le croupier") : state.gameId === "bataille" ? `${state.submittedPlayerIds?.length ?? 0} / ${state.players.length}` : current?.pseudo ?? "—"}</dd></div>
       <div><dt>{t("Joueurs")}</dt><dd>{state.players.length}{poker && room.maxPlayers ? ` / ${room.maxPlayers}` : ""}</dd></div>
       <div><dt>{t(poker ? "Blindes" : blackjack ? "Limites de mise" : room.ranked ? "Partie classée" : "Mise par joueur")}</dt><dd>{poker ? `${state.smallBlind} / ${state.bigBlind}` : blackjack ? `${state.modifiers?.minimumBet ?? 50} – ${state.modifiers?.maximumBet ?? 100}` : room.ranked ? <><Trophy size={15}/>{t("Classé")}</> : <CompactNumber value={room.stake} suffix={t(" jetons")}/>}</dd></div>
     </dl></div>
-    {!poker && !president && <div className="table-hud-players">{state.players.map((player, index) => {
+    {(!embeddedPlayers || blackjack) && <div className="table-hud-players">{state.players.map((player, index) => {
       const active = !state.finished && (blackjack ? !player.isBot && !state.completedPlayerIds?.includes(player.id) : index === state.currentPlayerIndex);
       const score = scores.find((row) => row.player.id === player.id);
       return <article className={`table-hud-player ${active ? "table-player-current" : ""}`} key={player.id} aria-current={active ? "true" : undefined}>
@@ -47,9 +51,9 @@ export function TableBoardHeading({ state }) {
 
 export function TableTurnFocus({ state, userId, pacing }) {
   const { t } = useLocale();
-  const current = state.players[state.currentPlayerIndex];
-  const mine = current?.id === userId && !pacing && !state.finished;
-  const hint = state.bust ? "Les points accumulés ce tour sont perdus. Confirme le score nul pour passer la main."
+  const current = state.players[state.currentPlayerIndex ?? 0];
+  const mine = (state.gameId === "bataille" ? !state.resolutionEndsAt && !state.submittedPlayerIds?.includes(userId) : current?.id === userId) && !pacing && !state.finished;
+  const hint = familyTableGames.has(state.gameId) ? familyTurnHint(state, userId) : state.bust ? "Les points accumulés ce tour sont perdus. Confirme le score nul pour passer la main."
     : state.gameId === "yahtzee" ? "Lance les dés, puis choisis une case dans la feuille de score."
     : state.gameId === "farkle" ? "Sélectionne uniquement les dés qui forment une combinaison, puis encaisse ou relance les autres."
     : "Les dés sélectionnés suivent ton mode de sélection. Valide ta figure pour terminer le tour.";
