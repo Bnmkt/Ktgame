@@ -1,5 +1,4 @@
 import { blackjackTotal } from "../games/engines/blackjack.js";
-import { MIDNIGHT_CONTRACTS } from "../games/engines/midnight-dice.js";
 import { totalYahtzee, YAHTZEE_CATEGORIES } from "../games/engines/yahtzee.js";
 
 export const MIDNIGHT_CONTRACT_RESULT_PREFIX = "midnight-contract-completed:";
@@ -9,8 +8,8 @@ export function midnightContractResultId(contract) {
 }
 
 export function completedMidnightContractCount(resultIds = []) {
-  const ids = new Set(resultIds);
-  return MIDNIGHT_CONTRACTS.filter((contract) => ids.has(midnightContractResultId(contract))).length;
+  // Result IDs are written by the engine. Keep lifetime credit for custom and retired contracts.
+  return new Set(resultIds.filter(id => typeof id === "string" && id.startsWith(MIDNIGHT_CONTRACT_RESULT_PREFIX) && /^[a-z][a-z0-9-]{1,63}$/.test(id.slice(MIDNIGHT_CONTRACT_RESULT_PREFIX.length)))).size;
 }
 
 export function gameResultAchievementIds(state, playerId) {

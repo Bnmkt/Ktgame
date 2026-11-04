@@ -5,6 +5,7 @@ import { games } from "../src/games/shared.js";
 import { normalizeProgressionConfig } from "../src/services/game-progression.js";
 import { normalizeRankedConfig, RANKED_GAMES } from "../src/services/ranked.js";
 import { ROOM_INACTIVITY_MS } from "../src/services/room-lifecycle.js";
+import { defaultMidnightContracts } from "../../client/src/features/games/midnightDice/contracts.js";
 
 const platform = { minRoomStake: 10, minPokerBuyIn: 100, signupTokens: 10000, pokerDefaultBigBlind: 10,
   pokerTurnSeconds: 300, botThinkingSeconds: 0, turnEndDelaySeconds: 1, roundResultsSeconds: 0,
@@ -59,6 +60,21 @@ test("all existing games can start in the same isolated runtime", async () => {
     assert.equal(result.room.state.gameId, game.id);
     assert.ok(result.effects.some((effect) => effect.kind === "tokens"));
   }
+});
+
+test("the game worker snapshots the configured midnight catalogue before later configuration changes", async () => {
+  const f = fixture("midnight-dice");
+  const entry = { id: "worker-ordered", label: "Mandat du worker", tier: "gold", rule: { type: "ordered", values: [4, 2, 1] } };
+  const configured = games.map(game => game.id === "midnight-dice" ? { ...game, midnightContracts: [...structuredClone(defaultMidnightContracts), entry] } : game);
+  f.kernel.configure({ id: "1", platform, games: configured });
+  await f.command("POST /api/rooms");
+  const started = (await f.command("POST /api/rooms/:code/start")).result;
+  assert.equal(started.status, 200);
+  assert.equal(started.room.state.contractCatalog[entry.id].tier, "gold");
+  entry.tier = "diamond";
+  f.kernel.configure({ id: "1", platform, games: configured });
+  const next = (await f.command("tick")).result;
+  assert.equal(next.room.state.contractCatalog[entry.id].tier, "gold");
 });
 
 test("guests can start every classic game without a stake debit or economic effects", async () => {

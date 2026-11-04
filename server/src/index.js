@@ -69,6 +69,7 @@ import { games } from "./games/shared.js";
 import { applyAction as applyGameAction, createGameState, pokerHandLabel, pokerHandPreview, tickBattleState, tickPokerState } from "./games/engines.js";
 import { normalizeBattleModifiers, normalizeGameModifiers } from "./games/modifiers.js";
 import { midnightDiceBotAction, midnightContractOffers, resumeMidnightAfterDeparture } from "./games/engines/midnight-dice.js";
+import { defaultMidnightContracts, normalizeMidnightContracts } from "../../client/src/features/games/midnightDice/contracts.js";
 import { velvetRuseBotAction } from "./games/engines/velvet-ruse.js";
 import { yahtzeeBotAction } from "./games/engines/yahtzee.js";
 import { fourTwentyOneBotAction, paidRerollPrice421 } from "./games/engines/four-twenty-one.js";
@@ -634,7 +635,7 @@ function battleDeckOverview(state, viewerId) {
 
 function configuredGames(db = readDb()) {
   const overrides = db.settings?.games ?? {};
-  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), descriptiveImage: gameImageUrl(overrides[game.id]?.descriptiveImage), coverImage: gameImageUrl(overrides[game.id]?.coverImage), discordIconImage: gameImageUrl(overrides[game.id]?.discordIconImage), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
+  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), descriptiveImage: gameImageUrl(overrides[game.id]?.descriptiveImage), coverImage: gameImageUrl(overrides[game.id]?.coverImage), discordIconImage: gameImageUrl(overrides[game.id]?.discordIconImage), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers), ...(game.id === "midnight-dice" ? { midnightContracts: structuredClone(overrides[game.id]?.midnightContracts ?? defaultMidnightContracts) } : {}) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
 }
 
 function configuredShop(db = readDb()) {
@@ -756,7 +757,7 @@ const resultAchievementCatalog = [
   { id: "midnight-perfect-contract", type: "games", milestone: true, group: "Dés de Minuit", title: "Mandat parfait", description: "Réussir un mandat Or, Platine ou Diamant.", target: 1 },
   { id: "midnight-market-shaker", type: "games", group: "Dés de Minuit", title: "Main invisible", description: "Écarter au moins trois dés du marché dans une partie.", target: 1 },
   { id: "midnight-flawless-contracts", type: "games", milestone: true, group: "Dés de Minuit", title: "Sans faute", description: "Réussir tous ses mandats au cours d'une même partie.", target: 1 },
-  { id: "midnight-all-contracts", type: "games", milestone: true, group: "Dés de Minuit", title: "Maître des mandats", description: "Réussir chacun des 12 mandats disponibles au moins une fois.", target: 12 },
+  { id: "midnight-all-contracts", type: "games", milestone: true, group: "Dés de Minuit", title: "Maître des mandats", description: "Réussir 12 mandats distincts au moins une fois.", target: 12 },
   { id: "midnight-diamond-contract", type: "games", milestone: true, secret: true, group: "Dés de Minuit", title: "Diamant de minuit", description: "Réussir le mandat Diamant.", target: 1 },
   { id: "velvet-bluff-caught", type: "games", group: "Velours Noir", title: "Pris dans le velours", description: "Démasquer un bluff adverse.", target: 1 },
   { id: "velvet-three-catches", type: "games", milestone: true, group: "Velours Noir", title: "Œil du casino", description: "Démasquer trois bluffs dans une même partie.", target: 1 }
@@ -5268,6 +5269,12 @@ app.patch("/api/me/locale", auth, (req, res) => {
   res.json(sanitizeUser(user));
 });
 app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
+  let midnightContracts;
+  if (Object.hasOwn(req.body, "midnightContracts")) {
+    if (req.params.id !== "midnight-dice") return res.status(400).json({ error: "Les mandats sont réservés aux Dés de Minuit." });
+    try { midnightContracts = normalizeMidnightContracts(req.body.midnightContracts); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+  }
   for (const field of ["descriptiveImage", "coverImage", "discordIconImage"]) {
     if (Object.hasOwn(req.body, field) && String(req.body[field] ?? "").trim() && !/^n\/?a$/i.test(String(req.body[field]).trim()) && !gameImageUrl(req.body[field])) return res.status(400).json({ error: "L’image doit utiliser une URL HTTPS ou un chemin absolu (/images/…)." });
   }
@@ -5279,6 +5286,7 @@ app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
     db.settings.games ??= {};
     db.settings.games[req.params.id] = {
       ...(db.settings.games[req.params.id] ?? {}),
+      ...(midnightContracts ? { midnightContracts } : {}),
       ...Object.fromEntries(["descriptiveImage", "coverImage", "discordIconImage"].filter((field) => Object.hasOwn(req.body, field)).map((field) => [field, gameImageUrl(req.body[field])])),
       ...(Object.hasOwn(req.body, "defaultModifiers") ? { defaultModifiers: req.params.id === "bataille" ? normalizeBattleModifiers(req.body.defaultModifiers) : normalizeGameModifiers(req.params.id, req.body.defaultModifiers) } : {}),
       name: String(req.body.name ?? "").trim().slice(0, 60),

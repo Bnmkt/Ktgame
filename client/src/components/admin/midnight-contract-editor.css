@@ -1,0 +1,25 @@
+.midnight-config { min-width: 0; display: grid; gap: 14px; border-top: 1px solid #56634b; padding-top: 20px; }
+.midnight-config > header { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.midnight-config h3, .midnight-config h4 { margin: 0 0 7px; }
+.midnight-config > header p, .midnight-config-note { margin: 0; font-size: 12px; line-height: 1.5; color: #c4cebe; }
+.midnight-config-workspace { display: grid; grid-template-columns: minmax(140px, .7fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+.midnight-config-list { display: grid; gap: 5px; max-height: 560px; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
+.midnight-config-list > button { display: grid; text-align: left; justify-content: start; padding: 9px; min-width: 0; border: 1px solid #56634b; background: #0c2018; color: #eddfb7; }
+.midnight-config-list > button.active { border-color: #eac66a; background: #4c431f; }
+.midnight-config-list strong { overflow-wrap: anywhere; font-size: 13px; }
+.midnight-config-fields { display: grid; gap: 16px; min-width: 0; }
+.midnight-config-title { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.midnight-config-title > small { overflow-wrap: anywhere; }
+.midnight-config button { min-height: 36px; font-size: 12px; }
+.midnight-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.midnight-config-dice { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.midnight-config-preview { display: grid; gap: 12px; padding: 14px; background: #092b21; border: 1px solid var(--contract-accent, #c79b30); border-radius: 7px; min-width: 0; }
+.midnight-config-preview p { margin: 0; font-size: 12px; }
+.midnight-config-preview .dice-throw-surface { min-height: 100px; padding: 15px; }
+.midnight-config-preview .die { width: 60px; height: 60px; min-width: 0; min-height: 0; }
+@media (max-width: 700px) {
+  .midnight-config-workspace { grid-template-columns: minmax(0, 1fr); }
+  .midnight-config-list { max-height: 180px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .midnight-config-grid { grid-template-columns: minmax(0, 1fr); }
+  .midnight-config-preview { padding: 10px; }
+}

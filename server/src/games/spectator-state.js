@@ -7,7 +7,7 @@ const fields = {
   farkle: ["dice", "turnScore", "remainingDice", "scores", "bust", "lastRoll", "target", "lastDiceByPlayer"],
   "shut-the-box": ["dice", "boxes", "scores", "lastTotal", "lastDiceByPlayer"],
   "liars-dice": ["diceCounts", "bid", "lastBidderId", "lastReveal"],
-  "midnight-dice": ["market", "trays", "scores", "contractOffers", "lastRound", "discardTray"],
+  "midnight-dice": ["market", "trays", "scores", "contractOffers", "contractCatalog", "lastRound", "discardTray"],
   "velvet-ruse": ["edict", "prestige", "lastChallenge", "lastAudit"],
   president: ["pile", "currentSet", "passes", "finishedOrder", "revolution"],
   blackjack: ["bets", "completedPlayerIds", "foldedPlayerIds", "shownPlayerIds", "payouts"],

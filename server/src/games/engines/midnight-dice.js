@@ -1,67 +1,48 @@
 import { currentPlayer, rollDice, shuffle } from "../shared.js";
 import { normalizeGameModifiers } from "../modifiers.js";
 import { appendLog, publicPlayers } from "../engine-context.js";
+import { midnightContractInfo, midnightContractTiers, midnightCatalogFor, normalizeMidnightContracts, evaluateMidnightDefinition } from "../../../../client/src/features/games/midnightDice/contracts.js";
 
-export const MIDNIGHT_CONTRACT_DEFINITIONS = {
-  spectrum: { tier: "bronze", bonus: 18 },
-  duo: { tier: "bronze", bonus: 18 },
-  "middle-road": { tier: "bronze", bonus: 18 },
-  extremes: { tier: "silver", bonus: 30 },
-  odd: { tier: "silver", bonus: 30 },
-  even: { tier: "silver", bonus: 30 },
-  straight: { tier: "gold", bonus: 45 },
-  balance: { tier: "gold", bonus: 45 },
-  "lucky-thirteen": { tier: "gold", bonus: 45 },
-  summit: { tier: "platinum", bonus: 65 },
-  cellar: { tier: "platinum", bonus: 65 },
-  triple: { tier: "diamond", bonus: 100 }
-};
-
+export const MIDNIGHT_CONTRACT_DEFINITIONS = Object.fromEntries(Object.entries(midnightContractInfo).map(([id, definition]) => [id, { ...definition, bonus: midnightContractTiers[definition.tier].bonus }]));
 export const MIDNIGHT_CONTRACTS = Object.keys(MIDNIGHT_CONTRACT_DEFINITIONS);
-
-function contractRotation(previous = []) {
-  const freshPool = MIDNIGHT_CONTRACTS.filter((contract) => !previous.includes(contract));
-  const pool = freshPool.length >= 4 ? freshPool : MIDNIGHT_CONTRACTS;
-  return shuffle(pool).slice(0, 4);
+const offerCache = new Map();
+function contractModel(catalog = midnightContractInfo) {
+  const key = JSON.stringify(catalog);
+  if (offerCache.has(key)) { const model = offerCache.get(key); offerCache.delete(key); offerCache.set(key, model); return model; }
+  const ids = Object.keys(catalog), potentials = {}, balancedOffers = [];
+  for (const id of ids) {
+    let maximum = 0;
+    for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) for (let c = 1; c <= 6; c++) maximum = Math.max(maximum, evaluateMidnightDefinition(catalog[id], [a, b, c]).points);
+    potentials[id] = maximum;
+  }
+  for (let a = 0; a < ids.length - 3; a++) for (let b = a + 1; b < ids.length - 2; b++) for (let c = b + 1; c < ids.length - 1; c++) for (let d = c + 1; d < ids.length; d++) {
+    const indices = [a, b, c, d], contracts = indices.map(index => ids[index]), points = contracts.map(id => potentials[id]).sort((a, b) => b - a);
+    balancedOffers.push({ contracts, points, mask: indices.reduce((mask, index) => mask | (1 << index), 0), total: points.reduce((sum, value) => sum + value, 0) });
+  }
+  const model = { ids, potentials, balancedOffers }; offerCache.set(key, model);
+  if (offerCache.size > 8) offerCache.delete(offerCache.keys().next().value);
+  return model;
+}
+export function midnightContractPotential(contract, catalog = midnightContractInfo) { return contractModel(catalog && typeof catalog === "object" && !Array.isArray(catalog) ? catalog : midnightContractInfo).potentials[contract] ?? 0; }
+function contractRotation(previous = [], catalog = midnightContractInfo) {
+  const ids = Object.keys(catalog), fresh = ids.filter(id => !previous.includes(id));
+  return shuffle(fresh.length >= 4 ? fresh : ids).slice(0, 4);
 }
 export function midnightContractOffers(state, playerId) {
   const offers = state.modifiers?.individualContracts ? state.privateContractOffers?.[playerId] ?? state.contractOffers ?? [] : state.contractOffers ?? [];
   const used = state.usedContracts?.[playerId] ?? [];
-  return offers.filter((contract) => !used.includes(contract));
-}
-
-const contractPotentials = Object.fromEntries(MIDNIGHT_CONTRACTS.map((contract) => {
-  let maximum = 0;
-  for (let first = 1; first <= 6; first++) for (let second = 1; second <= 6; second++) for (let third = 1; third <= 6; third++) {
-    maximum = Math.max(maximum, scoreMidnightContract(contract, [first, second, third]));
-  }
-  return [contract, maximum];
-}));
-
-export function midnightContractPotential(contract) { return contractPotentials[contract] ?? 0; }
-
-// Cache the 495 possible offers, valued from the scoring rules (base + bonus).
-const balancedOffers = [];
-for (let first = 0; first < MIDNIGHT_CONTRACTS.length - 3; first++) {
-  for (let second = first + 1; second < MIDNIGHT_CONTRACTS.length - 2; second++) {
-    for (let third = second + 1; third < MIDNIGHT_CONTRACTS.length - 1; third++) {
-      for (let fourth = third + 1; fourth < MIDNIGHT_CONTRACTS.length; fourth++) {
-        const indices = [first, second, third, fourth], contracts = indices.map((index) => MIDNIGHT_CONTRACTS[index]);
-        const points = contracts.map(midnightContractPotential).sort((left, right) => right - left);
-        balancedOffers.push({ contracts, points, mask: indices.reduce((mask, index) => mask | (1 << index), 0), total: points.reduce((sum, value) => sum + value, 0) });
-      }
-    }
-  }
+  return offers.filter(id => Object.hasOwn(midnightCatalogFor(state), id) && !used.includes(id));
 }
 
 function renewIndividualOffers(state, firstRound = state.round) {
+  const { ids, balancedOffers } = contractModel(midnightCatalogFor(state));
   if (!state.players.length) { state.privateContractOffers = {}; return; }
   const previous = state.privateContractOffers ?? {};
   const rounds = Math.min(4, state.modifiers.rounds - firstRound + 1);
   const valuedOffers = balancedOffers.map((offer) => ({ ...offer, potential: offer.points.slice(0, rounds).reduce((sum, value) => sum + value, 0) }));
   const candidates = state.players.map((player) => {
     const mask = (previous[player.id] ?? []).reduce((value, contract) => {
-      const index = MIDNIGHT_CONTRACTS.indexOf(contract);
+      const index = ids.indexOf(contract);
       return index < 0 ? value : value | (1 << index);
     }, 0);
     const fresh = valuedOffers.filter((offer) => !(offer.mask & mask));
@@ -104,31 +85,15 @@ function renewIndividualOffers(state, firstRound = state.round) {
   state.privateContractOffers = Object.fromEntries(state.players.map((player, index) => [player.id, shuffle(best.selected[index].contracts)]));
 }
 
-export function evaluateMidnightContract(contract, dice = []) {
-  const sorted = [...dice].sort((a, b) => a - b);
-  const total = sorted.reduce((sum, die) => sum + die, 0);
-  const counts = sorted.reduce((result, die) => ({ ...result, [die]: (result[die] ?? 0) + 1 }), {});
-  const highestCount = Math.max(0, ...Object.values(counts));
-  const complete = sorted.length === 3;
-  let achieved = false;
-  if (contract === "straight") achieved = complete && new Set(sorted).size === 3 && sorted[2] - sorted[0] === 2;
-  if (contract === "triple") achieved = complete && highestCount === 3;
-  if (contract === "balance") achieved = complete && total === 10;
-  if (contract === "spectrum") achieved = complete && new Set(sorted).size === 3;
-  if (contract === "duo") achieved = complete && highestCount === 2;
-  if (contract === "summit") achieved = complete && total >= 15;
-  if (contract === "cellar") achieved = complete && total <= 7;
-  if (contract === "odd") achieved = complete && sorted.every((die) => die % 2 === 1);
-  if (contract === "even") achieved = complete && sorted.every((die) => die % 2 === 0);
-  if (contract === "extremes") achieved = complete && sorted.includes(1) && sorted.includes(6);
-  if (contract === "lucky-thirteen") achieved = complete && total === 13;
-  if (contract === "middle-road") achieved = complete && sorted.every((die) => [2, 3, 4, 5].includes(die));
-  const definition = MIDNIGHT_CONTRACT_DEFINITIONS[contract] ?? { tier: "bronze", bonus: 0 };
-  return { achieved, base: total, bonus: achieved ? definition.bonus : 0, points: total + (achieved ? definition.bonus : 0), tier: definition.tier };
-}
 
-export function scoreMidnightContract(contract, dice = []) {
-  return evaluateMidnightContract(contract, dice).points;
+export function evaluateMidnightContract(contract, dice = [], catalog = midnightContractInfo) { return evaluateMidnightDefinition(catalog[contract], dice); }
+export function scoreMidnightContract(contract, dice = [], catalog = midnightContractInfo) { return evaluateMidnightContract(contract, dice, catalog).points; }
+
+export function midnightDraftPotential(contract, dice, catalog = midnightContractInfo) {
+  if (dice.length >= 3) return scoreMidnightContract(contract, dice, catalog);
+  let maximum = 0;
+  for (let value = 1; value <= 6; value++) maximum = Math.max(maximum, midnightDraftPotential(contract, [...dice, value], catalog));
+  return maximum;
 }
 
 function nextEligiblePlayer(state, predicate) {
@@ -140,7 +105,7 @@ function nextEligiblePlayer(state, predicate) {
 }
 
 function prepareRound(state) {
-  if (!Array.isArray(state.contractOffers) || state.contractOffers.length !== 4) state.contractOffers = contractRotation();
+  if (!Array.isArray(state.contractOffers) || state.contractOffers.length !== 4) state.contractOffers = contractRotation([], midnightCatalogFor(state));
   if (state.modifiers.individualContracts && !state.privateContractOffers) renewIndividualOffers(state);
   state.phase = "contract";
   state.currentPlayerIndex = state.startingPlayerIndex;
@@ -155,7 +120,7 @@ function resolveRound(state) {
   const results = state.players.map((player) => {
     const dice = [...(state.trays[player.id] ?? [])];
     const contract = state.secretContracts[player.id];
-    const evaluation = evaluateMidnightContract(contract, dice);
+    const evaluation = evaluateMidnightContract(contract, dice, midnightCatalogFor(state));
     const stats = state.stats[player.id] ??= { perfectContracts: 0, marketDiscards: 0, contractsAttempted: 0, contractsCompleted: 0, completedContractIds: [] };
     stats.contractsAttempted = (stats.contractsAttempted ?? 0) + 1;
     if (evaluation.achieved) {
@@ -176,7 +141,7 @@ function resolveRound(state) {
   }
   if (state.round % 4 === 0) {
     if (state.modifiers.individualContracts) renewIndividualOffers(state, state.round + 1);
-    else state.contractOffers = contractRotation(state.contractOffers);
+    else state.contractOffers = contractRotation(state.contractOffers, midnightCatalogFor(state));
     state.usedContracts = Object.fromEntries(state.players.map((player) => [player.id, []]));
     appendLog(state, "dealer", state.modifiers.individualContracts ? "renouvelle secrètement les quatre mandats de chaque joueur." : `renouvelle les quatre mandats: ${state.contractOffers.join(", ")}.`);
   }
@@ -190,6 +155,7 @@ export function createMidnightDiceState(players, options = {}) {
   const state = {
     gameId: "midnight-dice",
     players: tablePlayers,
+    contractCatalog: Object.fromEntries(normalizeMidnightContracts(options.midnightContracts).map(definition => [definition.id, definition])),
     modifiers: normalizeGameModifiers("midnight-dice", options.gameModifiers),
     round: 1,
     startingPlayerIndex: 0,
@@ -213,7 +179,7 @@ export function createMidnightDiceState(players, options = {}) {
 }
 
 export function applyMidnightDiceAction(state, actorId, action) {
-  if (!Array.isArray(state.contractOffers) || state.contractOffers.length !== 4) state.contractOffers = contractRotation();
+  if (!Array.isArray(state.contractOffers) || state.contractOffers.length !== 4) state.contractOffers = contractRotation([], midnightCatalogFor(state));
   state.usedContracts ??= Object.fromEntries(state.players.map((player) => [player.id, []]));
   if (currentPlayer(state).id !== actorId) throw new Error("Ce n'est pas ton tour.");
   if (action.type === "choose-contract") {
@@ -286,7 +252,7 @@ export function midnightDiceBotAction(state, bot) {
   }
   const contract = state.secretContracts?.[bot.id];
   const tray = state.trays?.[bot.id] ?? [];
-  const choices = (state.market ?? []).map((die, index) => ({ index, value: scoreMidnightContract(contract, [...tray, die]) })).sort((a, b) => b.value - a.value);
+  const choices = (state.market ?? []).map((die, index) => ({ index, value: midnightDraftPotential(contract, [...tray, die], midnightCatalogFor(state)) })).sort((a, b) => b.value - a.value);
   if (!choices.length) return null;
   if ((state.discardRemaining?.[bot.id] ?? 0) > 0 && Math.random() < 0.15 && state.market[choices.at(-1).index] <= 2) return { type: "discard-market", index: choices.at(-1).index };
   return { type: "draft", index: choices[0].index };

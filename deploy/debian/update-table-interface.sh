@@ -25,6 +25,11 @@ const allowed=new Set([...defaults,
  'client/src/components/game/SolitaireTable.jsx','client/src/components/room/family-tables.css',
  'client/src/components/game/dice-solid-renderer.js',
  'client/src/features/games/table-families.js',
+ 'client/src/features/games/midnightDice/model.js','client/src/features/games/midnightDice/contracts.js',
+ 'client/src/components/admin/GameEditor.jsx','client/src/components/admin/MidnightContractsEditor.jsx',
+ 'client/src/components/admin/midnight-contract-editor.css','client/src/components/room/RoomPanels.jsx',
+ 'client/src/config/site.js','server/src/games/engines/midnight-dice.js',
+ 'server/src/games/spectator-state.js','server/src/services/room-runtime.js','server/src/services/result-achievements.js',
  'server/src/games/engines/president.js',
  'client/src/components/game/ImmersiveGameSelector.jsx','client/src/components/game/immersive-game-selector.css',
  'client/src/components/game/useOrbitMotion.js','client/src/features/games/selector.js','client/src/pages/LobbyPage.jsx',
@@ -164,6 +169,16 @@ checkTables
 systemctl stop ktga.service
 stopped=true
 checkTables
+# Save the primary settings and room snapshots before changing their interpretation.
+if printf '%s\n' "${files[@]}" | grep -q '^server/src/'; then
+  node - "$backup" <<'JS'
+const fs=require('node:fs'),path=require('node:path'),{DatabaseSync}=require('node:sqlite');
+const env=require('/opt/ktga/server/node_modules/dotenv').parse(fs.readFileSync('/etc/ktga/server.env'));
+if(!env.SQLITE_PATH?.startsWith('/var/lib/ktga/')) throw Error('Unexpected primary database path');
+const db=new DatabaseSync(env.SQLITE_PATH,{readOnly:true});
+try { db.exec(`VACUUM INTO '${path.join(process.argv[2],'main.sqlite').replace(/'/g,"''")}'`); } finally { db.close(); }
+JS
+fi
 # Keep consistent private copies before additive chat/report schema migrations.
 if printf '%s\n' "${files[@]}" | grep -q '^server/src/services/\(chat\|bug-reports\)\.js$'; then
   node - "$backup" <<'JS'

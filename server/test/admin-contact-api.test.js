@@ -392,6 +392,32 @@ test("in-flight account projections are not delivered after revocation", { skip:
   assert.ok(!Object.hasOwn(rejected.data, "email"));
 });
 
+test("midnight catalogue CRUD is admin-only, validated, durable and snapshotted into real rooms", async () => {
+  const route = "/api/admin/games/midnight-dice";
+  const original = (await request(null, "/api/games")).data.find(game => game.id === "midnight-dice");
+  assert.equal(original.midnightContracts.length, 12);
+  const entry = { id: "integration-ordered", label: "Ordre de prise", tier: "gold", rule: { type: "ordered", values: [4, 2, 1] } };
+  const edited = { ...original, midnightContracts: [...original.midnightContracts, entry] };
+  for (const id of [null, "editor"]) assert.equal((await request(id, route, "PATCH", edited)).status, id ? 403 : 401);
+  assert.equal((await request("admin", route, "PATCH", { ...edited, midnightContracts: [] })).status, 400);
+  assert.equal((await request("admin", route, "PATCH", edited)).status, 200);
+  const room = await request("admin", "/api/rooms", "POST", { gameId: "midnight-dice", name: "Catalogue snapshot fixture" });
+  assert.equal(room.status, 200);
+  const started = await request("admin", `/api/rooms/${room.data.code}/start`, "POST", {});
+  assert.equal(started.status, 200, JSON.stringify(started.data));
+  assert.equal(started.data.state.contractCatalog[entry.id].tier, "gold");
+  entry.tier = "diamond"; entry.label = "Ordre modifié";
+  assert.equal((await request("admin", route, "PATCH", edited)).status, 200);
+  await stop(); await start();
+  const saved = (await request(null, "/api/games")).data.find(game => game.id === "midnight-dice");
+  assert.equal(saved.midnightContracts.at(-1).tier, "diamond");
+  assert.equal((await request("admin", `/api/rooms/${room.data.code}`)).data.state.contractCatalog[entry.id].tier, "gold");
+  assert.equal((await request("admin", route, "PATCH", original)).status, 200);
+  assert.equal((await request(null, "/api/games")).data.find(game => game.id === "midnight-dice").midnightContracts.length, 12);
+  assert.equal((await request("admin", `/api/rooms/${room.data.code}`)).data.state.contractCatalog[entry.id].label, "Ordre de prise");
+  assert.equal((await request("admin", `/api/rooms/${room.data.code}`, "DELETE")).status, 200);
+});
+
 test("global moderation uses real account roles and broadcasts its durable reset over Socket.IO", async () => {
   for (const id of [null, "player", "editor"]) assert.equal((await request(id, "/api/admin/chat/global", "DELETE", { confirm: true })).status, id ? 403 : 401);
   assert.equal((await request("admin", "/api/admin/chat/global", "DELETE", {})).status, 400);

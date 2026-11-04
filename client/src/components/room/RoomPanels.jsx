@@ -7,16 +7,16 @@ import { Die } from "../game/GamePieces.jsx";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { blackjackDealerDisplay, blackjackTotal, yahtzeeTotal, yahtzeeUpperTotal } from "../game/GameSupport.jsx";
 import { gameModifierDefinitions, gameTitle, payoutRatesForPlayerCount, scoreCategories, yahtzeeFixedScores, yahtzeeScoreHelp } from "../../features/games/config.js";
-import { midnightContractInfo, midnightContractLabel, midnightContractTiers } from "../../features/games/midnightDice/model.js";
+import { midnightContractInfo, midnightContractLabel, midnightContractTiers, midnightCatalogFor } from "../../features/games/midnightDice/model.js";
 import { CompactNumber, formatTime } from "../../utils/presentation.jsx";
 import { RankBadge } from "../../features/games/RankedPlay.jsx";
 import { isFundedPlayer } from "../../features/games/token-economy.js";
 
-function MidnightContractBadge({ contract }) {
+function MidnightContractBadge({ contract, catalog = midnightContractInfo }) {
   const { t: localeText } = useLocale();
-  const info = midnightContractInfo[contract];
+  const info = catalog[contract];
   const tier = midnightContractTiers[info?.tier];
-  return <span className="midnight-score-contract" style={{ "--contract-accent": tier?.accent ?? "#c7d0d8" }}><i />{midnightContractLabel(contract)}<small>{localeText(tier?.label)}</small></span>;
+  return <span className="midnight-score-contract" style={{ "--contract-accent": tier?.accent ?? "#c7d0d8" }}><i />{midnightContractLabel(contract, catalog)}<small>{localeText(tier?.label)}</small></span>;
 }
 
 export function ScorePanel({ state, userId }) {
@@ -49,7 +49,7 @@ export function ScorePanel({ state, userId }) {
   if (state.gameId === "shut-the-box") return <table className="score-table"><thead><tr><th>{localeText("Joueur")}</th><th>{localeText("Score")}</th><th>{localeText("Ouvertes")}</th></tr></thead><tbody>{state.players.map((p) => <tr key={p.id}><td><DisplayName user={p} /></td><td>{state.scores[p.id] ?? "-"}</td><td>{state.boxes[p.id]?.join(" ") || "-"}</td></tr>)}</tbody></table>;
   if (state.gameId === "golf-solitaire") return <table className="score-table"><tbody><tr><td>{localeText("Cartes tableau")}</td><td>{state.tableau.reduce((sum, column) => sum + column.length, 0)}</td></tr><tr><td>{localeText("Pioche")}</td><td>{state.stock.length}</td></tr><tr><td>{localeText("Score")}</td><td>{state.score ?? "-"}</td></tr></tbody></table>;
   if (state.gameId === "accordion") return <table className="score-table"><tbody><tr><td>{localeText("Piles restantes")}</td><td>{state.piles.length}</td></tr><tr><td>{localeText("Score")}</td><td>{state.score ?? "-"}</td></tr></tbody></table>;
-  if (state.gameId === "midnight-dice") return <table className="score-table"><thead><tr><th>{localeText("Joueur")}</th><th>{localeText("Mandat")}</th><th>{localeText("Score")}</th></tr></thead><tbody>{state.players.map((p) => <tr key={p.id}><td><DisplayName user={p} /></td><td>{state.secretContracts?.[p.id] ? <MidnightContractBadge contract={state.secretContracts[p.id]} /> : state.phase === "contract" ? localeText("À choisir") : localeText("Secret")}</td><td>{state.scores?.[p.id] ?? 0}</td></tr>)}</tbody></table>;
+  if (state.gameId === "midnight-dice") return <table className="score-table"><thead><tr><th>{localeText("Joueur")}</th><th>{localeText("Mandat")}</th><th>{localeText("Score")}</th></tr></thead><tbody>{state.players.map((p) => <tr key={p.id}><td><DisplayName user={p} /></td><td>{state.secretContracts?.[p.id] ? <MidnightContractBadge contract={state.secretContracts[p.id]} catalog={midnightCatalogFor(state)} /> : state.phase === "contract" ? localeText("À choisir") : localeText("Secret")}</td><td>{state.scores?.[p.id] ?? 0}</td></tr>)}</tbody></table>;
   if (state.gameId === "velvet-ruse") return <table className="score-table"><thead><tr><th>{localeText("Joueur")}</th><th>{localeText("Cartes")}</th><th>{localeText("Prestige")}</th></tr></thead><tbody>{state.players.map((p) => <tr key={p.id}><td><DisplayName user={p} /></td><td>{state.hands?.[p.id]?.length ?? 0}</td><td>{state.prestige?.[p.id] ?? 0} / {state.modifiers?.targetPrestige ?? 20}</td></tr>)}</tbody></table>;
   return <table className="score-table"><thead><tr><th>{localeText("Joueur")}</th><th>{localeText("Cartes")}</th><th>{localeText("Statut")}</th></tr></thead><tbody>{state.players.map((p) => <tr key={p.id}><td><DisplayName user={p} /></td><td>{state.hands?.[p.id]?.length ?? 0}</td><td>{state.finishedOrder?.includes(p.id) ? localeText("Sorti #{value0}", { value0: state.finishedOrder.indexOf(p.id) + 1 }) : localeText("En jeu")}</td></tr>)}</tbody></table>;
 }

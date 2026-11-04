@@ -455,7 +455,7 @@ export function createRoomRuntime(dependencies) {
     room.gameModifiers = normalizeGameModifiers(room.gameId, room.gameModifiers);
     if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
     const seatedPlayers = room.gameId === "belote" ? room.beloteSeats.map((id) => room.players.find((player) => player.id === id)) : room.players;
-    room.state = createGameState(room.gameId, seatedPlayers, { buyIn: room.stake, bigBlind: room.pokerBlinds?.bigBlind, maximumBet: room.pokerBlinds?.maximumBet, turnDurationMs: (room.pokerTurnSeconds ?? settings.pokerTurnSeconds) * 1000, battleModifiers: room.battleModifiers, gameModifiers: room.gameModifiers });
+    room.state = createGameState(room.gameId, seatedPlayers, { buyIn: room.stake, bigBlind: room.pokerBlinds?.bigBlind, maximumBet: room.pokerBlinds?.maximumBet, turnDurationMs: (room.pokerTurnSeconds ?? settings.pokerTurnSeconds) * 1000, battleModifiers: room.battleModifiers, gameModifiers: room.gameModifiers, midnightContracts: game.midnightContracts });
     if (room.state.gameId === "bataille") room.state.resolutionDurationMs = room.timing.turnEndDelayMs;
     room.activityMatchId = randomUUID();
     runBotTurns(room, db);
