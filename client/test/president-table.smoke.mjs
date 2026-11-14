@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Server } from "../../server/node_modules/socket.io/dist/index.js";
 import { createPresidentState, applyPresidentAction } from "../../server/src/games/engines/president.js";
-import { presidentCardKey, presidentDealSequence } from "../src/features/games/president.js";
+import { presidentCardKey, presidentDealSequence, sortPresidentHand } from "../src/features/games/president.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const dependencies = process.env.KTGA_BROWSER_TOOLS ? path.join(process.env.KTGA_BROWSER_TOOLS, "node_modules") : path.join(tmpdir(), "ktga-chat-browser-tools/node_modules");
@@ -124,6 +124,15 @@ try {
       assert.ok(geometry.pageWidth <= geometry.viewport, `${count}/${name} page overflow`);
       assert.ok(geometry.cards.every(card => card.left >= -1 && card.right <= geometry.width + 1 && card.opacity === "1" && card.pieceOpacity === "1" && Math.abs(card.ratio - 82 / 118) < .02), `${count}/${name}: opaque, proportioned, visible cards`);
       assert.ok(geometry.cards.every(card => Math.abs(card.top - geometry.cards[0].top) < 1), 'one row');
+      const indicator = await page.locator('.president-order-status').evaluate(node => {
+        const rect = node.getBoundingClientRect(), field = node.closest('.president-playfield').getBoundingClientRect();
+        const overlaps = [...document.querySelectorAll('.president-hand-card, .president-local-identity')].some(card => {
+          const bounds = card.getBoundingClientRect();
+          return rect.left < bounds.right && rect.right > bounds.left && rect.top < bounds.bottom && rect.bottom > bounds.top;
+        });
+        return { fits: rect.left >= field.left && rect.right <= field.right && rect.top >= field.top && rect.bottom <= field.bottom, overlaps, display: getComputedStyle(node).display };
+      });
+      assert.ok(indicator.fits && !indicator.overlaps && indicator.display === 'flex', `${count}/${name} strength indicator stays clear of the hand and identity: ${JSON.stringify(indicator)}`);
       if (viewport.width >= 1100) assert.ok(geometry.pageHeight <= geometry.height + 2, `${count}/${name} vertical overflow ${JSON.stringify(geometry)}`);
       if (count === 6 || count === 3 && name === 'laptop') await page.screenshot({ path: path.join(output, `${count}-players-${name}.png`), fullPage: true });
     }
@@ -172,6 +181,59 @@ try {
   for (const socket of realtime.sockets.sockets.values()) if (socket.data.viewer === 'me') socket.conn.close();
   await until(() => watches.get('me') > oldWatches, 'transport reconnect'); broadcast();
   assert.equal(await page.locator('[data-president-dealing]').count(), 0);
+  // Explicit local sorting, unchanged selection, and two real four-of-a-kind actions.
+  const selectMiddle = key => page.locator(`[data-president-card="${key}"]`).click({ position: { x: 30, y: 35 } });
+  prepare(3, true);
+  room.state.hands.me = [
+    { rank: 'K', suit: 'S' }, { rank: '3', suit: 'C' }, { rank: 'K', suit: 'H' }, { rank: '2', suit: 'C' },
+    { rank: 'K', suit: 'D' }, { rank: 'A', suit: 'S' }, { rank: 'K', suit: 'C' },
+    ...['S', 'H', 'D', 'C'].map(suit => ({ rank: 'Q', suit }))
+  ];
+  room.state.hands.p1 = [{ rank: '4', suit: 'C' }, { rank: '5', suit: 'C' }];
+  room.state.hands.p2 = [{ rank: '6', suit: 'C' }, { rank: '7', suit: 'C' }];
+  broadcast(); await until(async () => (await cardKeys()).length === 11, 'custom revolution hand');
+  assert.deepEqual(await cardKeys(), room.state.hands.me.map(presidentCardKey), 'new hands are never implicitly sorted');
+  await page.locator('.president-order-status[data-president-order="standard"]').waitFor();
+  const controls = await page.locator('.president-command-dock .table-action-bar > button').evaluateAll(nodes => nodes.map(node => ({ text: node.textContent, x: node.getBoundingClientRect().x, background: getComputedStyle(node).backgroundImage })));
+  assert.match(controls[0].text, /Jouer/); assert.match(controls[1].text, /Passer/);
+  assert.ok(controls[0].x < controls[1].x);
+  assert.match(controls[0].background, /rgb\(19, 139, 85\)/); assert.match(controls[1].background, /rgb\(165, 44, 58\)/);
+  const sortButton = page.getByRole('button', { name: 'Trier les cartes', exact: true });
+  assert.ok((await sortButton.boundingBox()).y > (await page.getByRole('button', { name: 'Tout désélectionner', exact: true }).boundingBox()).y);
+  await selectMiddle('0:K:S'); const actionsBeforeSort = actions.length;
+  await sortButton.click();
+  const normalOrder = sortPresidentHand(room.state.hands.me).map(presidentCardKey);
+  assert.deepEqual(await cardKeys(), normalOrder);
+  assert.equal(await page.locator('[data-president-card="0:K:S"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(actions.length, actionsBeforeSort, 'sorting never sends a server action');
+  broadcast(); await page.waitForTimeout(120); assert.deepEqual(await cardKeys(), normalOrder);
+  for (const suit of ['H', 'D', 'C']) await selectMiddle(`0:K:${suit}`);
+  await page.getByRole('button', { name: 'Jouer la sélection', exact: true }).click();
+  await page.locator('.president-order-status[data-president-order="inverted"][data-president-order-change]').waitFor();
+  await opponent.locator('.president-order-status[data-president-order="inverted"][data-president-order-change]').waitFor();
+  assert.match(await page.locator('.president-order-status').innerText(), /Révolution !/);
+  assert.match(await page.locator('.president-order-status').innerText(), /2 → A → K → … → 3/);
+  assert.deepEqual(await cardKeys(), normalOrder.filter(key => !key.includes(':K:')), 'revolution does not implicitly sort');
+  await page.screenshot({ path: path.join(output, 'revolution-controls.png'), fullPage: true });
+  await sortButton.click();
+  const invertedOrder = sortPresidentHand(room.state.hands.me, true).map(presidentCardKey);
+  assert.deepEqual(await cardKeys(), invertedOrder);
+  await page.reload(); await page.locator('.president-order-status[data-president-order="inverted"]').waitFor();
+  assert.deepEqual(await cardKeys(), invertedOrder, 'requested sort survives reconnect');
+  assert.equal(await page.locator('[data-president-order-change]').count(), 0, 'reconnect restores order without replaying feedback');
+  for (const suit of ['S', 'H', 'D', 'C']) await selectMiddle(`0:Q:${suit}`);
+  await page.getByRole('button', { name: 'Jouer la sélection', exact: true }).click();
+  await page.locator('.president-order-status[data-president-order="standard"][data-president-order-change]').waitFor();
+  await opponent.locator('.president-order-status[data-president-order="standard"][data-president-order-change]').waitFor();
+  assert.match(await page.locator('.president-order-status').innerText(), /Ordre classique rétabli/);
+  assert.deepEqual(await cardKeys(), invertedOrder.filter(key => !key.includes(':Q:')));
+  await until(async () => await page.locator('[data-president-order-change]').count() === 0, 'feedback settles');
+  assert.ok(await page.locator('.president-order-status').isVisible(), 'persistent strength indicator survives feedback');
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok((await sortButton.boundingBox()).y > (await page.getByRole('button', { name: 'Tout désélectionner', exact: true }).boundingBox()).y);
+  assert.ok(await page.locator('.president-order-status').isVisible());
+  await page.screenshot({ path: path.join(output, 'direction-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1366, height: 768 });
   await opponent.close();
 
   // New matches animate; accelerating, skipping and server updates restore every card.

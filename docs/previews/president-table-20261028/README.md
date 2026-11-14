@@ -1,5 +1,17 @@
 # Table Président — 28 octobre 2026
 
+## Ajustements du 14 novembre 2026
+
+« Jouer la sélection » se trouve à gauche en vert et « Passer » à droite en rouge. Le nouveau bouton « Trier les cartes », sous « Tout désélectionner », classe la main de la plus faible à la plus forte selon l'ordre actuel. Cette opération est uniquement déclenchée au clic : ni la distribution, ni une mise à jour serveur, ni une révolution ne trient implicitement la main. Les cartes de même rang conservent leur position relative et la sélection reste attachée aux identités. Le glisser-déposer et la mémorisation locale de l'ordre restent disponibles ; aucune action métier n'est envoyée pour le tri.
+
+Une pastille près du joueur local affiche l'ordre des valeurs et une courte échelle des cartes. Chaque changement réel de `state.revolution` déclenche un contour lumineux et un message pendant 4,5 secondes, y compris le retour à l'ordre classique. La reconnexion restaure l'indicateur sans rejouer le signal. L'indicateur possède son espace dans la ligne d'identité ; sur mobile, il occupe une ligne distincte. Les préférences de réduction des animations sont respectées.
+
+Les scénarios navigateur incluent deux carrés joués par le moteur, la synchronisation de l'indicateur entre deux joueurs, le tri normal et inversé, la conservation de la sélection et de l'ordre après reconnexion, la position et la couleur des actions ainsi que l'absence de chevauchement de l'indicateur avec la main. Le parcours utilise Ghostery et couvre les résolutions ci-dessous.
+
+Validation : 11 tests ciblés et parcours navigateur complet réussis ; build client et SSR validé. Captures : [révolution et commandes](./1794649298324/revolution-controls.png), [indicateur et tri sur mobile](./1794649298324/direction-mobile.png).
+
+## Refonte initiale
+
 Captures validées : [1793197177027](./1793197177027/).
 
 - [1366 × 768, six joueurs](./1793197177027/6-players-laptop.png)

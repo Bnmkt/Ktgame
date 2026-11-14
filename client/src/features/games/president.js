@@ -19,6 +19,11 @@ export function hasPlayablePresidentSet(state, hand = []) {
 
 export const presidentCardKey = (card) => `${card.deckId ?? 0}:${card.rank}:${card.suit}`;
 
+// Explicit local control only: preserve equal ranks and never mutate server cards.
+export function sortPresidentHand(hand, revolution = false) {
+  return [...hand].sort((left, right) => presidentCardValue(left.rank, revolution) - presidentCardValue(right.rank, revolution));
+}
+
 // Reconcile identities, never values: socket snapshots must not sort a manual hand.
 export function reconcilePresidentHand(hand, order = []) {
   const cards = new Map(hand.filter(Boolean).map((card) => [presidentCardKey(card), card]));

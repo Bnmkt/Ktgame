@@ -5314,5 +5314,11 @@
   "Or : prime de 45 points.": "Gold: 45 bonus points.",
   "Platine : prime de 65 points.": "Platinum: 65 bonus points.",
   "Diamant : prime de 100 points.": "Diamond: 100 bonus points.",
-  "Le bouton des mandats ouvre le catalogue de cette partie avec les conditions, les exemples et le calcul des points. Un mandat fixe respecte l’ordre de prise ; un mandat variable accepte les valeurs dans n’importe quel ordre.": "The contracts button opens this game’s catalogue with conditions, examples and scoring. A fixed contract requires pickup order; an unordered contract accepts the required values in any order."
+  "Le bouton des mandats ouvre le catalogue de cette partie avec les conditions, les exemples et le calcul des points. Un mandat fixe respecte l’ordre de prise ; un mandat variable accepte les valeurs dans n’importe quel ordre.": "The contracts button opens this game’s catalogue with conditions, examples and scoring. A fixed contract requires pickup order; an unordered contract accepts the required values in any order.",
+  "Révolution !": "Revolution!",
+  "Ordre classique rétabli": "Standard order restored",
+  "Ordre inversé": "Reversed order",
+  "De la plus faible à la plus forte": "From weakest to strongest",
+  "Trier de la plus faible à la plus forte, selon l’ordre actuel": "Sort from weakest to strongest using the current order",
+  "Trier les cartes": "Sort cards"
 }

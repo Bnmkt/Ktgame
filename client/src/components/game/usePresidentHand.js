@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { movePresidentCard, presidentCardKey, reconcilePresidentHand } from "../../features/games/president.js";
+import { movePresidentCard, presidentCardKey, reconcilePresidentHand, sortPresidentHand } from "../../features/games/president.js";
 
 function restored(key) {
   try {
@@ -18,5 +18,8 @@ export function usePresidentHand(hand, matchKey) {
     setSaved((previous) => previous.key === key && JSON.stringify(previous.order) === signature ? previous : { key, order });
     try { sessionStorage.setItem(key, signature); } catch { /* A private browser can disable storage. */ }
   }, [key, signature]);
-  return [cards, (cardKey, destination) => setSaved({ key, order: movePresidentCard(order, cardKey, destination) })];
+  return [cards,
+    (cardKey, destination) => setSaved({ key, order: movePresidentCard(order, cardKey, destination) }),
+    (revolution = false) => setSaved({ key, order: sortPresidentHand(cards, revolution).map(presidentCardKey) })
+  ];
 }

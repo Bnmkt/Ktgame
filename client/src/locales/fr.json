@@ -5381,5 +5381,11 @@
   "Or : prime de 45 points.": "Or : prime de 45 points.",
   "Platine : prime de 65 points.": "Platine : prime de 65 points.",
   "Diamant : prime de 100 points.": "Diamant : prime de 100 points.",
-  "Le bouton des mandats ouvre le catalogue de cette partie avec les conditions, les exemples et le calcul des points. Un mandat fixe respecte l’ordre de prise ; un mandat variable accepte les valeurs dans n’importe quel ordre.": "Le bouton des mandats ouvre le catalogue de cette partie avec les conditions, les exemples et le calcul des points. Un mandat fixe respecte l’ordre de prise ; un mandat variable accepte les valeurs dans n’importe quel ordre."
+  "Le bouton des mandats ouvre le catalogue de cette partie avec les conditions, les exemples et le calcul des points. Un mandat fixe respecte l’ordre de prise ; un mandat variable accepte les valeurs dans n’importe quel ordre.": "Le bouton des mandats ouvre le catalogue de cette partie avec les conditions, les exemples et le calcul des points. Un mandat fixe respecte l’ordre de prise ; un mandat variable accepte les valeurs dans n’importe quel ordre.",
+  "Révolution !": "Révolution !",
+  "Ordre classique rétabli": "Ordre classique rétabli",
+  "Ordre inversé": "Ordre inversé",
+  "De la plus faible à la plus forte": "De la plus faible à la plus forte",
+  "Trier de la plus faible à la plus forte, selon l’ordre actuel": "Trier de la plus faible à la plus forte, selon l’ordre actuel",
+  "Trier les cartes": "Trier les cartes"
 }

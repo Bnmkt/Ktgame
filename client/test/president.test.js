@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { canPlayPresidentSet, hasPlayablePresidentSet, presidentCardValue } from "../src/features/games/president.js";
 import { presidentValue } from "../../server/src/games/engines/president.js";
-import { movePresidentCard, presidentCardKey, presidentDealSequence, presidentHandGeometry, reconcilePresidentHand } from "../src/features/games/president.js";
+import { movePresidentCard, presidentCardKey, presidentDealSequence, presidentHandGeometry, reconcilePresidentHand, sortPresidentHand } from "../src/features/games/president.js";
 
 const cards = (...ranks) => ranks.map((rank, index) => ({ rank, suit: ["S", "H", "D", "C"][index % 4] }));
 const state = (rank, count = 1, revolution = false) => ({ currentSet: { rank, count }, revolution });
@@ -43,6 +43,18 @@ test("un ordre manuel survit aux snapshots, aux cartes jouées et aux nouveaux �
   assert.deepEqual(reconcilePresidentHand(hand, order).map(card => card.rank), ["A", "K", "3", "7"]);
   assert.deepEqual(reconcilePresidentHand([hand[3], hand[0], hand[2]], order).map(card => card.rank), ["A", "K", "7"]);
   assert.deepEqual(reconcilePresidentHand(hand).map(card => card.rank), ["K", "3", "A", "7"]);
+});
+
+test("le tri demandé suit la force actuelle, conserve les égalités et ne modifie pas la main serveur", () => {
+  const hand = cards("K", "3", "2", "A", "3", "10");
+  const original = hand.map(presidentCardKey);
+  const normal = sortPresidentHand(hand), inverted = sortPresidentHand(hand, true);
+  assert.deepEqual(normal.map(card => card.rank), ["3", "3", "10", "K", "A", "2"]);
+  assert.deepEqual(inverted.map(card => card.rank), ["2", "A", "K", "10", "3", "3"]);
+  assert.equal(normal[0], hand[1]); assert.equal(normal[1], hand[4]);
+  assert.deepEqual(hand.map(presidentCardKey), original);
+  // Later snapshots and changes of strength retain the explicit local order.
+  assert.deepEqual(reconcilePresidentHand([...hand].reverse(), normal.map(presidentCardKey)), normal);
 });
 
 test("la main entière tient dans la largeur disponible, sans déformer les cartes", () => {

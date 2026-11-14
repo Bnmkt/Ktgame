@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Check, ChevronsRight, Crown, Hand, Play, X } from "lucide-react";
+import { ArrowDownUp, Check, ChevronsRight, Crown, Hand, Play, RotateCcw, RotateCw, X } from "lucide-react";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
 import { suits } from "../../features/games/config.js";
 import { canPlayPresidentSet, movePresidentCard, presidentCardKey, presidentHandGeometry, presidentPlaceLabel } from "../../features/games/president.js";
@@ -74,11 +74,32 @@ function PresidentHand({ cards, selected, onSelect, onMove, canSelect, state }) 
   </div>;
 }
 
+function PresidentDirection({ revolution, matchKey }) {
+  const { t } = useLocale();
+  const previous = useRef({ revolution, matchKey });
+  const [change, setChange] = useState(null);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = { revolution, matchKey };
+    if (before.matchKey !== matchKey) { setChange(null); return; }
+    if (before.revolution === revolution) return;
+    setChange({ revolution, matchKey });
+    const timeout = setTimeout(() => setChange(null), 4500);
+    return () => clearTimeout(timeout);
+  }, [revolution, matchKey]);
+  const changed = change?.matchKey === matchKey && change.revolution === revolution;
+  const DirectionIcon = revolution ? RotateCcw : RotateCw;
+  return <div className="president-order-status" data-president-order={revolution ? "inverted" : "standard"} data-president-order-change={changed ? "true" : undefined} role="status" aria-live="polite" aria-atomic="true">
+    <DirectionIcon size={22} aria-hidden="true"/>
+    <span><strong>{t(changed ? revolution ? "Révolution !" : "Ordre classique rétabli" : revolution ? "Ordre inversé" : "Ordre classique")}</strong><small title={t("De la plus faible à la plus forte")} aria-label={`${t("De la plus faible à la plus forte")} : ${revolution ? "2 → A → K → … → 3" : "3 → … → K → A → 2"}`}>{revolution ? "2 → A → K → … → 3" : "3 → … → K → A → 2"}</small></span>
+  </div>;
+}
+
 export function PresidentTable({ room, state, user, onAction, canAct, busy, selected, onSelectionChange, autoPassDeadline, countdown, dealKey }) {
   const { t } = useLocale();
   const root = useRef(null);
   const matchKey = `${room.code}:${room.activityMatchId ?? "current"}:${user.id}`;
-  const [hand, moveCard] = usePresidentHand(state.hands[user.id] ?? [], matchKey);
+  const [hand, moveCard, sortHand] = usePresidentHand(state.hands[user.id] ?? [], matchKey);
   const localSkin = user.cosmetics?.equipped?.cardSkin ?? "default";
   const chosen = hand.filter((card) => selected.includes(presidentCardKey(card)));
   const required = state.currentSet?.count;
@@ -116,12 +137,12 @@ export function PresidentTable({ room, state, user, onAction, canAct, busy, sele
       </div>
       <div className={`president-self-zone ${canAct ? "active" : ""}`} data-card-owner={user.id}>
         <PresidentHand cards={hand.map((card) => ({ ...card, ownerId: user.id, skin: localSkin }))} state={state} selected={selected} onSelect={selectCard} onMove={moveCard} canSelect={canAct && !busy && !state.finished}/>
-        <div className="president-local-identity"><DisplayName user={user}/><span>{hand.length} {t("cartes")}</span><strong>{t(state.finishedOrder.includes(user.id) ? presidentPlaceLabel(state.finishedOrder.indexOf(user.id), state.players.length) : canAct ? "À toi de jouer" : "En attente du joueur actif")}</strong></div>
+        <div className="president-player-status"><div className="president-local-identity"><DisplayName user={user}/><span>{hand.length} {t("cartes")}</span><strong>{t(state.finishedOrder.includes(user.id) ? presidentPlaceLabel(state.finishedOrder.indexOf(user.id), state.players.length) : canAct ? "À toi de jouer" : "En attente du joueur actif")}</strong></div><div hidden={deal.dealing}><PresidentDirection revolution={Boolean(state.revolution)} matchKey={matchKey}/></div></div>
       </div>
     </div>
     <div className="president-command-dock">
-      <div className="president-selection-summary" aria-live="polite"><strong>{t("{value0} carte(s) sélectionnée(s)", { value0: chosen.length })}</strong><button className="secondary" disabled={!selected.length} onClick={() => onSelectionChange([])}><X size={13}/>{t("Tout désélectionner")}</button></div>
-      <TableActionBar><button className="secondary" disabled={!canAct || busy || !state.currentSet || state.finished} onClick={() => onAction({ type: "pass" })}><Hand size={22}/>{t("Passer")}{autoPassDeadline && <> · {countdown}</>}</button><button className="table-command-gold" disabled={!canAct || busy || !playable || state.finished} onClick={() => onAction({ type: "play", cards: chosen.map(({ rank, suit }) => ({ rank, suit })) })}><Play size={22}/>{t("Jouer la sélection")}</button></TableActionBar>
+      <div className="president-selection-summary" aria-live="polite"><strong>{t("{value0} carte(s) sélectionnée(s)", { value0: chosen.length })}</strong><button className="secondary" disabled={!selected.length} onClick={() => onSelectionChange([])}><X size={13}/>{t("Tout désélectionner")}</button><button className="secondary president-sort-hand" disabled={hand.length < 2 || busy || deal.dealing} onClick={() => sortHand(state.revolution)} title={t("Trier de la plus faible à la plus forte, selon l’ordre actuel")}><ArrowDownUp size={13}/>{t("Trier les cartes")}</button></div>
+      <TableActionBar><button className="president-play-command" disabled={!canAct || busy || !playable || state.finished} onClick={() => onAction({ type: "play", cards: chosen.map(({ rank, suit }) => ({ rank, suit })) })}><Play size={22}/>{t("Jouer la sélection")}</button><button className="president-pass-command" disabled={!canAct || busy || !state.currentSet || state.finished} onClick={() => onAction({ type: "pass" })}><Hand size={22}/>{t("Passer")}{autoPassDeadline && <> · {countdown}</>}</button></TableActionBar>
       <div className="president-order-hint"><div className="president-requirement" role="status">{t(state.revolution ? "Révolution active" : "Ordre classique")}<strong>{state.currentSet ? t("{value0} carte{value1} · {value2} {value3}", { value0: state.currentSet.count, value1: state.currentSet.count > 1 ? "s" : "", value2: state.revolution ? "en dessous de" : "au-dessus de", value3: state.currentSet.rank }) : t("Pose libre")}</strong></div><small>{t("Glisser pour déplacer · Alt + flèche pour réordonner")}</small></div>
     </div>
   </section>;
