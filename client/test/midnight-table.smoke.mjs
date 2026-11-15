@@ -96,7 +96,7 @@ try {
   await opponent.locator("[data-midnight-offer]").first().locator(".midnight-offer-face").click(); await opponent.getByRole("button", { name: "Confirmer le mandat", exact: true }).click();
   await until(() => room.state.currentPlayerIndex === 2, "opponent choice");
   while (room.state.phase === "contract") { const player = room.state.players[room.state.currentPlayerIndex]; applyMidnightDiceAction(room.state, player.id, midnightDiceBotAction(room.state, player)); }
-  broadcast(); await page.locator(".midnight-market-floor").scrollIntoViewIfNeeded(); await page.locator(".midnight-market-piece .dice-solid-scene canvas").first().waitFor();
+  broadcast(); await page.bringToFront(); await page.locator(".midnight-market-floor").scrollIntoViewIfNeeded(); await page.locator(".midnight-market-piece .dice-solid-scene canvas").first().waitFor();
   const positions = () => page.locator("[data-midnight-market-id]").evaluateAll(nodes => Object.fromEntries(nodes.map(node => [node.dataset.midnightMarketId, [node.style.left, node.style.top, node.style.getPropertyValue("--midnight-rest-rotation")]])));
   const before = await positions(), ids = [...room.state.marketIds], count = room.state.market.length;
   await page.locator(".midnight-market-piece .die").first().click();
@@ -111,6 +111,30 @@ try {
   assert.equal(room.state.market.length, count - 1);
   assert.deepEqual(await positions(), Object.fromEntries(Object.entries(before).filter(([id]) => id !== ids[0])));
   assert.ok(await page.getByRole("button", { name: "Jouer le dé", exact: true }).isDisabled());
+  const ownDie = page.locator('[data-midnight-die-slot="me:0"] .dice-solid-scene');
+  await ownDie.locator('canvas').waitFor();
+  await until(async () => (await ownDie.getAttribute('data-dice-motion')) === 'settled', 'recovered die stops rotating');
+  const settledPose = await ownDie.getAttribute('data-dice-pose');
+  await page.waitForTimeout(400);
+  assert.equal(await ownDie.getAttribute('data-dice-pose'), settledPose, '3D pose stays fixed after pickup');
+  assert.equal(await ownDie.getAttribute('data-dice-result'), String(room.state.trays.me[0]));
+  assert.ok(await page.locator('[data-midnight-die-slot="me:0"] .die').evaluate(node => node.classList.contains('die-skin-table-inlay')), 'equipped 3D material remains in use');
+  // Read-only personal cards stay usable while the table blocks game actions.
+  const ownMandateName = room.state.contractCatalog[room.state.secretContracts.me].label;
+  room.pacing = { id: 'inspection-pause', kind: 'turn-end', actorId: 'me', actorName: 'Bnmkt', startedAt: Date.now(), endsAt: Date.now() + 60000 };
+  broadcast(); await page.locator('.board.pacing-locked').waitFor();
+  await page.getByRole('button', { name: 'Consulter mon mandat', exact: true }).click();
+  await page.getByRole('dialog', { name: ownMandateName, exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click();
+  await page.locator('.midnight-active-contract').click();
+  await page.getByRole('dialog', { name: ownMandateName, exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click();
+  assert.ok(await page.locator('[data-midnight-player="p1"] .midnight-personal-contract').isDisabled(), 'opponent mandate stays inaccessible');
+  assert.ok(await page.getByRole('button', { name: 'Jouer le dé', exact: true }).isDisabled());
+  room.pacing = null; broadcast(); await until(async () => await page.locator('.board.pacing-locked').count() === 0, 'pause clears');
+  await page.getByRole('button', { name: 'Consulter mon mandat', exact: true }).click();
+  await page.getByRole('dialog', { name: ownMandateName, exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Fermer', exact: true }).click();
   await until(async () => await page.locator(".midnight-card-flight").count() === 0, "visual settled");
   for (const [name, viewport] of [["laptop", { width: 1366, height: 768 }], ["desktop", { width: 1920, height: 1080 }], ["tablet", { width: 820, height: 1180 }], ["mobile", { width: 390, height: 844 }], ["small", { width: 320, height: 740 }]]) {
     await page.setViewportSize(viewport); await page.waitForTimeout(250);

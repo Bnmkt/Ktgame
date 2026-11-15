@@ -18,6 +18,8 @@ Le design général est stocké dans `settings.games["midnight-dice"].midnightCa
 
 Les cartes proposées tiennent sur une ligne sur ordinateur et sur deux colonnes sur mobile. Le clic sélectionne ; **Confirmer le mandat** envoie l'action. La consultation agrandie reste distincte de la confirmation. Les autres joueurs ne reçoivent jamais le mandat choisi par un adversaire.
 
+Le mandat personnel reste consultable hors de son tour et pendant les pauses entre les actions, depuis la zone Joueur ou le rappel central. Cette consultation ne déverrouille aucune action de jeu. Les dés récupérés et ceux des résultats conservent un rendu 3D immobile, avec leur valeur face visible et leur cosmétique ; seuls les dés lancés ou relancés dans le marché utilisent la rotation de lancer.
+
 Un clic sur un dé du marché sélectionne sa véritable identité. **Jouer le dé** confirme sa récupération ; **Relancer** utilise une relance et conserve le dé dans le marché. Les restrictions de tour, la présentation des résultats et l'attente d'une requête désactivent les actions appropriées.
 
 Les `marketIds` sont attribués par le serveur et conservés lors d'une relance ; retirer un dé retire uniquement son identifiant. La position des autres dés ne dépend donc pas du nouvel indice dans le tableau. `marketRollKeys` distingue aussi une relance qui retombe sur la même valeur. Les animations suivent les instantanés reçus : elles ne déclenchent aucune action et ne retardent pas la synchronisation. Reconnexion, changement de résolution et plein écran restaurent immédiatement l'état actuel. La réduction des animations est respectée.

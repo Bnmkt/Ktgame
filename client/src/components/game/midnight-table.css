@@ -25,6 +25,7 @@
 .midnight-player-zone > footer { display: flex; align-items: center; gap: 7px; margin-top: 7px; font-size: 10px; color: #c7c9db; }
 .midnight-personal-contract { display: block; width: 50px; flex-shrink: 0; min-height: 0; padding: 0; border: 0; background: none; box-shadow: none; }
 .midnight-board .midnight-personal-contract:disabled, .midnight-board .midnight-offer-face:disabled, .midnight-market-floor:disabled .die { opacity: 1; filter: none; cursor: default; }
+.board.board-midnight-dice.pacing-locked .midnight-board :is(.midnight-personal-contract, .midnight-active-contract) { pointer-events: auto; opacity: 1; }
 .midnight-center-board { min-width: 0; padding: 12px; border: 2px solid var(--midnight-gold); border-radius: 18px; background: radial-gradient(ellipse at 30% 10%, #354273, #161f3e); box-shadow: inset 0 0 35px #101630; }
 .midnight-center-board > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 14px; }
 .midnight-center-board > header > span { font-size: 11px; max-width: 50%; color: #d3cee4; }
