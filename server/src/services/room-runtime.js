@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createGameState, tickPokerState } from "../games/engines.js";
 import { normalizeGameModifiers } from "../games/modifiers.js";
 import { midnightDiceBotAction, resumeMidnightAfterDeparture } from "../games/engines/midnight-dice.js";
-import { midnightRankingScore, publicMidnightOptions } from "../../../client/src/features/games/midnightDice/contracts.js";
+import { compareMidnightPlayers, publicMidnightOptions } from "../../../client/src/features/games/midnightDice/contracts.js";
 import { velvetRuseBotAction } from "../games/engines/velvet-ruse.js";
 import { yahtzeeBotAction } from "../games/engines/yahtzee.js";
 import { fourTwentyOneBotAction } from "../games/engines/four-twenty-one.js";
@@ -125,7 +125,7 @@ export function createRoomRuntime(dependencies) {
       isBot: Boolean(player.isBot),
       score: scoreForRanking(room.state, player),
       winner: room.state?.winners?.includes(player.id) ?? false
-    })).sort((a, b) => Number(b.winner) - Number(a.winner) || (room.gameId === "midnight-dice" && publicMidnightOptions(room.state)?.victory ? midnightRankingScore(room.state, b.id) - midnightRankingScore(room.state, a.id) : b.score - a.score));
+    })).sort((a, b) => Number(b.winner) - Number(a.winner) || (room.gameId === "midnight-dice" && publicMidnightOptions(room.state)?.victory ? compareMidnightPlayers(room.state, b.id, a.id) : b.score - a.score));
   }
 
   function removePlayerFromRoomState(room, playerId) {

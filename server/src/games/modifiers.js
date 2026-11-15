@@ -1,3 +1,5 @@
+import { midnightVictoryModes } from "../../../client/src/features/games/midnightDice/results.js";
+
 function integerOption(modifiers, key, fallback, min, max) {
   const parsed = Number(modifiers[key]);
   const value = Number.isFinite(parsed) ? parsed : fallback;
@@ -55,7 +57,7 @@ export function normalizeGameModifiers(gameId, modifiers = {}) {
     marketExtra: integer("marketExtra", 2, 0, 6),
     discardsPerRound: 2,
     firstPlayer: ["random", "first-seat", "midnight"].includes(modifiers.firstPlayer) ? modifiers.firstPlayer : "random",
-    victory: ["highest", "lowest", "contracts", "midnight"].includes(modifiers.victory) ? modifiers.victory : "highest",
+    victory: [...midnightVictoryModes, "lowest", "contracts", "midnight"].includes(modifiers.victory) ? modifiers.victory : "highest",
     victoryReveal: modifiers.victoryReveal === "end" ? "end" : "start",
     individualContracts: modifiers.individualContracts !== false,
     uniqueContracts: modifiers.uniqueContracts !== false

@@ -82,6 +82,17 @@
 .midnight-round-results > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
 .midnight-round-results article { min-width: 0; display: grid; align-content: start; gap: 8px; padding: 12px; background: #1c2645; border: 1px solid #b08a55; border-radius: 12px; animation: midnight-reveal-in 300ms ease-out both; }
 .midnight-round-results article > p { font-size: 12px; margin: 0; }
+.midnight-round-results article > header { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.midnight-round-results article > header > svg { color: #f5cf75; }
+.midnight-match-history { color: #eddbb4; background: #17213b; border: 1px solid #9c834c; border-radius: 9px; padding: 12px; margin-block: 12px; }
+.midnight-match-history > summary { cursor: pointer; font-weight: 700; }
+.midnight-match-history > div { display: grid; gap: 9px; margin-top: 12px; }
+.midnight-history-round { border-top: 1px solid #ae985346; padding-top: 10px; min-width: 0; }
+.midnight-history-round > summary { display: flex; gap: 10px; flex-wrap: wrap; cursor: pointer; font-size: 12px; }
+.midnight-history-round > summary > span { color: #cbd1df; line-height: 1.6; }
+.midnight-history-round .midnight-round-results > h3, .midnight-auto-results .midnight-round-results > h3 { display: none; }
+.midnight-history-round .midnight-round-results { margin-top: 12px; }
+.midnight-review-actions { display: flex; justify-content: end; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .midnight-result-achieved > strong { color: #a9f1bb; }
 .midnight-result-missed > strong { color: #f5b9b5; }
 .midnight-result-dice { display: flex; justify-content: center; gap: 6px; }
@@ -105,5 +116,55 @@
   .midnight-contract-hand > div { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 9px; }
   .midnight-codex-gallery > div:last-child { grid-template-columns: 1fr 1fr; }
   .midnight-round-results > div { grid-template-columns: 1fr; }
+}
+/* Scope out the older fullscreen grid rules, which target .midnight-market globally. */
+@media (min-width: 1000px) {
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] { height: 100dvh; max-height: 100dvh; min-height: 0; padding: 7px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .room-heading { margin: 0; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .room-heading h1 { margin: 0; font-size: 14px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .room-table-tools { margin: 0; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] > .room-heading,
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] > .room-table-tools { flex-shrink: 0; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .layout { flex: 1; height: auto; min-height: 0; grid-template-columns: minmax(0, 1fr) clamp(210px, 20vw, 290px); gap: 10px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .layout > section { min-height: 0; height: 100%; gap: 7px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .board { flex: 1; min-height: 0; margin: 0; }
+  .room-app-shell.table-interface.table-family-interface.table-fullscreen[data-table-game="midnight-dice"] .board > .board-felt { min-height: 0; height: 100%; padding: 8px; display: block; overflow: auto; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board { gap: 8px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board .midnight-market { grid-column: auto; grid-row: auto; align-self: stretch; padding: 0; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-market-floor { height: max(170px, calc(var(--midnight-market-rows) * 40px)); }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-market-piece .die { width: 38px; height: 38px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-layout { gap: 9px; grid-template-columns: minmax(140px, .7fr) minmax(250px, 2fr) minmax(140px, .7fr); }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-side-seats { gap: 6px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-player-zone { padding: 6px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-player-marks { min-height: 13px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-player-dice > div { width: min(100%, 29px); }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-personal-contract { width: 29px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-player-zone > footer { margin-top: 4px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-wordmark { font-size: 23px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-victory-rule { margin-block: 3px; font-size: 11px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-center-board { padding: 8px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-center-board > header { padding-bottom: 9px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-active-contract { padding: 5px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-active-contract > .midnight-card { width: 60px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-player-console { grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr); gap: 8px; margin-top: 7px; align-items: stretch; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-active-contract small { display: none; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-primary-actions { flex-direction: column; gap: 5px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-primary-actions > button { min-height: 35px; padding: 7px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-contract-hand > div { justify-content: center; gap: 9px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-contract-hand article { max-width: min(210px, 25dvh); }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-contract-hand > header { margin-bottom: 6px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-confirm-contract { min-height: 32px; margin-top: 7px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing .midnight-player-console { display: none; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing { grid-template-columns: minmax(140px, .7fr) minmax(250px, 2fr) minmax(140px, .7fr); column-gap: 9px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing > .midnight-board-tools { grid-column: 1 / -1; grid-row: 1; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing > .midnight-extra-seats { grid-column: 1 / -1; grid-row: 2; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing > .midnight-board-layout { grid-column: 1 / -1; grid-row: 3; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing .midnight-market-station { visibility: hidden; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing > .midnight-contract-hand { grid-column: 2; grid-row: 3; align-self: start; z-index: 2; margin: 55px 9px 0; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing .midnight-contract-hand > div { display: grid; grid-template-columns: repeat(2, minmax(0, min(150px, 16dvh))); }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-board-choosing .midnight-contract-hand h3 { font-size: 13px; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-extra-seats .midnight-player-zone { display: grid; grid-template-columns: minmax(0, 1fr) 95px; gap: 3px 7px; width: min(45%, 350px); }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-extra-seats .midnight-player-resources { grid-column: 2; grid-row: 1 / 3; }
+  .room-app-shell.table-interface.table-fullscreen[data-table-game="midnight-dice"] .midnight-extra-seats .midnight-player-zone > footer { grid-column: 1 / -1; margin: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .midnight-board *, .midnight-round-results article { animation: none !important; transition: none !important; } }

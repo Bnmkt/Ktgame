@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BookOpen, Check, Crown, Dices, Eye, RotateCcw, Trophy, ZoomIn } from "lucide-react";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
-import { midnightCatalogFor, midnightContractTiers, midnightVictoryLabels } from "../../features/games/midnightDice/contracts.js";
+import { midnightCatalogFor, midnightContractTiers, midnightVictoryLabels, midnightRoundHistory, midnightRoundWinners } from "../../features/games/midnightDice/contracts.js";
 import { DisplayName } from "../cosmetics/Cosmetics.jsx";
 import { Dialog } from "../common/Dialog.jsx";
 import { Die } from "./GamePieces.jsx";
@@ -90,11 +90,19 @@ function useMidnightMotion(root, state, matchKey, userId, dealKey) {
   }, []);
 }
 
-export function MidnightRoundResults({ state }) {
+export function MidnightRoundResults({ state, round = state.lastRound }) {
   const { t } = useLocale();
   const catalog = midnightCatalogFor(state);
-  if (!state.lastRound) return null;
-  return <section className="midnight-round-results"><h3>{t("Résultat de la manche")} {state.lastRound.round}</h3><div>{state.lastRound.results.map(result => <article key={result.playerId} className={result.achieved ? "midnight-result-achieved" : "midnight-result-missed"}><DisplayName user={state.players.find(player => player.id === result.playerId) ?? { pseudo: result.playerId }}/><MidnightContractCard definition={catalog[result.contract]} design={state.cardDesign}/><div className="midnight-result-dice">{result.dice.map((value, index) => <Die value={value} key={index} animate={false} static3D/>)}</div><p>{result.dice.join(" + ")} = <strong>{result.base}</strong></p><p>{t(result.achieved ? "Mandat réussi" : "Mandat non réalisé")} · {t("Prime du mandat")} : <strong>+{result.bonus}</strong></p><strong>{t("Total de la manche")} : {result.points} {t("points")}</strong></article>)}</div></section>;
+  if (!round) return null;
+  const winners = midnightRoundWinners(round);
+  return <section className="midnight-round-results"><h3>{t("Résultat de la manche")} {round.round}</h3><div>{round.results.map(result => <article key={result.playerId} className={result.achieved ? "midnight-result-achieved" : "midnight-result-missed"}><header><DisplayName user={state.players.find(player => player.id === result.playerId) ?? { pseudo: result.playerName ?? result.playerId }}/>{winners.includes(result.playerId) && <Trophy size={16} aria-label={t("Victoire de manche")}/>}</header><MidnightContractCard definition={catalog[result.contract]} design={state.cardDesign}/><div className="midnight-result-dice">{result.dice.map((value, index) => <Die value={value} key={index} skin={state.players.find(player => player.id === result.playerId)?.cosmetics?.equipped?.diceSkin ?? "default"} animate={false} static3D/>)}</div><p>{result.dice.join(" + ")} = <strong>{result.base}</strong></p><p>{t(result.achieved ? "Mandat réussi" : "Mandat non réalisé")} · {t("Prime du mandat")} : <strong>+{result.bonus}</strong></p><strong>{t("Total de la manche")} : {result.points} {t("points")}</strong></article>)}</div></section>;
+}
+
+export function MidnightMatchHistory({ state }) {
+  const { t } = useLocale();
+  const rounds = midnightRoundHistory(state);
+  if (!rounds.length) return null;
+  return <details className="midnight-match-history"><summary>{t("Récapitulatif des manches")} ({rounds.length})</summary><div>{rounds.map(round => <details className="midnight-history-round" key={round.round}><summary><strong>{t("Manche")} {round.round}</strong><span>{round.results.map(result => `${state.players.find(player => player.id === result.playerId)?.pseudo ?? result.playerName ?? result.playerId} : ${result.points}`).join(" · ")}</span></summary><MidnightRoundResults state={state} round={round}/></details>)}</div></details>;
 }
 
 export function MidnightDiceBoard({ state, user, onAction, room, canAct, dealKey }) {

@@ -411,6 +411,22 @@ test("midnight catalogue CRUD is admin-only, validated, durable and snapshotted 
   assert.equal(started.data.state.resolvedOptions.victory, null);
   assert.equal(started.data.state.contractDrawPiles, undefined);
   assert.equal(started.data.state.contractDrawPile, undefined);
+  let current = started.data;
+  const roundDeadline = Date.now() + 30000;
+  while (!current.state.roundHistory.length && Date.now() < roundDeadline) {
+    current = (await request("admin", `/api/rooms/${room.data.code}`)).data;
+    if (current.state.roundHistory.length) break;
+    if (current.pacing) { assert.equal((await request("admin", `/api/rooms/${room.data.code}/pacing/skip`, "POST", {})).status, 200); continue; }
+    if (current.state.players[current.state.currentPlayerIndex].id !== "admin") { await new Promise(resolve => setTimeout(resolve, 100)); continue; }
+    const action = current.state.phase === "contract" ? { type: "choose-contract", contract: current.state.contractOffers[0] } : { type: "draft", index: 0 };
+    const played = await request("admin", `/api/rooms/${room.data.code}/action`, "POST", action);
+    if (played.status === 409 && played.data.error === "L'IA prépare encore son coup.") { await new Promise(resolve => setTimeout(resolve, 100)); continue; }
+    assert.equal(played.status, 200, JSON.stringify(played.data)); current = played.data;
+  }
+  assert.equal(current.state.roundHistory.length, 1);
+  const firstRound = current.state.roundHistory[0];
+  assert.equal(firstRound.round, 1);
+  assert.equal(firstRound.results[0].playerId, "admin");
   assert.equal((await request("admin", route, "PATCH", { ...edited, midnightCardDesign: { frontImage: "javascript:alert(1)" } })).status, 400);
   entry.tier = "diamond"; entry.label = "Ordre modifié";
   assert.equal((await request("admin", route, "PATCH", edited)).status, 200);
@@ -421,6 +437,7 @@ test("midnight catalogue CRUD is admin-only, validated, durable and snapshotted 
   const restoredMidnight = (await request("admin", `/api/rooms/${room.data.code}`)).data.state;
   assert.equal(restoredMidnight.resolvedOptions.victory, null);
   assert.equal(restoredMidnight.contractDrawPiles, undefined);
+  assert.deepEqual(restoredMidnight.roundHistory, [firstRound], "every public round result survives a real server restart");
   assert.equal((await request("admin", `/api/rooms/${room.data.code}`)).data.state.contractCatalog[entry.id].tier, "gold");
   assert.equal((await request("admin", route, "PATCH", original)).status, 200);
   assert.equal((await request(null, "/api/games")).data.find(game => game.id === "midnight-dice").midnightContracts.length, 12);

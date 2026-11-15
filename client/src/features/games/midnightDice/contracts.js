@@ -35,19 +35,12 @@ export const defaultMidnightContracts = [
 ];
 export const midnightContractInfo = Object.fromEntries(defaultMidnightContracts.map(contract => [contract.id, contract]));
 export const midnightCatalogFor = state => state?.contractCatalog ?? midnightContractInfo;
-export const midnightVictoryLabels = { highest: "Score le plus haut", lowest: "Score le plus bas", contracts: "Le plus de mandats réussis" };
+export { midnightVictoryLabels, midnightVictoryModes, midnightRoundHistory, midnightRoundWinners, midnightRankingVector, compareMidnightPlayers, midnightRankingScore } from "./results.js";
 export function publicMidnightOptions(state) {
   if (!state.resolvedOptions) return undefined;
   const hidden = state.modifiers?.victory === "midnight" && state.modifiers?.victoryReveal === "end" && !state.finished;
   return { ...state.resolvedOptions, ...(hidden ? { victory: null } : {}) };
 }
-export function midnightRankingScore(state, playerId) {
-  const criterion = state.resolvedOptions?.victory ?? "highest";
-  if (criterion === "contracts") return state.stats?.[playerId]?.contractsCompleted ?? 0;
-  const points = state.scores?.[playerId] ?? 0;
-  return criterion === "lowest" ? -points : points;
-}
-
 export function evaluateMidnightDefinition(definition, dice = []) {
   const valid = Array.isArray(dice) && dice.length <= 3 && dice.every(value => Number.isInteger(value) && value >= 1 && value <= 6);
   const values = valid ? dice : [], sorted = [...values].sort((a, b) => a - b), base = values.reduce((sum, die) => sum + die, 0);

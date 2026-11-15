@@ -1,4 +1,4 @@
-import { midnightRankingScore } from "./midnightDice/contracts.js";
+import { compareMidnightPlayers } from "./midnightDice/contracts.js";
 import { isFundedPlayer } from "./token-economy.js";
 
 const lowScoreGames = new Set(["shut-the-box", "golf-solitaire", "accordion"]);
@@ -7,7 +7,7 @@ export function classicResults(room) {
   const state = room?.state;
   if (!state?.finished || room.ranked) return [];
   const players = state.players ?? [];
-  const ranking = state.ranking?.length ? state.ranking : players;
+  const ranking = state.ranking?.length ? state.ranking : state.gameId === "midnight-dice" ? [...players].sort((a, b) => compareMidnightPlayers(state, b.id, a.id)) : players;
   let previous;
   return ranking.map((entry, index) => {
     const player = { ...entry, ...players.find((row) => row.id === entry.id), ...room.players?.find((row) => row.id === entry.id) };
@@ -30,10 +30,9 @@ export function classicResults(room) {
       : Number(state.payouts?.[entry.id] ?? 0) + Number(state.roomPayouts?.[entry.id] ?? 0);
     const rerollsKnown = state.gameId !== "421" || !state.modifiers?.paidRerollsEnabled || state.paidRerollSpent !== undefined;
     const spent = funded ? Number(room.stake ?? 0) + (state.gameId === "blackjack" ? Number(state.bets?.[entry.id] ?? 0) : 0) + Number(state.paidRerollSpent?.[entry.id] ?? 0) : 0;
-    const rankingValue = state.gameId === "midnight-dice" ? midnightRankingScore(state, entry.id) : raw;
-    const tied = state.gameId !== "president" && previous?.raw === rankingValue && previous.winner === winner;
+    const tied = state.gameId !== "president" && previous && (state.gameId === "midnight-dice" ? compareMidnightPlayers(state, previous.id, entry.id) === 0 : previous.raw === raw) && previous.winner === winner;
     const rank = tied ? previous.rank : index + 1;
-    previous = { raw: rankingValue, winner, rank };
+    previous = { id: entry.id, raw, winner, rank };
     const push = state.gameId === "blackjack" && !state.foldedPlayerIds?.includes(entry.id) && Number(state.bets?.[entry.id]) > 0 && Number(state.payouts?.[entry.id]) === Number(state.bets[entry.id]);
     return { ...player, rank, score, unit, winner, push, recovered, spent,
       net: !funded || !rerollsKnown ? null : recovered - spent };

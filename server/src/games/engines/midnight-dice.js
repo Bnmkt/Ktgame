@@ -1,7 +1,7 @@
 import { currentPlayer, rollDice, shuffle } from "../shared.js";
 import { normalizeGameModifiers } from "../modifiers.js";
 import { appendLog, publicPlayers } from "../engine-context.js";
-import { midnightContractInfo, midnightContractTiers, midnightCatalogFor, normalizeMidnightContracts, evaluateMidnightDefinition, midnightRankingScore } from "../../../../client/src/features/games/midnightDice/contracts.js";
+import { midnightContractInfo, midnightContractTiers, midnightCatalogFor, normalizeMidnightContracts, evaluateMidnightDefinition, midnightVictoryModes, midnightRoundHistory, midnightRoundWinners, compareMidnightPlayers } from "../../../../client/src/features/games/midnightDice/contracts.js";
 import { normalizeMidnightCardDesign } from "../../../../client/src/features/games/midnightDice/appearance.js";
 
 export const MIDNIGHT_CONTRACT_DEFINITIONS = Object.fromEntries(Object.entries(midnightContractInfo).map(([id, definition]) => [id, { ...definition, bonus: midnightContractTiers[definition.tier].bonus }]));
@@ -159,6 +159,7 @@ function prepareRound(state) {
 }
 
 function resolveRound(state) {
+  const history = midnightRoundHistory(state);
   const results = state.players.map((player) => {
     const dice = [...(state.trays[player.id] ?? [])];
     const contract = state.secretContracts[player.id];
@@ -171,14 +172,16 @@ function resolveRound(state) {
       if (["gold", "platinum", "diamond"].includes(evaluation.tier)) stats.perfectContracts = (stats.perfectContracts ?? 0) + 1;
     }
     state.scores[player.id] = (state.scores[player.id] ?? 0) + evaluation.points;
-    return { playerId: player.id, dice, contract, ...evaluation, total: state.scores[player.id] };
+    return { playerId: player.id, playerName: player.pseudo, dice, contract, ...evaluation, total: state.scores[player.id] };
   });
   state.lastRound = { round: state.round, results, discarded: [...state.discardTray], contractOffers: state.modifiers.individualContracts ? [] : [...state.contractOffers] };
+  state.lastRound.winners = midnightRoundWinners(state.lastRound);
+  state.roundHistory = midnightRoundHistory({ ...state, roundHistory: history });
   if (state.rulesVersion >= 2) state.revealedContracts = [...(state.revealedContracts ?? []), ...results.map(({ playerId, contract }) => ({ playerId, contract, round: state.round }))];
   appendLog(state, "dealer", `révèle les mandats de la manche ${state.round}.`, "result");
   if (state.round >= state.modifiers.rounds) {
-    const best = Math.max(...state.players.map(player => midnightRankingScore(state, player.id)));
-    state.winners = state.players.filter(player => midnightRankingScore(state, player.id) === best).map(player => player.id);
+    const best = state.players.reduce((leader, player) => compareMidnightPlayers(state, player.id, leader.id) > 0 ? player : leader);
+    state.winners = state.players.filter(player => compareMidnightPlayers(state, player.id, best.id) === 0).map(player => player.id);
     state.finished = true;
     return;
   }
@@ -218,6 +221,7 @@ export function createMidnightDiceState(players, options = {}) {
     scores: Object.fromEntries(tablePlayers.map((player) => [player.id, 0])),
     stats: Object.fromEntries(tablePlayers.map((player) => [player.id, { perfectContracts: 0, marketDiscards: 0, contractsAttempted: 0, contractsCompleted: 0, completedContractIds: [] }])),
     lastRound: null,
+    roundHistory: [],
     logs: [],
     finished: false,
     winners: []
@@ -226,7 +230,7 @@ export function createMidnightDiceState(players, options = {}) {
   else state.modifiers.discardsPerRound = Number.isInteger(options.gameModifiers?.discardsPerRound) ? options.gameModifiers.discardsPerRound : 1;
   if (state.rulesVersion >= 2) {
     const choose = values => values[Math.floor(Math.random() * values.length)];
-    state.resolvedOptions = { firstPlayer: state.modifiers.firstPlayer === "midnight" ? choose(["random", "first-seat"]) : state.modifiers.firstPlayer, victory: state.modifiers.victory === "midnight" ? choose(["highest", "lowest", "contracts"]) : state.modifiers.victory };
+    state.resolvedOptions = { firstPlayer: state.modifiers.firstPlayer === "midnight" ? choose(["random", "first-seat"]) : state.modifiers.firstPlayer, victory: state.modifiers.victory === "midnight" ? choose(midnightVictoryModes) : state.modifiers.victory };
     state.startingPlayerIndex = state.resolvedOptions.firstPlayer === "random" ? Math.floor(Math.random() * tablePlayers.length) : 0;
   }
   prepareRound(state);

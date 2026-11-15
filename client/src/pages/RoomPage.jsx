@@ -1,3 +1,4 @@
+import { midnightRoundHistory } from "../features/games/midnightDice/results.js";
 import { MidnightRoundResults } from "../components/game/MidnightTable.jsx";
 import { useLocale } from "../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
@@ -165,6 +166,8 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
   const [accordionFrom, setAccordionFrom] = useState(null);
   const [selectedPresidentCards, setSelectedPresidentCards] = useState([]);
   const [presidentDealKey, setPresidentDealKey] = useState(null);
+  const [midnightRoundReviews, setMidnightRoundReviews] = useState([]);
+  const midnightRoundSeen = useRef({ key: "", round: 0 });
   const [tableDealKey, setTableDealKey] = useState(null);
   const previousPresidentRoom = useRef(null);
   const [presidentActionBusy, setPresidentActionBusy] = useState(false);
@@ -192,6 +195,20 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
     if (snapshot === roomSnapshotRef.current) return;
     roomSnapshotRef.current = snapshot;
     const previous = previousPresidentRoom.current;
+    if (payload.gameId === "midnight-dice") {
+      const key = `${payload.code}:${payload.activityMatchId ?? "current"}`;
+      const lastSeen = midnightRoundSeen.current.round;
+      if (midnightRoundSeen.current.key !== key) {
+        midnightRoundSeen.current = { key, round: payload.state?.lastRound?.round ?? 0 };
+        setMidnightRoundReviews([]);
+      } else {
+        midnightRoundSeen.current.round = Math.max(lastSeen, payload.state?.lastRound?.round ?? 0);
+        if (animateStart) {
+          const ended = midnightRoundHistory(payload.state ?? {}).filter(round => round.round > lastSeen);
+          if (ended.length) setMidnightRoundReviews(queue => [...queue, ...ended.filter(round => !queue.some(item => item.round === round.round))]);
+        }
+      }
+    }
     if (animateStart && familyTableGames.has(payload.gameId) && cardTableGames.has(payload.gameId) && payload.state && !payload.state.finished && previous?.code === payload.code &&
       (!previous.state || previous.activityMatchId && payload.activityMatchId !== previous.activityMatchId || payload.gameId === "belote" && previous.state.round !== payload.state.round)) {
       setTableDealKey(`${payload.code}:${payload.activityMatchId ?? "game"}:${payload.state.round ?? Date.now()}`);
@@ -336,6 +353,12 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  function closeMidnightRoundReview() {
+    const reviewed = midnightRoundReviews[0];
+    setMidnightRoundReviews(queue => queue.slice(1));
+    if (isSeatedPlayer && pacing?.kind === "round-results" && pacing.round === reviewed?.round) void skipPacing();
   }
 
   async function closeRoom() {
@@ -526,7 +549,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
           {rankedLeave && <ConfirmDialog title={localeText("Abandonner la partie classée ?")} message={room.ranked.config.abandonPolicy==="cancel" ? localeText("Un abandon annule l’attribution Elo de cette partie pour tous les joueurs.") : localeText("Un abandon entraîne le classement en dernière position{value0}", { value0: room.ranked.config.abandonPolicy==="rank" ? "." : ` et une pénalité supplémentaire pouvant atteindre ${room.ranked.config.abandonPenalty} Elo, selon les limites de la partie.` })} danger confirmLabel={localeText("Abandonner")} onConfirm={()=>leaveTable(true)} onClose={()=>setRankedLeave(false)}/>}
           {!state && room.gameId === "belote" && <BeloteTeams room={room} userId={user.id} onChange={changeBeloteTeam} />}
           {showFinishedResult && room.ranked && <FinishedLeaderboard room={room} state={state} />}
-          {showFinishedResult && state?.finished && !room.ranked && <CompletionContainer {...(tableInterface ? { className: "table-completion", open: true } : {})}>{tableInterface && <summary>{localeText("Bilan de la partie")}</summary>}<ClassicCompletion key={room.activityMatchId ?? room.id} room={room} userId={user.id} isOwner={isOwner} pacing={pacing} canSkip={isSeatedPlayer} onSkip={skipPacing} onReplay={() => roomPost("replay")} onInstantReplay={() => roomPost("replay-now")} onLeave={leaveTable}/></CompletionContainer>}
+          {showFinishedResult && state?.finished && !room.ranked && (room.gameId !== "midnight-dice" || !midnightRoundReviews.length) && <CompletionContainer {...(tableInterface ? { className: "table-completion", open: true } : {})}>{tableInterface && <summary>{localeText("Bilan de la partie")}</summary>}<ClassicCompletion key={room.activityMatchId ?? room.id} room={room} userId={user.id} isOwner={isOwner} pacing={pacing} canSkip={isSeatedPlayer} onSkip={skipPacing} onReplay={() => roomPost("replay")} onInstantReplay={() => roomPost("replay-now")} onLeave={leaveTable}/></CompletionContainer>}
           {(!state?.finished || room.ranked) && <TurnPacingBanner pacing={pacing} players={room.players} canSkip={isSeatedPlayer} onSkip={skipPacing} />}
 
           {state && (!state.finished || room.ranked || ["blackjack", "texas-holdem", "belote"].includes(room.gameId)) && <section className={`board board-${room.gameId} ${state.finished ? "finished-board" : ""} ${isPlayerActionExpected ? "your-active-turn" : ""} ${pacingActive ? "pacing-locked" : ""}`}><CardMotionSurface opaqueFlights={room.gameId === "president" || familyTableGames.has(room.gameId)} attachToChild version={state} actorId={current?.id} dealKey={tableDealKey} dealSequence={tableDealSequence(state)} skipLabel={localeText("Passer la distribution")}>
@@ -646,9 +669,10 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
         <section className="game-modifiers-panel"><h3>{localeText("Niveaux admis dans") + " "}{localeText(gameTitle(room.gameId))}</h3><div className="settings-field-grid"><label>{localeText("Niveau minimum")}<input aria-label={localeText("Niveau minimum de la table")} disabled={!isOwner} type="number" min={1} max={1000} value={levelLimits.minLevel} onChange={(event) => setLevelLimits({ ...levelLimits, minLevel: event.target.value })} /></label><label>{localeText("Niveau maximum")}<input aria-label={localeText("Niveau maximum de la table")} disabled={!isOwner} type="number" min={levelLimits.minLevel} max={1000} value={levelLimits.maxLevel} placeholder={localeText("Sans limite")} onChange={(event) => setLevelLimits({ ...levelLimits, maxLevel: event.target.value })} /></label></div></section>
         <GameModifiersPanel gameId={room.gameId} value={gameModifiers} isOwner={isOwner} onChange={setGameModifiers} showFooter={false} />
       </div><div className="room-settings-modal-footer"><span><Swords size={16} />{" " + localeText("Ces paramètres seront verrouillés au lancement.")}</span><div className="actions">{isOwner && <button onClick={applyRoomSettings}><Save size={17} />{" " + localeText("Appliquer les paramètres")}</button>}<button className="secondary" onClick={cancelRoomSettings}>{isOwner ? localeText("Annuler") : localeText("Fermer")}</button></div></div></div></ModalBackdrop>}
+      {room.gameId === "midnight-dice" && state && midnightRoundReviews.length > 0 && <Dialog key={midnightRoundReviews[0].round} title={`${localeText("Résultat de la manche")} ${midnightRoundReviews[0].round}`} className="midnight-results-dialog midnight-auto-results" onClose={closeMidnightRoundReview}><MidnightRoundResults state={state} round={midnightRoundReviews[0]}/><footer className="midnight-review-actions">{pacing?.kind === "round-results" && pacing.round === midnightRoundReviews[0].round && <small>{localeText("Reprise automatique")} · <PacingCountdown endsAt={pacing.endsAt}/>{" " + localeText("s")}</small>}<button type="button" onClick={closeMidnightRoundReview}>{localeText("Continuer")}</button></footer></Dialog>}
       {rulesOpen && <RulesModal gameId={room.gameId} onClose={() => setRulesOpen(false)} />}
-      {pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && !(pacing.final && (!room.ranked || room.ranked.results?.some((row)=>row.userId===user.id))) && <RoundResultsOverlay state={state} pacing={pacing} players={room.players} ranked={room.ranked} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
-      {room.ranked?.results?.find((row)=>row.userId===user.id) && <RankedCompletion key={`${room.ranked.matchId}:${user.id}`} matchId={room.ranked.matchId} result={room.ranked.results.find((row)=>row.userId===user.id)} userId={user.id} gameId={room.gameId} state={state}/>}
+      {room.gameId !== "midnight-dice" && pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && !(pacing.final && (!room.ranked || room.ranked.results?.some((row)=>row.userId===user.id))) && <RoundResultsOverlay state={state} pacing={pacing} players={room.players} ranked={room.ranked} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
+      {(room.gameId !== "midnight-dice" || !midnightRoundReviews.length) && room.ranked?.results?.find((row)=>row.userId===user.id) && <RankedCompletion key={`${room.ranked.matchId}:${user.id}`} matchId={room.ranked.matchId} result={room.ranked.results.find((row)=>row.userId===user.id)} userId={user.id} gameId={room.gameId} state={state}/>}
     </main>
   );
 }

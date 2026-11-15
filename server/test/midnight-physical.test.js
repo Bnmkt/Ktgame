@@ -71,7 +71,7 @@ test("first player and random options are resolved once by the server and surviv
   assert.equal(normalizeGameModifiers("midnight-dice").victory, "highest");
   t.mock.method(Math, "random", () => .9);
   const state = createMidnightDiceState(roster(6), { gameModifiers: { firstPlayer: "midnight", victory: "midnight" } });
-  assert.equal(state.resolvedOptions.firstPlayer, "first-seat"); assert.equal(state.resolvedOptions.victory, "contracts");
+  assert.equal(state.resolvedOptions.firstPlayer, "first-seat"); assert.equal(state.resolvedOptions.victory, "bounties");
   const randomSeat = createMidnightDiceState(roster(6)); assert.equal(randomSeat.currentPlayerIndex, 5);
   const restored = JSON.parse(JSON.stringify(state)); finishRound(restored);
   assert.deepEqual(restored.resolvedOptions, state.resolvedOptions);

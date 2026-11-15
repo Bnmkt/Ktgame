@@ -1,4 +1,4 @@
-import { midnightRankingScore } from "../../../client/src/features/games/midnightDice/contracts.js";
+import { midnightRankingScore, compareMidnightPlayers } from "../../../client/src/features/games/midnightDice/contracts.js";
 import { games } from "../games/shared.js";
 import { normalizeGameModifiers } from "../games/modifiers.js";
 import { totalYahtzee, YAHTZEE_CATEGORIES } from "../games/engines/yahtzee.js";
@@ -222,7 +222,7 @@ export function competitivePositions(room) {
     for (const row of scores) row.score=losingTeams.has(row.team) ? 0 : 1;
     return scores.map((row)=>({...row,position:1+scores.filter((other)=>other.score>row.score).length}));
   }
-  return scores.map((row)=>({...row,position:1+scores.filter((other)=>Number(other.forfeited)<Number(row.forfeited) || other.forfeited===row.forfeited && other.score>row.score).length}));
+  return scores.map((row)=>({...row,position:1+scores.filter((other)=>Number(other.forfeited)<Number(row.forfeited) || other.forfeited===row.forfeited && (room.gameId === "midnight-dice" ? compareMidnightPlayers(state,other.id,row.id)>0 : other.score>row.score)).length}));
 }
 export function settleRanked(room, users, history, previousSettlement = null) {
   if (!room.ranked || room.ranked.settled || room.ranked.cancelled) return [];

@@ -37,6 +37,7 @@ const service = createServer(async (request, response) => {
   const pathname = new URL(request.url, "http://localhost").pathname, viewer = request.headers.authorization?.replace("Bearer ", "") ?? "me";
   const reply = (body, status = 200) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   if (pathname.endsWith("/start")) { room.state = createMidnightDiceState(room.players, { gameModifiers: { rounds: 3, firstPlayer: "first-seat", victory: "midnight", victoryReveal: "end" } }); room.activityMatchId = `test-${++revision}`; broadcast(); return reply(payload(viewer)); }
+  if (pathname.endsWith('/pacing/skip')) { room.pacing = null; broadcast(); return reply(payload(viewer)); }
   if (pathname.endsWith("/action")) {
     const chunks = []; for await (const chunk of request) chunks.push(chunk);
     const action = JSON.parse(Buffer.concat(chunks)); actions.push({ viewer, action });
@@ -67,6 +68,27 @@ try {
     return page;
   }
   const page = await pageFor("me"); prepare(6);
+  const fullscreenChecks = [];
+  async function checkFullscreen(label) {
+    for (const viewport of [{ width: 1280, height: 720 }, { width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
+      await page.setViewportSize(viewport);
+      await page.getByRole("button", { name: "Plein écran", exact: true }).click();
+      await page.waitForTimeout(300);
+      assert.ok(await page.evaluate(() => Boolean(document.fullscreenElement)));
+      const geometry = await page.evaluate(() => {
+        const board = document.querySelector('.midnight-board'), felt = board.closest('.board-felt');
+        const rect = node => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y, right: box.right, bottom: box.bottom, width: box.width, height: box.height }; };
+        return { board: rect(board), felt: rect(felt), width: innerWidth, height: innerHeight, clientHeight: felt.clientHeight, scrollHeight: felt.scrollHeight,
+          elements: [...board.querySelectorAll('.midnight-player-zone, .midnight-market-floor, .midnight-primary-actions, .midnight-contract-hand')].filter(node => node.checkVisibility({ visibilityProperty: true })).map(rect) };
+      });
+      fullscreenChecks.push({ label, viewport, geometry });
+      assert.ok(geometry.scrollHeight <= geometry.clientHeight + 2, `${label} ${viewport.width}: board fits vertically ${JSON.stringify(geometry)}`);
+      assert.ok(geometry.elements.every(box => box.x >= -1 && box.right <= geometry.width + 1 && box.y >= -1 && box.bottom <= geometry.height + 1), `${label} ${viewport.width}: every seat, market and action visible`);
+      if (viewport.width === 1366) await page.screenshot({ path: path.join(output, `plein-ecran-${label}.png`) });
+      await page.getByRole("button", { name: "Réduire", exact: true }).click();
+    }
+    await page.setViewportSize({ width: 1366, height: 768 });
+  }
   const url = viewer => `${origin}/test/fixtures/table-interface.html?game=midnight-dice&viewer=${viewer}`;
   await page.goto(url("me")); await page.getByRole("button", { name: "Démarrer la partie", exact: true }).click();
   await page.locator(".midnight-board").waitFor();
@@ -75,6 +97,7 @@ try {
   assert.equal(await page.locator(".midnight-side-seats").last().locator(".midnight-player-zone").count(), 3);
   await until(async () => await page.locator(".midnight-card-flight").count() === 0, "initial visual deal");
   assert.match(await page.locator(".midnight-victory-rule").textContent(), /Condition secrète/);
+  await checkFullscreen('choix-six');
   await page.screenshot({ path: path.join(output, "choix-six-joueurs.png"), fullPage: true });
   const offered = await page.locator("[data-midnight-offer]").evaluateAll(nodes => nodes.map(node => node.dataset.midnightOffer));
   await page.locator("[data-midnight-offer]").first().locator(".midnight-offer-inspect").click();
@@ -144,25 +167,43 @@ try {
     const cards = await page.locator(".midnight-card").evaluateAll(nodes => nodes.filter(node => node.clientWidth).every(node => Math.abs(node.clientWidth / node.clientHeight - 88 / 63) < .03)); assert.ok(cards, `${name}: landscape card proportions`);
     await page.screenshot({ path: path.join(output, `plateau-${name}.png`), fullPage: true });
   }
-  await page.setViewportSize({ width: 1366, height: 768 }); await page.getByRole("button", { name: "Plein écran", exact: true }).click();
-  assert.ok(await page.evaluate(() => Boolean(document.fullscreenElement))); await page.screenshot({ path: path.join(output, "plein-ecran.png") });
-  await page.getByRole("button", { name: "Réduire", exact: true }).click();
+  await checkFullscreen('marche-six');
   const selected = room.state.secretContracts.me;
   while (room.state.round === 1) { const player = room.state.players[room.state.currentPlayerIndex]; applyMidnightDiceAction(room.state, player.id, { type: "draft", index: 0 }); }
-  broadcast(); await page.getByRole("button", { name: "Résultat de la manche", exact: true }).waitFor();
+  room.pacing = { id: 'first-round-results', kind: 'round-results', round: 1, startedAt: Date.now(), endsAt: Date.now() + 60000 };
+  broadcast(); await page.locator('.midnight-auto-results').waitFor();
   assert.equal(midnightContractOffers(room.state, "me").filter(id => offered.includes(id)).length, 3);
   assert.ok(!midnightContractOffers(room.state, "me").includes(selected));
-  await page.getByRole("button", { name: "Résultat de la manche", exact: true }).click();
   await page.locator(".midnight-round-results").waitFor();
   assert.equal(await page.locator(".midnight-results-dialog .midnight-round-results article").count(), 6);
   assert.match(await page.locator(".midnight-round-results").textContent(), /Prime du mandat.*Total de la manche/s);
   await page.screenshot({ path: path.join(output, "revelation.png"), fullPage: true });
-  await page.getByRole("button", { name: "Fermer", exact: true }).click();
+  await page.getByRole("button", { name: "Continuer", exact: true }).click();
+  await until(() => !room.pacing, 'continue keeps the existing ability to skip the round pause');
   await page.reload(); await page.locator(".midnight-board").waitFor();
   assert.equal(await page.locator(".midnight-card-flight").count(), 0, "reconnect restores without dealing again");
+  assert.equal(await page.locator('.midnight-auto-results').count(), 0, 'reconnect never replays an old round');
   assert.match(await page.locator(".midnight-victory-rule").textContent(), /Condition secrète/);
   while (!room.state.finished) { const player = room.state.players[room.state.currentPlayerIndex]; applyMidnightDiceAction(room.state, player.id, room.state.phase === "contract" ? midnightDiceBotAction(room.state, player) : { type: "draft", index: 0 }); }
-  broadcast(); await page.getByRole("dialog", { name: "Bilan de la partie", exact: true }).waitFor();
+  broadcast();
+  for (const round of [2, 3]) {
+    await page.getByRole('dialog', { name: `Résultat de la manche ${round}`, exact: true }).waitFor();
+    assert.equal(await page.locator('.classic-completion-modal').count(), 0, 'final recap follows round reviews');
+    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+  }
+  await page.getByRole("dialog", { name: "Bilan de la partie", exact: true }).waitFor();
+  const history = page.locator('.classic-completion-modal .midnight-match-history');
+  assert.equal(await history.getAttribute('open'), null, 'all-round recap is collapsed by default');
+  assert.match(await history.locator(':scope > summary').textContent(), /3/);
+  await page.screenshot({ path: path.join(output, 'bilan-replie.png') });
+  await history.locator(':scope > summary').click();
+  assert.equal(await history.locator('.midnight-history-round').count(), 3);
+  for (let index = 0; index < 3; index++) {
+    const round = history.locator('.midnight-history-round').nth(index);
+    await round.locator(':scope > summary').click();
+    assert.equal(await round.locator('article').count(), 6);
+    assert.match(await round.locator('article').first().textContent(), new RegExp(`Total de la manche : ${room.state.roundHistory[index].results[0].points}`));
+  }
   assert.ok(!/Condition secrète/.test(await page.locator(".classic-completion-modal .midnight-victory-rule").textContent()));
   assert.equal(payload("p1").state.resolvedOptions.victory, room.state.resolvedOptions.victory);
   assert.equal(spectatorState(room.state).resolvedOptions.victory, room.state.resolvedOptions.victory);
@@ -170,9 +211,13 @@ try {
   await opponent.close();
   prepare(8, true); broadcast(); await page.locator(".midnight-board").waitFor(); await until(async () => await page.locator(".midnight-player-zone").count() === 8, "eight-player compatibility");
   assert.equal(await page.locator(".midnight-side-seats").first().locator(".midnight-player-zone").count(), 3); assert.equal(await page.locator(".midnight-extra-seats .midnight-player-zone").count(), 2);
+  await checkFullscreen('choix-huit');
+  while (room.state.phase === 'contract') { const player = room.state.players[room.state.currentPlayerIndex]; applyMidnightDiceAction(room.state, player.id, midnightDiceBotAction(room.state, player)); }
+  broadcast(); await page.locator('.midnight-market-piece').first().waitFor();
+  await checkFullscreen('marche-huit');
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.screenshot({ path: path.join(output, "huit-joueurs.png"), fullPage: true });
   assert.deepEqual(errors, []);
-  fs.writeFileSync(path.join(output, "results.json"), JSON.stringify({ ok: true, output, actions, blocker: true, errors }, null, 2));
+  fs.writeFileSync(path.join(output, "results.json"), JSON.stringify({ ok: true, output, actions, fullscreenChecks, blocker: true, errors }, null, 2));
   console.log(JSON.stringify({ ok: true, output, actions: actions.length, blocker: true, privateMandates: true, deferredVictory: true }));
 } catch (failure) {
   const active = browser?.contexts()[0]?.pages()[0];

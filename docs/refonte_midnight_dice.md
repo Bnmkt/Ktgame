@@ -41,12 +41,33 @@ Les anciens états sans version, ou explicitement en version 1, gardent leurs gr
 | Paramètre | Par défaut | Autres choix |
 | --- | --- | --- |
 | Premier joueur | Joueur aléatoire | Premier siège ; Dés de minuit (option aléatoire) |
-| Condition de victoire | Score le plus haut | Score le plus bas ; le plus de mandats réussis ; Dés de minuit (option aléatoire) |
+| Condition de victoire | Score total | Champion des manches ; Chasseur de prestige ; Régularité ; Record de Minuit ; Chasseur de primes ; Dés de minuit (option aléatoire). Les deux variantes historiques restent disponibles. |
 | Révélation de la condition de victoire | Début de partie | Fin de partie, si la condition est aléatoire |
 
 « Dés de minuit » tire une option du réglage concerné **une seule fois côté serveur**, au lancement. Le résultat est persisté dans `resolvedOptions`. Une condition aléatoire révélée à la fin est remplacée par `null` dans les projections réseau tant que la partie n'est pas terminée, y compris pour les spectateurs. Le classement intermédiaire n'utilise pas cette condition cachée. Le plateau affiche « Condition secrète », puis la véritable condition dans les résultats finaux. Les critères connus sont affichés sur le plateau dès le départ.
 
-Le moteur calcule les gagnants, les classements classique et classé utilisent le même critère et les égalités exactes partagent la victoire. Les points cumulés restent affichés comme des points, y compris lorsqu'un score bas gagne.
+Les six conditions officielles sont comparées par `results.js`, partagé entre le moteur, le classement classique et le classement classé :
+
+- **Score total** : cumul des valeurs des dés et des primes ; mode par défaut.
+- **Champion des manches** : nombre de manches remportées. Tous les joueurs au meilleur score d'une manche reçoivent une victoire.
+- **Chasseur de prestige** : vecteur des réussites Diamant, Platine, Or, Argent puis Bronze, comparé dans cet ordre.
+- **Régularité** : scores de manche triés du plus faible au plus fort ; comparaison successive jusqu'à la première différence.
+- **Record de Minuit** : maximum d'une seule manche, sans autre départage.
+- **Chasseur de primes** : cumul des primes des mandats réussis, sans les valeurs des dés.
+
+Une égalité complète sur le critère reste une victoire partagée : ni les points cumulés ni l'ordre des sièges n'ajoutent de départage implicite. Le comparateur utilise les valeurs successives, sans encodage numérique qui perdrait de la précision. Le choix aléatoire porte sur les six conditions officielles. Les variantes historiques `lowest` et `contracts` restent proposées et les anciennes parties conservent leur option résolue.
+
+Le moteur calcule les gagnants, les classements classique et classé utilisent le même comparateur et les égalités exactes partagent la victoire. Les points cumulés restent affichés comme des points, y compris lorsqu'un score bas gagne.
+
+## Résultats de manche et plein écran
+
+`resolveRound` conserve les résultats publics dans `state.roundHistory` (numéro, joueur, nom, dés, mandat, palier, réussite, valeur des dés, prime, points et gagnants de la manche). `lastRound` reste présent pour les consommateurs existants. La sauvegarde habituelle des états inclut l'historique ; les projections Joueur et Spectateur ne dévoilent que les manches déjà terminées, jamais les futurs mandats.
+
+`RoomPage.commitRoom` détecte les nouveaux numéros de manche d'une même partie et ouvre une consultation automatique pour chacun, y compris le dernier. Plusieurs manches reçues en une mise à jour sont mises en file. Le serveur continue normalement : fermer un résultat ne déclenche aucune action de jeu. À la reconnexion, le premier instantané restaure les données sans rouvrir les anciens résultats. Le bilan final suit ces consultations et contient `MidnightMatchHistory`, un détail natif **fermé par défaut**, puis un sous-détail par manche. La consultation manuelle du dernier résultat reste disponible sur le plateau.
+
+Pour une ancienne sauvegarde sans historique, seule la dernière manche encore connue peut être récupérée ; les manches antérieures perdues ne sont pas inventées.
+
+En plein écran sur ordinateur, le plateau utilise la hauteur disponible et annule les anciennes règles de grille ciblant le marché. Lors du choix, les quatre mandats sont disposés au centre sur deux rangées, entre les places des joueurs. Les miniatures restent agrandissables. Les six ou huit places, les dés 3D et les actions sont conservés ; les panneaux secondaires gardent leur défilement indépendant.
 
 ## Confidentialité et composants
 
@@ -61,20 +82,22 @@ Le moteur calcule les gagnants, les classements classique et classé utilisent l
 
 ## Vérification
 
-Résultats : **86 tests ciblés réussis**, **16 tests API réussis** (un test historique de suspension de processus indisponible sous Windows), deux parcours navigateur réussis et build client/SSR validé.
+Résultats : **95 tests ciblés réussis**, **16 tests API réussis** (un test historique de suspension de processus indisponible sous Windows), parcours de table actualisé réussi avec Ghostery et build client/SSR validé. Le parcours de l’éditeur graphique reste celui de la livraison initiale, sans modification de cet éditeur ici.
 
 Captures : [plateau sur ordinateur](./previews/midnight-physical-20261115/1794703674507/plateau-laptop.png), [plateau sur mobile](./previews/midnight-physical-20261115/1794703674507/plateau-mobile.png), [mandat agrandi](./previews/midnight-physical-20261115/1794703674507/mandat-agrandi.png), [éditeur graphique](./previews/midnight-contracts-20261104/1794703769590/apparence-admin.png).
 
-Les tests de règles couvrent deux à huit joueurs, les catalogues de six et douze mandats, huit manches, les modes individuel et commun, l'épuisement des pioches, les budgets partagés de relance, les identités stables, les tirages uniques, les trois critères de victoire et les états historiques. Les tests API réels couvrent les rôles, les réglages graphiques invalides, la sauvegarde, le redémarrage et les projections privées. Les tests du runtime isolé des workers et du mode classé restent exécutés.
+Les tests de règles couvrent deux à huit joueurs, les catalogues de six et douze mandats, huit manches, les modes individuel et commun, l'épuisement des pioches, les budgets partagés de relance, les identités stables, les tirages uniques, les six conditions officielles, leurs départages exacts et les états historiques. Le cas Régularité avec huit manches vérifie aussi la précision au dernier départage. Les tests API réels couvrent les rôles, les réglages graphiques invalides, la sauvegarde, la conservation des résultats de manche après un redémarrage réel et les projections privées. Les tests du runtime isolé des workers et du mode classé restent exécutés.
 
-Les parcours navigateur utilisent Ghostery et deux vues privées reliées par Socket.IO au moteur réel. Ils vérifient la sélection/confirmation, le secret des mandats et de la victoire, les relances, la récupération, la pioche suivante, les révélations et le bilan final. Résolutions : 1366 × 768, 1920 × 1080, tablette 820 px, mobiles 390/320 px et plein écran. L'éditeur est exercé par création/modification/suppression, glisser-déposer du personnage, redimensionnement, réinitialisation, recto/verso et conservation de la logique du mandat.
+Les parcours navigateur utilisent Ghostery et deux vues privées reliées par Socket.IO au moteur réel. Ils vérifient la sélection/confirmation, le secret des mandats et de la victoire, les relances, la récupération, la pioche suivante, les révélations et le bilan final. Résolutions : 1366 × 768, 1920 × 1080, tablette 820 px et mobiles 390/320 px. Douze contrôles géométriques de plein écran couvrent 1280 × 720, 1366 × 768 et 1920 × 1080, six et huit joueurs, choix des mandats et marché actif : chaque place, main et action visible tient dans la hauteur et la largeur, sans défilement du plateau. Le parcours vérifie aussi le dé immobile avec son matériau équipé, la consultation hors tour, la file des résultats, le bouton Continuer, la reconnexion sans réouverture et le récapitulatif initialement fermé. L'éditeur est exercé par création/modification/suppression, glisser-déposer du personnage, redimensionnement, réinitialisation, recto/verso et conservation de la logique du mandat.
 
 Commandes principales :
 
 ```powershell
-node --test server/test/midnight-physical.test.js server/test/midnight-contracts.test.js server/test/midnight-catalog.test.js server/test/game-modules.test.js server/test/game-worker-kernel.test.js server/test/ranked-runtime.test.js client/test/classic-completion.test.js client/test/room-sounds.test.js
+node --test server/test/midnight-victory.test.js server/test/midnight-physical.test.js server/test/midnight-contracts.test.js server/test/midnight-catalog.test.js server/test/game-modules.test.js server/test/game-worker-kernel.test.js server/test/ranked-runtime.test.js client/test/classic-completion.test.js client/test/room-sounds.test.js
 node --test server/test/admin-contact-api.test.js
 node client/test/midnight-table.smoke.mjs
 node client/test/midnight-contract-editor.smoke.mjs
 npm --prefix client run build
 ```
+
+Captures de ce correctif : [plein écran à huit joueurs](./previews/midnight-physical-20261115/1794734064929/plein-ecran-marche-huit.png), [choix central des mandats](./previews/midnight-physical-20261115/1794734064929/plein-ecran-choix-huit.png), [bilan avec récapitulatif replié](./previews/midnight-physical-20261115/1794734064929/bilan-replie.png). Les mesures sont dans [results.json](./previews/midnight-physical-20261115/1794734064929/results.json).
