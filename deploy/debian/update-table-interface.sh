@@ -28,6 +28,13 @@ const allowed=new Set([...defaults,
  'client/src/features/games/midnightDice/model.js','client/src/features/games/midnightDice/contracts.js',
  'client/src/components/admin/GameEditor.jsx','client/src/components/admin/MidnightContractsEditor.jsx',
  'client/src/components/admin/midnight-contract-editor.css','client/src/components/room/RoomPanels.jsx',
+ 'client/src/components/admin/MidnightCardDesignEditor.jsx','client/src/components/admin/midnight-card-design-editor.css',
+ 'client/src/components/game/MidnightTable.jsx','client/src/components/game/midnight-table.css',
+ 'client/src/components/game/MidnightContractCard.jsx','client/src/components/game/midnight-contract-card.css',
+ 'client/src/features/games/midnightDice/appearance.js','client/src/features/games/config.js',
+ 'client/src/features/games/classic-completion.js','server/src/games/modifiers.js','server/src/services/ranked.js',
+ 'server/src/games/engines.js',
+ 'client/public/midnight-dice/mandat-front.svg','client/public/midnight-dice/mandat-back.svg',
  'client/src/config/site.js','server/src/games/engines/midnight-dice.js',
  'server/src/games/spectator-state.js','server/src/services/room-runtime.js','server/src/services/result-achievements.js',
  'server/src/games/engines/president.js',
@@ -96,7 +103,7 @@ function snapshot(directory) {
     if (entry.isDirectory()) walk(filename); else result[path.relative(directory,filename)] = hash(filename);
   }}
   walk(directory);
-  for (const relative of files.filter(file=>file.startsWith('server/'))) {
+  for (const relative of files.filter(file=>!file.startsWith('client/src/'))) {
     const live=path.join('/opt/ktga',relative);
     result['/'+relative]=fs.existsSync(live)?hash(live):null;
   }
@@ -138,7 +145,7 @@ function walk(folder) { for(const entry of fs.readdirSync(folder,{withFileTypes:
 }}
 walk('/opt/ktga/client/src');
 const manifest=JSON.parse(fs.readFileSync(path.join(process.argv[2],'source-manifest.json')));
-for(const relative of (manifest.files??[]).filter(file=>file.startsWith('server/'))) {
+for(const relative of (manifest.files??[]).filter(file=>!file.startsWith('client/src/'))) {
  const live=path.join('/opt/ktga',relative);
  current['/'+relative]=fs.existsSync(live)?crypto.createHash('sha256').update(fs.readFileSync(live,'utf8').replace(/\r\n/g,'\n')).digest('hex'):null;
 }
@@ -146,7 +153,9 @@ if(JSON.stringify(previous)!==JSON.stringify(current)) throw Error('Live source 
 JS
 backup=/var/backups/ktga/tables-$(date -u +%Y%m%dT%H%M%SZ)-$$
 install -d -m 0700 "$backup"
-tar -czf "$backup/code.tar.gz" -C /opt/ktga client/src client/dist-ssr server/src
+public_backup=()
+if [[ -d /opt/ktga/client/public/midnight-dice ]]; then public_backup+=(client/public/midnight-dice); fi
+tar -czf "$backup/code.tar.gz" -C /opt/ktga client/src client/dist-ssr server/src "${public_backup[@]}"
 tar -czf "$backup/frontend.tar.gz" -C /var/www/ktga .
 stopped=false
 changed=false

@@ -1,3 +1,4 @@
+import { MidnightRoundResults, MidnightVictory } from "../../components/game/MidnightTable.jsx";
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, ChevronsRight, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import { Dialog } from "../../components/common/Dialog.jsx";
@@ -10,7 +11,7 @@ import "../../components/room/completion-dialog.css";
 
 const headings = { promotion: "Promotion !", demotion: "Relégation", reveal: "Ton rang est révélé", placement: "Partie de placement terminée", gain: "Tu progresses", loss: "La prochaine sera la bonne", unchanged: "Partie terminée" };
 
-export function RankedCompletion({ result, matchId, userId, gameId }) {
+export function RankedCompletion({ result, matchId, userId, gameId, state }) {
   const { t, region } = useLocale();
   const [closed, setClosed] = useState(false);
   const [stage, setStage] = useState("intro");
@@ -61,6 +62,7 @@ export function RankedCompletion({ result, matchId, userId, gameId }) {
     <div className="ranked-recap-progress" role="progressbar" aria-label={t("Ta progression classée")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}><i key={revealed ? "after" : "before"} style={{ width: `${percent}%` }}/></div>
     {animation.ranked ? <div className="ranked-recap-rating"><span>{t("Ton Elo")}<strong>{Number(rating.toFixed(2)).toLocaleString(region)}</strong></span><b className={result.delta < 0 ? "ranked-loss" : "ranked-gain"}>{result.delta > 0 ? "+" : ""}{Number(result.delta.toFixed(2)).toLocaleString(region)} {t("Elo")}</b></div> : result.placement && <p className="ranked-recap-placement"><Trophy size={18}/>{t("{done} / {total} placements", { done: result.placement.games, total: result.placement.required })}</p>}
     </div>
+    {gameId === "midnight-dice" && state && <><MidnightVictory state={state}/><MidnightRoundResults state={state}/></>}
     <footer>{stage !== "settled" && <button type="button" className="secondary" onClick={() => { timers.current.forEach(clearTimeout); setStage("settled"); }}><ChevronsRight size={18}/>{t("Afficher le résultat")}</button>}<button type="button" onClick={dismiss}>{t("Continuer")}<ArrowRight size={17}/></button></footer>
   </Dialog>;
 }

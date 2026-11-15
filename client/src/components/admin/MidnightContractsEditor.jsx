@@ -1,3 +1,4 @@
+import { MidnightArtworkEditor } from "./MidnightCardDesignEditor.jsx";
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useLocale } from "../../locales/LocaleProvider.jsx";
@@ -8,7 +9,7 @@ import "./midnight-contract-editor.css";
 
 const newRule = type => type === "ordered" || type === "unordered" ? { type, values: [4, 2, 1] } : type === "sum" ? { type, comparison: "eq", value: 10 } : { type: "special", condition: "sum-two" };
 const numberValue = event => event.target.value === "" ? "" : Number(event.target.value);
-export function MidnightContractsEditor({ value, onChange }) {
+export function MidnightContractsEditor({ value, onChange, design }) {
   const { t } = useLocale();
   const entries = value ?? defaultMidnightContracts;
   const [selectedId, setSelectedId] = useState(entries[0]?.id), [testDice, setTestDice] = useState([1, 2, 3]);
@@ -50,6 +51,7 @@ export function MidnightContractsEditor({ value, onChange }) {
           {rule.condition === "range" && <div className="midnight-config-grid">{["minimum", "maximum"].map(field => <label key={field}>{t(field === "minimum" ? "Valeur minimum du dé" : "Valeur maximum du dé")}<input required aria-label={t(field === "minimum" ? "Valeur minimum du dé" : "Valeur maximum du dé")} type="number" min={1} max={6} value={rule[field]} onChange={event => changeRule({ ...rule, [field]: numberValue(event) })}/></label>)}</div>}</>}
         <label>{t("Texte d’aide facultatif")}<input aria-label={t("Texte d’aide facultatif")} maxLength={200} placeholder={description} value={selected.hint ?? ""} onChange={event => change({ hint: event.target.value })}/><small>{t("Laisse vide pour décrire automatiquement la condition.")}</small></label>
         <div className="midnight-config-preview" style={{ "--contract-accent": tier.accent }}><h4>{t("Tester une combinaison")}</h4><p>{description}</p>{diceFields(testDice, "Dé test {number}", setTestDice)}<DiceThrowTray compact label={t("Aperçu des dés")} caption={t(tier.label)}>{testDice.map((die, index) => <Die key={index} value={die} animate={false}/>)}</DiceThrowTray>{previewError ? <p role="alert" className="error">{t(previewError)}</p> : <p role="status"><strong>{t(preview?.achieved ? "Mandat réussi" : "Mandat non réalisé")}</strong> · {preview?.base} + {preview?.bonus} = {preview?.points} {t("points")}</p>}</div>
+        <MidnightArtworkEditor definition={selected} design={design} onChange={artwork => change({ artwork })}/>
       </div>}
     </div>
   </section>;

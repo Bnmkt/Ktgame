@@ -1,3 +1,4 @@
+import { midnightRankingScore } from "../../../client/src/features/games/midnightDice/contracts.js";
 import { games } from "../games/shared.js";
 import { normalizeGameModifiers } from "../games/modifiers.js";
 import { totalYahtzee, YAHTZEE_CATEGORIES } from "../games/engines/yahtzee.js";
@@ -209,7 +210,7 @@ export function competitivePositions(room) {
     let score;
     if (room.gameId === "belote") score=state.teamScores[player.team] ?? 0;
     else if (room.gameId === "yahtzee") score=totalYahtzee(state.scores[player.id]);
-    else if (room.gameId === "midnight-dice") score=state.scores[player.id] ?? 0;
+    else if (room.gameId === "midnight-dice") score=midnightRankingScore(state,player.id);
     else if (room.gameId === "president") score=-(state.finishedOrder.indexOf(player.id) < 0 ? roster.length : state.finishedOrder.indexOf(player.id));
     else if (room.gameId === "liars-dice") score=(state.diceCounts[player.id] ?? 0)>0 ? roster.length : (state.eliminationOrder ?? []).indexOf(player.id);
     else if (room.gameId === "texas-holdem") score=(state.stacks[player.id] ?? 0)>0 ? roster.length : (state.eliminationGroups ?? []).findIndex((group)=>group.includes(player.id));

@@ -1,3 +1,4 @@
+import { MidnightRoundResults } from "../components/game/MidnightTable.jsx";
 import { useLocale } from "../locales/LocaleProvider.jsx";
 import { ModalBackdrop } from "../components/common/ModalBackdrop.jsx";
 import { ConfirmDialog } from "../components/common/ConfirmAction.jsx";
@@ -101,7 +102,7 @@ function TurnPacingBanner({ pacing, players, canSkip, onSkip }) {
   return <section className={`room-pacing-banner ${thinking ? "thinking" : "turn-ended"}`} aria-live="polite"><div className="room-pacing-icon">{botTurn ? <Bot size={20} /> : <Clock3 size={20} />}</div><div><small>{thinking ? localeText("Réflexion de l’IA") : botTurn ? localeText("Tour de l’IA terminé") : localeText("Tour terminé")}</small><strong>{actor ? <DisplayName user={actor} /> : pacing.actorName ?? (botTurn ? localeText("L’IA") : localeText("Le joueur"))} {thinking ? localeText("prépare son coup") : localeText("laisse la table visible")}</strong></div><span className="room-pacing-countdown"><Clock3 size={16} /><PacingCountdown endsAt={pacing.endsAt} />{" " + localeText("s")}</span>{canSkip && <button type="button" className="secondary" onClick={onSkip}><FastForward size={17} />{" " + localeText("Passer l’attente")}</button>}</section>;
 }
 
-function RoundResultsOverlay({ pacing, players, canSkip, isOwner, onSkip, onDismiss, ranked }) {
+function RoundResultsOverlay({ state, pacing, players, canSkip, isOwner, onSkip, onDismiss, ranked }) {
   const { t: localeText } = useLocale();
   if (pacing?.kind !== "round-results") return null;
   return <div className="modal-backdrop round-results-layer" role="presentation">
@@ -109,6 +110,7 @@ function RoundResultsOverlay({ pacing, players, canSkip, isOwner, onSkip, onDism
       <header><div className="round-results-emblem"><Trophy size={25}/></div><div><span className="eyebrow">{pacing.final ? localeText("Partie terminée") : localeText("Manche {value0}", { value0: pacing.round })}</span><h2 id="round-results-title">{pacing.final ? localeText("Résultats finaux") : localeText("Résultats de la manche")}</h2></div><button type="button" className="secondary icon-toggle" aria-label={canSkip ? localeText("Fermer les résultats et continuer") : localeText("Masquer les résultats")} title={canSkip ? localeText("Continuer la partie") : localeText("Masquer pour moi")} onClick={canSkip ? onSkip : onDismiss}><X size={18}/></button></header>
       <div className="round-results-timer"><span>{pacing.final ? localeText("Fin de l’affichage") : localeText("Reprise automatique")}</span><strong><PacingCountdown endsAt={pacing.endsAt}/>{" " + localeText("secondes")}</strong><i><b style={{ animationDuration: `${Math.max(1, pacing.endsAt - pacing.startedAt)}ms`, animationDelay: `${Math.min(0, pacing.startedAt - Date.now())}ms` }}/></i></div>
       {pacing.final && <RankedResult autoScroll={false} result={ranked?.results?.find((row)=>row.delta!==undefined)}/>}
+      {state?.gameId === "midnight-dice" && <MidnightRoundResults state={state}/>}
       <ol className="round-results-list">{(pacing.results ?? []).map((result) => {
         const player=players.find((entry)=>entry.id===result.id) ?? result;
         return <li className={result.winner ? "winner" : ""} key={result.id}><span>{result.rank}</span><DisplayName user={player}/><strong>{result.scoreLabel ?? <CompactNumber value={result.score} label={localeText("Score exact de {value0}", { value0: result.pseudo })}/>}</strong>{result.winner && <Trophy size={17}/>}</li>;
@@ -194,6 +196,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
       (!previous.state || previous.activityMatchId && payload.activityMatchId !== previous.activityMatchId || payload.gameId === "belote" && previous.state.round !== payload.state.round)) {
       setTableDealKey(`${payload.code}:${payload.activityMatchId ?? "game"}:${payload.state.round ?? Date.now()}`);
     }
+    if (animateStart && payload.gameId === "midnight-dice" && payload.state && !payload.state.finished && previous?.code === payload.code && (!previous.state || previous.activityMatchId && payload.activityMatchId !== previous.activityMatchId)) setTableDealKey(`${payload.code}:${payload.activityMatchId}`);
     if (animateStart && payload.gameId === "president" && payload.state && !payload.state.finished && previous?.code === payload.code &&
       (!previous.state || previous.activityMatchId && payload.activityMatchId !== previous.activityMatchId)) {
       setPresidentDealKey(payload.code + ":" + (payload.activityMatchId ?? Date.now()));
@@ -579,7 +582,7 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
 
               {!state.finished && room.gameId === "shut-the-box" && <ShutTheBoxBoard state={state} user={user} onAction={action} rollLocked={diceRollLocked} />}
 
-              {!state.finished && room.gameId === "midnight-dice" && <MidnightDiceBoard state={state} user={user} onAction={action} />}
+              {room.gameId === "midnight-dice" && <MidnightDiceBoard state={state} user={user} onAction={action} room={room} canAct={isMyTurn} dealKey={tableDealKey} />}
 
               {!state.finished && room.gameId === "velvet-ruse" && <VelvetRuseBoard state={state} user={user} onAction={action} />}
 
@@ -644,8 +647,8 @@ export function Room({ code, user, setUser, onBack, onAchievements, onExcluded, 
         <GameModifiersPanel gameId={room.gameId} value={gameModifiers} isOwner={isOwner} onChange={setGameModifiers} showFooter={false} />
       </div><div className="room-settings-modal-footer"><span><Swords size={16} />{" " + localeText("Ces paramètres seront verrouillés au lancement.")}</span><div className="actions">{isOwner && <button onClick={applyRoomSettings}><Save size={17} />{" " + localeText("Appliquer les paramètres")}</button>}<button className="secondary" onClick={cancelRoomSettings}>{isOwner ? localeText("Annuler") : localeText("Fermer")}</button></div></div></div></ModalBackdrop>}
       {rulesOpen && <RulesModal gameId={room.gameId} onClose={() => setRulesOpen(false)} />}
-      {pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && !(pacing.final && (!room.ranked || room.ranked.results?.some((row)=>row.userId===user.id))) && <RoundResultsOverlay pacing={pacing} players={room.players} ranked={room.ranked} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
-      {room.ranked?.results?.find((row)=>row.userId===user.id) && <RankedCompletion key={`${room.ranked.matchId}:${user.id}`} matchId={room.ranked.matchId} result={room.ranked.results.find((row)=>row.userId===user.id)} userId={user.id} gameId={room.gameId}/>}
+      {pacing?.kind === "round-results" && pacing.id !== dismissedPacingId && !(pacing.final && (!room.ranked || room.ranked.results?.some((row)=>row.userId===user.id))) && <RoundResultsOverlay state={state} pacing={pacing} players={room.players} ranked={room.ranked} canSkip={isSeatedPlayer} isOwner={isOwner} onSkip={skipPacing} onDismiss={() => setDismissedPacingId(pacing.id)} />}
+      {room.ranked?.results?.find((row)=>row.userId===user.id) && <RankedCompletion key={`${room.ranked.matchId}:${user.id}`} matchId={room.ranked.matchId} result={room.ranked.results.find((row)=>row.userId===user.id)} userId={user.id} gameId={room.gameId} state={state}/>}
     </main>
   );
 }

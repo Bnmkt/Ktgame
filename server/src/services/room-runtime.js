@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createGameState, tickPokerState } from "../games/engines.js";
 import { normalizeGameModifiers } from "../games/modifiers.js";
 import { midnightDiceBotAction, resumeMidnightAfterDeparture } from "../games/engines/midnight-dice.js";
+import { midnightRankingScore, publicMidnightOptions } from "../../../client/src/features/games/midnightDice/contracts.js";
 import { velvetRuseBotAction } from "../games/engines/velvet-ruse.js";
 import { yahtzeeBotAction } from "../games/engines/yahtzee.js";
 import { fourTwentyOneBotAction } from "../games/engines/four-twenty-one.js";
@@ -124,7 +125,7 @@ export function createRoomRuntime(dependencies) {
       isBot: Boolean(player.isBot),
       score: scoreForRanking(room.state, player),
       winner: room.state?.winners?.includes(player.id) ?? false
-    })).sort((a, b) => Number(b.winner) - Number(a.winner) || b.score - a.score);
+    })).sort((a, b) => Number(b.winner) - Number(a.winner) || (room.gameId === "midnight-dice" && publicMidnightOptions(room.state)?.victory ? midnightRankingScore(room.state, b.id) - midnightRankingScore(room.state, a.id) : b.score - a.score));
   }
 
   function removePlayerFromRoomState(room, playerId) {
@@ -145,7 +146,7 @@ export function createRoomRuntime(dependencies) {
       if (removedIndex < state.currentPlayerIndex) state.currentPlayerIndex -= 1;
       if (state.currentPlayerIndex >= state.players.length) state.currentPlayerIndex = 0;
     }
-    for (const key of ["scores", "hands", "bets", "piles", "boxes", "diceCounts", "drawnCards", "pendingChoices", "botThinking", "cardCounts", "trays", "secretContracts", "privateContractOffers", "usedContracts", "discardRemaining", "prestige", "stats"]) {
+    for (const key of ["scores", "hands", "bets", "piles", "boxes", "diceCounts", "drawnCards", "pendingChoices", "botThinking", "cardCounts", "trays", "secretContracts", "privateContractOffers", "contractDrawPiles", "usedContracts", "discardRemaining", "prestige", "stats"]) {
       if (state[key]) delete state[key][playerId];
     }
     if (state.deckKnowledge) {
@@ -455,7 +456,7 @@ export function createRoomRuntime(dependencies) {
     room.gameModifiers = normalizeGameModifiers(room.gameId, room.gameModifiers);
     if (room.gameId === "belote") room.beloteSeats = beloteSeats(room);
     const seatedPlayers = room.gameId === "belote" ? room.beloteSeats.map((id) => room.players.find((player) => player.id === id)) : room.players;
-    room.state = createGameState(room.gameId, seatedPlayers, { buyIn: room.stake, bigBlind: room.pokerBlinds?.bigBlind, maximumBet: room.pokerBlinds?.maximumBet, turnDurationMs: (room.pokerTurnSeconds ?? settings.pokerTurnSeconds) * 1000, battleModifiers: room.battleModifiers, gameModifiers: room.gameModifiers, midnightContracts: game.midnightContracts });
+    room.state = createGameState(room.gameId, seatedPlayers, { buyIn: room.stake, bigBlind: room.pokerBlinds?.bigBlind, maximumBet: room.pokerBlinds?.maximumBet, turnDurationMs: (room.pokerTurnSeconds ?? settings.pokerTurnSeconds) * 1000, battleModifiers: room.battleModifiers, gameModifiers: room.gameModifiers, midnightContracts: game.midnightContracts, midnightCardDesign: game.midnightCardDesign });
     if (room.state.gameId === "bataille") room.state.resolutionDurationMs = room.timing.turnEndDelayMs;
     room.activityMatchId = randomUUID();
     runBotTurns(room, db);

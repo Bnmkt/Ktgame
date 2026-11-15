@@ -21,7 +21,7 @@ La réussite exige trois dés valides de 1 à 6. La somme rapporte toujours ses 
 
 Le palier est réglable pour chaque mandat : Bronze (+18), Argent (+30), Or (+45), Platine (+65), Diamant (+100). Le formulaire affiche les primes existantes ; cette livraison ajoute le choix du palier, sans créer de nouvelles catégories de paliers.
 
-Le catalogue contient de 6 à 24 mandats. Le minimum conserve assez de groupes distincts de quatre pour huit joueurs. Le maximum borne le coût du calcul d'équilibrage. Les propositions sont calculées avec les règles et paliers configurés, et les mandats consommés restent retirés pendant leur rotation.
+Le catalogue contient de 6 à 24 mandats. Le minimum conserve assez de groupes distincts de quatre pour huit joueurs. Le maximum borne le coût du calcul d'équilibrage. Les propositions initiales utilisent les règles et paliers configurés. Depuis la refonte du 15 novembre, les nouvelles parties conservent les trois cartes non jouées et piochent un nouveau mandat après chaque manche. Les anciennes parties gardent leur rotation historique. Voir [la refonte Midnight Dice](./refonte_midnight_dice.md) pour le mode commun, les variantes de victoire et la personnalisation graphique.
 
 ## Sauvegarde et parties en cours
 

@@ -69,9 +69,10 @@ export function applyAction(state, actorId, action) {
   const log = result.logs?.at(-1);
   if (log && log.id !== previousLog) {
     const dice = action.type === "roll" || result.gameId === "liars-dice" && result.round !== round ||
-      result.gameId === "midnight-dice" && (result.market?.length > (marketSize ?? 0) || action.type === "discard");
+      result.gameId === "midnight-dice" && (result.market?.length > (marketSize ?? 0) || action.type === "discard-market");
     const card = ["draw", "hit", "double"].includes(action.type) ||
       result.gameId === "blackjack" && action.type === "bet" ||
+      result.gameId === "midnight-dice" && action.type === "choose-contract" ||
       ["belote", "president", "golf-solitaire", "accordion", "velvet-ruse"].includes(result.gameId) && ["play", "move"].includes(action.type);
     if (dice || card) log.cue = dice ? "dice" : "card";
   }

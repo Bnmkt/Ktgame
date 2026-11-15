@@ -1,3 +1,4 @@
+import { normalizeMidnightArtwork } from "./appearance.js";
 // Shared, declarative contract rules. Used by the server, previews and administration.
 export const midnightContractTiers = {
   bronze: { label: "Bronze", bonus: 18, accent: "#c7834a", order: 0 },
@@ -34,6 +35,18 @@ export const defaultMidnightContracts = [
 ];
 export const midnightContractInfo = Object.fromEntries(defaultMidnightContracts.map(contract => [contract.id, contract]));
 export const midnightCatalogFor = state => state?.contractCatalog ?? midnightContractInfo;
+export const midnightVictoryLabels = { highest: "Score le plus haut", lowest: "Score le plus bas", contracts: "Le plus de mandats réussis" };
+export function publicMidnightOptions(state) {
+  if (!state.resolvedOptions) return undefined;
+  const hidden = state.modifiers?.victory === "midnight" && state.modifiers?.victoryReveal === "end" && !state.finished;
+  return { ...state.resolvedOptions, ...(hidden ? { victory: null } : {}) };
+}
+export function midnightRankingScore(state, playerId) {
+  const criterion = state.resolvedOptions?.victory ?? "highest";
+  if (criterion === "contracts") return state.stats?.[playerId]?.contractsCompleted ?? 0;
+  const points = state.scores?.[playerId] ?? 0;
+  return criterion === "lowest" ? -points : points;
+}
 
 export function evaluateMidnightDefinition(definition, dice = []) {
   const valid = Array.isArray(dice) && dice.length <= 3 && dice.every(value => Number.isInteger(value) && value >= 1 && value <= 6);
@@ -101,6 +114,14 @@ export function midnightExample(definition) {
   throw new Error("Cette condition ne peut être obtenue avec trois dés à six faces.");
 }
 
+export function midnightExamples(definition) {
+  const first = midnightExample(definition), candidates = [];
+  for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) for (let c = 1; c <= 6; c++) {
+    if (evaluateMidnightDefinition(definition, [a, b, c]).achieved && [a, b, c].join() !== first.join()) candidates.push([a, b, c]);
+  }
+  return [first, candidates[Math.floor(candidates.length / 2)] ?? first, candidates.at(-1) ?? first];
+}
+
 export function normalizeMidnightContracts(input = defaultMidnightContracts) {
   if (!Array.isArray(input) || input.length < midnightCatalogLimits.minimum || input.length > midnightCatalogLimits.maximum) throw new Error(`Le catalogue doit contenir entre ${midnightCatalogLimits.minimum} et ${midnightCatalogLimits.maximum} mandats.`);
   const ids = new Set();
@@ -112,6 +133,7 @@ export function normalizeMidnightContracts(input = defaultMidnightContracts) {
     const rule = normalizeMidnightRule(entry.rule), hint = typeof entry.hint === "string" ? entry.hint.trim() : "";
     if (hint.length > 200) throw new Error("La description du mandat ne peut dépasser 200 caractères.");
     const definition = { id: entry.id, label: entry.label.trim(), hint: hint || midnightRuleDescription(rule), tier: entry.tier, rule };
+    if (entry.artwork !== undefined) definition.artwork = normalizeMidnightArtwork(entry.artwork);
     definition.example = midnightExample({ ...definition, example: entry.example });
     return definition;
   });

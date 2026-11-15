@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="630" viewBox="0 0 880 630">
+ <defs><radialGradient id="night"><stop stop-color="#46558c"/><stop offset="1" stop-color="#131c3e"/></radialGradient><linearGradient id="gold"><stop stop-color="#ffe0a0"/><stop offset="1" stop-color="#c78936"/></linearGradient></defs>
+ <rect width="880" height="630" rx="56" fill="#151e40"/><rect x="8" y="8" width="864" height="614" rx="51" fill="url(#night)"/>
+ <path d="M71 34h738q0 35 35 35v481q-35 0-35 35H71q0-35-35-35V69q35 0 35-35z" fill="none" stroke="#edb45f" stroke-width="3" stroke-dasharray="7 6"/>
+ <circle cx="700" cy="398" r="134" fill="#ffdfa1"/>
+ <path d="M0 490h82v-47h55v-24h23v-39h19v39h16v-39h18v39h36v-18h118l55 55h72v-83l43-20 10-99 11 99 41 20v161h50v-51h61v-31h42v-26h14v-40h16v40h16v-40h16v40h38v-38h28v-34h14v34h37v220H0z" fill="#101834"/>
+ <g fill="#f5bf67"><rect x="238" y="452" width="18" height="60" rx="8"/><rect x="280" y="452" width="18" height="60" rx="8"/><rect x="322" y="452" width="18" height="60" rx="8"/><rect x="540" y="422" width="20" height="54" rx="7"/></g>
+ <g fill="url(#gold)"><path d="M142 257l10 28 30 3-23 19 6 29-25-16-25 15 7-28-22-20 31-2zM717 148l4 13 14 4-14 4-4 14-4-14-13-4 13-4zM399 71a13 13 0 1 0 1 24 14 14 0 0 1-1-24"/>
+ <text x="440" y="201" text-anchor="middle" font-family="Georgia,serif" font-size="143" font-style="italic">Midnight</text><text x="440" y="324" text-anchor="middle" font-family="Georgia,serif" font-size="143" font-style="italic">Dice</text><path d="M174 218q187-42 477 4" fill="none" stroke="#eab258" stroke-width="5"/></g>
+</svg>

@@ -1,0 +1,9 @@
+.midnight-design-settings, .midnight-artwork-settings { display: grid; gap: 14px; min-width: 0; }
+.midnight-design-settings > header p, .midnight-artwork-settings > p { color: #ccd3c6; font-size: 12px; line-height: 1.5; }
+.midnight-design-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.midnight-design-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-block: 8px; }
+.midnight-design-actions button { min-height: 34px; padding: 6px 9px; font-size: 12px; }
+.midnight-design-preview { width: min(100%, 560px); min-width: 0; justify-self: center; }
+.midnight-artwork-settings > summary { cursor: pointer; color: #e9c875; padding-block: 10px; }
+.midnight-design-settings [data-midnight-copy-fits="false"], .midnight-artwork-settings [data-midnight-copy-fits="false"] { outline: 2px dashed #e79582; }
+@media (max-width: 600px) { .midnight-design-grid { grid-template-columns: 1fr; } }

@@ -53,7 +53,10 @@ export function normalizeGameModifiers(gameId, modifiers = {}) {
   if (gameId === "midnight-dice") return {
     rounds: integer("rounds", 5, 3, 8),
     marketExtra: integer("marketExtra", 2, 0, 6),
-    discardsPerRound: integer("discardsPerRound", 1, 0, 3),
+    discardsPerRound: 2,
+    firstPlayer: ["random", "first-seat", "midnight"].includes(modifiers.firstPlayer) ? modifiers.firstPlayer : "random",
+    victory: ["highest", "lowest", "contracts", "midnight"].includes(modifiers.victory) ? modifiers.victory : "highest",
+    victoryReveal: modifiers.victoryReveal === "end" ? "end" : "start",
     individualContracts: modifiers.individualContracts !== false,
     uniqueContracts: modifiers.uniqueContracts !== false
   };

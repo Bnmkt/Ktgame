@@ -1,3 +1,4 @@
+import { publicMidnightOptions } from "../../../client/src/features/games/midnightDice/contracts.js";
 import { publicBeloteState } from "./engines/belote.js";
 
 const fields = {
@@ -7,7 +8,7 @@ const fields = {
   farkle: ["dice", "turnScore", "remainingDice", "scores", "bust", "lastRoll", "target", "lastDiceByPlayer"],
   "shut-the-box": ["dice", "boxes", "scores", "lastTotal", "lastDiceByPlayer"],
   "liars-dice": ["diceCounts", "bid", "lastBidderId", "lastReveal"],
-  "midnight-dice": ["market", "trays", "scores", "contractOffers", "contractCatalog", "lastRound", "discardTray"],
+  "midnight-dice": ["market", "marketIds", "marketRollKeys", "trays", "scores", "contractOffers", "contractCatalog", "lastRound", "discardTray", "startingPlayerIndex", "discardRemaining", "rulesVersion", "revealedContracts", "cardDesign", "resolvedOptions"],
   "velvet-ruse": ["edict", "prestige", "lastChallenge", "lastAudit"],
   president: ["pile", "currentSet", "passes", "finishedOrder", "revolution"],
   blackjack: ["bets", "completedPlayerIds", "foldedPlayerIds", "shownPlayerIds", "payouts"],
@@ -37,6 +38,10 @@ export function spectatorState(state) {
   }
   if (state.gameId === "texas-holdem") for (const id of state.shownPlayerIds ?? []) result.hands[id] = (state.hands[id] ?? []).map(visibleCard);
   if (state.gameId === "belote") result.announcements = publicBeloteState(state, "").announcements;
+  if (state.gameId === "midnight-dice") {
+    result.resolvedOptions = publicMidnightOptions(state);
+    result.stats = Object.fromEntries(state.players.map(player => [player.id, { contractsCompleted: state.stats?.[player.id]?.contractsCompleted ?? 0 }]));
+  }
   if (state.gameId === "midnight-dice" && state.modifiers?.individualContracts) result.contractOffers = [];
   if (state.gameId === "bataille") {
     result.battleLanes = (state.battleLanes ?? []).map((lane) => ({ id: lane.id, tie: lane.tie, cards: lane.cards.map((card) => ({ ownerId: card.ownerId, ...(card.revealedToAll ? visibleCard(card) : { hidden: true }) })) }));

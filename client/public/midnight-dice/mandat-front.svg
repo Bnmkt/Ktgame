@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="630" viewBox="0 0 880 630">
+ <defs><radialGradient id="night"><stop stop-color="#3d4c85"/><stop offset="1" stop-color="#121a3b"/></radialGradient><linearGradient id="gold"><stop stop-color="#bc7e31"/><stop offset=".48" stop-color="#f8d08a"/><stop offset="1" stop-color="#c58a3c"/></linearGradient></defs>
+ <rect width="880" height="630" rx="54" fill="#171c40"/><rect x="12" y="10" width="856" height="608" rx="49" fill="url(#night)" stroke="#e5aa4f" stroke-width="4"/>
+ <circle cx="124" cy="250" r="91" fill="#ffe0a0"/><path d="M148 61a45 45 0 1 0 0 86 47 47 0 0 1 0-86" fill="url(#gold)"/>
+ <path d="M0 335V265h37v-35h13v35h14v-32h12v32h19v70h41v-37h58v-69l24-54 24 54v95h44v-41h17v-15h19v15h18v-15h19v15h18v41h61v57H0" fill="#101833"/>
+ <path d="M801 47l8 25 25 8-25 8-8 25-8-25-25-8 25-8zM35 181l3 10 10 3-10 3-3 10-3-10-10-3 10-3z" fill="url(#gold)"/>
+ <path d="M208 63h478q17 0 29 13h11q32 0 32 38t-32 38h-11q-12 13-29 13H477l-37 18-37-18H208q-17 0-29-13h-11q-32 0-32-38t32-38h11q12-13 29-13z" fill="url(#gold)" stroke="#eba94d" stroke-width="5"/>
+ <path d="M208 72h478q17 0 29 13h11q23 0 23 29t-23 29h-11q-12 13-29 13H473l-33 16-33-16H208q-17 0-29-13h-11q-23 0-23-29t23-29h11q12-13 29-13z" fill="none" stroke="#25304d" stroke-width="3"/>
+ <rect x="197" y="171" width="230" height="51" rx="26" fill="none" stroke="#e4ac50" stroke-width="4"/><rect x="459" y="171" width="230" height="51" rx="26" fill="none" stroke="#e4ac50" stroke-width="4"/>
+ <path d="M290 300h511q0 12 12 12v76q-12 0-12 12H290q0-12-12-12v-76q12 0 12-12z" fill="url(#gold)" stroke="#edb65f" stroke-width="5"/><path d="M294 307h502q0 10 10 10v65q-10 0-10 10H294q0-10-10-10v-65q10 0 10-10z" fill="none" stroke="#4f3b28" stroke-width="2"/>
+ <path d="M262 459h165m227 0h170M262 277h164m229 0h166" stroke="#e3ae57" stroke-width="2"/>
+ <g fill="#ddb16b"><rect x="271" y="478" width="153" height="77" rx="17"/><rect x="462" y="478" width="153" height="77" rx="17"/><rect x="654" y="478" width="153" height="77" rx="17"/></g>
+</svg>

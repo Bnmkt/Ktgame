@@ -28,7 +28,10 @@ test("les modificateurs sont bornés et complétés par leurs valeurs par défau
   assert.deepEqual(normalizeGameModifiers("midnight-dice", { rounds: 99, marketExtra: -4 }), {
     rounds: 8,
     marketExtra: 0,
-    discardsPerRound: 1,
+    discardsPerRound: 2,
+    firstPlayer: "random",
+    victory: "highest",
+    victoryReveal: "start",
     individualContracts: true,
     uniqueContracts: true
   });
@@ -324,7 +327,7 @@ test("un identifiant de jeu inconnu est rejeté par le routeur", () => {
 });
 
 test("Dés de Minuit enchaîne le choix des mandats, le draft et la résolution", () => {
-  const state = createMidnightDiceState(players, { gameModifiers: { rounds: 3, marketExtra: 0, discardsPerRound: 0 } });
+  const state = createMidnightDiceState(players, { gameModifiers: { rounds: 3, marketExtra: 0, firstPlayer: "first-seat" } });
   assert.equal(state.phase, "contract");
   assert.equal(state.contractOffers.length, 4);
 
@@ -346,7 +349,7 @@ test("Dés de Minuit enchaîne le choix des mandats, le draft et la résolution"
 
 test("Midnight gives eight distinct personal offers, validates ownership and rotates without repetition",()=> {
   const roster=Array.from({length:8},(_,i)=>({id:`p${i}`,pseudo:`Player ${i}`}));
-  const state=createMidnightDiceState(roster,{gameModifiers:{rounds:5}});
+  const state=createMidnightDiceState(roster,{midnightRulesVersion:1,gameModifiers:{rounds:5}});
   const previous=structuredClone(state.privateContractOffers);
   const observer=spectatorState(state);assert.equal(observer.privateContractOffers,undefined);assert.deepEqual(observer.contractOffers,[]);
   assert.equal(new Set(Object.values(previous).map((offers)=>[...offers].sort().join("|"))).size,8);
@@ -364,7 +367,7 @@ test("Midnight gives eight distinct personal offers, validates ownership and rot
   assert.deepEqual(state.lastRound.contractOffers,[]);
 });
 test("Midnight shared mode remains available and legacy live states keep their shared offers",()=> {
-  const state=createMidnightDiceState(players,{gameModifiers:{individualContracts:false}});
+  const state=createMidnightDiceState(players,{midnightRulesVersion:1,gameModifiers:{individualContracts:false}});
   assert.equal(state.privateContractOffers,undefined);
   assert.deepEqual(midnightContractOffers(state,"p1"),midnightContractOffers(state,"p2"));
   delete state.modifiers.individualContracts;

@@ -1,7 +1,8 @@
 import { currentPlayer, rollDice, shuffle } from "../shared.js";
 import { normalizeGameModifiers } from "../modifiers.js";
 import { appendLog, publicPlayers } from "../engine-context.js";
-import { midnightContractInfo, midnightContractTiers, midnightCatalogFor, normalizeMidnightContracts, evaluateMidnightDefinition } from "../../../../client/src/features/games/midnightDice/contracts.js";
+import { midnightContractInfo, midnightContractTiers, midnightCatalogFor, normalizeMidnightContracts, evaluateMidnightDefinition, midnightRankingScore } from "../../../../client/src/features/games/midnightDice/contracts.js";
+import { normalizeMidnightCardDesign } from "../../../../client/src/features/games/midnightDice/appearance.js";
 
 export const MIDNIGHT_CONTRACT_DEFINITIONS = Object.fromEntries(Object.entries(midnightContractInfo).map(([id, definition]) => [id, { ...definition, bonus: midnightContractTiers[definition.tier].bonus }]));
 export const MIDNIGHT_CONTRACTS = Object.keys(MIDNIGHT_CONTRACT_DEFINITIONS);
@@ -31,7 +32,35 @@ function contractRotation(previous = [], catalog = midnightContractInfo) {
 export function midnightContractOffers(state, playerId) {
   const offers = state.modifiers?.individualContracts ? state.privateContractOffers?.[playerId] ?? state.contractOffers ?? [] : state.contractOffers ?? [];
   const used = state.usedContracts?.[playerId] ?? [];
-  return offers.filter(id => Object.hasOwn(midnightCatalogFor(state), id) && !used.includes(id));
+  return offers.filter(id => Object.hasOwn(midnightCatalogFor(state), id) && (state.rulesVersion >= 2 ? id !== state.secretContracts?.[playerId] : !used.includes(id)));
+}
+
+function refillContracts(state) {
+  const catalog = Object.keys(midnightCatalogFor(state));
+  function refill(offers, played, deck) {
+    const remaining = offers.filter(id => !played.includes(id));
+    let draw = [...(deck ?? shuffle(catalog.filter(id => !offers.includes(id) && !played.includes(id))))];
+    while (remaining.length < 4) {
+      if (!draw.length) {
+        const fresh = catalog.filter(id => !remaining.includes(id) && !played.includes(id));
+        draw = shuffle(fresh.length ? fresh : catalog.filter(id => !remaining.includes(id)));
+      }
+      const next = draw.shift();
+      if (next && !remaining.includes(next)) remaining.push(next);
+    }
+    return { offers: remaining, deck: draw };
+  }
+  if (state.modifiers.individualContracts) {
+    state.contractDrawPiles ??= {};
+    for (const player of state.players) {
+      const next = refill(state.privateContractOffers[player.id], [state.secretContracts[player.id]], state.contractDrawPiles[player.id]);
+      state.privateContractOffers[player.id] = next.offers;
+      state.contractDrawPiles[player.id] = next.deck;
+    }
+  } else {
+    const next = refill(state.contractOffers, Object.values(state.secretContracts), state.contractDrawPile);
+    state.contractOffers = next.offers; state.contractDrawPile = next.deck;
+  }
 }
 
 function renewIndividualOffers(state, firstRound = state.round) {
@@ -104,12 +133,25 @@ function nextEligiblePlayer(state, predicate) {
   return -1;
 }
 
+function openMidnightMarket(state) {
+  state.market = rollDice(state.players.length * 3 + state.modifiers.marketExtra);
+  state.marketIds = state.market.map((_, index) => `${state.round}:${index}`);
+  state.marketRollKeys = {};
+}
+
 function prepareRound(state) {
   if (!Array.isArray(state.contractOffers) || state.contractOffers.length !== 4) state.contractOffers = contractRotation([], midnightCatalogFor(state));
   if (state.modifiers.individualContracts && !state.privateContractOffers) renewIndividualOffers(state);
+  if (state.rulesVersion >= 2) {
+    const ids = Object.keys(midnightCatalogFor(state));
+    if (state.modifiers.individualContracts) state.contractDrawPiles ??= Object.fromEntries(state.players.map(player => [player.id, shuffle(ids.filter(id => !state.privateContractOffers[player.id].includes(id)))]));
+    else state.contractDrawPile ??= shuffle(ids.filter(id => !state.contractOffers.includes(id)));
+  }
   state.phase = "contract";
   state.currentPlayerIndex = state.startingPlayerIndex;
   state.market = [];
+  state.marketIds = [];
+  state.marketRollKeys = {};
   state.trays = Object.fromEntries(state.players.map((player) => [player.id, []]));
   state.secretContracts = {};
   state.discardRemaining = Object.fromEntries(state.players.map((player) => [player.id, state.modifiers.discardsPerRound]));
@@ -132,14 +174,18 @@ function resolveRound(state) {
     return { playerId: player.id, dice, contract, ...evaluation, total: state.scores[player.id] };
   });
   state.lastRound = { round: state.round, results, discarded: [...state.discardTray], contractOffers: state.modifiers.individualContracts ? [] : [...state.contractOffers] };
+  if (state.rulesVersion >= 2) state.revealedContracts = [...(state.revealedContracts ?? []), ...results.map(({ playerId, contract }) => ({ playerId, contract, round: state.round }))];
   appendLog(state, "dealer", `révèle les mandats de la manche ${state.round}.`, "result");
   if (state.round >= state.modifiers.rounds) {
-    const best = Math.max(...Object.values(state.scores));
-    state.winners = state.players.filter((player) => state.scores[player.id] === best).map((player) => player.id);
+    const best = Math.max(...state.players.map(player => midnightRankingScore(state, player.id)));
+    state.winners = state.players.filter(player => midnightRankingScore(state, player.id) === best).map(player => player.id);
     state.finished = true;
     return;
   }
-  if (state.round % 4 === 0) {
+  if (state.rulesVersion >= 2) {
+    refillContracts(state);
+    state.usedContracts = Object.fromEntries(state.players.map(player => [player.id, []]));
+  } else if (state.round % 4 === 0) {
     if (state.modifiers.individualContracts) renewIndividualOffers(state, state.round + 1);
     else state.contractOffers = contractRotation(state.contractOffers, midnightCatalogFor(state));
     state.usedContracts = Object.fromEntries(state.players.map((player) => [player.id, []]));
@@ -154,8 +200,10 @@ export function createMidnightDiceState(players, options = {}) {
   const tablePlayers = publicPlayers(players.slice(0, 8));
   const state = {
     gameId: "midnight-dice",
+    rulesVersion: options.midnightRulesVersion === 1 ? 1 : 2,
     players: tablePlayers,
     contractCatalog: Object.fromEntries(normalizeMidnightContracts(options.midnightContracts).map(definition => [definition.id, definition])),
+    cardDesign: normalizeMidnightCardDesign(options.midnightCardDesign),
     modifiers: normalizeGameModifiers("midnight-dice", options.gameModifiers),
     round: 1,
     startingPlayerIndex: 0,
@@ -174,6 +222,13 @@ export function createMidnightDiceState(players, options = {}) {
     finished: false,
     winners: []
   };
+  if (state.rulesVersion >= 2) state.modifiers.discardsPerRound = 2;
+  else state.modifiers.discardsPerRound = Number.isInteger(options.gameModifiers?.discardsPerRound) ? options.gameModifiers.discardsPerRound : 1;
+  if (state.rulesVersion >= 2) {
+    const choose = values => values[Math.floor(Math.random() * values.length)];
+    state.resolvedOptions = { firstPlayer: state.modifiers.firstPlayer === "midnight" ? choose(["random", "first-seat"]) : state.modifiers.firstPlayer, victory: state.modifiers.victory === "midnight" ? choose(["highest", "lowest", "contracts"]) : state.modifiers.victory };
+    state.startingPlayerIndex = state.resolvedOptions.firstPlayer === "random" ? Math.floor(Math.random() * tablePlayers.length) : 0;
+  }
   prepareRound(state);
   return state;
 }
@@ -187,9 +242,12 @@ export function applyMidnightDiceAction(state, actorId, action) {
     const contract = String(action.contract ?? "");
     const offers=midnightContractOffers(state,actorId);
     const used = state.usedContracts[actorId] ?? [];
-    if (used.includes(contract)) throw new Error("Ce mandat a déjà été utilisé dans ce cycle.");
+    if (!(state.rulesVersion >= 2) && used.includes(contract)) throw new Error("Ce mandat a déjà été utilisé dans ce cycle.");
     if (!offers.includes(contract)) throw new Error("Ce mandat n'est pas proposé pendant cette rotation.");
     state.secretContracts[actorId] = contract;
+    if (state.rulesVersion >= 2) {
+      if (state.modifiers.individualContracts) state.privateContractOffers[actorId] = state.privateContractOffers[actorId].filter(id => id !== contract);
+    }
     state.usedContracts[actorId] = [...new Set([...(state.usedContracts[actorId] ?? []), contract])];
     appendLog(state, actorId, "choisit secrètement son mandat.");
     const next = nextEligiblePlayer(state, (player) => !state.secretContracts[player.id]);
@@ -197,12 +255,14 @@ export function applyMidnightDiceAction(state, actorId, action) {
     else {
       state.phase = "draft";
       state.currentPlayerIndex = state.startingPlayerIndex;
-      state.market = rollDice(state.players.length * 3 + state.modifiers.marketExtra);
+      openMidnightMarket(state);
       appendLog(state, "dealer", `ouvre le marché avec ${state.market.length} dés.`);
     }
     return state;
   }
   if (state.phase !== "draft") throw new Error("Choisis d'abord ton mandat.");
+  if (state.marketIds?.length !== state.market.length) state.marketIds = state.market.map((_, index) => `${state.round}:${index}`);
+  state.marketRollKeys ??= {};
   if (action.type === "discard-market") {
     const index = Number(action.index);
     if (!Number.isInteger(index) || index < 0 || index >= state.market.length) throw new Error("Dé du marché introuvable.");
@@ -210,6 +270,8 @@ export function applyMidnightDiceAction(state, actorId, action) {
     const discarded = state.market[index];
     const replacement = rollDice(1)[0];
     state.market[index] = replacement;
+    const marketId = state.marketIds[index];
+    state.marketRollKeys[marketId] = (state.marketRollKeys[marketId] ?? 0) + 1;
     state.discardRemaining[actorId] -= 1;
     state.discardTray.push({ playerId: actorId, die: discarded, replacement });
     state.stats[actorId].marketDiscards += 1;
@@ -220,6 +282,7 @@ export function applyMidnightDiceAction(state, actorId, action) {
   const index = Number(action.index);
   if (!Number.isInteger(index) || index < 0 || index >= state.market.length) throw new Error("Dé du marché introuvable.");
   const [die] = state.market.splice(index, 1);
+  state.marketIds.splice(index, 1);
   state.trays[actorId].push(die);
   appendLog(state, actorId, `prend un ${die} dans le marché.`);
   const next = nextEligiblePlayer(state, (player) => (state.trays[player.id]?.length ?? 0) < 3);
@@ -240,7 +303,7 @@ export function resumeMidnightAfterDeparture(state) {
   if (state.phase==="contract") {
     state.phase="draft";
     state.currentPlayerIndex=state.startingPlayerIndex;
-    state.market=rollDice(state.players.length*3+state.modifiers.marketExtra);
+    openMidnightMarket(state);
     appendLog(state,"dealer",`ouvre le marché avec ${state.market.length} dés.`);
   } else resolveRound(state);
 }

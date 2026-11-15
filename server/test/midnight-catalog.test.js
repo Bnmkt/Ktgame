@@ -51,7 +51,7 @@ test("new custom catalogues support eight private distinct offers at their lower
 });
 test("real drafted rounds, bot decisions, reloads and achievements use the immutable match catalogue", () => {
   const entries = catalog();
-  let state = createGameState("midnight-dice", players.slice(0, 2), { midnightContracts: entries, gameModifiers: { individualContracts: false } });
+  let state = createGameState("midnight-dice", players.slice(0, 2), { midnightContracts: entries, gameModifiers: { individualContracts: false, firstPlayer: "first-seat" } });
   state.contractOffers = ["ordered-test", "unordered-test", "addition-test", "sum-test"];
   applyAction(state, "p0", { type: "choose-contract", contract: "ordered-test" });
   applyAction(state, "p1", { type: "choose-contract", contract: "unordered-test" });

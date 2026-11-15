@@ -1,0 +1,20 @@
+.midnight-card { position: relative; isolation: isolate; overflow: clip; width: 100%; aspect-ratio: 88 / 63; container-type: inline-size; color: #131b34; background: #151e3b; border-radius: 6%; box-shadow: 0 2px 0 #070d26, 0 5px 10px #0006; transform-style: preserve-3d; user-select: none; }
+.midnight-card-template { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; border-radius: inherit; pointer-events: none; }
+.midnight-card-copy { position: absolute; z-index: 3; display: grid; place-items: center; box-sizing: border-box; text-align: center; pointer-events: none; }
+.midnight-card-copy > span { display: block; width: 100%; max-height: 100%; font-weight: 600; line-height: 1.06; overflow-wrap: anywhere; }
+.midnight-card-copy:first-of-type > span { font-weight: 900; }
+.midnight-card-section-label { position: absolute; z-index: 3; left: 52%; translate: -50% 0; color: #f0c373; font-size: 3.7cqw; white-space: nowrap; pointer-events: none; }
+.midnight-card-examples { position: absolute; z-index: 3; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
+.midnight-card-examples > div { flex: 1; min-width: 0; display: grid; gap: .3cqw; text-align: center; }
+.midnight-card-examples > div > div { display: flex; justify-content: center; gap: .35cqw; }
+.midnight-card-examples .die { width: 4.3cqw; height: 4.3cqw; min-width: 0; min-height: 0; border: .3cqw solid #17203b; border-radius: 1cqw; padding: .35cqw; background: #e9bf7d; box-shadow: none; }
+.midnight-card-examples .die .pip { background: #162039; width: .7cqw; height: .7cqw; box-shadow: none; }
+.midnight-card-examples small { font-size: 2.6cqw; line-height: 1; color: inherit; }
+.midnight-card-character { position: absolute; pointer-events: none; }
+.midnight-card-character > img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.midnight-card-character.midnight-character-editable { pointer-events: auto; cursor: move; outline: 1px dashed #ffe0a1; touch-action: none; }
+.midnight-card-character .midnight-character-resize { position: absolute; right: -5px; bottom: -5px; width: 24px; height: 24px; min-height: 0; padding: 0; background: #f5cb7c; color: #171c36; cursor: nwse-resize; touch-action: none; }
+.midnight-card-expanded.casino-dialog { width: min(960px, 96vw); max-width: 960px; background: #111930; }
+.midnight-card-expanded .midnight-card { max-height: none; width: min(100%, calc(70dvh * 88 / 63)); height: auto; margin: 0 auto; }
+.midnight-card-expanded > p { line-height: 1.5; color: #f6dfaf; }
+@media (prefers-reduced-motion: reduce) { .midnight-card { animation: none !important; transition: none !important; } }

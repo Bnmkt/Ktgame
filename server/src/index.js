@@ -69,7 +69,8 @@ import { games } from "./games/shared.js";
 import { applyAction as applyGameAction, createGameState, pokerHandLabel, pokerHandPreview, tickBattleState, tickPokerState } from "./games/engines.js";
 import { normalizeBattleModifiers, normalizeGameModifiers } from "./games/modifiers.js";
 import { midnightDiceBotAction, midnightContractOffers, resumeMidnightAfterDeparture } from "./games/engines/midnight-dice.js";
-import { defaultMidnightContracts, normalizeMidnightContracts } from "../../client/src/features/games/midnightDice/contracts.js";
+import { defaultMidnightCardDesign, normalizeMidnightCardDesign } from "../../client/src/features/games/midnightDice/appearance.js";
+import { defaultMidnightContracts, normalizeMidnightContracts, publicMidnightOptions } from "../../client/src/features/games/midnightDice/contracts.js";
 import { velvetRuseBotAction } from "./games/engines/velvet-ruse.js";
 import { yahtzeeBotAction } from "./games/engines/yahtzee.js";
 import { fourTwentyOneBotAction, paidRerollPrice421 } from "./games/engines/four-twenty-one.js";
@@ -635,7 +636,7 @@ function battleDeckOverview(state, viewerId) {
 
 function configuredGames(db = readDb()) {
   const overrides = db.settings?.games ?? {};
-  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), descriptiveImage: gameImageUrl(overrides[game.id]?.descriptiveImage), coverImage: gameImageUrl(overrides[game.id]?.coverImage), discordIconImage: gameImageUrl(overrides[game.id]?.discordIconImage), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers), ...(game.id === "midnight-dice" ? { midnightContracts: structuredClone(overrides[game.id]?.midnightContracts ?? defaultMidnightContracts) } : {}) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
+  return configurationCache.get("games", overrides, () => games.map((game, index) => ({ ...game, description: defaultGameDescriptions[game.id] ?? "", position: index + 1, enabled: true, ...(overrides[game.id] ?? {}), descriptiveImage: gameImageUrl(overrides[game.id]?.descriptiveImage), coverImage: gameImageUrl(overrides[game.id]?.coverImage), discordIconImage: gameImageUrl(overrides[game.id]?.discordIconImage), defaultModifiers: game.id === "bataille" ? normalizeBattleModifiers(overrides[game.id]?.defaultModifiers) : normalizeGameModifiers(game.id, overrides[game.id]?.defaultModifiers), ...(game.id === "midnight-dice" ? { midnightContracts: structuredClone(overrides[game.id]?.midnightContracts ?? defaultMidnightContracts), midnightCardDesign: structuredClone(overrides[game.id]?.midnightCardDesign ?? defaultMidnightCardDesign) } : {}) })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999)));
 }
 
 function configuredShop(db = readDb()) {
@@ -1551,8 +1552,11 @@ function serializeRoom(room, viewerId, db, forceSpectator, playerPresentations =
     safeState.hands = Object.fromEntries(Object.entries(safeState.hands ?? {}).map(([playerId, hand]) => [playerId, playerId === viewerId ? [...hand] : Array(hand.length).fill(null)]));
   }
   if (safeState?.gameId === "midnight-dice") {
+    safeState.resolvedOptions = publicMidnightOptions(safeState);
     safeState.contractOffers = safeState.players.some((player)=>player.id===viewerId) ? [...midnightContractOffers(safeState,viewerId)] : [];
     delete safeState.privateContractOffers;
+    delete safeState.contractDrawPiles;
+    delete safeState.contractDrawPile;
     safeState.secretContracts = Object.fromEntries(safeState.players.map((player) => [player.id, player.id === viewerId ? safeState.secretContracts?.[player.id] ?? null : null]));
     safeState.usedContracts = Object.fromEntries(safeState.players.map((player) => [player.id, player.id === viewerId ? [...(safeState.usedContracts?.[player.id] ?? [])] : []]));
   }
@@ -5269,7 +5273,12 @@ app.patch("/api/me/locale", auth, (req, res) => {
   res.json(sanitizeUser(user));
 });
 app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
-  let midnightContracts;
+  let midnightContracts, midnightCardDesign;
+  if (Object.hasOwn(req.body, "midnightCardDesign")) {
+    if (req.params.id !== "midnight-dice") return res.status(400).json({ error: "Les mandats sont réservés aux Dés de Minuit." });
+    try { midnightCardDesign = normalizeMidnightCardDesign(req.body.midnightCardDesign); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+  }
   if (Object.hasOwn(req.body, "midnightContracts")) {
     if (req.params.id !== "midnight-dice") return res.status(400).json({ error: "Les mandats sont réservés aux Dés de Minuit." });
     try { midnightContracts = normalizeMidnightContracts(req.body.midnightContracts); }
@@ -5287,6 +5296,7 @@ app.patch("/api/admin/games/:id", auth, requireAdmin, (req, res) => {
     db.settings.games[req.params.id] = {
       ...(db.settings.games[req.params.id] ?? {}),
       ...(midnightContracts ? { midnightContracts } : {}),
+      ...(midnightCardDesign ? { midnightCardDesign } : {}),
       ...Object.fromEntries(["descriptiveImage", "coverImage", "discordIconImage"].filter((field) => Object.hasOwn(req.body, field)).map((field) => [field, gameImageUrl(req.body[field])])),
       ...(Object.hasOwn(req.body, "defaultModifiers") ? { defaultModifiers: req.params.id === "bataille" ? normalizeBattleModifiers(req.body.defaultModifiers) : normalizeGameModifiers(req.params.id, req.body.defaultModifiers) } : {}),
       name: String(req.body.name ?? "").trim().slice(0, 60),

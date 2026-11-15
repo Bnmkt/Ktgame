@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createGameState } from "../src/games/engines.js";
+import { createGameState as createState } from "../src/games/engines.js";
 import { applyMidnightDiceAction, MIDNIGHT_CONTRACTS, midnightContractOffers, midnightContractPotential, midnightDiceBotAction, scoreMidnightContract } from "../src/games/engines/midnight-dice.js";
 import { normalizeRankedConfig, validateRankedAction } from "../src/services/ranked.js";
 import { spectatorState } from "../src/games/spectator-state.js";
 
+// Explicitly exercise pre-refill snapshots and their preserved rotation rules.
+const createGameState = (game, players, options = {}) => createState(game, players, { ...options, midnightRulesVersion: 1 });
 const roster = (count) => Array.from({ length: count }, (_, index) => ({ id: `player-${index}`, pseudo: `Player ${index}` }));
 const potential = (offer, rounds = 4) => {
   const points = offer.map(midnightContractPotential).sort((left, right) => right - left);

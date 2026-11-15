@@ -54,8 +54,10 @@ export const gameModifierDefinitions = {
   "midnight-dice": [
     { key: "rounds", type: "range", label: "Nombre de manches", help: "Chaque manche comporte trois choix de dés par joueur.", min: 3, max: 8, defaultValue: 5 },
     { key: "marketExtra", type: "range", label: "Dés supplémentaires", help: "Ajoute des options au marché; les dés restants seront écartés.", min: 0, max: 6, defaultValue: 2 },
-    { key: "discardsPerRound", type: "range", label: "Défausses tactiques", help: "Nombre de dés qu'un joueur peut remplacer dans le marché à chaque manche.", min: 0, max: 3, defaultValue: 1 },
-    { key: "individualContracts", type: "toggle", label: "Mandats individuels", enabledLabel: "Quatre mandats aléatoires propres à chaque joueur", disabledLabel: "Quatre mandats communs à toute la table", help: "Les sélections sont équilibrées en points potentiels et renouvelées toutes les quatre manches. Un mandat choisi est toujours retiré des choix du joueur jusqu'à la prochaine rotation, même s'il échoue.", defaultValue: true }
+    { key: "firstPlayer", type: "select", label: "Premier joueur", defaultValue: "random", options: [["random", "Joueur aléatoire"], ["first-seat", "Premier siège"], ["midnight", "Dés de minuit (option aléatoire)"]] },
+    { key: "victoryReveal", type: "select", label: "Révélation de la condition de victoire", defaultValue: "start", help: "Lorsque la condition est aléatoire, elle peut rester secrète jusqu’à la fin de partie.", options: [["start", "Début de partie"], ["end", "Fin de partie"]] },
+    { key: "victory", type: "select", label: "Condition de victoire", defaultValue: "highest", options: [["highest", "Score le plus haut"], ["lowest", "Score le plus bas"], ["contracts", "Le plus de mandats réussis"], ["midnight", "Dés de minuit (option aléatoire)"]] },
+    { key: "individualContracts", type: "toggle", label: "Mandats individuels", enabledLabel: "Quatre mandats aléatoires propres à chaque joueur", disabledLabel: "Quatre mandats communs à toute la table", help: "Les quatre propositions initiales sont équilibrées. Les trois mandats non joués sont conservés et une nouvelle carte est piochée à chaque manche. Deux relances sont disponibles pour toute la manche. En mode commun, toutes les cartes jouées sont remplacées dans le choix partagé.", defaultValue: true }
   ],
   "velvet-ruse": [
     { key: "targetPrestige", type: "range", label: "Prestige à atteindre", help: "La partie s'arrête dès qu'un joueur atteint ce total.", min: 10, max: 50, step: 5, defaultValue: 20 },

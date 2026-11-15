@@ -14,7 +14,7 @@ const listener = http.createServer(); await new Promise(resolve => listener.list
 const port = listener.address().port; await new Promise(resolve => listener.close(resolve)); const origin = `http://127.0.0.1:${port}`;
 const directory = path.join(root, "docs/previews/midnight-contracts-20261104", String(Date.now())); fs.mkdirSync(directory, { recursive: true });
 const vite = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: path.join(root, "client"), windowsHide: true, stdio: "pipe", env: { ...process.env, VITE_BASE_PATH: "/", VITE_API_URL: origin } });
-let output = "", browser, saves = 0, game = { id: "midnight-dice", name: "Dés de Minuit", type: "dice", description: "Choisir des dés et réussir son mandat secret.", position: 1, enabled: true, minPlayers: 2, maxPlayers: 8, midnightContracts: structuredClone(defaultMidnightContracts), defaultModifiers: { rounds: 5, marketExtra: 2, discardsPerRound: 1, individualContracts: true, uniqueContracts: true } }, state;
+let output = "", browser, saves = 0, game = { id: "midnight-dice", name: "Dés de Minuit", type: "dice", description: "Choisir des dés et réussir son mandat secret.", position: 1, enabled: true, minPlayers: 2, maxPlayers: 8, midnightContracts: structuredClone(defaultMidnightContracts), defaultModifiers: { rounds: 5, marketExtra: 2, discardsPerRound: 2, individualContracts: true, uniqueContracts: true } }, state;
 const errors = []; vite.stdout.on("data", data => output += data); vite.stderr.on("data", data => output += data);
 function html() { return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
 import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;
@@ -31,7 +31,7 @@ try {
   for (let i = 0; i < 150; i++) { try { if ((await fetch(origin)).ok) break; } catch {} if (i === 149) throw Error(output); await new Promise(resolve => setTimeout(resolve, 100)); }
   browser = await chromium.launch({ channel: "chrome", headless: true, args: ["--enable-unsafe-swiftshader", "--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"] });
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } }); page.on("pageerror", error => errors.push(error.message));
-  await PlaywrightBlocker.deserialize(fs.readFileSync(process.env.KTGA_BLOCKER_CACHE)).enableBlockingInPage(page);
+  const blocker = process.env.KTGA_BLOCKER_CACHE && fs.existsSync(process.env.KTGA_BLOCKER_CACHE) ? PlaywrightBlocker.deserialize(fs.readFileSync(process.env.KTGA_BLOCKER_CACHE)) : await PlaywrightBlocker.fromPrebuiltAdsAndTracking(fetch); await blocker.enableBlockingInPage(page);
   await page.route("**/__midnight", route => route.fulfill({ contentType: "text/html; charset=utf-8", body: html() }));
   await page.route("**/api/**", async route => {
     const url = new URL(route.request().url()), method = route.request().method();
@@ -41,7 +41,7 @@ try {
     }
     if (url.pathname === "/api/preview-midnight") {
       if (method === "GET") {
-        state = createGameState("midnight-dice", [{ id: "me", pseudo: "Bnmkt" }, { id: "other", pseudo: "Camille" }], { midnightContracts: game.midnightContracts, gameModifiers: { individualContracts: false } });
+        state = createGameState("midnight-dice", [{ id: "me", pseudo: "Bnmkt" }, { id: "other", pseudo: "Camille" }], { midnightContracts: game.midnightContracts, midnightCardDesign: game.midnightCardDesign, gameModifiers: { individualContracts: false, firstPlayer: "first-seat" } });
         state.contractOffers = game.midnightContracts.slice(-4).map(entry => entry.id);
       } else {
         applyAction(state, "me", route.request().postDataJSON());
@@ -81,6 +81,39 @@ try {
   assert.equal(await page.locator(".midnight-config-list > button").count(), 15);
   await page.getByRole("button", { name: "Enregistrer", exact: true }).click(); await page.waitForFunction(() => window.saved); assert.equal(saves, 1);
   assert.equal(game.midnightContracts.find(entry => entry.id === "duo").tier, "gold"); assert.ok(!game.midnightContracts.some(entry => entry.id === "cellar"));
+  // The same live card is edited graphically without changing its predicate.
+  await page.locator(".midnight-config-list > button").first().click();
+  const initialRule = structuredClone(game.midnightContracts[0].rule);
+  await page.getByLabel("Position horizontale (%)", { exact: true }).fill("4");
+  await page.getByLabel("Position verticale (%)", { exact: true }).fill("43");
+  await page.getByLabel("Échelle du personnage", { exact: true }).fill("0.85");
+  const character = page.locator(".midnight-artwork-settings .midnight-character-editable");
+  await character.scrollIntoViewIfNeeded(); const portrait = await character.boundingBox();
+  await page.mouse.move(portrait.x + portrait.width / 2, portrait.y + portrait.height / 2); await page.mouse.down();
+  await page.mouse.move(portrait.x + portrait.width / 2 + 18, portrait.y + portrait.height / 2 + 7, { steps: 6 }); await page.mouse.up();
+  assert.ok(Number(await page.getByLabel("Position horizontale (%)", { exact: true }).inputValue()) > 4);
+  const handle = page.getByRole("button", { name: "Redimensionner le personnage", exact: true });
+  const grip = await handle.boundingBox(); await page.mouse.move(grip.x + 10, grip.y + 10); await page.mouse.down(); await page.mouse.move(grip.x + 24, grip.y + 10, { steps: 5 }); await page.mouse.up();
+  assert.ok(Number(await page.getByLabel("Échelle du personnage", { exact: true }).inputValue()) > .85);
+  await page.getByRole("button", { name: "Réinitialiser le positionnement", exact: true }).click();
+  assert.equal(await page.getByLabel("Position horizontale (%)", { exact: true }).inputValue(), "-1");
+  await page.getByLabel("Position horizontale (%)", { exact: true }).fill("2.5");
+  await page.getByRole("tab", { name: "Visuels", exact: true }).click();
+  await page.getByLabel("Modèle du recto des mandats", { exact: true }).fill("/midnight-dice/mandat-front.svg");
+  await page.getByLabel("Verso commun des mandats", { exact: true }).fill("/midnight-dice/mandat-back.svg");
+  await page.getByLabel("Police des titres", { exact: true }).selectOption("classic");
+  await page.getByLabel("Couleur du texte", { exact: true }).fill("#202040");
+  await page.getByLabel("Marge intérieure du texte", { exact: true }).fill("3");
+  await page.locator(".midnight-design-settings .midnight-design-preview").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(directory, "apparence-admin.png"), fullPage: true });
+  await page.getByRole("button", { name: "Verso", exact: true }).last().click();
+  assert.ok(await page.locator(".midnight-design-settings .midnight-card-covered").isVisible());
+  await page.getByRole("button", { name: "Recto", exact: true }).last().click();
+  await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('button[type=submit]').disabled);
+  assert.equal(saves, 2);
+  assert.equal(game.midnightCardDesign.headingFont, "classic"); assert.equal(game.midnightCardDesign.padding, 3);
+  assert.equal(game.midnightContracts[0].artwork.x, 2.5); assert.deepEqual(game.midnightContracts[0].rule, initialRule);
   await page.reload(); await page.getByRole("tab", { name: "Règles", exact: true }).click(); assert.equal(await page.locator(".midnight-config-list > button").count(), 15);
   await page.setViewportSize({ width: 390, height: 844 }); await page.locator(".midnight-config").scrollIntoViewIfNeeded();
   assert.equal(await page.locator(".midnight-config").isVisible(), true); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -88,13 +121,13 @@ try {
   await page.getByLabel("Nom du mandat", { exact: true }).fill("Modification annulée"); await page.getByRole("button", { name: "Annuler", exact: true }).click();
   assert.equal(game.midnightContracts[0].label, "Spectre");
   await page.setViewportSize({ width: 1366, height: 768 }); await page.getByRole("button", { name: "Voir la table", exact: true }).click();
-  await page.getByRole("dialog", { name: "Choisis ton mandat", exact: true }).waitFor();
-  assert.equal(await page.getByRole("button", { name: "Choisir", exact: true }).count(), 4);
-  await page.locator(".midnight-codex-panel article").filter({ hasText: "421 chronologique" }).getByRole("button", { name: "Choisir", exact: true }).click(); await page.locator(".midnight-market").waitFor();
-  assert.match(await page.locator(".midnight-current-contract").textContent(), /421 chronologique/);
-  await page.getByRole("button", { name: "Voir les 15 mandats", exact: true }).click();
+  await page.getByRole("region", { name: "Choisis ton mandat", exact: true }).waitFor();
+  assert.equal(await page.locator("[data-midnight-offer]").count(), 4);
+  await page.getByRole("button", { name: "Sélectionner 421 chronologique", exact: true }).click(); await page.getByRole("button", { name: "Confirmer le mandat", exact: true }).click(); await page.locator(".midnight-market").waitFor();
+  assert.match(await page.locator(".midnight-active-contract").textContent(), /421 chronologique/);
+  await page.getByRole("button", { name: "Codex des mandats", exact: true }).click();
   await page.getByRole("dialog", { name: "Codex des mandats", exact: true }).waitFor();
-  assert.match(await page.locator(".midnight-codex-panel").textContent(), /Deux font le troisième/); assert.equal(await page.locator(".midnight-codex-panel article").count(), 15);
+  assert.match(await page.locator(".midnight-codex-gallery").textContent(), /Deux font le troisième/); assert.equal(await page.locator(".midnight-codex-gallery [data-midnight-contract]").count(), 15);
   await page.screenshot({ path: path.join(directory, "codex-personnalise.png"), fullPage: true });
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ ok: true, directory, saves, catalogue: game.midnightContracts.length, blocker: true, customTable: true, predicates: ["ordered", "unordered", "sum", "sum-two"] }));
