@@ -38,6 +38,10 @@ const service = createServer(async (request, response) => {
   const reply = (body, status = 200) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   if (pathname.endsWith("/start")) { room.state = createMidnightDiceState(room.players, { gameModifiers: { rounds: 3, firstPlayer: "first-seat", victory: "midnight", victoryReveal: "end" } }); room.activityMatchId = `test-${++revision}`; broadcast(); return reply(payload(viewer)); }
   if (pathname.endsWith('/pacing/skip')) { room.pacing = null; broadcast(); return reply(payload(viewer)); }
+  if (pathname.endsWith('/game-settings')) {
+    const chunks = []; for await (const chunk of request) chunks.push(chunk);
+    room.gameModifiers = JSON.parse(Buffer.concat(chunks)); broadcast(); return reply(payload(viewer));
+  }
   if (pathname.endsWith("/action")) {
     const chunks = []; for await (const chunk of request) chunks.push(chunk);
     const action = JSON.parse(Buffer.concat(chunks)); actions.push({ viewer, action });
@@ -90,7 +94,44 @@ try {
     await page.setViewportSize({ width: 1366, height: 768 });
   }
   const url = viewer => `${origin}/test/fixtures/table-interface.html?game=midnight-dice&viewer=${viewer}`;
-  await page.goto(url("me")); await page.getByRole("button", { name: "Démarrer la partie", exact: true }).click();
+  await page.goto(url("me"));
+  const settingsChecks = [];
+  for (const [name, viewport] of [['laptop', { width: 1366, height: 768 }], ['desktop', { width: 1920, height: 1080 }], ['mobile', { width: 390, height: 844 }]]) {
+    await page.setViewportSize(viewport);
+    const trigger = viewport.width < 700 ? page.locator('.room-setup-summary').getByRole('button', { name: 'Modifier', exact: true }) : page.getByRole('button', { name: 'Paramètres de la table', exact: true });
+    await trigger.click();
+    const modal = page.locator('.room-settings-modal'), victory = modal.getByRole('group', { name: 'Condition de victoire', exact: true });
+    assert.equal(await victory.getByRole('button').count(), 9);
+    const panel = await victory.evaluate(node => {
+      const section = node.closest('.game-modifiers-panel'), rect = section.getBoundingClientRect();
+      return { height: rect.height, scrollHeight: section.scrollHeight, clientHeight: section.clientHeight, overflow: getComputedStyle(section).overflow, options: [...node.querySelectorAll('button')].map(button => button.textContent) };
+    });
+    settingsChecks.push({ name, viewport, panel });
+    assert.ok(panel.scrollHeight <= panel.clientHeight + 2 || panel.overflow === 'visible', `${name}: options are clipped inside their panel ${JSON.stringify(panel)}`);
+    assert.equal(await modal.locator('.game-modifier-control').first().locator('legend').textContent(), 'Condition de victoire');
+    if (viewport.width >= 1000) assert.ok(await victory.evaluate(node => {
+      const body = node.closest('.room-settings-modal-body').getBoundingClientRect();
+      return [...node.querySelectorAll('button')].slice(0, 7).every(button => { const rect = button.getBoundingClientRect(); return rect.top >= body.top && rect.bottom <= body.bottom; });
+    }), `${name}: six official conditions and random mode are visible on opening`);
+    for (const label of ['Score total', 'Champion des manches', 'Chasseur de prestige', 'Régularité', 'Record de Minuit', 'Chasseur de primes', 'Dés de minuit (option aléatoire)']) {
+      const button = victory.getByRole('button', { name: label, exact: true });
+      await button.click();
+      assert.equal(await button.getAttribute('aria-pressed'), 'true');
+      assert.ok(await button.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        return node.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+      }), `${name}: ${label} is genuinely visible and clickable`);
+    }
+    await page.screenshot({ path: path.join(output, `parametres-${name}.png`) });
+    await modal.getByRole('button', { name: 'Appliquer les paramètres', exact: true }).click();
+    await until(() => room.gameModifiers?.victory === 'midnight', 'random victory setting saved');
+    await trigger.click();
+    assert.equal(await page.locator('.room-settings-modal').getByRole('group', { name: 'Condition de victoire', exact: true }).getByRole('button', { name: 'Dés de minuit (option aléatoire)', exact: true }).getAttribute('aria-pressed'), 'true');
+    await page.locator('.room-settings-modal').getByRole('button', { name: 'Annuler', exact: true }).click();
+  }
+  await page.setViewportSize({ width: 1366, height: 768 });
+  if (process.env.KTGA_MIDNIGHT_SETTINGS_ONLY !== '1') {
+  await page.getByRole("button", { name: "Démarrer la partie", exact: true }).click();
   await page.locator(".midnight-board").waitFor();
   assert.equal(await page.locator("[data-midnight-offer]").count(), 4);
   assert.equal(await page.locator(".midnight-side-seats").first().locator(".midnight-player-zone").count(), 3);
@@ -216,9 +257,10 @@ try {
   broadcast(); await page.locator('.midnight-market-piece').first().waitFor();
   await checkFullscreen('marche-huit');
   await page.emulateMedia({ reducedMotion: "reduce" }); await page.screenshot({ path: path.join(output, "huit-joueurs.png"), fullPage: true });
+  }
   assert.deepEqual(errors, []);
-  fs.writeFileSync(path.join(output, "results.json"), JSON.stringify({ ok: true, output, actions, fullscreenChecks, blocker: true, errors }, null, 2));
-  console.log(JSON.stringify({ ok: true, output, actions: actions.length, blocker: true, privateMandates: true, deferredVictory: true }));
+  fs.writeFileSync(path.join(output, "results.json"), JSON.stringify({ ok: true, output, actions, settingsChecks, fullscreenChecks, blocker: true, errors }, null, 2));
+  console.log(JSON.stringify({ ok: true, output, actions: actions.length, blocker: true, settings: true, board: process.env.KTGA_MIDNIGHT_SETTINGS_ONLY !== '1' }));
 } catch (failure) {
   const active = browser?.contexts()[0]?.pages()[0];
   if (active) {

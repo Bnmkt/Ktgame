@@ -1,0 +1,21 @@
+/* Settings must keep their content height; only the modal body scrolls. */
+.modal.room-settings-modal {
+  max-width: 980px;
+  padding: 0;
+  overflow: hidden;
+}
+.room-settings-modal .room-settings-modal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.room-settings-modal .room-settings-modal-body > section {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: visible;
+}
+.room-settings-modal .modifier-select .modifier-option-row {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+}

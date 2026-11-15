@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "output": "D:\\dev\\dicegame\\docs\\previews\\midnight-physical-20261115\\1794735002983",
+  "actions": [],
+  "settingsChecks": [
+    {
+      "name": "laptop",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "panel": {
+        "height": 1120.328125,
+        "scrollHeight": 1120,
+        "clientHeight": 1120,
+        "overflow": "visible",
+        "options": [
+          "Score total",
+          "Dés de minuit (option aléatoire)",
+          "Champion des manches",
+          "Chasseur de prestige",
+          "Régularité",
+          "Record de Minuit",
+          "Chasseur de primes",
+          "Score le plus bas",
+          "Le plus de mandats réussis"
+        ]
+      }
+    },
+    {
+      "name": "desktop",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "panel": {
+        "height": 1120.328125,
+        "scrollHeight": 1120,
+        "clientHeight": 1120,
+        "overflow": "visible",
+        "options": [
+          "Score total",
+          "Dés de minuit (option aléatoire)",
+          "Champion des manches",
+          "Chasseur de prestige",
+          "Régularité",
+          "Record de Minuit",
+          "Chasseur de primes",
+          "Score le plus bas",
+          "Le plus de mandats réussis"
+        ]
+      }
+    },
+    {
+      "name": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "panel": {
+        "height": 2283.53125,
+        "scrollHeight": 2284,
+        "clientHeight": 2284,
+        "overflow": "visible",
+        "options": [
+          "Score total",
+          "Dés de minuit (option aléatoire)",
+          "Champion des manches",
+          "Chasseur de prestige",
+          "Régularité",
+          "Record de Minuit",
+          "Chasseur de primes",
+          "Score le plus bas",
+          "Le plus de mandats réussis"
+        ]
+      }
+    }
+  ],
+  "fullscreenChecks": [],
+  "blocker": true,
+  "errors": []
+}

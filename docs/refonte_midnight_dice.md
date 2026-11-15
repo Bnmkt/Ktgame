@@ -101,3 +101,13 @@ npm --prefix client run build
 ```
 
 Captures de ce correctif : [plein écran à huit joueurs](./previews/midnight-physical-20261115/1794734064929/plein-ecran-marche-huit.png), [choix central des mandats](./previews/midnight-physical-20261115/1794734064929/plein-ecran-choix-huit.png), [bilan avec récapitulatif replié](./previews/midnight-physical-20261115/1794734064929/bilan-replie.png). Les mesures sont dans [results.json](./previews/midnight-physical-20261115/1794734064929/results.json).
+
+## Correctif des paramètres de table
+
+La fenêtre comprimait ses sections de variantes dans une grille, tandis que `.game-modifiers-panel` masquait leur débordement. En 1366 × 768, le panneau occupait environ 276 px pour 1 315 px de contenu : les conditions existaient dans le DOM mais restaient inaccessibles au défilement normal. Les styles génériques de `.modal`, chargés après ceux de la fenêtre, limitaient aussi sa largeur à 720 px et lui ajoutaient une marge intérieure supplémentaire.
+
+`components/room/room-settings.css` conserve la hauteur naturelle des sections dans une colonne et réserve le défilement au corps de la fenêtre. Une règle spécifique restaure sa largeur maximale de 980 px et son cadre prévu. Les options s'organisent automatiquement selon la largeur disponible. La condition de victoire arrive avant les autres variantes ; l'option aléatoire est placée immédiatement après Score total. Les paramètres de niveau restent disponibles après les variantes.
+
+Le parcours `midnight-table.smoke.mjs` vérifie désormais les paramètres avant la partie : les neuf options (six officielles, aléatoire et deux historiques), l'absence de contenu rogné, les clics réels sur chaque condition officielle et le hasard, puis l'enregistrement et la réouverture du choix. Les six conditions et le hasard doivent être visibles dès l'ouverture sur ordinateur. Parcours réussi avec Ghostery en 1366 × 768, 1920 × 1080 et 390 × 844 ; build client/SSR validé. Le mode `KTGA_MIDNIGHT_SETTINGS_ONLY=1` permet de rejouer uniquement cette vérification.
+
+Captures : [paramètres sur ordinateur](./previews/midnight-physical-20261115/1794735002983/parametres-laptop.png), [paramètres sur mobile](./previews/midnight-physical-20261115/1794735002983/parametres-mobile.png), [résultats des vérifications](./previews/midnight-physical-20261115/1794735002983/results.json).
