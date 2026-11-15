@@ -70,6 +70,8 @@ export function normalizeProgressionConfig(input = {}, gameIds = []) {
     formula: String(input.formula ?? DEFAULT_XP_FORMULA).trim(),
     maxLevel: Math.max(1, integer(input.maxLevel, 101, 101)),
     completionXp: integer(input.completionXp, 50, 1000000), victoryXp: integer(input.victoryXp, 25, 1000000),
+    completionParticipantXp: integer(input.completionParticipantXp, 10, 1000000),
+    victoryParticipantXp: integer(input.victoryParticipantXp, 5, 1000000),
     titles: titles(input.titles ?? [{ level: 1, label: "Débutant" }, { level: 5, label: "Habitué" }, { level: 10, label: "Confirmé" }, { level: 25, label: "Expert" }, { level: 50, label: "Maître" }]), games: {}
   };
   for (const id of gameIds) {
@@ -78,6 +80,8 @@ export function normalizeProgressionConfig(input = {}, gameIds = []) {
     if (Object.hasOwn(input.games ?? {}, id) || gameTitles) config.games[id] = {
       ...(row.completionXp !== undefined ? { completionXp: integer(row.completionXp, config.completionXp, 1000000) } : {}),
       ...(row.victoryXp !== undefined ? { victoryXp: integer(row.victoryXp, config.victoryXp, 1000000) } : {}),
+      ...(row.completionParticipantXp !== undefined ? { completionParticipantXp: integer(row.completionParticipantXp, config.completionParticipantXp, 1000000) } : {}),
+      ...(row.victoryParticipantXp !== undefined ? { victoryParticipantXp: integer(row.victoryParticipantXp, config.victoryParticipantXp, 1000000) } : {}),
       ...(gameTitles ? { titles: titles(gameTitles) } : {})
     };
   }
@@ -125,7 +129,20 @@ export function unlockedGameTitles(config, gameId, level) {
   return (config.games?.[gameId]?.titles ?? config.titles).filter((entry) => entry.level <= level);
 }
 export function gameXpRules(config, gameId) {
-  return { completionXp: config.games?.[gameId]?.completionXp ?? config.completionXp, victoryXp: config.games?.[gameId]?.victoryXp ?? config.victoryXp };
+  const game = config.games?.[gameId];
+  return { completionXp: game?.completionXp ?? config.completionXp, victoryXp: game?.victoryXp ?? config.victoryXp,
+    completionParticipantXp: game?.completionParticipantXp ?? config.completionParticipantXp ?? 10,
+    victoryParticipantXp: game?.victoryParticipantXp ?? config.victoryParticipantXp ?? 5 };
+}
+export function gameXpParticipantCount(room) {
+  // The starting seats remain participants after a departure. Spectators never enter this list.
+  const ids = [...(room.state?.xpParticipantIds ?? []), ...[...(room.ranked?.roster ?? []), ...(room.players ?? []), ...(room.state?.players ?? []), ...(room.state?.departedPlayers ?? [])].map(player => player.id)];
+  return Math.max(1, new Set(ids.filter(id => typeof id === "string" && id)).size);
+}
+export function gameCompletionXp(config, gameId, participantCount, won) {
+  const rules = gameXpRules(config, gameId);
+  const extra = Number.isSafeInteger(participantCount) && participantCount > 1 ? participantCount - 1 : 0;
+  return Math.min(MAX_XP, rules.completionXp + extra * rules.completionParticipantXp + (won ? rules.victoryXp + extra * rules.victoryParticipantXp : 0));
 }
 export function equippedGameTitle(user, config, gameIds) {
   if (user?.profile?.titleHidden || !gameIds.length) return null;

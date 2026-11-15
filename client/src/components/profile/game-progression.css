@@ -26,6 +26,7 @@
 .xp-game-list progress::-moz-progress-bar { background: #d5b35f; border-radius: 3px; }
 .xp-settings { min-width: 0; display: grid; gap: 22px; }
 .xp-settings .settings-field-grid { margin-top: 20px; }
+.xp-settings .xp-participant-help { margin: 10px 0 0; font-size: 12px; line-height: 1.5; }
 .xp-settings textarea { width: 100%; min-height: 100px; resize: vertical; font-family: monospace; }
 .xp-chart-controls { display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; }
 .xp-curve { max-width: 100%; overflow-x: auto; }

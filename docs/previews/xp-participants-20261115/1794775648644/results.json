@@ -1,0 +1,48 @@
+{
+  "ok": true,
+  "output": "D:\\dev\\dicegame\\docs\\previews\\xp-participants-20261115\\1794775648644",
+  "blocker": true,
+  "common": {
+    "completionParticipantXp": 12,
+    "victoryParticipantXp": 7
+  },
+  "yahtzee": {
+    "completionParticipantXp": 3,
+    "victoryParticipantXp": 0,
+    "titles": [
+      {
+        "level": 1,
+        "label": "Lanceur"
+      },
+      {
+        "level": 5,
+        "label": "Paire"
+      },
+      {
+        "level": 10,
+        "label": "Brelan"
+      },
+      {
+        "level": 20,
+        "label": "Carré"
+      },
+      {
+        "level": 40,
+        "label": "Full"
+      },
+      {
+        "level": 60,
+        "label": "Petite Suite"
+      },
+      {
+        "level": 80,
+        "label": "Grande Suite"
+      },
+      {
+        "level": 100,
+        "label": "Yahtzee"
+      }
+    ]
+  },
+  "errors": []
+}

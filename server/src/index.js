@@ -88,7 +88,7 @@ import { normalizeCosmeticCss, normalizeCosmeticDesign, normalizeCosmeticMotion 
 import { friendRoomPresence } from "./services/friend-presence.js";
 import { createOnlinePresence } from "./services/online-presence.js";
 import { roomCredentialsError } from "./services/room-credentials.js";
-import { MAX_XP, awardGameXp, equippedGameTitle, gameProgress, gameXpRules, grantAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "./services/game-progression.js";
+import { MAX_XP, awardGameXp, equippedGameTitle, gameProgress, gameCompletionXp, gameXpParticipantCount, grantAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "./services/game-progression.js";
 import { buildLeaderboard as calculateLeaderboard } from "./services/leaderboards.js";
 import {
   appendEventPotEntry,
@@ -2338,14 +2338,15 @@ function finishRoomIfNeeded(room, db, { ranking } = {}) {
   syncRoomPlayerTokens(room, db);
   const historyPlayers=room.ranked ? room.ranked.roster.map((p)=>room.players.find((player)=>player.id===p.id) ?? {id:p.id,pseudo:db.users.find((u)=>u.id===p.id)?.pseudo ?? p.pseudo ?? "Joueur",isBot:Boolean(p.isBot)}) : room.players;
   const historyRow = { id: randomUUID(), roomId: room.id, code: room.code, name: room.name, gameId: room.gameId, players: historyPlayers.map((p) => ({ id: p.id, pseudo: p.pseudo, isBot: p.isBot })), winners, ranking: room.state.ranking, payouts: roomPayouts, blackjackPayouts: room.state.gameId === "blackjack" ? room.state.payouts ?? {} : {}, pot, achievementEvents, finishedAt: new Date().toISOString() };
+  historyRow.xpParticipantCount = gameXpParticipantCount(room);
   if (room.gameId === "belote") historyRow.leaderboardScores = Object.fromEntries(room.state.players.map((player, index) => [player.id, room.state.teamScores[index % 2]]));
   db.history.push(historyRow);
   settleRanked(room, db.users, historyRow);
   for (const player of room.players.filter((p) => !p.isBot && !room.ranked?.forfeits?.[p.id])) {
     const user = db.users.find((u) => u.id === player.id);
-    const config = progressionConfig(db), xpRules = gameXpRules(config, room.gameId);
+    const config = progressionConfig(db);
     const previousProgress = previousProgressByUser.get(player.id);
-    const amount = xpRules.completionXp + (winners.includes(player.id) ? xpRules.victoryXp : 0);
+    const amount = gameCompletionXp(config, room.gameId, historyRow.xpParticipantCount, winners.includes(player.id));
     const xp = awardGameXp(user, room.gameId, amount, config);
     if (xp) {
       (historyRow.xpAwards ??= {})[player.id] = xp.amount;

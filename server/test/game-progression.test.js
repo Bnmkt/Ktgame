@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { awardGameXp, compileXpFormula, DEFAULT_XP_FORMULA, equippedGameTitle, gameProgress, gameXpRules, grantAchievementRewards, normalizeAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "../src/services/game-progression.js";
+import { awardGameXp, compileXpFormula, DEFAULT_XP_FORMULA, equippedGameTitle, gameProgress, gameXpRules, gameCompletionXp, gameXpParticipantCount, grantAchievementRewards, normalizeAchievementRewards, normalizeProgressionConfig, progressionCurve, roomLevelError, roomLevelLimits, unlockedGameTitles } from "../src/services/game-progression.js";
 import { DEFAULT_GAME_TITLES } from "../src/services/game-titles.js";
 import { games } from "../src/games/shared.js";
 import { achievementRuleSchemas, consumeAchievementEvent, normalizeAchievementDefinition } from "../src/services/achievement-rules.js";
@@ -90,9 +90,41 @@ test("a chosen lower-tier title stays equipped after leveling and invalid or rem
 
 test("per-game titles do not freeze inherited XP amounts", () => {
   const config = normalizeProgressionConfig({ completionXp: 20, victoryXp: 25 }, ["yahtzee", "blackjack"]);
-  assert.deepEqual(gameXpRules(config, "yahtzee"), { completionXp: 20, victoryXp: 25 });
+  assert.deepEqual(gameXpRules(config, "yahtzee"), { completionXp: 20, victoryXp: 25, completionParticipantXp: 10, victoryParticipantXp: 5 });
   const changed = normalizeProgressionConfig({ ...config, completionXp: 80 }, ["yahtzee", "blackjack"]);
-  assert.deepEqual(gameXpRules(changed, "yahtzee"), { completionXp: 80, victoryXp: 25 });
+  assert.deepEqual(gameXpRules(changed, "yahtzee"), { completionXp: 80, victoryXp: 25, completionParticipantXp: 10, victoryParticipantXp: 5 });
   const overridden = normalizeProgressionConfig({ ...changed, games: { ...changed.games, yahtzee: { ...changed.games.yahtzee, victoryXp: 100 } } }, ["yahtzee"]);
-  assert.deepEqual(gameXpRules(overridden, "yahtzee"), { completionXp: 80, victoryXp: 100 });
+  assert.deepEqual(gameXpRules(overridden, "yahtzee"), { completionXp: 80, victoryXp: 100, completionParticipantXp: 10, victoryParticipantXp: 5 });
+});
+
+test("participant XP matches the requested one, two and three-player win and loss examples", () => {
+  const config = normalizeProgressionConfig({ completionXp: 20, victoryXp: 25 });
+  for (const [participants, loss, win] of [[1, 20, 45], [2, 30, 60], [3, 40, 75], [8, 90, 150]]) {
+    assert.equal(gameCompletionXp(config, "dice", participants, false), loss);
+    assert.equal(gameCompletionXp(config, "dice", participants, true), win);
+  }
+});
+
+test("both coefficients inherit, override per game, accept zero and validate independently", () => {
+  const config = normalizeProgressionConfig({ completionXp: 20, victoryXp: 25, games: { dice: { completionParticipantXp: 0 } } }, ["dice", "cards"]);
+  assert.equal(gameCompletionXp(config, "dice", 3, true), 55);
+  const changed = normalizeProgressionConfig({ ...config, completionParticipantXp: 12, victoryParticipantXp: 7 }, ["dice", "cards"]);
+  assert.equal(gameCompletionXp(changed, "dice", 3, true), 59);
+  assert.equal(gameCompletionXp(changed, "cards", 3, true), 83);
+  const disabled = normalizeProgressionConfig({ ...config, completionParticipantXp: 0, victoryParticipantXp: 0 }, ["dice"]);
+  assert.equal(gameCompletionXp(disabled, "dice", 8, true), 45);
+  for (const key of ["completionParticipantXp", "victoryParticipantXp"]) for (const invalid of [-1, .5, 1000001, Infinity]) {
+    assert.throws(() => normalizeProgressionConfig({ [key]: invalid }));
+    assert.throws(() => normalizeProgressionConfig({ games: { dice: { [key]: invalid } } }, ["dice"]));
+  }
+});
+
+test("participant count includes bots, guests and departed starting seats once, excluding spectators", () => {
+  const room = { players: [{ id: "human" }, { id: "bot", isBot: true }, { id: "guest", guest: true }], state: { xpParticipantIds: ["human", "bot", "guest", "departed"], players: [{ id: "human" }] }, ranked: { roster: [{ id: "human" }, { id: "bot" }] }, spectators: [{ id: "viewer" }] };
+  assert.equal(gameXpParticipantCount(room), 4);
+  room.players = [{ id: "human" }];
+  assert.equal(gameXpParticipantCount(room), 4, "departures never shrink the recorded starting table");
+  assert.equal(gameXpParticipantCount({ state: { players: [{ id: "human" }, { id: "bot", isBot: true }, { id: "guest", guest: true }] } }), 3, "older matches use the known roster");
+  assert.equal(awardGameXp({ guest: true }, "dice", 60, normalizeProgressionConfig()), null);
+  assert.equal(awardGameXp({ isBot: true }, "dice", 60, normalizeProgressionConfig()), null);
 });

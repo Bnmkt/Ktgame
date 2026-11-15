@@ -240,6 +240,67 @@ test("profile, equipment and shop changes never write a worker-owned room direct
   } finally { assert.equal((await request("player", `/api/rooms/${code}`, "DELETE")).status, 200); }
 });
 
+test("participant XP is settled once through Game Workers and counts bots and guest players", async () => {
+  const original = (await request("admin", "/api/admin")).data.settings;
+  const progression = { ...original.gameProgression, completionXp: 20, victoryXp: 25, games: {} };
+  delete progression.completionParticipantXp; delete progression.victoryParticipantXp;
+  let code;
+  try {
+    assert.equal((await request("editor", "/api/admin/settings", "PATCH", { gameProgression: progression })).status, 403);
+    for (const field of ["completionParticipantXp", "victoryParticipantXp"]) assert.equal((await request("admin", "/api/admin/settings", "PATCH", { gameProgression: { ...progression, [field]: -1 } })).status, 400);
+    const saved = await request("admin", "/api/admin/settings", "PATCH", { guestAccessEnabled: true, gameProgression: progression, botThinkingSeconds: 0, turnEndDelaySeconds: 1, roundResultsSeconds: 0 });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.data.gameProgression.completionParticipantXp, 10);
+    assert.equal(saved.data.gameProgression.victoryParticipantXp, 5);
+    const signedIn = await request(null, "/api/auth/guest", "POST", { pseudo: "XP guest" });
+    const guestId = signedIn.data.user.id;
+    const guestRequest = async (route, method = "GET", body) => {
+      const response = await fetch(url + route, { method, headers: { Authorization: `Bearer ${signedIn.data.token}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      return { status: response.status, data: await response.json() };
+    };
+    const created = await request("admin", "/api/rooms", "POST", { gameId: "421", name: "XP participants", stake: 10 });
+    assert.equal(created.status, 200, JSON.stringify(created.data)); code = created.data.code;
+    assert.equal((await request("editor", `/api/rooms/${code}/join`, "POST", {})).status, 200);
+    assert.equal((await guestRequest(`/api/rooms/${code}/join`, "POST", {})).status, 200);
+    assert.equal((await request("admin", `/api/rooms/${code}/bot`, "POST", {})).status, 200);
+    assert.equal((await request("editor", `/api/rooms/${code}/ready`, "POST", {})).status, 200);
+    assert.equal((await guestRequest(`/api/rooms/${code}/ready`, "POST", {})).status, 200);
+    assert.equal((await request("admin", `/api/rooms/${code}/game-settings`, "POST", { rounds: 1, rollsPerTurn: 1 })).status, 200);
+    const started = await request("admin", `/api/rooms/${code}/start`, "POST", {});
+    assert.equal(started.status, 200, JSON.stringify(started.data));
+    let room = started.data;
+    assert.equal(room.state.xpParticipantIds.length, 4);
+    const deadline = Date.now() + 30000;
+    while (!room.finished && Date.now() < deadline) {
+      if (room.pacing) {
+        const skipped = await request("admin", `/api/rooms/${code}/pacing/skip`, "POST", { pacingId: room.pacing.id });
+        assert.equal(skipped.status, 200, JSON.stringify(skipped.data)); room = skipped.data; continue;
+      }
+      const actor = room.state.players[room.state.currentPlayerIndex];
+      if (actor.isBot) { await new Promise(resolve => setTimeout(resolve, 60)); room = (await request("admin", `/api/rooms/${code}`)).data; continue; }
+      const action = { type: room.state.dice.length ? "bank" : "roll" };
+      const result = actor.id === guestId ? await guestRequest(`/api/rooms/${code}/action`, "POST", action) : await request(actor.id, `/api/rooms/${code}/action`, "POST", action);
+      if (result.status === 409 && result.data.error === "L'IA prépare encore son coup.") { await new Promise(resolve => setTimeout(resolve, 60)); room = (await request("admin", `/api/rooms/${code}`)).data; continue; }
+      assert.equal(result.status, 200, JSON.stringify(result.data)); room = result.data;
+    }
+    assert.equal(room.finished, true);
+    const db = new DatabaseSync(path.join(directory, "main.sqlite"), { readOnly: true });
+    let history;
+    try { history = JSON.parse(db.prepare("SELECT data FROM history WHERE json_extract(data,'$.roomId')=?").get(room.id).data); }
+    finally { db.close(); }
+    assert.equal(history.xpParticipantCount, 4);
+    for (const id of ["admin", "editor"]) assert.equal(history.xpAwards[id], history.winners.includes(id) ? 90 : 50);
+    assert.equal(history.xpAwards[guestId], undefined);
+    assert.equal(Object.keys(history.xpAwards).length, 2);
+    const before = (await request("admin", "/api/me")).data.gameProgression.find(row => row.gameId === "421").xp;
+    for (let i = 0; i < 3; i++) await request("admin", `/api/rooms/${code}`);
+    assert.equal((await request("admin", "/api/me")).data.gameProgression.find(row => row.gameId === "421").xp, before);
+  } finally {
+    if (code) await request("admin", `/api/admin/rooms/${code}`, "DELETE");
+    await request("admin", "/api/admin/settings", "PATCH", { guestAccessEnabled: original.guestAccessEnabled, gameProgression: original.gameProgression, botThinkingSeconds: original.botThinkingSeconds, turnEndDelaySeconds: original.turnEndDelaySeconds, roundResultsSeconds: original.roundResultsSeconds });
+  }
+});
+
 test("guest play cannot transfer its virtual balance into a registered account", async () => {
   const settings = (await request("admin", "/api/config")).data;
   await request("admin", "/api/admin/settings", "PATCH", { guestAccessEnabled: true });

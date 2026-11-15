@@ -58,6 +58,7 @@ test("all existing games can start in the same isolated runtime", async () => {
     const { result } = await f.command("POST /api/rooms/:code/start");
     assert.equal(result.status, 200, `${game.id}: ${JSON.stringify(result.response)}`);
     assert.equal(result.room.state.gameId, game.id);
+    assert.deepEqual(result.room.state.xpParticipantIds, result.room.state.players.map(player => player.id), `${game.id}: starting seats persisted for XP`);
     assert.ok(result.effects.some((effect) => effect.kind === "tokens"));
   }
 });

@@ -65,6 +65,19 @@ test("a write failure rolls back both XP balances and per-game receipts", () => 
   } finally { sqlite.close(); }
 });
 
+test("uncredited historical games include bots and guests, preserve recorded participant counts and stay idempotent", () => {
+  const { sqlite, add } = fixture();
+  try {
+    add("three-seats", "yahtzee", true, { players: [{ id: "bob" }, { id: "bot", isBot: true }, { id: "guest", guest: true }] }, { userId: "bob" });
+    add("departed-seat", "yahtzee", false, { players: [{ id: "bob" }], xpParticipantCount: 3 }, { userId: "bob" });
+    const result = backfillHistoricalGameXp(sqlite, "bob", config, ["yahtzee"], { apply: true });
+    assert.equal(JSON.parse(sqlite.prepare("SELECT data FROM history WHERE id='three-seats'").get().data).xpAwards.bob, 75);
+    assert.equal(JSON.parse(sqlite.prepare("SELECT data FROM history WHERE id='departed-seat'").get().data).xpAwards.bob, 40);
+    assert.equal(backfillHistoricalGameXp(sqlite, "bob", config, ["yahtzee"], { apply: true }).addedXp, 0);
+    assert.ok(result.addedXp >= 115);
+  } finally { sqlite.close(); }
+});
+
 test("XP ceilings and zero rewards record the actual amount without allowing a later duplicate", () => {
   const { sqlite } = fixture();
   try {
